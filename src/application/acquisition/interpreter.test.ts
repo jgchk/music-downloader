@@ -1,0 +1,230 @@
+import { errAsync, okAsync } from 'neverthrow';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { interpretEffect } from './interpreter.js';
+import type { EffectPorts, InterpreterDeps } from './interpreter.js';
+import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
+import { infraError } from '../ports/errors.js';
+import { DEFAULT_DOWNLOAD_POLICY } from '../../domain/policy/policies.js';
+import type { DownloadProgress } from '../ports/outbound-ports.js';
+import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import {
+  importingHistory,
+  matchingCandidate,
+  requestedHistory,
+  resolvedHistory,
+  sampleFiles,
+  sampleRequest,
+  sampleTarget,
+  selectedHistory,
+  validatingHistory,
+} from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+
+function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
+  return {
+    metadata: { resolve: vi.fn() },
+    search: { search: vi.fn() },
+    download: { download: vi.fn() },
+    probe: { probe: vi.fn() },
+    library: { import: vi.fn(), discardStaging: vi.fn() },
+    ...overrides,
+  };
+}
+
+let store: FakeEventStore;
+const onProgress = vi.fn();
+
+function deps(ports: EffectPorts): InterpreterDeps {
+  return { store, clock: fixedClock(), ports, onProgress };
+}
+
+async function seed(history: readonly AcquisitionEvent[]): Promise<void> {
+  await store.append('acq-1', 0, history, { acquisitionId: 'acq-1', occurredAt: 't' });
+}
+
+function appendedTypes(): string[] {
+  return store.all().map((entry) => entry.type);
+}
+
+beforeEach(() => {
+  store = new FakeEventStore();
+  onProgress.mockClear();
+});
+
+describe('interpretEffect — metadata resolution', () => {
+  it('records the resolved target', async () => {
+    await seed(requestedHistory());
+    const ports = stubPorts({
+      metadata: {
+        resolve: vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget })),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'ResolveMetadata',
+      request: sampleRequest,
+    });
+    expect(appendedTypes()).toContain('TargetResolved');
+  });
+
+  it('records a metadata resolution failure', async () => {
+    await seed(requestedHistory());
+    const ports = stubPorts({
+      metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'ResolveMetadata',
+      request: { kind: 'musicbrainz', mbid: 'x', targetType: 'album' },
+    });
+    expect(appendedTypes()).toContain('MetadataResolutionFailed');
+  });
+
+  it('propagates an infrastructure fault without appending', async () => {
+    await seed(requestedHistory());
+    const ports = stubPorts({
+      metadata: { resolve: vi.fn(() => errAsync(infraError('mb', 'down'))) },
+    });
+    const result = await interpretEffect(deps(ports), 'acq-1', {
+      type: 'ResolveMetadata',
+      request: { kind: 'musicbrainz', mbid: 'x', targetType: 'album' },
+    });
+    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+  });
+});
+
+describe('interpretEffect — search', () => {
+  it('records and ranks search results', async () => {
+    await seed(resolvedHistory());
+    const ports = stubPorts({
+      search: { search: vi.fn(() => okAsync([matchingCandidate('a')])) },
+    });
+    await interpretEffect(deps(ports), 'acq-1', { type: 'Search', target: sampleTarget, round: 1 });
+    expect(appendedTypes()).toEqual(
+      expect.arrayContaining(['SearchCompleted', 'CandidatesRanked', 'CandidateSelected']),
+    );
+  });
+});
+
+describe('interpretEffect — download', () => {
+  it('reports progress and records a completed download', async () => {
+    await seed(selectedHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      download: {
+        download: vi.fn((_c, _p, cb: (progress: DownloadProgress) => void) => {
+          cb({ percent: 50, bytesTransferred: 5, bytesTotal: 10 });
+          return okAsync({ kind: 'completed' as const, files: sampleFiles });
+        }),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Download',
+      candidate: matchingCandidate('a'),
+      policy: DEFAULT_DOWNLOAD_POLICY,
+    });
+    expect(appendedTypes()).toContain('DownloadCompleted');
+    expect(onProgress).toHaveBeenCalledOnce();
+  });
+
+  it('records a failed download', async () => {
+    await seed(selectedHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      download: {
+        download: vi.fn(() =>
+          okAsync({ kind: 'failed' as const, reason: 'PeerUnavailable' as const }),
+        ),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Download',
+      candidate: matchingCandidate('a'),
+      policy: DEFAULT_DOWNLOAD_POLICY,
+    });
+    expect(appendedTypes()).toContain('DownloadFailed');
+  });
+});
+
+describe('interpretEffect — validation', () => {
+  it('records a passing validation', async () => {
+    await seed(validatingHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      probe: {
+        probe: vi.fn((path: string) =>
+          okAsync({
+            decodedCleanly: true,
+            codec: 'flac',
+            durationMs: path.includes('01') ? 251000 : 264000,
+          }),
+        ),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Validate',
+      files: sampleFiles,
+      target: sampleTarget,
+      matchPolicy: { threshold: 0.5 },
+    });
+    expect(appendedTypes()).toContain('ValidationPassed');
+  });
+
+  it('records a failing validation', async () => {
+    await seed(validatingHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      probe: {
+        probe: vi.fn(() => okAsync({ decodedCleanly: false, codec: 'flac', durationMs: 0 })),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Validate',
+      files: sampleFiles,
+      target: sampleTarget,
+      matchPolicy: { threshold: 0.9 },
+    });
+    expect(appendedTypes()).toContain('ValidationFailed');
+  });
+});
+
+describe('interpretEffect — import and cleanup', () => {
+  it('records a successful import and fulfilment', async () => {
+    await seed(importingHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      library: {
+        import: vi.fn(() => okAsync({ kind: 'imported' as const, location: '/lib/x' })),
+        discardStaging: vi.fn(),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Import',
+      files: sampleFiles,
+      target: sampleTarget,
+    });
+    expect(appendedTypes()).toEqual(expect.arrayContaining(['Imported', 'AcquisitionFulfilled']));
+  });
+
+  it('records an import conflict', async () => {
+    await seed(importingHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      library: {
+        import: vi.fn(() => okAsync({ kind: 'conflict' as const, location: '/lib/x' })),
+        discardStaging: vi.fn(),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Import',
+      files: sampleFiles,
+      target: sampleTarget,
+    });
+    expect(appendedTypes()).toContain('ImportConflicted');
+  });
+
+  it('discards staging on cleanup without appending events', async () => {
+    await seed(selectedHistory([matchingCandidate('a')]));
+    const discardStaging = vi.fn(() => okAsync(undefined));
+    const ports = stubPorts({
+      library: { import: vi.fn(), discardStaging },
+    });
+    const result = await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Cleanup',
+      candidate: matchingCandidate('a').identity,
+    });
+    expect(result._unsafeUnwrap()).toEqual([]);
+    expect(discardStaging).toHaveBeenCalledOnce();
+  });
+});

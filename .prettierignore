@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+
+# Managed separately (OpenSpec artifacts, the development constitution, tooling config).
+.claude/
+docs/
+openspec/
