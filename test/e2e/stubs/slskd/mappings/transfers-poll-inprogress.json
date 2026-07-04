@@ -1,0 +1,28 @@
+{
+  "scenarioName": "transfer",
+  "requiredScenarioState": "Started",
+  "newScenarioState": "Completed",
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v0/transfers/downloads/peer1",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": [
+      {
+        "directory": "@@music\\Test Artist\\Test Album",
+        "files": [
+          {
+            "id": "transfer-1",
+            "filename": "@@music\\Test Artist\\Test Album\\01 Track One.flac",
+            "state": "InProgress, Transferring",
+            "size": 1234567,
+            "bytesTransferred": 617283
+          }
+        ]
+      }
+    ]
+  }
+}

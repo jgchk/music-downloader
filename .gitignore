@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.e2e-tmp/
 *.log
 *.sqlite
 *.sqlite-*

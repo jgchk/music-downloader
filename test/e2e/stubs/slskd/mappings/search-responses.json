@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v0/searches/search-1/responses",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": [
+      {
+        "username": "peer1",
+        "hasFreeUploadSlot": true,
+        "uploadSpeed": 5000000,
+        "queueLength": 0,
+        "files": [
+          {
+            "filename": "@@music\\Test Artist\\Test Album\\01 Track One.flac",
+            "size": 1234567,
+            "bitRate": 900,
+            "sampleRate": 44100,
+            "bitDepth": 16,
+            "length": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/release/release-1",
+    "queryParameters": { "fmt": { "equalTo": "json" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "release-1",
+      "title": "Test Album",
+      "date": "2020-05-01",
+      "artist-credit": [{ "name": "Test Artist" }],
+      "media": [{ "tracks": [{ "position": 1, "title": "Track One", "length": 10000 }] }]
+    }
+  }
+}

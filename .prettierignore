@@ -1,9 +1,13 @@
 node_modules/
 dist/
 coverage/
+.e2e-tmp/
 pnpm-lock.yaml
 
 # Managed separately (OpenSpec artifacts, the development constitution, tooling config).
 .claude/
 docs/
 openspec/
+
+# Managed by semantic-release (its own changelog format, not Prettier's).
+CHANGELOG.md

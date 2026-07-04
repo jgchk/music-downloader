@@ -27,7 +27,18 @@ const layerBoundaryZones = [
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '*.config.ts', '*.config.js'],
+    // test/e2e is an out-of-process, Docker-driven black-box suite verified by execution, not part
+    // of the src-scoped TypeScript project (tsconfig `include: ["src"]`); keep it out of the
+    // type-checked lint to avoid projectService "file not in project" errors.
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      '.e2e-tmp/**',
+      'test/e2e/**',
+      '*.config.ts',
+      '*.config.js',
+    ],
   },
   {
     files: ['**/*.ts'],

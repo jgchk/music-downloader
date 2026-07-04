@@ -36,7 +36,8 @@ jobs:
           -p @semantic-release/git
           semantic-release
 
-  # Build the ffmpeg-baked image and push it to GHCR on every merge to main.
+  # Build the ffmpeg-baked image, gate it through the out-of-process E2E tier, then push to GHCR.
+  # Publishing is conditional on the tier passing (change: add-out-of-process-e2e).
   image:
     needs: release
     runs-on: ubuntu-latest
@@ -58,7 +59,36 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha
-      - uses: docker/build-push-action@v6
+
+      # Build once, load locally as `music-downloader:e2e`, cache to gha so the publish step below
+      # reuses the exact same layers (no rebuild).
+      - name: Build image (load, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: music-downloader:e2e
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Node/pnpm to run the host-side suite that drives the container over HTTP.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # THE GATE: stand up the freshly built image + WireMock stubs, drive it end to end over a real
+      # socket, tear down. A failure here fails the job and blocks the publish step below.
+      - name: Out-of-process E2E gate
+        env:
+          E2E_SKIP_BUILD: '1'
+        run: pnpm test:e2e
+
+      # Publish only after the gate is green — reuses the gha cache, so this is a fast no-rebuild push.
+      - name: Publish image
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true

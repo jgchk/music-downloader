@@ -1,0 +1,50 @@
+# Out-of-process E2E harness (change: add-out-of-process-e2e).
+#
+# Runs the REAL built image over a real HTTP socket, with the reactor and on-disk SQLite live,
+# and only the two outermost third parties (slskd + MusicBrainz) replaced by WireMock stubs on
+# the compose network. The E2E suite runs on the host (see `pnpm test:e2e`), driving `app` over
+# localhost:3000 and seeding the audio fixture into the shared ./.e2e-tmp staging volume.
+services:
+  mb-stub:
+    image: wiremock/wiremock:3.9.2
+    command: ['--disable-banner']
+    volumes:
+      - ./test/e2e/stubs/musicbrainz:/home/wiremock
+    ports:
+      - '8081:8080'
+
+  slskd-stub:
+    image: wiremock/wiremock:3.9.2
+    command: ['--disable-banner']
+    volumes:
+      - ./test/e2e/stubs/slskd:/home/wiremock
+    ports:
+      - '8082:8080'
+
+  app:
+    build: .
+    image: music-downloader:e2e
+    # Run as the host user that creates ./.e2e-tmp so the container can read the seeded fixture and
+    # write/clean the shared staging + library dirs (uids differ on CI runners). Defaults to the
+    # image's `node` user (1000) for local dev.
+    user: '${E2E_UID:-1000}:${E2E_GID:-1000}'
+    depends_on:
+      - mb-stub
+      - slskd-stub
+    environment:
+      HTTP_PORT: '3000'
+      HTTP_HOST: '0.0.0.0'
+      LIBRARY_ROOT: /data/library
+      STAGING_ROOT: /data/staging
+      DATABASE_FILE: /data/events.db
+      LOG_LEVEL: info
+      MUSICBRAINZ_BASE_URL: http://mb-stub:8080
+      MUSICBRAINZ_USER_AGENT: music-downloader-e2e/0.0 (https://example.test)
+      SLSKD_BASE_URL: http://slskd-stub:8080
+      SLSKD_API_KEY: test-key
+    ports:
+      - '3000:3000'
+    volumes:
+      # Shared with the host test runner: it seeds the fixture under staging/ and can inspect the
+      # on-disk SQLite file and the imported library here.
+      - ./.e2e-tmp:/data
