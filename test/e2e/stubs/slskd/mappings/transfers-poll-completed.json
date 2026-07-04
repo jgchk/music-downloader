@@ -16,7 +16,7 @@
           {
             "id": "transfer-1",
             "filename": "@@music\\Test Artist\\Test Album\\01 Track One.flac",
-            "state": "Completed, Errored",
+            "state": "Completed, Succeeded",
             "size": 1234567,
             "bytesTransferred": 1234567
           }
