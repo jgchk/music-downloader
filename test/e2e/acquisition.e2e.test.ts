@@ -37,7 +37,8 @@ async function waitForOk(url: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      const res = await fetch(url);
+      // Bound each attempt: a port that is open but not yet answering must not hang the poll.
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (res.ok) return;
     } catch {
       // not up yet
@@ -55,7 +56,9 @@ interface StatusView {
 async function pollUntilTerminal(id: string, timeoutMs = 60_000): Promise<StatusView> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const res = await fetch(`${BASE_URL}/api/v1/acquisitions/${id}`);
+    const res = await fetch(`${BASE_URL}/api/v1/acquisitions/${id}`, {
+      signal: AbortSignal.timeout(2000),
+    });
     if (res.ok) {
       const view = (await res.json()) as StatusView;
       if (
