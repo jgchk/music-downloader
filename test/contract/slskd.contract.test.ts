@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
+import { FakeResourceLedger, silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { SlskdClient } from '../../src/adapters/slskd/client.js';
 import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
@@ -63,9 +63,9 @@ describe('slskd contract (tier 1)', () => {
       title: 'The Dark Side of the Moon',
       tracks: [{ position: 1, title: 'Time', durationMs: 1000 }],
     })._unsafeUnwrap();
-    const search = new SlskdSearch(silentLogger(), client(), fakeTimer());
+    const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
 
-    const candidates = (await search.search(target, 1))._unsafeUnwrap();
+    const candidates = (await search.search('acq-contract', target, 1))._unsafeUnwrap();
 
     expect(candidates.length).toBeGreaterThan(0);
     expect(candidates[0]?.files.length).toBeGreaterThan(0);
@@ -102,12 +102,15 @@ describe('slskd contract (tier 1)', () => {
     const policy: DownloadPolicy = { stallTimeoutMs: 100_000, maxQueueWaitMs: 0 };
     const download = new SlskdDownload(
       silentLogger(),
+      new FakeResourceLedger(),
       { stagingRoot: '/tmp/contract-staging' },
       client(),
       fakeTimer(),
     );
 
-    const result = (await download.download(candidate, policy, () => undefined))._unsafeUnwrap();
+    const result = (
+      await download.download('acq-contract', candidate, policy, () => undefined)
+    )._unsafeUnwrap();
 
     const downloadsPath = `/api/v0/transfers/downloads/${body.username}`;
     const enqueue = server.requests.find((r) => r.method === 'POST' && r.path === downloadsPath)!;

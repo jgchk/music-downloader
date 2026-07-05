@@ -79,15 +79,16 @@ function wire(opts: E2eOptions) {
 
   const ports: EffectPorts = {
     metadata: { resolve: () => okAsync({ kind: 'resolved', target: sampleTarget }) },
-    search: { search: (_target, round) => okAsync(opts.searchByRound(round)) },
+    search: { search: (_acquisitionId, _target, round) => okAsync(opts.searchByRound(round)) },
     download: {
-      download: (candidate, _policy, onProgress) => {
+      download: (_acquisitionId, candidate, _policy, onProgress) => {
         const result = opts.downloadByUser[candidate.identity.username] ?? FAILED;
         if (result.kind === 'completed') {
           onProgress({ percent: 100, bytesTransferred: 1, bytesTotal: 1 });
         }
         return okAsync(result);
       },
+      abort: () => okAsync(undefined),
     },
     probe: { probe: (path) => okAsync(PROBES[path]!) },
     library: { import: () => okAsync(opts.importResult), discardStaging },

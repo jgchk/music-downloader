@@ -3,8 +3,9 @@ import Database from 'better-sqlite3';
 /**
  * The single SQLite database behind `EventStorePort` (D7): an append-only `events` table whose
  * `global_seq` gives the total order that drives projections and the reactor, plus a `checkpoints`
- * table for the durable reactor (D8). `UNIQUE(stream_id, version)` is the optimistic-concurrency
- * guard; WAL mode lets readers (projections) run concurrently with the single writer.
+ * table for the durable reactor (D8) and a `source_resources` ownership ledger for source-resource
+ * stewardship. `UNIQUE(stream_id, version)` is the optimistic-concurrency guard; WAL mode lets
+ * readers (projections) run concurrently with the single writer.
  */
 export type EventDatabase = Database.Database;
 
@@ -23,6 +24,17 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS checkpoints (
   consumer   TEXT    PRIMARY KEY,
   global_seq INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS source_resources (
+  source         TEXT NOT NULL,
+  kind           TEXT NOT NULL,
+  resource_key   TEXT NOT NULL,
+  resource_id    TEXT,
+  acquisition_id TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  removed_at     TEXT,
+  PRIMARY KEY (source, kind, resource_key, acquisition_id)
 );
 `;
 

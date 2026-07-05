@@ -39,8 +39,14 @@ const conflictedHistory: AcquisitionEvent[] = [
   ...importingHistory([a]),
   { type: 'ImportConflicted', location: '/library/x' },
 ];
+// Cancelled mid-download: the folded Cancelled state retains `a` as `pending` (abort-then-settle).
 const cancelledHistory: AcquisitionEvent[] = [
   ...selectedHistory([a]),
+  { type: 'AcquisitionCancelled' },
+];
+// Cancelled with no candidate in flight — a plainly terminal state with nothing left to settle.
+const cancelledNoPending: AcquisitionEvent[] = [
+  ...resolvedHistory(),
   { type: 'AcquisitionCancelled' },
 ];
 const metadataFailedHistory: AcquisitionEvent[] = [
@@ -222,7 +228,7 @@ describe('Acquisition.execute — cancellation and guards', () => {
     ).toEqual(['AcquisitionCancelled']);
   });
 
-  const terminal = Acquisition.fromHistory(cancelledHistory);
+  const terminal = Acquisition.fromHistory(cancelledNoPending);
 
   const effectResults: AcquisitionCommand[] = [
     { type: 'RecordTarget', target: sampleTarget },
@@ -264,6 +270,33 @@ describe('Acquisition.execute — cancellation and guards', () => {
     expect(downloading.execute({ type: 'RecordMetadataFailed' })._unsafeUnwrapErr().kind).toBe(
       'IllegalTransition',
     );
+  });
+
+  it('rejects the pending candidate when a cancelled download settles (completed)', () => {
+    const events = Acquisition.fromHistory(cancelledHistory)
+      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['CandidateRejected']);
+    const rejected = events[0] as Extract<AcquisitionEvent, { type: 'CandidateRejected' }>;
+    expect(rejected.candidate).toEqual(a.identity);
+  });
+
+  it('rejects the pending candidate when a cancelled download settles (failed)', () => {
+    const events = Acquisition.fromHistory(cancelledHistory)
+      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled' })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['CandidateRejected']);
+  });
+
+  it('ignores a duplicate settlement once the pending candidate has been rejected', () => {
+    const settled = Acquisition.fromHistory([
+      ...cancelledHistory,
+      { type: 'CandidateRejected', candidate: a.identity },
+    ]);
+    expect(settled.phase).toBe('Cancelled');
+    expect(
+      settled.execute({ type: 'RecordDownloadFailed', reason: 'Cancelled' })._unsafeUnwrap(),
+    ).toEqual([]);
   });
 });
 
@@ -373,11 +406,29 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
   });
 
-  it('does not clean up staging when cancelling an in-flight download', () => {
-    // cancelledHistory cancels from Downloading, where the transfer may still be writing.
+  it('aborts the transfer instead of cleaning up when cancelling an in-flight download', () => {
+    // cancelledHistory cancels from Downloading: the transfer must first be aborted at the source;
+    // staging cleanup is deferred until the resulting settlement rejects the candidate.
     expect(
       Acquisition.fromHistory(cancelledHistory).reactTo({ type: 'AcquisitionCancelled' }),
+    ).toEqual([{ type: 'AbortDownload', candidate: a }]);
+  });
+
+  it('emits no effect when cancelling with no candidate in flight', () => {
+    // Cancelled from Searching: neither a settled `current` nor a mid-download `pending` is kept.
+    expect(
+      Acquisition.fromHistory(cancelledNoPending).reactTo({ type: 'AcquisitionCancelled' }),
     ).toEqual([]);
+  });
+
+  it('re-reacting a cancellation after the pending candidate settled emits nothing', () => {
+    // Redelivery guard: once the settlement's CandidateRejected clears `pending`, the folded state
+    // no longer carries a candidate, so a replayed AcquisitionCancelled produces no effect.
+    const settled = Acquisition.fromHistory([
+      ...cancelledHistory,
+      { type: 'CandidateRejected', candidate: a.identity },
+    ]);
+    expect(settled.reactTo({ type: 'AcquisitionCancelled' })).toEqual([]);
   });
 
   it('emits no effect when a state-dependent event lands on a mismatched phase', () => {
@@ -396,6 +447,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
       }),
     ).toEqual([]);
     expect(empty.reactTo({ type: 'ImportConflicted', location: '/x' })).toEqual([]);
+    expect(empty.reactTo({ type: 'AcquisitionCancelled' })).toEqual([]);
   });
 });
 

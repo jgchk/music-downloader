@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
@@ -11,6 +11,7 @@ import { SlskdDownload } from './download.js';
 import type { Timer } from './timer.js';
 
 const STAGING = '/staging';
+const ACQ = 'acq-1';
 const candidate: Candidate = {
   identity: { username: 'u1', path: '@@a\\Album', sizeBytes: 200 },
   files: [
@@ -52,17 +53,23 @@ function fakeTimer(): Timer {
 interface Opts {
   enqueue?: HttpResponse;
   polls: HttpResponse[];
+  deleteStatus?: number; // status returned for record-removal DELETEs (default 204)
 }
 
-function downloader(opts: Opts): { adapter: SlskdDownload; deletes: string[] } {
+function downloader(opts: Opts): {
+  adapter: SlskdDownload;
+  deletes: string[];
+  ledger: FakeResourceLedger;
+} {
   const deletes: string[] = [];
+  const ledger = new FakeResourceLedger();
   const queue = [...opts.polls];
   const http: HttpClient = {
     send: ({ method, url }) => {
       if (method === 'POST') return Promise.resolve(opts.enqueue ?? { status: 200, body: '' });
       if (method === 'DELETE') {
         deletes.push(url);
-        return Promise.resolve({ status: 204, body: '' });
+        return Promise.resolve({ status: opts.deleteStatus ?? 204, body: '' });
       }
       const next = queue.length > 1 ? queue.shift() : queue[0];
       return Promise.resolve(next ?? { status: 200, body: '{"directories":[]}' });
@@ -70,11 +77,12 @@ function downloader(opts: Opts): { adapter: SlskdDownload; deletes: string[] } {
   };
   const adapter = new SlskdDownload(
     silentLogger(),
+    ledger,
     { stagingRoot: STAGING, pollIntervalMs: 100 },
     new SlskdClient(http),
     fakeTimer(),
   );
-  return { adapter, deletes };
+  return { adapter, deletes, ledger };
 }
 
 function stagedPath(name: string): string {
@@ -94,7 +102,9 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(1000, 1000), (p) => progress.push(p));
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), (p) =>
+      progress.push(p),
+    );
 
     expect(result._unsafeUnwrap()).toEqual({
       kind: 'completed',
@@ -116,7 +126,7 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
   });
@@ -131,7 +141,7 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'PeerUnavailable' });
   });
@@ -146,7 +156,7 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(50, 100000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(50, 100000), () => undefined);
 
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled' });
     expect(deletes).toHaveLength(2);
@@ -162,7 +172,7 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(100000, 50), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(100000, 50), () => undefined);
 
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout' });
     expect(deletes).toHaveLength(2);
@@ -188,7 +198,7 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(candidate, policy(100000, 100000), (p) =>
+    const result = await adapter.download(ACQ, candidate, policy(100000, 100000), (p) =>
       progress.push(p),
     );
 
@@ -219,11 +229,12 @@ describe('SlskdDownload', () => {
     };
     const adapter = new SlskdDownload(
       silentLogger(),
+      new FakeResourceLedger(),
       { stagingRoot: STAGING },
       new SlskdClient(http),
     );
 
-    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrap().kind).toBe('completed');
   });
@@ -231,7 +242,7 @@ describe('SlskdDownload', () => {
   it('surfaces an enqueue failure as an InfraError', async () => {
     const { adapter } = downloader({ enqueue: { status: 500, body: 'boom' }, polls: [] });
 
-    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -244,11 +255,138 @@ describe('SlskdDownload', () => {
       polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
     });
 
-    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'slskd.download',
+    });
+  });
+
+  it('records transfers write-ahead, captures their ids, and removes records on completion', async () => {
+    const { adapter, deletes, ledger } = downloader({
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+        ]),
+      ],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(ledger.created.map((r) => r.resourceKey)).toEqual([
+      'u1|@@a\\Album\\01.flac',
+      'u1|@@a\\Album\\02.flac',
+    ]);
+    expect(ledger.ids.map((entry) => entry.id)).toEqual(['01.flac', '02.flac']);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
+    ]);
+    expect(ledger.removed).toHaveLength(2);
+  });
+
+  it('dooms the candidate and cancels the remainder the moment one file fails', async () => {
+    const { adapter, deletes, ledger } = downloader({
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
+          transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 30 }),
+        ]),
+      ],
+    });
+
+    // Generous policy timeouts: the failure — not a stall — is what ends the download.
+    const result = await adapter.download(ACQ, candidate, policy(100000, 100000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
+    // Both the failed file and the still-in-flight one are cancelled and removed.
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
+    ]);
+    expect(ledger.removed).toHaveLength(2);
+  });
+
+  it('still completes when removing a settled record fails at the source', async () => {
+    const { adapter, ledger } = downloader({
+      deleteStatus: 500, // the cancel+remove DELETE errors, but the download already succeeded
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+        ]),
+      ],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap().kind).toBe('completed');
+    // The ledger rows are still marked removed; the sweep will retire the leftover source records.
+    expect(ledger.removed).toHaveLength(2);
+  });
+
+  it('completes even when ledger bookkeeping fails, leaving the ledger untouched', async () => {
+    const { adapter, ledger } = downloader({
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+        ]),
+      ],
+    });
+    ledger.fail = true;
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(ledger.created).toEqual([]);
+  });
+
+  describe('abort', () => {
+    it('cancels and removes the candidate’s transfers, tolerating missing ids and filenames', async () => {
+      const { adapter, deletes } = downloader({
+        polls: [
+          poll([
+            transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+            { filename: '@@a\\Album\\02.flac', state: 'Queued, Remotely' }, // ours, but no id
+            { id: 'x', state: 'InProgress' }, // no filename → not one of ours
+            { id: 'other', filename: '@@a\\Other\\99.flac', state: 'InProgress' }, // another dir
+          ]),
+        ],
+      });
+
+      const result = await adapter.abort(ACQ, candidate);
+
+      expect(result._unsafeUnwrap()).toBeUndefined();
+      expect(deletes).toEqual([
+        'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
+        'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=true',
+      ]);
+    });
+
+    it('is a no-op when the candidate has no transfers left', async () => {
+      const { adapter, deletes } = downloader({ polls: [poll([])] });
+
+      const result = await adapter.abort(ACQ, candidate);
+
+      expect(result._unsafeUnwrap()).toBeUndefined();
+      expect(deletes).toEqual([]);
+    });
+
+    it('surfaces a contract-violating poll body as an InfraError', async () => {
+      const { adapter } = downloader({
+        polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
+      });
+
+      const result = await adapter.abort(ACQ, candidate);
+
+      expect(result._unsafeUnwrapErr()).toMatchObject({
+        kind: 'InfraError',
+        operation: 'slskd.abort',
+      });
     });
   });
 });

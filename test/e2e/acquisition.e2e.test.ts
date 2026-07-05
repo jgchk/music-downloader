@@ -16,6 +16,7 @@ import type { CandidateIdentity } from '../../src/domain/candidate/candidate.js'
  */
 
 const BASE_URL = process.env['TARGET_BASE_URL'] ?? 'http://localhost:3000';
+const SLSKD_ADMIN = process.env['SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
 const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e-tmp');
 const STAGING_DIR = join(DATA_DIR, 'staging');
 
@@ -74,6 +75,30 @@ async function pollUntilTerminal(id: string, timeoutMs = 60_000): Promise<Status
   }
 }
 
+async function slskdDeletes(): Promise<string[]> {
+  const res = await fetch(`${SLSKD_ADMIN}/requests`, { signal: AbortSignal.timeout(2000) });
+  const body = (await res.json()) as { requests: { request: { method: string; url: string } }[] };
+  return body.requests
+    .map((entry) => entry.request)
+    .filter((request) => request.method === 'DELETE')
+    .map((request) => request.url);
+}
+
+/** Poll the slskd stub's request journal until `predicate` holds over the recorded DELETEs. */
+async function waitForDeletes(
+  predicate: (deletes: string[]) => boolean,
+  timeoutMs = 15_000,
+): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const deletes = await slskdDeletes();
+    if (predicate(deletes)) return deletes;
+    if (Date.now() >= deadline)
+      throw new Error(`slskd DELETEs never matched: ${deletes.join(', ')}`);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
 describe('out-of-process acquisition E2E (HTTP)', () => {
   beforeAll(async () => {
     // Seed the "downloaded" file where the real download adapter will report it, using the app's
@@ -115,5 +140,21 @@ describe('out-of-process acquisition E2E (HTTP)', () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     expect(existsSync(stagingDir)).toBe(false);
+
+    // Source-resource stewardship: the app deletes the search it created and removes the completed
+    // transfer's record — and issues no DELETE against any resource it does not own.
+    const deletes = await waitForDeletes(
+      (urls) =>
+        urls.some((url) => url === '/api/v0/searches/search-1') &&
+        urls.some((url) => url.startsWith('/api/v0/transfers/downloads/peer1/transfer-1')),
+    );
+    expect(
+      deletes.every(
+        (url) => url.includes('/searches/search-1') || url.includes('/peer1/transfer-1'),
+      ),
+    ).toBe(true);
+    expect(deletes.find((url) => url.includes('/peer1/transfer-1'))?.includes('remove=true')).toBe(
+      true,
+    );
   });
 });

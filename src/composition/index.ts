@@ -7,14 +7,17 @@ import {
   SlskdClient,
   SlskdDownload,
   SlskdSearch,
+  SlskdResourceRemover,
   SqliteCheckpointStore,
   SqliteEventStore,
+  SqliteResourceLedger,
   UpcasterRegistry,
   fetchHttpClient,
   openEventDatabase,
   realTimer,
 } from '../adapters/index.js';
 import { Reactor } from '../application/acquisition/reactor.js';
+import { SourceResourceSweep } from '../application/acquisition/sweep.js';
 import type { InterpreterDeps } from '../application/acquisition/interpreter.js';
 import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
 import { createLogger } from '../application/logging/logger.js';
@@ -55,6 +58,7 @@ async function main(): Promise<void> {
   const bus = new InProcessEventBus();
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
+  const ledger = new SqliteResourceLedger(db, clock);
 
   // --- Projections (rebuilt from the log at startup, then followed live) ------------------------
   const status = new AcquisitionStatusProjection();
@@ -83,9 +87,10 @@ async function main(): Promise<void> {
     userAgent: config.musicbrainz.userAgent,
   });
   const probe = new FfmpegAudioProbe(logger);
-  const search = new SlskdSearch(logger, slskdClient, realTimer);
+  const search = new SlskdSearch(logger, ledger, slskdClient, realTimer);
   const download = new SlskdDownload(
     logger,
+    ledger,
     { stagingRoot: config.stagingRoot },
     slskdClient,
     realTimer,
@@ -94,6 +99,15 @@ async function main(): Promise<void> {
     { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
     logger,
   );
+
+  // --- Startup sweep: finish any source-resource removals a prior run left owing, before the
+  //     reactor starts firing new effects (so the two never contend for the same resource). --------
+  await new SourceResourceSweep({
+    ledger,
+    remover: new SlskdResourceRemover(logger, slskdClient),
+    store,
+    logger,
+  }).run();
 
   // --- The durable reactor (fires effects; feeds results back through decide) -------------------
   const interpreter: InterpreterDeps = {

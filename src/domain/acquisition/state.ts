@@ -95,6 +95,7 @@ export interface ExhaustedState extends Progress {
 export interface CancelledState extends Progress {
   readonly phase: 'Cancelled';
   readonly current?: Candidate; // present only when cancelled after the transfer settled (D: Validating/Importing)
+  readonly pending?: Candidate; // present only when cancelled mid-download: abort the transfer, then clean up on settle
 }
 
 export type AcquisitionState =
@@ -186,6 +187,11 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
     case 'DownloadFailed':
       return state; // the following CandidateRejected does the state work
     case 'CandidateRejected':
+      // A cancelled acquisition whose mid-download candidate has now settled: drop `pending` so the
+      // deferred cleanup fires once (via `react`) and any later settlement report is a no-op.
+      if (state.phase === 'Cancelled') {
+        return state.pending === undefined ? state : { phase: 'Cancelled', ...progressOf(state) };
+      }
       if (state.phase !== 'Downloading' && state.phase !== 'Validating') return state;
       return {
         phase: 'Selecting',
@@ -235,10 +241,14 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       };
     case 'AcquisitionCancelled':
       if (isTerminal(state)) return state;
-      // Retain the in-flight candidate only when its transfer has settled (files are staged and
-      // stable); an in-flight Downloading transfer is still being written, so cleaning it is unsafe.
+      // A settled transfer's files are staged and stable — retain the candidate for immediate
+      // cleanup. An in-flight Downloading transfer is still being written — retain it as `pending`
+      // so the transfer is first aborted, then cleaned up once it settles (never both at once).
       if (state.phase === 'Validating' || state.phase === 'Importing') {
         return { phase: 'Cancelled', current: state.current, ...progressOf(state) };
+      }
+      if (state.phase === 'Downloading') {
+        return { phase: 'Cancelled', pending: state.current, ...progressOf(state) };
       }
       return { phase: 'Cancelled', ...progressOf(state) };
   }
