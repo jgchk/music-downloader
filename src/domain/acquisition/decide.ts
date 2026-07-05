@@ -31,21 +31,25 @@ function illegal(command: AcquisitionCommandType, state: AcquisitionState): Doma
   return { kind: 'IllegalTransition', command, phase: state.phase };
 }
 
-/** Merge untried + newly-found candidates, drop the rejected-set, dedupe by stable identity (D6). */
-function mergeCandidates(
-  existing: readonly Candidate[],
+/**
+ * Admit newly-found candidates, dropping the rejected-set and deduping by stable identity (D6).
+ * D6 frames re-search as merging new results with the *untried* working set — but re-search fires
+ * only once that set has emptied (see {@link selectNext}), so there are never untried candidates to
+ * merge; the incoming round is the whole picture.
+ */
+function usableCandidates(
   incoming: readonly Candidate[],
   rejected: readonly string[],
 ): Candidate[] {
   const seen = new Set(rejected);
-  const merged: Candidate[] = [];
-  for (const candidate of [...existing, ...incoming]) {
+  const admitted: Candidate[] = [];
+  for (const candidate of incoming) {
     const key = candidateKey(candidate.identity);
     if (seen.has(key)) continue;
     seen.add(key);
-    merged.push(candidate);
+    admitted.push(candidate);
   }
-  return merged;
+  return admitted;
 }
 
 /**
@@ -94,13 +98,9 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
     case 'RecordSearchResults': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Searching') return err(illegal(command.type, state));
-      const merged = mergeCandidates(
-        state.working.map((ranked) => ranked.candidate),
-        command.candidates,
-        state.rejected,
-      );
+      const usable = usableCandidates(command.candidates, state.rejected);
       const ranked = rankCandidates(
-        merged,
+        usable,
         state.target!,
         state.policies!.quality,
         state.policies!.match,
