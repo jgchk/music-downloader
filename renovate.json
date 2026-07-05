@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Bump .nvmrc and the Dockerfile Node base image together, keeping the exact runtime pin and dev/prod parity in lockstep (spec: runtime-baseline).",
+      "matchManagers": ["nvm", "dockerfile"],
+      "matchDepNames": ["node"],
+      "groupName": "node runtime"
+    }
+  ]
+}

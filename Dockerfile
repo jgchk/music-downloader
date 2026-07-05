@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # --- Builder: install all deps (incl. native better-sqlite3 build) and compile TypeScript --------
-FROM node:20-slim AS builder
+FROM node:24.18.0-slim AS builder
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -23,7 +23,7 @@ RUN pnpm run build
 RUN pnpm prune --prod
 
 # --- Runtime: Node + ffmpeg (a declared OS-level dependency, D5) baked in -------------------------
-FROM node:20-slim AS runtime
+FROM node:24.18.0-slim AS runtime
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg \
   && rm -rf /var/lib/apt/lists/*
