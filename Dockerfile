@@ -12,7 +12,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries the pnpm 11 `allowBuilds` setting that permits better-sqlite3's native
+# build; without it the install skips the native addon and the runtime image is broken.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY tsconfig.json tsconfig.build.json ./
