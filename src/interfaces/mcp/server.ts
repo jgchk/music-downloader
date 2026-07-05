@@ -1,4 +1,6 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -7,6 +9,7 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   cancelAcquisition,
@@ -32,7 +35,14 @@ import {
  * (`md://acquisitions`, `md://acquisitions/{id}`, `…/progress`). Tool input schemas are derived
  * from the shared zod contracts via `z.toJSONSchema`, so HTTP validation, OpenAPI, and MCP cannot
  * drift. Like the HTTP adapter, it maps DTOs to/from the domain and never touches domain types.
+ *
+ * MCP is served over the streamable HTTP transport on the application's own HTTP server
+ * (`registerMcpEndpoint`), so every client talks to the one running instance — no stdio, no
+ * client-spawned second process racing the reactor. The transport runs stateless: a fresh server
+ * and transport are built per request (nothing here pushes to clients, so sessions buy nothing).
  */
+
+const MCP_PATH = '/mcp';
 
 const COLLECTION_URI = 'md://acquisitions';
 const STATUS_URI = /^md:\/\/acquisitions\/([^/]+)$/;
@@ -146,4 +156,50 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger): Server {
   });
 
   return server;
+}
+
+/**
+ * Mount the MCP server on the given Fastify app at `POST /mcp` (streamable HTTP). `/mcp` sits
+ * outside the `/api/v1` REST prefix on purpose: MCP versions its own protocol at initialize, so it
+ * must not be coupled to the REST resource version. The POST route hijacks the reply and lets the
+ * transport write the raw response directly. `GET`/`DELETE` — which the streamable HTTP protocol
+ * uses only to open or tear down server-push SSE streams — are refused with a method-not-allowed
+ * JSON-RPC error, since this stateless surface never pushes to clients.
+ */
+export function registerMcpEndpoint(app: FastifyInstance, deps: UseCaseDeps, logger: Logger): void {
+  // `hide: true` keeps MCP off the derived OpenAPI document: `/mcp` is a JSON-RPC surface, not part
+  // of the versioned REST contract the OpenAPI snapshot guards.
+  const hidden = { schema: { hide: true } };
+
+  app.post(
+    MCP_PATH,
+    hidden,
+    async (
+      request: { raw: IncomingMessage; body?: unknown },
+      reply: { hijack: () => void; raw: ServerResponse },
+    ): Promise<void> => {
+      const server = buildMcpServer(deps, logger);
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      reply.raw.on('close', () => {
+        void transport.close();
+        void server.close();
+      });
+      reply.hijack();
+      await server.connect(transport);
+      await transport.handleRequest(request.raw, reply.raw, request.body);
+    },
+  );
+
+  const methodNotAllowed = (
+    _request: unknown,
+    reply: { code: (status: number) => { send: (body: unknown) => void } },
+  ): void => {
+    reply.code(405).send({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Method not allowed.' },
+      id: null,
+    });
+  };
+  app.get(MCP_PATH, hidden, methodNotAllowed);
+  app.delete(MCP_PATH, hidden, methodNotAllowed);
 }

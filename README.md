@@ -86,7 +86,17 @@ Both surfaces map onto the same application use-cases and derive from one shared
 | `POST /api/v1/acquisitions/{id}/cancel`  | Cancel a non-terminal acquisition. |
 
 **MCP** — tools `submit_acquisition` / `cancel_acquisition`; resources `md://acquisitions`,
-`md://acquisitions/{id}`, `md://acquisitions/{id}/progress` (served over stdio).
+`md://acquisitions/{id}`, `md://acquisitions/{id}/progress`. Served over the **streamable HTTP**
+transport by the same server at `POST /mcp` (i.e. `http://<HTTP_HOST>:<HTTP_PORT>/mcp`), so HTTP and
+MCP clients share one process and one set of acquisitions. Point an MCP client at that URL:
+
+```jsonc
+{ "mcpServers": { "music-downloader": { "url": "http://localhost:3000/mcp" } } }
+```
+
+> **Breaking change:** the stdio transport has been removed. A spawn-the-process MCP config
+> (`command`/`args`) no longer works — migrate it to the URL form above. This is an intentional,
+> owner-approved break to the MCP connection contract; the tool and resource contracts are unchanged.
 
 ## Development
 
