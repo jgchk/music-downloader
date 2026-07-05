@@ -56,7 +56,9 @@ describe('projectStatus', () => {
     expect(view.location).toBe('/lib/c');
     expect(view.attempts).toBe(3);
     expect(view.rejectedCount).toBe(2);
-    expect(view.currentCandidate?.username).toBe('c');
+    // A fulfilled acquisition has nothing in flight, so it reports no current candidate; the
+    // candidate that succeeded is recorded in the history's 'imported' entry below.
+    expect(view.currentCandidate).toBeUndefined();
     expect(view.history.map((entry) => entry.kind)).toEqual([
       'selected',
       'download-failed',

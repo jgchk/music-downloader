@@ -6,7 +6,12 @@ import { rankCandidates } from '../ranking/ranking.js';
 import type { AcquisitionCommand, AcquisitionCommandType } from './commands.js';
 import type { AcquisitionEvent } from './events.js';
 import { isTerminal } from './state.js';
-import type { AcquisitionPhase, AcquisitionState } from './state.js';
+import type {
+  AcquisitionPhase,
+  AcquisitionState,
+  DownloadingState,
+  ValidatingState,
+} from './state.js';
 
 /**
  * `decide` is the brain (D2): a pure function that, given a command and the current state,
@@ -57,8 +62,8 @@ function usableCandidates(
  * next-best candidate, request a fresh bounded re-search, or give up (D6). `RetryPolicy` bounds
  * guarantee termination.
  */
-function selectNext(state: AcquisitionState): AcquisitionEvent {
-  const retry = state.policies!.retry;
+function selectNext(state: DownloadingState | ValidatingState): AcquisitionEvent {
+  const retry = state.policies.retry;
   if (state.attempts >= retry.maxTotalAttempts) return { type: 'AcquisitionExhausted' };
   const next = state.working[0];
   if (next !== undefined) return { type: 'CandidateSelected', candidate: next.candidate };
@@ -70,11 +75,14 @@ function selectNext(state: AcquisitionState): AcquisitionEvent {
 
 /** After a candidate fails, reject it and decide the next move in one batch. */
 function rejectAndAdvance(
-  state: AcquisitionState,
+  state: DownloadingState | ValidatingState,
   failure: AcquisitionEvent,
 ): readonly AcquisitionEvent[] {
-  const current = state.current!;
-  return [failure, { type: 'CandidateRejected', candidate: current.identity }, selectNext(state)];
+  return [
+    failure,
+    { type: 'CandidateRejected', candidate: state.current.identity },
+    selectNext(state),
+  ];
 }
 
 export function decide(command: AcquisitionCommand, state: AcquisitionState): Decision {
@@ -101,9 +109,9 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       const usable = usableCandidates(command.candidates, state.rejected);
       const ranked = rankCandidates(
         usable,
-        state.target!,
-        state.policies!.quality,
-        state.policies!.match,
+        state.target,
+        state.policies.quality,
+        state.policies.match,
       );
       const events: AcquisitionEvent[] = [
         { type: 'SearchCompleted', round: state.searchRounds + 1, candidates: command.candidates },
@@ -121,7 +129,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok([
-        { type: 'DownloadCompleted', candidate: state.current!.identity, files: command.files },
+        { type: 'DownloadCompleted', candidate: state.current.identity, files: command.files },
       ]);
 
     case 'RecordDownloadFailed':
@@ -130,7 +138,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       return ok(
         rejectAndAdvance(state, {
           type: 'DownloadFailed',
-          candidate: state.current!.identity,
+          candidate: state.current.identity,
           reason: command.reason,
         }),
       );
@@ -139,7 +147,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Validating') return err(illegal(command.type, state));
       return ok([
-        { type: 'ValidationPassed', candidate: state.current!.identity, verdict: command.verdict },
+        { type: 'ValidationPassed', candidate: state.current.identity, verdict: command.verdict },
       ]);
 
     case 'RecordValidationFailed':
@@ -148,7 +156,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       return ok(
         rejectAndAdvance(state, {
           type: 'ValidationFailed',
-          candidate: state.current!.identity,
+          candidate: state.current.identity,
           verdict: command.verdict,
         }),
       );
@@ -157,7 +165,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Importing') return err(illegal(command.type, state));
       return ok([
-        { type: 'Imported', candidate: state.current!.identity, location: command.location },
+        { type: 'Imported', candidate: state.current.identity, location: command.location },
         { type: 'AcquisitionFulfilled', location: command.location },
       ]);
 

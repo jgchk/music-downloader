@@ -68,6 +68,7 @@ function wire(opts: E2eOptions) {
   const bus = new InProcessEventBus();
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
+  const discardStaging = vi.fn((_candidate) => okAsync<void>(undefined));
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
   const libraryView = new LibraryViewProjection();
@@ -89,7 +90,7 @@ function wire(opts: E2eOptions) {
       },
     },
     probe: { probe: (path) => okAsync(PROBES[path]!) },
-    library: { import: () => okAsync(opts.importResult), discardStaging: () => okAsync(undefined) },
+    library: { import: () => okAsync(opts.importResult), discardStaging },
   };
   const interpreter: InterpreterDeps = {
     store,
@@ -105,7 +106,7 @@ function wire(opts: E2eOptions) {
     status,
     progress: progressModel,
   };
-  return { db, reactor, status, progressModel, libraryView, deps };
+  return { db, reactor, status, progressModel, libraryView, deps, discardStaging };
 }
 
 type Wiring = ReturnType<typeof wire>;
@@ -214,6 +215,10 @@ describe('acquisition E2E', () => {
     const id = res.json<{ acquisitionId: string }>().acquisitionId;
 
     await settle(w, id, 'Conflicted');
+    // The conflicted candidate's staged files must not be left orphaned in staging.
+    await vi.waitFor(() => {
+      expect(w.discardStaging).toHaveBeenCalledWith(matchingCandidate('a').identity);
+    });
   });
 
   it('fulfills an acquisition submitted over MCP', async () => {

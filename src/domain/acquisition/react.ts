@@ -22,7 +22,19 @@ export type Effect =
   | { readonly type: 'Import'; readonly files: readonly DownloadedFile[]; readonly target: Target }
   | { readonly type: 'Cleanup'; readonly candidate: CandidateIdentity };
 
-/** `state` is the state *after* the event has been applied. */
+/**
+ * `state` is the aggregate's *current* folded state — NOT strictly the state right after `event`.
+ * The reactor folds the whole stream before reacting (see `Reactor.process`), so when `decide`
+ * co-emits `event` with a follow-on (e.g. `Imported`, always trailed by `AcquisitionFulfilled`),
+ * `state` is already the *later* phase (`Fulfilled`), not `event`'s post-state (`Importing`). This
+ * also holds under at-least-once redelivery: a re-reacted event sees whatever state the stream has
+ * since reached. Two rules follow:
+ *   1. A reaction that must fire for a non-final co-emitted event MUST key off the event's own
+ *      payload, never the folded state (e.g. `Imported` → `Cleanup(event.candidate)`).
+ *   2. A reaction that reads `state` narrows on its phase and falls through to no effects when the
+ *      pairing does not match — consistent with `evolve`'s tolerant fold, and doubling as a guard
+ *      that suppresses re-emitting an effect whose consequences the stream already records.
+ */
 export function react(event: AcquisitionEvent, state: AcquisitionState): readonly Effect[] {
   switch (event.type) {
     case 'AcquisitionRequested':
@@ -30,33 +42,53 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
     case 'TargetResolved':
       return [{ type: 'Search', target: event.target, round: 1 }];
     case 'SearchRequested':
-      return [{ type: 'Search', target: state.target!, round: event.round }];
+      return state.phase === 'Searching'
+        ? [{ type: 'Search', target: state.target, round: event.round }]
+        : [];
     case 'CandidateSelected':
-      return [{ type: 'Download', candidate: event.candidate, policy: state.policies!.download }];
+      return state.phase === 'Downloading'
+        ? [{ type: 'Download', candidate: event.candidate, policy: state.policies.download }]
+        : [];
     case 'DownloadCompleted':
-      return [
-        {
-          type: 'Validate',
-          files: event.files,
-          target: state.target!,
-          matchPolicy: state.policies!.match,
-        },
-      ];
+      return state.phase === 'Validating'
+        ? [
+            {
+              type: 'Validate',
+              files: event.files,
+              target: state.target,
+              matchPolicy: state.policies.match,
+            },
+          ]
+        : [];
     case 'ValidationPassed':
-      return [{ type: 'Import', files: state.downloadedFiles, target: state.target! }];
+      return state.phase === 'Importing'
+        ? [{ type: 'Import', files: state.downloadedFiles, target: state.target }]
+        : [];
     case 'CandidateRejected':
       // A rejected candidate's staged files must never reach the library (D13).
       return [{ type: 'Cleanup', candidate: event.candidate }];
+    case 'Imported':
+      // The imported candidate's now-empty staging directory is removed. Keyed off the event's own
+      // candidate because the folded post-state is already Fulfilled (see the note above).
+      return [{ type: 'Cleanup', candidate: event.candidate }];
+    case 'ImportConflicted':
+      // The downloaded release will never be imported (the location is occupied) — discard staging.
+      return state.phase === 'Conflicted'
+        ? [{ type: 'Cleanup', candidate: state.current.identity }]
+        : [];
+    case 'AcquisitionCancelled':
+      // Discard staging only when the transfer had settled (the folded Cancelled state kept the
+      // candidate); an in-flight download is left alone (no `current`) to avoid racing the source.
+      return state.phase === 'Cancelled' && state.current !== undefined
+        ? [{ type: 'Cleanup', candidate: state.current.identity }]
+        : [];
     case 'MetadataResolutionFailed':
     case 'SearchCompleted':
     case 'CandidatesRanked':
     case 'DownloadFailed':
     case 'ValidationFailed':
-    case 'Imported':
     case 'AcquisitionFulfilled':
     case 'AcquisitionExhausted':
-    case 'ImportConflicted':
-    case 'AcquisitionCancelled':
       return [];
   }
 }
