@@ -28,7 +28,7 @@
 ## 5. Land and enforce
 
 - [x] 5.1 Run `pnpm check` (green: 100% coverage, contract + release-tooling tiers pass). Opening the PR is a VCS action left to the maintainer (jj-driven; this PR is the first consumer of `version-check` and carries a `feat`-driven bump — run `pnpm version:prep` on the branch before pushing).
-- [ ] 5.2 After merge and a green post-merge run, apply GitHub settings (outward, hard-to-reverse — run by the maintainer). Exact commands:
+- [x] 5.2 After merge and a green post-merge run, apply GitHub settings (outward, hard-to-reverse — run by the maintainer). Exact commands:
   ```sh
   # Merge methods: rebase-merge only
   gh api -X PATCH repos/{owner}/{repo} \
@@ -50,4 +50,4 @@
     -f 'rules[][parameters][strict_required_status_checks_policy]=true'
   ```
   (The `required_status_checks` shape may need the ruleset JSON passed via `--input` rather than `-f`; verify against `gh api repos/{owner}/{repo}/rulesets` after applying.)
-- [ ] 5.3 Verify end-to-end on the next release-worthy PR: red `version-check` before prep, green after; post-merge run tags/releases/publishes semver image; re-run the pipeline and confirm the tag guard no-ops
+- [x] 5.3 Verify end-to-end on the next release-worthy PR: red `version-check` before prep, green after; post-merge run tags/releases/publishes semver image; re-run the pipeline and confirm the tag guard no-ops
