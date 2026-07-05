@@ -19,6 +19,23 @@ describe('MusicBrainz contract schemas', () => {
     expect(parsed.media?.[0]?.tracks?.[0]?.length).toBe(1000);
   });
 
+  it('accepts a null track length (MusicBrainz reports unknown durations as null)', () => {
+    const parsed = mbReleaseSchema.parse({
+      id: 'rel-1',
+      title: 'Album',
+      'artist-credit': [{ name: 'Artist' }],
+      media: [
+        { tracks: [{ position: 1, title: 'T1', length: null, recording: { length: null } }] },
+      ],
+    });
+
+    expect(parsed.media?.[0]?.tracks?.[0]?.length).toBeNull();
+  });
+
+  it('accepts a null recording length', () => {
+    expect(mbRecordingSchema.parse({ id: 'rec-1', title: 'Song', length: null }).length).toBeNull();
+  });
+
   it('tolerates unknown fields (additive provider changes are not drift)', () => {
     const parsed = mbReleaseSchema.parse({
       id: 'rel-1',
@@ -60,9 +77,48 @@ describe('MusicBrainz contract schemas', () => {
     expect(mbRecordingSearchSchema.parse({}).recordings).toBeUndefined();
   });
 
+  it('consumes the release-search identity and edition fields when present', () => {
+    const [hit] = mbReleaseSearchSchema.parse({
+      releases: [
+        {
+          id: 'rel-2',
+          score: 100,
+          title: 'Album (Deluxe Edition)',
+          status: 'Official',
+          date: '2016-11-04',
+          'release-group': { id: 'rg-1', title: 'Album' }, // title unknown to the contract
+        },
+      ],
+    }).releases!;
+
+    expect(hit).toEqual({
+      id: 'rel-2',
+      score: 100,
+      title: 'Album (Deluxe Edition)',
+      status: 'Official',
+      date: '2016-11-04',
+      'release-group': { id: 'rg-1' },
+    });
+  });
+
+  it('tolerates release-search hits missing the identity and edition fields', () => {
+    expect(
+      mbReleaseSearchSchema.parse({ releases: [{ id: 'rel-2', score: 95 }] }).releases,
+    ).toEqual([{ id: 'rel-2', score: 95 }]);
+  });
+
   it('rejects a search hit whose score is not a number', () => {
     expect(
       mbReleaseSearchSchema.safeParse({ releases: [{ id: 'x', score: 'high' }] }).success,
     ).toBe(false);
+  });
+
+  it('rejects a release-search hit whose release-group id is retyped', () => {
+    const result = mbReleaseSearchSchema.safeParse({
+      releases: [{ id: 'x', score: 100, 'release-group': { id: 42 } }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'release-group', 'id']);
   });
 });

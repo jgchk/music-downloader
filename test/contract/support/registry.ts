@@ -34,6 +34,7 @@ export const fixtureSchemas: Record<string, ZodType> = {
 
 /** E2E WireMock stub filename → schema. */
 export const stubSchemas: Record<string, ZodType> = {
+  'musicbrainz/search.json': mbReleaseSearchSchema,
   'musicbrainz/release.json': mbReleaseSchema,
   'slskd/search-create.json': slskdSearchStateSchema,
   'slskd/search-state.json': slskdSearchStateSchema,

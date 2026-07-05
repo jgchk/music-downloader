@@ -1,5 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { releaseCandidateIds } from '../../../src/adapters/musicbrainz/mapping.js';
+import { mbReleaseSearchSchema } from '../../../src/adapters/musicbrainz/schemas.js';
 import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.js';
 
 /**
@@ -48,25 +50,35 @@ function write(name: string, fixture: ContractFixture): void {
   console.log(`wrote musicbrainz/${name} (${fixture.response.status})`);
 }
 
-function topId(body: unknown, key: 'releases' | 'recordings'): string {
-  const entries = (body as Record<string, { id?: string }[]>)[key] ?? [];
+function topRecordingId(body: unknown): string {
+  const entries = (body as { recordings?: { id?: string }[] }).recordings ?? [];
   const id = entries[0]?.id;
-  if (id === undefined) throw new Error(`no ${key} in search result`);
+  if (id === undefined) throw new Error('no recordings in search result');
+  return id;
+}
+
+// The release the album adapter actually fetches: the canonical pick within the resolved release
+// group, so the recorded lookup stays consistent with the adapter's selection.
+function selectedReleaseId(body: unknown): string {
+  const releases = mbReleaseSearchSchema.parse(body).releases;
+  const id = releaseCandidateIds(releases, ALBUM.title)[0];
+  if (id === undefined) throw new Error('no confident release group in search result');
   return id;
 }
 
 // Mirror the adapter's own search URL construction verbatim (D: contract must be byte-faithful).
-const searchQuery = (q: string): string => `query=${encodeURIComponent(q)}&fmt=json&limit=5`;
+const searchQuery = (q: string, limit: number): string =>
+  `query=${encodeURIComponent(q)}&fmt=json&limit=${limit}`;
 
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
 
   const releaseSearch = await get(
     '/release',
-    searchQuery(`release:"${ALBUM.title}" AND artist:"${ALBUM.artist}"`),
+    searchQuery(`release:"${ALBUM.title}" AND artist:"${ALBUM.artist}"`, 100),
   );
   write('release-search.json', releaseSearch);
-  const releaseId = topId(releaseSearch.response.body, 'releases');
+  const releaseId = selectedReleaseId(releaseSearch.response.body);
   write(
     'release-lookup.json',
     await get(`/release/${releaseId}`, 'inc=recordings+artist-credits&fmt=json'),
@@ -74,10 +86,10 @@ async function main(): Promise<void> {
 
   const recordingSearch = await get(
     '/recording',
-    searchQuery(`recording:"${TRACK.title}" AND artist:"${TRACK.artist}"`),
+    searchQuery(`recording:"${TRACK.title}" AND artist:"${TRACK.artist}"`, 5),
   );
   write('recording-search.json', recordingSearch);
-  const recordingId = topId(recordingSearch.response.body, 'recordings');
+  const recordingId = topRecordingId(recordingSearch.response.body);
   write(
     'recording-lookup.json',
     await get(`/recording/${recordingId}`, 'inc=artist-credits&fmt=json'),

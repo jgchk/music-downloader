@@ -1,6 +1,6 @@
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
-import type { MbRecording, MbRelease, MbScoredEntry } from './schemas.js';
+import type { MbRecording, MbRelease, MbScoredEntry, MbScoredRelease } from './schemas.js';
 
 /**
  * Pure mapping from MusicBrainz JSON to the normalized, source-agnostic {@link Target} (D11,
@@ -58,7 +58,12 @@ export function recordingToTarget(recording: MbRecording): Target | undefined {
   return result.isOk() ? result.value : undefined;
 }
 
-/** The confident best match's id, or `undefined` when the results are empty, weak, or ambiguous. */
+/**
+ * The confident best match's id, or `undefined` when the results are empty, weak, or ambiguous.
+ * This flat guard remains the recording-descriptor path: recordings have no release-group analogue,
+ * so identity ambiguity is judged directly over the scored hits (see {@link releaseCandidateIds}
+ * for the album path, which judges ambiguity across release groups instead).
+ */
 export function bestMatchId(entries: readonly MbScoredEntry[] | undefined): string | undefined {
   const scored = (entries ?? []).map((entry) => ({ id: entry.id, score: entry.score ?? 0 }));
   scored.sort((a, b) => b.score - a.score);
@@ -67,4 +72,102 @@ export function bestMatchId(entries: readonly MbScoredEntry[] | undefined): stri
   if (best === undefined || best.score < HIGH_CONFIDENCE) return undefined;
   if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return undefined;
   return best.id;
+}
+
+/**
+ * Normalize a title for exact-after-normalization comparison: canonical-compose, casefold, and
+ * collapse every run of non-alphanumeric characters (punctuation, parentheses, brackets, whitespace)
+ * to a single space, trimmed. So `"Midnights (3am Edition)"`, `"midnights  3AM edition"`, and
+ * `"MIDNIGHTS (3am Edition)"` all normalize identically, while `"Midnights"` does not equal
+ * `"Midnights (3am Edition)"`. Equality after this transform is the *only* edition-match relation —
+ * there is deliberately no fuzzy or partial matching, because a wrong edition becomes the download
+ * validation contract.
+ */
+export function normalizeTitle(title: string): string {
+  return title
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+interface GroupedRelease {
+  readonly id: string;
+  readonly score: number;
+  readonly title: string;
+  readonly status: string | undefined;
+  readonly date: string | undefined;
+}
+
+// Real MusicBrainz dates are year-leading (`2013`, `2016-11-04`), so they order chronologically
+// under a plain lexicographic compare; an undated or non-year-leading value maps to a sentinel that
+// sorts after them all, since ':' (0x3A) follows '9' (0x39).
+const UNDATED = ':';
+function dateKey(date: string | undefined): string {
+  return date !== undefined && /^\d{4}/.test(date) ? date : UNDATED;
+}
+
+/**
+ * Order the releases within a resolved album (release group): those whose title matches the
+ * requested title after normalization come first (edition intent expressed in the request text),
+ * then the canonical rule — `Official` status before any other, then earliest release date.
+ * Same-rank ties keep the incoming (search-relevance) order via the stable sort.
+ */
+function compareReleases(wantedTitle: string) {
+  return (a: GroupedRelease, b: GroupedRelease): number => {
+    const titleRank =
+      Number(normalizeTitle(a.title) !== wantedTitle) -
+      Number(normalizeTitle(b.title) !== wantedTitle);
+    if (titleRank !== 0) return titleRank;
+    const statusRank = Number(a.status !== 'Official') - Number(b.status !== 'Official');
+    if (statusRank !== 0) return statusRank;
+    const aDate = dateKey(a.date);
+    const bDate = dateKey(b.date);
+    return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+  };
+}
+
+/**
+ * The ordered release ids to try for an album descriptor, best first — empty when the results are
+ * empty, weak, or ambiguous. Hits are grouped by release group (the album identity), and the
+ * confidence/ambiguity guard is applied *across groups*: the best group must score at least
+ * {@link HIGH_CONFIDENCE} and beat the runner-up group by at least {@link AMBIGUITY_MARGIN} (a
+ * group's score is its top hit's). Many equally-scored editions of one album are therefore a single
+ * unambiguous identity, not an ambiguous result. Within the winning group, releases are ordered by
+ * {@link compareReleases}; the caller fetches them in order and takes the first that yields a valid
+ * target, so a release with unusable metadata falls through to the next.
+ */
+export function releaseCandidateIds(
+  releases: readonly MbScoredRelease[] | undefined,
+  requestTitle: string,
+): readonly string[] {
+  const groups = new Map<string, GroupedRelease[]>();
+  for (const release of releases ?? []) {
+    if (release.id === undefined) continue;
+    // A hit without a release-group id cannot be grouped by identity, so it forms its own singleton
+    // group keyed by its release id — conservative, since it can only widen apparent ambiguity.
+    const key = release['release-group']?.id ?? `release:${release.id}`;
+    const member: GroupedRelease = {
+      id: release.id,
+      score: release.score ?? 0,
+      title: release.title ?? '',
+      status: release.status,
+      date: release.date,
+    };
+    const existing = groups.get(key);
+    if (existing === undefined) groups.set(key, [member]);
+    else existing.push(member);
+  }
+
+  const ranked = [...groups.values()]
+    .map((members) => ({ members, score: Math.max(...members.map((m) => m.score)) }))
+    .sort((a, b) => b.score - a.score);
+
+  const best = ranked[0];
+  const second = ranked[1];
+  if (best === undefined || best.score < HIGH_CONFIDENCE) return [];
+  if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return [];
+
+  const wanted = normalizeTitle(requestTitle);
+  return [...best.members].sort(compareReleases(wanted)).map((m) => m.id);
 }
