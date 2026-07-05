@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.1.1](https://github.com/jgchk/music-downloader/compare/v2.1.0...v2.1.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **acquisition:** model AcquisitionState as a phase discriminated union and close staging-cleanup gaps ([1f9289e](https://github.com/jgchk/music-downloader/commit/1f9289eba2ce1079fe5907d2ef98339ddbe848ce))
+
 ## [2.1.0](https://github.com/jgchk/music-downloader/compare/v2.0.1...v2.1.0) (2026-07-05)
 
 
