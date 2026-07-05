@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   FfmpegAudioProbe,
   FilesystemLibrary,
@@ -26,7 +25,6 @@ import {
   ProgressReadModel,
 } from '../application/projections/read-models.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
-import { buildMcpServer } from '../interfaces/mcp/server.js';
 import { loadConfig } from './config.js';
 
 /**
@@ -108,22 +106,22 @@ async function main(): Promise<void> {
   const reactor = new Reactor({ store, checkpoints, bus, logger, interpreter });
   await reactor.start();
 
-  // --- Inbound interfaces (both over the same use-cases) ---------------------------------------
+  // --- Inbound interfaces: one HTTP server serves both REST and MCP (streamable HTTP) ----------
+  // MCP is mounted on the same Fastify app (`POST /mcp`) over the same use-cases, so every client —
+  // HTTP or MCP — talks to this one process. That is what lets an acquisition submitted over HTTP be
+  // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
+  // process that raced this one's reactor and read stale projections.
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
   const httpApp = await buildHttpApp(deps, logger);
   await httpApp.listen({ port: config.httpPort, host: config.host });
 
-  const mcpServer = buildMcpServer(deps, logger);
-  await mcpServer.connect(new StdioServerTransport());
-
   logger.info({ port: config.httpPort, host: config.host }, 'music-downloader started');
 
-  // --- Graceful shutdown: stop reacting, drain in-flight HTTP, close resources ------------------
+  // --- Graceful shutdown: stop reacting, drain in-flight HTTP (incl. MCP), close resources -------
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
     reactor.stop();
     await httpApp.close();
-    await mcpServer.close();
     db.close();
     process.exit(0);
   };

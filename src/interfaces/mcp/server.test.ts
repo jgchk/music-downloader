@@ -1,7 +1,11 @@
+import type { AddressInfo } from 'node:net';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { buildHttpApp } from '../http/app.js';
 import { testWiring } from '../__fixtures__/wiring.js';
 import type { TestWiring } from '../__fixtures__/wiring.js';
 import { buildMcpServer } from './server.js';
@@ -166,5 +170,76 @@ describe('MCP server', () => {
       client.readResource({ uri: 'md://acquisitions/missing/progress' }),
     ).rejects.toThrow();
     await expect(client.readResource({ uri: 'md://other' })).rejects.toThrow();
+  });
+});
+
+describe('MCP over streamable HTTP', () => {
+  let wiring: TestWiring;
+  let app: FastifyInstance;
+  let baseUrl: string;
+  let client: Client;
+
+  beforeEach(async () => {
+    wiring = testWiring();
+    app = await buildHttpApp(wiring.deps, silentLogger());
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${port}`;
+    client = new Client({ name: 'test', version: '0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`)));
+  });
+
+  afterEach(async () => {
+    await client.close();
+    await app.close();
+  });
+
+  it('completes the handshake and advertises the tools with derived schemas', async () => {
+    const { tools } = await client.listTools();
+
+    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_acquisition', 'submit_acquisition']);
+    expect(tools.find((t) => t.name === 'submit_acquisition')?.inputSchema).toMatchObject({
+      type: 'object',
+    });
+  });
+
+  it('round-trips submit then cancel over the same server', async () => {
+    const submitted = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: descriptorArgs,
+    })) as CallToolResult;
+    wiring.sync();
+    const { acquisitionId } = JSON.parse(submitted.content[0]!.text) as { acquisitionId: string };
+    expect(submitted.isError).toBeFalsy();
+
+    const cancelled = (await client.callTool({
+      name: 'cancel_acquisition',
+      arguments: { id: acquisitionId },
+    })) as CallToolResult;
+
+    expect(cancelled.isError).toBeFalsy();
+    expect(JSON.parse(cancelled.content[0]!.text)).toEqual({ acquisitionId });
+  });
+
+  it('serves the projection-backed resources', async () => {
+    await client.callTool({ name: 'submit_acquisition', arguments: descriptorArgs });
+    wiring.sync();
+
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toContain('md://acquisitions');
+
+    const collection = firstJson(await client.readResource({ uri: 'md://acquisitions' }));
+    expect((collection as { acquisitions: unknown[] }).acquisitions).toHaveLength(1);
+  });
+
+  it('rejects a GET on the MCP endpoint with a method-not-allowed JSON-RPC error', async () => {
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+    });
+
+    expect(res.status).toBe(405);
+    const body = (await res.json()) as { error: { code: number } };
+    expect(typeof body.error.code).toBe('number');
   });
 });

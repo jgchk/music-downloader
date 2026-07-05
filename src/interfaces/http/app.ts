@@ -32,13 +32,15 @@ import {
   submitAcquisitionResponseSchema,
 } from '../contracts/index.js';
 import { progressToDto } from '../contracts/mapping.js';
+import { registerMcpEndpoint } from '../mcp/server.js';
 
 /**
  * The versioned HTTP API (D12). A thin inbound adapter: it validates against the shared zod
  * contracts, maps DTOs to/from the domain via the anti-corruption layer, and delegates to the
  * application use-cases — it never touches domain types directly. Requests are accepted
  * asynchronously (`202`) with a status URL to observe. The same zod schemas drive request
- * validation, the OpenAPI document, and (elsewhere) the MCP tool schemas.
+ * validation, the OpenAPI document, and the MCP tool schemas. The MCP server is mounted on this
+ * same app (streamable HTTP, `POST /mcp`) so one process serves both surfaces over one port.
  */
 
 const BASE_PATH = '/api/v1/acquisitions';
@@ -74,6 +76,7 @@ export async function buildHttpApp(deps: UseCaseDeps, logger: Logger): Promise<F
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
   registerAcquisitionRoutes(app, deps);
+  registerMcpEndpoint(app, deps, logger);
 
   await app.ready();
   return app;
