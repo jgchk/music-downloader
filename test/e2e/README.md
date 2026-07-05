@@ -57,9 +57,12 @@ from eslint/tsconfig): it is verified by execution, not by the 100% unit-coverag
 ## Caveats — what this tier does NOT cover
 
 - **Stub fidelity.** The stubs are only as faithful as we make them; drift from the real slskd /
-  MusicBrainz wire format yields false green. This tier verifies _our_ composition and adapter code
-  against a fixed contract, not the third parties' current behaviour. A live tier against the real
-  services is deliberately out of scope.
+  MusicBrainz wire format would yield false green. This is now guarded on two sides by the contract
+  tier (`test/contract/`, see its README): the contract test suite validates every stub `jsonBody`
+  here against the same schemas the adapters enforce, so a stub can't drift from the contract; and a
+  weekly drift workflow validates the contract against the live services. This tier still verifies
+  _our_ composition end to end against a fixed contract, not the third parties' live behaviour —
+  that live check lives in the contract tier's tier 2.
 - **MCP.** The MCP interface is stdio-only and is covered by the in-process subcutaneous tier, not
   here. Out-of-process MCP would require a self-contained spawned instance and a logger-to-stderr
   change; it is out of scope for this tier.

@@ -1,31 +1,23 @@
 import type { DownloadFailureReason } from '../../domain/acquisition/events.js';
 import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
+import type { SlskdTransfer, SlskdTransfersPayload } from './schemas.js';
 
 /**
  * Pure interpretation of slskd's rich transfer reality into the small, source-agnostic facts the
  * domain sees (D10). slskd's per-file transfer state machine and byte counters are folded into one
  * candidate-level outcome plus an ephemeral progress snapshot; a source-specific failure is mapped
- * to the domain's small reason enum.
+ * to the domain's small reason enum. Payloads arrive already validated against the contract schema
+ * (D2), so these functions consume the inferred types directly.
  */
 
-export interface SlskdTransfer {
-  readonly id?: string;
-  readonly filename?: string;
-  readonly state?: string;
-  readonly size?: number;
-  readonly bytesTransferred?: number;
-  readonly placeInQueue?: number;
-  readonly exception?: string;
-}
+export type { SlskdTransfer };
 
 /**
  * slskd's `GET …/downloads/{username}` returns a single user object whose transfers are grouped by
  * directory under `directories`; flatten those groups to a flat file list.
  */
-export function flattenDownloads(json: unknown): SlskdTransfer[] {
-  const payload = json as
-    { directories?: readonly { files?: readonly SlskdTransfer[] }[] } | undefined;
-  return (payload?.directories ?? []).flatMap((directory) => directory.files ?? []);
+export function flattenDownloads(payload: SlskdTransfersPayload): SlskdTransfer[] {
+  return (payload.directories ?? []).flatMap((directory) => directory.files ?? []);
 }
 
 type TransferStatus = 'succeeded' | 'failed' | 'queued' | 'transferring';

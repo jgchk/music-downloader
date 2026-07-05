@@ -53,15 +53,18 @@ const aggregateEncapsulationZones = aggregateExternalConsumers.flatMap((target) 
 
 export default tseslint.config(
   {
-    // test/e2e is an out-of-process, Docker-driven black-box suite verified by execution, not part
-    // of the src-scoped TypeScript project (tsconfig `include: ["src"]`); keep it out of the
-    // type-checked lint to avoid projectService "file not in project" errors.
+    // test/e2e and test/contract are out-of-src suites verified by execution (Docker-driven e2e;
+    // frozen-fixture contract tests), not part of the src-scoped TypeScript project (tsconfig
+    // `include: ["src"]`); keep them out of the type-checked lint to avoid projectService "file not
+    // in project" errors. Their production dependency — the schema modules — lives in src and is
+    // fully linted and typechecked there.
     ignores: [
       'dist/**',
       'coverage/**',
       'node_modules/**',
       '.e2e-tmp/**',
       'test/e2e/**',
+      'test/contract/**',
       '*.config.ts',
       '*.config.js',
     ],

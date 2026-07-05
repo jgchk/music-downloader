@@ -1,0 +1,617 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-07-05",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/recording",
+    "query": {
+      "query": "recording:\"Smells Like Teen Spirit\" AND artist:\"Nirvana\"",
+      "fmt": "json",
+      "limit": "5"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "created": "2026-07-05T15:52:25.650Z",
+      "count": 530,
+      "offset": 0,
+      "recordings": [
+        {
+          "id": "6fd45825-5e07-48b7-801c-433c48d3262e",
+          "score": 100,
+          "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+          "title": "Smells Like Teen Spirit",
+          "length": 280800,
+          "disambiguation": "live, 1991-11-19: Il Castello, Rome, Italy",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Nirvana",
+              "artist": {
+                "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                "name": "Nirvana",
+                "sort-name": "Nirvana",
+                "disambiguation": "1980s–1990s US grunge band",
+                "aliases": [
+                  {
+                    "sort-name": "ニルヴァーナ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニルヴァーナ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Nirvana",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana US",
+                    "name": "Nirvana US",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "3ca2e53a-dbb7-4b38-ab63-c6853878bffb",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 1,
+              "title": "1993-11-18: R.I.P.: Sony Studios (Unplugged), New York City, NY, USA",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "1a0f6160-5557-34b3-91d3-e9623cdc11fd",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "1993-11-18: R.I.P.: Sony Studios (Unplugged), New York City, NY, USA",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 18,
+              "media": [
+                {
+                  "id": "d8e661f9-906d-3f0d-a185-ffd5e40de8e6",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "0f8bd532-2b1a-37fc-912f-c98b784eba6f",
+                      "number": "18",
+                      "title": "Smells Like Teen Spirit",
+                      "length": 280800
+                    }
+                  ],
+                  "track-count": 18,
+                  "track-offset": 17
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5d7e9199-2907-45fe-8db1-2db14f108b24",
+          "score": 100,
+          "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+          "title": "Smells Like Teen Spirit",
+          "length": 284240,
+          "disambiguation": "live, 1991-10-12: Cabaret Metro, Chicago, IL, USA",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Nirvana",
+              "artist": {
+                "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                "name": "Nirvana",
+                "sort-name": "Nirvana",
+                "disambiguation": "1980s–1990s US grunge band",
+                "aliases": [
+                  {
+                    "sort-name": "ニルヴァーナ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニルヴァーナ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Nirvana",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana US",
+                    "name": "Nirvana US",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "ed779065-ae4b-40e1-966b-2289862ad69c",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 1,
+              "title": "1991-10-12: Dressed for Success, Cabaret Metro, Chicago, IL, USA",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "68a3a3e8-c5f7-37cd-ada6-7defc208fce1",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "1991-10-12: Dressed for Success, Cabaret Metro, Chicago, IL, USA",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 23,
+              "media": [
+                {
+                  "id": "db7390e4-a3b4-3736-bdd0-4c47763dcc76",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "ce1f6d9b-44ce-301c-acdc-816bea2ef89f",
+                      "number": "6",
+                      "title": "Smells Like Teen Spirit",
+                      "length": 284240
+                    }
+                  ],
+                  "track-count": 23,
+                  "track-offset": 5
+                }
+              ]
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "alternative rock"
+            },
+            {
+              "count": 1,
+              "name": "grunge"
+            }
+          ]
+        },
+        {
+          "id": "1507d1fe-0102-49f2-a04c-c9c63ace2e5d",
+          "score": 100,
+          "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+          "title": "Smells Like Teen Spirit",
+          "length": 268960,
+          "disambiguation": "live, 1991-11-19: Il Castello, Rome, Italy",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Nirvana",
+              "artist": {
+                "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                "name": "Nirvana",
+                "sort-name": "Nirvana",
+                "disambiguation": "1980s–1990s US grunge band",
+                "aliases": [
+                  {
+                    "sort-name": "ニルヴァーナ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニルヴァーナ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Nirvana",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana US",
+                    "name": "Nirvana US",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "82992e60-5f22-4f34-8ccb-2419ddd301e0",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 1,
+              "title": "1991-11-19: On a Plain: Il Castello, Rome, Italy",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "4c873488-29e6-31dd-9356-defa8aaf23f8",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "1991-11-19: On a Plain: Il Castello, Rome, Italy",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 17,
+              "media": [
+                {
+                  "id": "12117b59-237f-3b9d-9a70-fb45bc5b7d42",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "4bd94749-21ff-3724-b3d8-d3adace07952",
+                      "number": "4",
+                      "title": "Smells Like Teen Spirit",
+                      "length": 268960
+                    }
+                  ],
+                  "track-count": 17,
+                  "track-offset": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3321e687-725c-4964-8e93-7a1da3df8f26",
+          "score": 100,
+          "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+          "title": "Smells Like Teen Spirit",
+          "length": 279000,
+          "disambiguation": "live, 1994-02-22: Palaghiaccio di Marino, Rome, Italy",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Nirvana",
+              "artist": {
+                "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                "name": "Nirvana",
+                "sort-name": "Nirvana",
+                "disambiguation": "1980s–1990s US grunge band",
+                "aliases": [
+                  {
+                    "sort-name": "ニルヴァーナ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニルヴァーナ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Nirvana",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana US",
+                    "name": "Nirvana US",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "a995d124-781f-4505-9c3c-3869a7941cfa",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 2,
+              "title": "1994-02-22: Palaghiaccio di Marino, Rome, Italy",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "ec56d89b-94e8-3d7b-b248-f895bf637baf",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "1994-02-22: Palaghiaccio di Marino, Rome, Italy",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 24,
+              "media": [
+                {
+                  "id": "0a42faae-78ca-3aa7-a3c4-4de0b388dbc2",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "bafed8bc-571b-38c3-99eb-31e25b745a9e",
+                      "number": "6",
+                      "title": "Smells Like Teen Spirit",
+                      "length": 279000
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "789ed300-f1c3-4115-b4de-235d92064a79",
+          "score": 100,
+          "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+          "title": "Smells Like Teen Spirit",
+          "length": 287000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Nirvana",
+              "artist": {
+                "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                "name": "Nirvana",
+                "sort-name": "Nirvana",
+                "disambiguation": "1980s–1990s US grunge band",
+                "aliases": [
+                  {
+                    "sort-name": "ニルヴァーナ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニルヴァーナ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Nirvana",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nirvana US",
+                    "name": "Nirvana US",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2002",
+          "releases": [
+            {
+              "id": "6d5fa02a-fdd6-4dc6-8428-2ace37e523a2",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 8,
+              "title": "Outcesticide Box Set",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "a934bd4b-4c2c-416b-b541-ba54013aa612",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Outcesticide Box Set",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                ]
+              },
+              "track-count": 172,
+              "media": [
+                {
+                  "id": "d061142e-da26-349e-ba14-18e647e546f2",
+                  "position": 6,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "65dfb800-4737-4196-8010-ad8a3b4afff2",
+                      "number": "3",
+                      "title": "Smells Like Teen Spirit (Live)",
+                      "length": 287000
+                    }
+                  ],
+                  "track-count": 21,
+                  "track-offset": 2
+                }
+              ]
+            },
+            {
+              "id": "fac73c04-72a5-4880-832c-f54a3a2fd5c5",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+              "count": 1,
+              "title": "Outcesticide, Volume 6",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Nirvana",
+                  "artist": {
+                    "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+                    "name": "Nirvana",
+                    "sort-name": "Nirvana",
+                    "disambiguation": "1980s–1990s US grunge band"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "ee3086f7-fd3c-3748-9e79-f71e67d831ff",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Outcesticide, Volume 6",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                ]
+              },
+              "date": "",
+              "country": "CZ",
+              "release-events": [
+                {
+                  "date": "",
+                  "area": {
+                    "id": "51d34c28-61bf-3d21-849f-7492672a9d44",
+                    "name": "Czechia",
+                    "sort-name": "Czechia",
+                    "iso-3166-1-codes": [
+                      "CZ"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 21,
+              "media": [
+                {
+                  "id": "230e5ff2-2ac9-3163-970a-0e755abe216a",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "455a6d91-a691-30e9-8e93-a32902ceb4f3",
+                      "number": "3",
+                      "title": "Smells Like Teen Spirit",
+                      "length": 287866
+                    }
+                  ],
+                  "track-count": 21,
+                  "track-offset": 2
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

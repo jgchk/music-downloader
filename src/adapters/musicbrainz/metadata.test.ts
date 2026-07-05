@@ -139,4 +139,14 @@ describe('MusicBrainzMetadata', () => {
       operation: 'musicbrainz.resolve',
     });
   });
+
+  it('surfaces a contract-violating 200 response as an InfraError without mapping it', async () => {
+    const malformed = ok({ id: 'rel-1', media: 'not-an-array' });
+    const result = await resolver([['/release/rel-1', malformed]]).resolve(albumById);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'musicbrainz.resolve',
+    });
+  });
 });

@@ -12,8 +12,8 @@ const richFile = {
 const sparseFile = { filename: '@@a\\Album\\02 Track.flac', size: 150 };
 
 describe('mapSearchResponses', () => {
-  it('returns nothing for an absent payload', () => {
-    expect(mapSearchResponses(undefined, 'album')).toEqual([]);
+  it('returns nothing for an empty response list', () => {
+    expect(mapSearchResponses([], 'album')).toEqual([]);
   });
 
   it('groups a release response into one folder candidate carrying every file', () => {

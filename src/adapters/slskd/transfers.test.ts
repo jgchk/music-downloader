@@ -2,26 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { aggregate, flattenDownloads, reasonFromTransfer } from './transfers.js';
 
 describe('flattenDownloads', () => {
-  it('returns nothing for an absent payload', () => {
-    expect(flattenDownloads(undefined)).toEqual([]);
+  it('returns nothing when the payload omits directories', () => {
+    expect(flattenDownloads({})).toEqual([]);
   });
 
   it("flattens transfers across a user payload's directory groups, tolerating empty groups", () => {
     // slskd's `GET …/downloads/{username}` returns a single user object whose transfers are nested
     // under `directories` — not a bare array of directory groups (verified against slskd 0.22.5).
+    // The user/directory wrapper keys are stripped by the contract schema before this runs, so the
+    // input here mirrors the post-parse shape.
     const flat = flattenDownloads({
-      username: 'nathan_988',
-      directories: [
-        { directory: 'a', files: [{ id: 't1' }, { id: 't2' }] },
-        { directory: 'empty' },
-      ],
+      directories: [{ files: [{ id: 't1' }, { id: 't2' }] }, {}],
     });
 
     expect(flat.map((t) => t.id)).toEqual(['t1', 't2']);
   });
 
   it('returns nothing when the payload carries no directories', () => {
-    expect(flattenDownloads({ username: 'u', directories: [] })).toEqual([]);
+    expect(flattenDownloads({ directories: [] })).toEqual([]);
   });
 });
 

@@ -238,4 +238,17 @@ describe('SlskdDownload', () => {
       operation: 'slskd.download',
     });
   });
+
+  it('surfaces a contract-violating poll body as an InfraError', async () => {
+    const { adapter } = downloader({
+      polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
+    });
+
+    const result = await adapter.download(candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.download',
+    });
+  });
 });

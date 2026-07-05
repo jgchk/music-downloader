@@ -1,0 +1,2919 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "per-peer search responses (kept 5 of 250 peers)"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/searches/ff434390-e757-4099-8802-7a33365766f2/responses"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "fileCount": 9,
+        "files": [
+          {
+            "bitRate": 227,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\01. Speak To Me,Breathe - Pink Floyd.mp3",
+            "length": 240,
+            "size": 6934792,
+            "isLocked": false
+          },
+          {
+            "bitRate": 237,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\02. On The Run - Pink Floyd.mp3",
+            "length": 213,
+            "size": 6411688,
+            "isLocked": false
+          },
+          {
+            "bitRate": 238,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\03. Time - Pink Floyd.mp3",
+            "length": 426,
+            "size": 12797875,
+            "isLocked": false
+          },
+          {
+            "bitRate": 223,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\04. The Great Gig In The Sky - Pink Floyd.mp3",
+            "length": 284,
+            "size": 8024676,
+            "isLocked": false
+          },
+          {
+            "bitRate": 246,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\05. Money - Pink Floyd.mp3",
+            "length": 392,
+            "size": 12142071,
+            "isLocked": false
+          },
+          {
+            "bitRate": 232,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\06. Us And Them - Pink Floyd.mp3",
+            "length": 460,
+            "size": 13453995,
+            "isLocked": false
+          },
+          {
+            "bitRate": 236,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\07. Any Colour You Like - Pink Floyd.mp3",
+            "length": 205,
+            "size": 6160538,
+            "isLocked": false
+          },
+          {
+            "bitRate": 240,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\08. Brain Damage - Pink Floyd.mp3",
+            "length": 230,
+            "size": 7011126,
+            "isLocked": false
+          },
+          {
+            "bitRate": 242,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\Pink Floyd\\1973 - Dark Side Of The Moon\\09. Eclipse - Pink Floyd.mp3",
+            "length": 124,
+            "size": 3854862,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 7,
+        "token": 850,
+        "uploadSpeed": 1233033,
+        "username": "peer1"
+      },
+      {
+        "fileCount": 14,
+        "files": [
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\00-pink_floyd-the_dark_side_of_the_moon-(remastered)-2011-.jpg",
+            "size": 305398,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\00-pink_floyd-the_dark_side_of_the_moon-(remastered)-2011.m3u",
+            "size": 313,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\00-pink_floyd-the_dark_side_of_the_moon-(remastered)-2011.nfo",
+            "size": 9134,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\00-pink_floyd-the_dark_side_of_the_moon-(remastered)-2011.sfv",
+            "size": 403,
+            "isLocked": false
+          },
+          {
+            "bitRate": 226,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\01 Speak to Me.mp3",
+            "length": 67,
+            "size": 1942720,
+            "isLocked": false
+          },
+          {
+            "bitRate": 235,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\02 Breathe (In The Air).mp3",
+            "length": 169,
+            "size": 5033864,
+            "isLocked": false
+          },
+          {
+            "bitRate": 240,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\03 On the Run.mp3",
+            "length": 225,
+            "size": 6805593,
+            "isLocked": false
+          },
+          {
+            "bitRate": 243,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\04 Time.mp3",
+            "length": 413,
+            "size": 12607162,
+            "isLocked": false
+          },
+          {
+            "bitRate": 229,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\05 The Great Gig in the Sky.mp3",
+            "length": 284,
+            "size": 8202373,
+            "isLocked": false
+          },
+          {
+            "bitRate": 253,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\06 Money.mp3",
+            "length": 383,
+            "size": 12197289,
+            "isLocked": false
+          },
+          {
+            "bitRate": 233,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\07 Us and Them.mp3",
+            "length": 469,
+            "size": 13736473,
+            "isLocked": false
+          },
+          {
+            "bitRate": 235,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\08 Any Colour You Like.mp3",
+            "length": 206,
+            "size": 6123289,
+            "isLocked": false
+          },
+          {
+            "bitRate": 240,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\09 Brain Damage.mp3",
+            "length": 226,
+            "size": 6848132,
+            "isLocked": false
+          },
+          {
+            "bitRate": 242,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Music\\P\\Pink Floyd\\Pink_Floyd-The_Dark_Side_Of_The_Moon-(Remastered_Digipack)-2011-CR\\10 Eclipse.mp3",
+            "length": 132,
+            "size": 4066916,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 274,
+        "token": 850,
+        "uploadSpeed": 2976290,
+        "username": "peer2"
+      },
+      {
+        "fileCount": 261,
+        "files": [
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\01 - Speak To Me.flac",
+            "length": 73,
+            "sampleRate": 44100,
+            "size": 3755129,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\01 - Speak To Me.xml",
+            "size": 15519,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\02 - Breathe.flac",
+            "length": 165,
+            "sampleRate": 44100,
+            "size": 14277215,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\02 - Breathe.xml",
+            "size": 15585,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\03 - On The Run.flac",
+            "length": 214,
+            "sampleRate": 44100,
+            "size": 16590702,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\03 - On The Run.xml",
+            "size": 20375,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\04 - Time.flac",
+            "length": 424,
+            "sampleRate": 44100,
+            "size": 35958907,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\04 - Time.xml",
+            "size": 15663,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\05 - The Great Gig In The Sky.flac",
+            "length": 287,
+            "sampleRate": 44100,
+            "size": 20692363,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\05 - The Great Gig In The Sky.xml",
+            "size": 17901,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\06 - Money.flac",
+            "length": 383,
+            "sampleRate": 44100,
+            "size": 38025961,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\06 - Money.xml",
+            "size": 16027,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\07 - Us And Them.flac",
+            "length": 469,
+            "sampleRate": 44100,
+            "size": 39756671,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\07 - Us And Them.xml",
+            "size": 22009,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\08 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 44100,
+            "size": 18788617,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\08 - Any Colour You Like.xml",
+            "size": 17069,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\09 - Brain Damage.flac",
+            "length": 230,
+            "sampleRate": 44100,
+            "size": 20501478,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\09 - Brain Damage.xml",
+            "size": 16275,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\10 - Eclipse.flac",
+            "length": 124,
+            "sampleRate": 44100,
+            "size": 11182086,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\10 - Eclipse.xml",
+            "size": 15945,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\Dark Side Of The Moon (Mobile Fidelity UltraDisc).log",
+            "size": 2975,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\Dark Side Of The Moon info.txt",
+            "size": 705,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM CD.jpg",
+            "size": 608030,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM book (00 front-back).jpg",
+            "size": 1471790,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM book (01-02).jpg",
+            "size": 1200534,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM book (03-04).jpg",
+            "size": 1431795,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM cover.jpg",
+            "size": 686936,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\art\\Pink Floyd DSOTM jewel.jpg",
+            "size": 849907,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\folder.jpg",
+            "size": 24071,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\01 - Speak To Me  Breathe In The Air.flac",
+            "length": 237,
+            "sampleRate": 44100,
+            "size": 21291016,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\01 - Speak To Me  Breathe In The Air.xml",
+            "size": 17751,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\02 - On The Run.flac",
+            "length": 211,
+            "sampleRate": 44100,
+            "size": 19340125,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\02 - On The Run.xml",
+            "size": 20317,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\03 - Time.flac",
+            "length": 425,
+            "sampleRate": 44100,
+            "size": 41925530,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\03 - Time.xml",
+            "size": 16687,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\04 - The Great Gig In The Sky.flac",
+            "length": 287,
+            "sampleRate": 44100,
+            "size": 24151222,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\04 - The Great Gig In The Sky.xml",
+            "size": 18165,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\05 - Money.flac",
+            "length": 383,
+            "sampleRate": 44100,
+            "size": 42203468,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\05 - Money.xml",
+            "size": 14803,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\06 - Us And Them.flac",
+            "length": 468,
+            "sampleRate": 44100,
+            "size": 44766457,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\06 - Us And Them.xml",
+            "size": 21645,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\07 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 44100,
+            "size": 20834714,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\07 - Any Colour You Like.xml",
+            "size": 16051,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\08 - Brain Damage.flac",
+            "length": 230,
+            "sampleRate": 44100,
+            "size": 22803950,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\08 - Brain Damage.xml",
+            "size": 14473,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\09 - Eclipse.flac",
+            "length": 126,
+            "sampleRate": 44100,
+            "size": 11776984,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\09 - Eclipse.xml",
+            "size": 18265,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\Info\\Holy Grail.txt",
+            "size": 16265,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\Info\\PinkFloyd A1A.txt",
+            "size": 1687,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\Info\\The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan].log",
+            "size": 2576,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\1A1_Matrix.jpg",
+            "size": 880129,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd-CD-1A1_Post.jpg",
+            "size": 228972,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_BkBack.jpg",
+            "size": 888268,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_BkBack.png",
+            "size": 1550313,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_CD.jpg",
+            "size": 559710,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_CD_1A1_Matrix.png",
+            "size": 7479360,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_CD_600dpi CD.png",
+            "size": 9554091,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_Liner.jpg",
+            "size": 1133361,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_Liner.png",
+            "size": 3112482,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\PinkFloyd_front.png",
+            "size": 774407,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\art\\obi.jpg",
+            "size": 14301,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  The Dark Side Of The Moon [BlackTriangle 1A1 Sony Japan]\\folder.jpg",
+            "size": 24071,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{2003}  Pink Floyd- DSOTM DTS Quad (1974)\\Dark Side Of The Moon (DTS).TXT",
+            "size": 380,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{2003}  Pink Floyd- DSOTM DTS Quad (1974)\\Dark Side Of The Moon (DTS).log",
+            "size": 2315,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{2003}  Pink Floyd- DSOTM DTS Quad (1974)\\art\\Pink_Floyd_-_Dark_Side_Of_The_Moon_DTS_(Back).jpg",
+            "size": 64505,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\01 - Speak To Me_Breathe.flac",
+            "length": 237,
+            "sampleRate": 44100,
+            "size": 21912374,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\01 - Speak To Me_Breathe.xml",
+            "size": 16903,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\02 - On The Run.flac",
+            "length": 211,
+            "sampleRate": 44100,
+            "size": 19765194,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\02 - On The Run.xml",
+            "size": 19767,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\03 - Time.flac",
+            "length": 425,
+            "sampleRate": 44100,
+            "size": 42874700,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\03 - Time.xml",
+            "size": 15819,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\04 - The Great Gig In The Sky.flac",
+            "length": 287,
+            "sampleRate": 44100,
+            "size": 25146199,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\04 - The Great Gig In The Sky.xml",
+            "size": 17191,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\05 - Money.flac",
+            "length": 383,
+            "sampleRate": 44100,
+            "size": 42786109,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\05 - Money.xml",
+            "size": 16389,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\06 - Us And Them.flac",
+            "length": 468,
+            "sampleRate": 44100,
+            "size": 45975437,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\06 - Us And Them.xml",
+            "size": 21365,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\07 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 44100,
+            "size": 21327055,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\07 - Any Colour You Like.xml",
+            "size": 16413,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\08 - Brain Damage.flac",
+            "length": 230,
+            "sampleRate": 44100,
+            "size": 23255205,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\08 - Brain Damage.xml",
+            "size": 17659,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\09 - Eclipse.flac",
+            "length": 126,
+            "sampleRate": 44100,
+            "size": 12157719,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\09 - Eclipse.xml",
+            "size": 17453,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\Dark Side Of The Moon.log",
+            "size": 2096,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\audiochecker.log",
+            "size": 676,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - Dark Side Of The Moon (Japan Harvest)\\folder.jpg",
+            "size": 38200,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\01 - Speak to Me.flac",
+            "length": 70,
+            "sampleRate": 44100,
+            "size": 5316082,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\10 - Eclipse.flac",
+            "length": 124,
+            "sampleRate": 44100,
+            "size": 12930991,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\musicbrainz Cover (1).jpg",
+            "size": 115559,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\musicbrainz Cover (2).jpg",
+            "size": 64367,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\musicbrainz Cover (3).jpg",
+            "size": 128146,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\musicbrainz Cover (4).jpg",
+            "size": 121092,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (1973)  ORIG. UK QUAD LP\\musicbrainz Cover.jpg",
+            "size": 119825,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 1\\08 - Any Colour You Like.flac",
+            "length": 206,
+            "sampleRate": 44100,
+            "size": 21428113,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 1\\musicbrainz Cover.jpg",
+            "size": 68163,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\01 - Speak to Me (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 165,
+            "sampleRate": 44100,
+            "size": 13870562,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\02 - Breathe (in the Air) (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 170,
+            "sampleRate": 44100,
+            "size": 17170508,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\03 - On the Run (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 308,
+            "sampleRate": 44100,
+            "size": 29734711,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\04 - Time (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 391,
+            "sampleRate": 44100,
+            "size": 40501163,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\05 - The Great Gig in the Sky (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 410,
+            "sampleRate": 44100,
+            "size": 38304720,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\06 - Money (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 521,
+            "sampleRate": 44100,
+            "size": 52911317,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\07 - Us and Them (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 489,
+            "sampleRate": 44100,
+            "size": 49412847,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\08 - Any Colour You Like (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 490,
+            "sampleRate": 44100,
+            "size": 47123304,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\09 - Brain Damage (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 223,
+            "sampleRate": 44100,
+            "size": 22944977,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\10 - Eclipse (live at the Empire Pool, Wembley, London 1974).flac",
+            "length": 139,
+            "sampleRate": 44100,
+            "size": 14633871,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\Folder Upscaled.jpg",
+            "size": 3746071,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\mbid-5eeac1d5-febe-4b81-a98d-ad7577c6562c-11429532352.jpg",
+            "size": 68163,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 2\\musicbrainz Cover.jpg",
+            "size": 68163,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\CD 3\\musicbrainz Cover.jpg",
+            "size": 68163,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\kopimi.jpg",
+            "size": 25376,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Pink Floyd - The Dark Side of the Moon (2011)\\the-dark-side-of-the-moon-gheTTo.jpg",
+            "size": 171828,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\01 - Speak to Me  Breathe.flac",
+            "length": 240,
+            "sampleRate": 44100,
+            "size": 21270088,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\01 - Speak to Me  Breathe.xml",
+            "size": 18001,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\02 - On the Run.flac",
+            "length": 213,
+            "sampleRate": 44100,
+            "size": 19186536,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\02 - On the Run.xml",
+            "size": 22203,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\03 - Time  Breathe (Reprise).flac",
+            "length": 426,
+            "sampleRate": 44100,
+            "size": 41244039,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\03 - Time  Breathe (Reprise).xml",
+            "size": 19199,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\04 - The Great Gig in the Sky.flac",
+            "length": 284,
+            "sampleRate": 44100,
+            "size": 24053905,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\04 - The Great Gig in the Sky.xml",
+            "size": 18785,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\05 - Money.flac",
+            "length": 392,
+            "sampleRate": 44100,
+            "size": 43365578,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\05 - Money.xml",
+            "size": 19105,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\06 - Us and Them.flac",
+            "length": 460,
+            "sampleRate": 44100,
+            "size": 45024481,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\06 - Us and Them.xml",
+            "size": 25909,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\07 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 44100,
+            "size": 21206642,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\07 - Any Colour You Like.xml",
+            "size": 17853,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\08 - Brain Damage.flac",
+            "length": 230,
+            "sampleRate": 44100,
+            "size": 23290769,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\08 - Brain Damage.xml",
+            "size": 18609,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\09 - Eclipse.flac",
+            "length": 124,
+            "sampleRate": 44100,
+            "size": 11760353,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\09 - Eclipse.xml",
+            "size": 17481,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_CD Collection_\\Rolling Stones 500 Greatest Albums\\043 # 1973 - Pink Floyd - The Dark Side of the Moon\\Cover\\043.png",
+            "size": 426560,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\01 - Speak to Me - Pink Floyd, Gilmour, David.flac",
+            "length": 72,
+            "sampleRate": 96000,
+            "size": 37826178,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\02 - Breathe - Pink Floyd, Gilmour, David.flac",
+            "length": 165,
+            "sampleRate": 96000,
+            "size": 110032242,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\03 - On the Run - Pink Floyd, Cerami, John Jr..flac",
+            "length": 223,
+            "sampleRate": 96000,
+            "size": 145801578,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\04 - Time - Pink Floyd, Gilmour, David.flac",
+            "length": 416,
+            "sampleRate": 96000,
+            "size": 284059074,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\05 - The Great Gig in the Sky - Pink Floyd, Waters, Roger.flac",
+            "length": 291,
+            "sampleRate": 96000,
+            "size": 191173662,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\06 - Money - Pink Floyd, Waters, Roger.flac",
+            "length": 403,
+            "sampleRate": 96000,
+            "size": 281174029,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\07 - Us and Them - Pink Floyd, Waters, Roger.flac",
+            "length": 455,
+            "sampleRate": 96000,
+            "size": 318589750,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\08 - Any Colour You Like - Pink Floyd, Gilmour, David.flac",
+            "length": 206,
+            "sampleRate": 96000,
+            "size": 142956470,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\09 - Brain Damage - Pink Floyd, Waters, Roger.flac",
+            "length": 232,
+            "sampleRate": 96000,
+            "size": 161795217,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - Dark Side of the Moon  (DVD-A  5.0)\\10 - Eclipse - Pink Floyd, Waters, Roger.flac",
+            "length": 127,
+            "sampleRate": 96000,
+            "size": 84379644,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\01 - Speak to Me (5.1 mix).flac",
+            "length": 67,
+            "sampleRate": 96000,
+            "size": 60524453,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\02 - Breathe (5.1 mix).flac",
+            "length": 169,
+            "sampleRate": 96000,
+            "size": 180670344,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\03 - On the Run (5.1 mix).flac",
+            "length": 213,
+            "sampleRate": 96000,
+            "size": 223056486,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\04 - Time (5.1 mix).flac",
+            "length": 424,
+            "sampleRate": 96000,
+            "size": 453797700,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\05 - The Great Gig in the Sky (5.1 mix).flac",
+            "length": 283,
+            "sampleRate": 96000,
+            "size": 285454715,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\06 - Money (5.1 mix).flac",
+            "length": 389,
+            "sampleRate": 96000,
+            "size": 420919862,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\07 - Us and Them (5.1 mix).flac",
+            "length": 463,
+            "sampleRate": 96000,
+            "size": 506282534,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\08 - Any Colour You Like (5.1 mix).flac",
+            "length": 205,
+            "sampleRate": 96000,
+            "size": 221240560,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\09 - Brain Damage (5.1 mix).flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 246065210,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\CD 03\\10 - Eclipse (5.1 mix).flac",
+            "length": 130,
+            "sampleRate": 96000,
+            "size": 135643664,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\001.jpg",
+            "size": 1558606,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\01.jpg",
+            "size": 2789903,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\02.jpg",
+            "size": 2124444,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\03.jpg",
+            "size": 3084008,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\04.jpg",
+            "size": 2553580,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\05.jpg",
+            "size": 1841418,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\06.jpg",
+            "size": 2721417,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\07.jpg",
+            "size": 2575222,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\08.jpg",
+            "size": 2759418,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\09.jpg",
+            "size": 2449022,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\10.jpg",
+            "size": 2249336,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\back1.jpg",
+            "size": 1316032,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\back2.jpg",
+            "size": 3040496,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd - The Dark Side of the Moon -{ 3 CDs }- (2003)  [24bit-96kHz]  [5.1 surround]\\art\\sacd.label.jpg",
+            "size": 1392421,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\01 - Speak To Me.flac",
+            "length": 67,
+            "sampleRate": 96000,
+            "size": 21965617,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\02 - Breathe.flac",
+            "length": 169,
+            "sampleRate": 96000,
+            "size": 66373000,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\03 - On The Run.flac",
+            "length": 213,
+            "sampleRate": 96000,
+            "size": 79203197,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\04 - Time.flac",
+            "length": 424,
+            "sampleRate": 96000,
+            "size": 165903064,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\05 - The Great Gig In The Sky.flac",
+            "length": 283,
+            "sampleRate": 96000,
+            "size": 104559308,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\06 - Money.flac",
+            "length": 389,
+            "sampleRate": 96000,
+            "size": 154476726,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\07 - Us And Them.flac",
+            "length": 463,
+            "sampleRate": 96000,
+            "size": 185271203,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\08 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 96000,
+            "size": 81039377,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\09 - Brain Damage.flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 89402652,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\Pink Floyd\\The Dark Side Of The Moon [SACD]\\10 - Eclipse.flac",
+            "length": 130,
+            "sampleRate": 96000,
+            "size": 49219552,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\01 Speak to Me-Breathe (In The Air).flac",
+            "size": 205249622,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\02 On the Run.flac",
+            "size": 197414456,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\03 Time.flac",
+            "length": 707,
+            "sampleRate": 44100,
+            "size": 377807923,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\04 The Great Gig in the Sky.flac",
+            "length": 286,
+            "sampleRate": 44100,
+            "size": 239905218,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\05 Money.flac",
+            "length": 276,
+            "sampleRate": 44100,
+            "size": 359783657,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\06 Us and Them.flac",
+            "length": 1120,
+            "sampleRate": 44100,
+            "size": 406724628,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\07 Any Colour You Like.flac",
+            "length": 1006,
+            "sampleRate": 44100,
+            "size": 179622204,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\08 Brain Damage.flac",
+            "length": 285,
+            "sampleRate": 88200,
+            "size": 191916979,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\Artwork\\Cover.png",
+            "size": 1124624,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\Artwork\\Cover_2x.png",
+            "size": 5944642,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio [SexySadist].info",
+            "size": 1571,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_HDTRACKS_\\Pink Floyd - Dark Side of the Moon (2020) - 7.1 Multichannel 192kHz-24bit High-Resolution Audio\\folder.jpg",
+            "size": 210422,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\07 - us and Them.flac",
+            "length": 462,
+            "sampleRate": 96000,
+            "size": 164696379,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\09 - Brain Damage.flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 82581691,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\10 - Eclipse.flac",
+            "length": 124,
+            "sampleRate": 96000,
+            "size": 45917191,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\Folder.jpg",
+            "size": 52230,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\01 - Speak to me 1.flac",
+            "length": 70,
+            "sampleRate": 96000,
+            "size": 23167529,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\02 - Breathe 1.flac",
+            "length": 164,
+            "sampleRate": 96000,
+            "size": 59623741,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\03 - on the run 1.flac",
+            "length": 213,
+            "sampleRate": 96000,
+            "size": 76296967,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\04 - Time 1.flac",
+            "length": 423,
+            "sampleRate": 96000,
+            "size": 157375612,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\06 - Money 1.flac",
+            "length": 396,
+            "sampleRate": 96000,
+            "size": 150109747,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\07 - us and Them 1.flac",
+            "length": 462,
+            "sampleRate": 96000,
+            "size": 165138982,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\08 - any Colour you Like 1.flac",
+            "length": 206,
+            "sampleRate": 96000,
+            "size": 74665585,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\09 - Brain Damage 1.flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 83062070,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\10 - Eclipse 1.flac",
+            "length": 124,
+            "sampleRate": 96000,
+            "size": 46365540,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\03 on the run.flac",
+            "length": 214,
+            "sampleRate": 44100,
+            "size": 20165455,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\05 the Great gig in the sky.flac",
+            "length": 288,
+            "sampleRate": 44100,
+            "size": 26049912,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\08 any Colour you Like.flac",
+            "length": 206,
+            "sampleRate": 44100,
+            "size": 21515653,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\PBTHAL Vinyl Rips\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\10 Eclipse.flac",
+            "length": 123,
+            "sampleRate": 44100,
+            "size": 12858041,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\01 - Speak to Me.flac",
+            "length": 71,
+            "sampleRate": 192000,
+            "size": 44934631,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\02 - Breathe.flac",
+            "length": 167,
+            "sampleRate": 192000,
+            "size": 113427576,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\03 - On The Run.flac",
+            "length": 226,
+            "sampleRate": 192000,
+            "size": 149508849,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\04 - Time.flac",
+            "length": 414,
+            "sampleRate": 192000,
+            "size": 282380643,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\05 - The Greate Gig In The Sky.flac",
+            "length": 282,
+            "sampleRate": 192000,
+            "size": 184671487,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\06 - Money.flac",
+            "length": 393,
+            "sampleRate": 192000,
+            "size": 269617824,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\07 - Us And Them.flac",
+            "length": 460,
+            "sampleRate": 192000,
+            "size": 306228976,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\08 - Any Colour You Like.flac",
+            "length": 206,
+            "sampleRate": 192000,
+            "size": 139495477,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\09 - Brain Damage.flac",
+            "length": 226,
+            "sampleRate": 192000,
+            "size": 150876666,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\10 - Eclipse.flac",
+            "length": 128,
+            "sampleRate": 192000,
+            "size": 86966740,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\The Dark Side Of The Moon.cue",
+            "size": 802,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (Japan)\\The Dark Side Of The Moon.flac",
+            "length": 2575,
+            "sampleRate": 192000,
+            "size": 1738401424,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\01 - Speak To Me.flac",
+            "length": 71,
+            "sampleRate": 192000,
+            "size": 45601006,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\02 - Breathe.flac",
+            "length": 169,
+            "sampleRate": 192000,
+            "size": 116225406,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\03 - On The Run.flac",
+            "length": 225,
+            "sampleRate": 192000,
+            "size": 151509483,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\04 - Time.flac",
+            "length": 413,
+            "sampleRate": 192000,
+            "size": 286803435,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\05 - The Great Gig In The Sky.flac",
+            "length": 287,
+            "sampleRate": 192000,
+            "size": 190503496,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\06 - Money.flac",
+            "length": 383,
+            "sampleRate": 192000,
+            "size": 269560437,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\07 - Us And Them.flac",
+            "length": 470,
+            "sampleRate": 192000,
+            "size": 317327582,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\08 - Any Colour You Like.flac",
+            "length": 205,
+            "sampleRate": 192000,
+            "size": 141120303,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\09 - Brain Damage.flac",
+            "length": 226,
+            "sampleRate": 192000,
+            "size": 153494339,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\10 - Eclipse.flac",
+            "length": 129,
+            "sampleRate": 192000,
+            "size": 88347978,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\The Dark Side Of The Moon.cue",
+            "size": 802,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\Pink Floyd [Vinyl]\\The Dark Side of the Moon (USA) MFSL\\The Dark Side Of The Moon.flac",
+            "length": 2582,
+            "sampleRate": 192000,
+            "size": 1774513822,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\01 - Speak to me.flac",
+            "length": 70,
+            "sampleRate": 96000,
+            "size": 22715329,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\02 - Breathe.flac",
+            "length": 164,
+            "sampleRate": 96000,
+            "size": 59178874,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\03 - on the run.flac",
+            "length": 213,
+            "sampleRate": 96000,
+            "size": 75817371,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\04 - Time.flac",
+            "length": 423,
+            "sampleRate": 96000,
+            "size": 156925641,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\05 - the Great gig in the sky.flac",
+            "length": 287,
+            "sampleRate": 96000,
+            "size": 101772920,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\06 - Money.flac",
+            "length": 396,
+            "sampleRate": 96000,
+            "size": 149637892,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\07 - us and Them.flac",
+            "length": 462,
+            "sampleRate": 96000,
+            "size": 164696379,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\08 - any Colour you Like.flac",
+            "length": 206,
+            "sampleRate": 96000,
+            "size": 74198006,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\09 - Brain Damage.flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 82581691,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\10 - Eclipse.flac",
+            "length": 124,
+            "sampleRate": 96000,
+            "size": 45917191,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\Folder.jpg",
+            "size": 52230,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\01 - Speak to me 1.flac",
+            "length": 70,
+            "sampleRate": 96000,
+            "size": 23167529,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\02 - Breathe 1.flac",
+            "length": 164,
+            "sampleRate": 96000,
+            "size": 59623741,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\03 - on the run 1.flac",
+            "length": 213,
+            "sampleRate": 96000,
+            "size": 76296967,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\04 - Time 1.flac",
+            "length": 423,
+            "sampleRate": 96000,
+            "size": 157375612,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\05 - the Great gig in the sky 1.flac",
+            "length": 287,
+            "sampleRate": 96000,
+            "size": 102212807,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\06 - Money 1.flac",
+            "length": 396,
+            "sampleRate": 96000,
+            "size": 150109747,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\07 - us and Them 1.flac",
+            "length": 462,
+            "sampleRate": 96000,
+            "size": 165138982,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\08 - any Colour you Like 1.flac",
+            "length": 206,
+            "sampleRate": 96000,
+            "size": 74665585,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\09 - Brain Damage 1.flac",
+            "length": 231,
+            "sampleRate": 96000,
+            "size": 83062070,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\1973 - Pink Floyd - Dark Side Of The Moon [UK Quadraphonic Vinyl 24-96 FLAC][Pbthal 2012]\\declicked\\10 - Eclipse 1.flac",
+            "length": 124,
+            "sampleRate": 96000,
+            "size": 46365540,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\01 Speak to me.flac",
+            "length": 70,
+            "sampleRate": 44100,
+            "size": 5313543,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\02 Breathe.flac",
+            "length": 164,
+            "sampleRate": 44100,
+            "size": 16447224,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\03 on the run.flac",
+            "length": 214,
+            "sampleRate": 44100,
+            "size": 20165455,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\04 Time.flac",
+            "length": 423,
+            "sampleRate": 44100,
+            "size": 43008105,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\05 the Great gig in the sky.flac",
+            "length": 288,
+            "sampleRate": 44100,
+            "size": 26049912,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\06 Money (uk Quad) (Pbthal Vinyl rip 2009).flac",
+            "length": 396,
+            "sampleRate": 44100,
+            "size": 44911662,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\07 us and Them.flac",
+            "length": 463,
+            "sampleRate": 44100,
+            "size": 47435436,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\08 any Colour you Like.flac",
+            "length": 206,
+            "sampleRate": 44100,
+            "size": 21515653,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\09 Brain Damage.flac",
+            "length": 231,
+            "sampleRate": 44100,
+            "size": 23409297,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\10 Eclipse.flac",
+            "length": 123,
+            "sampleRate": 44100,
+            "size": 12858041,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\Folder.jpg",
+            "size": 24071,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\front.jpg",
+            "size": 128893,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\_HD Music Collection_\\_Vinyl Transfers_\\_PBTHAL Vinyl Rips_\\PINK FLOYD The Dark Side Of The Moon (PBTHAL vinyl) FLAC\\vinyl.jpg",
+            "size": 164115,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 217,
+        "token": 850,
+        "uploadSpeed": 756989,
+        "username": "peer3"
+      },
+      {
+        "fileCount": 19,
+        "files": [
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\01 - Speak To Me _ Breathe.mp3",
+            "length": 240,
+            "size": 9644031,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\02 - On The Run.mp3",
+            "length": 213,
+            "size": 8543753,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\03 - Time.mp3",
+            "length": 426,
+            "size": 17083704,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\04 - The Great Gig In The Sky.mp3",
+            "length": 284,
+            "size": 11384831,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\05 - Money.mp3",
+            "length": 392,
+            "size": 15703394,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\06 - Us And Them.mp3",
+            "length": 460,
+            "size": 18455655,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\07 - Any Colour You Like.mp3",
+            "length": 205,
+            "size": 8248047,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\08 - Brain Damage.mp3",
+            "length": 230,
+            "size": 9243835,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\09 - Eclipse.mp3",
+            "length": 124,
+            "size": 4991100,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\10 - Speak To Me.mp3",
+            "length": 68,
+            "size": 2787328,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\11 - Breathe.mp3",
+            "length": 168,
+            "size": 6801408,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\12 - On The Run.mp3",
+            "length": 230,
+            "size": 9277440,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\13 - Time.mp3",
+            "length": 409,
+            "size": 16437248,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\14 - The Great Gig In The Sky.mp3",
+            "length": 284,
+            "size": 11419648,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\15 - Money.mp3",
+            "length": 382,
+            "size": 15364096,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\16 - Us And Them.mp3",
+            "length": 469,
+            "size": 18847744,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\17 - Any Colour You Like.mp3",
+            "length": 206,
+            "size": 8302592,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\18 - Brain Damage.mp3",
+            "length": 226,
+            "size": 9132032,
+            "isLocked": false
+          },
+          {
+            "bitRate": 320,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\0 - Albums\\--P--\\Pink Floyd [1973] Dark Side Of The Moon (30th Anniversary Remaster) [320 kbps]\\19 - Eclipse.mp3",
+            "length": 131,
+            "size": 5316608,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 28,
+        "token": 850,
+        "uploadSpeed": 696610,
+        "username": "peer4"
+      },
+      {
+        "fileCount": 21,
+        "files": [
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 01 - Speak To Me-Breathe.mp3",
+            "length": 476,
+            "size": 11440681,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 02 - On The Run.mp3",
+            "length": 555,
+            "size": 13323989,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 03 - Time.mp3",
+            "length": 454,
+            "size": 10910890,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 04 - Great Gig In The Sky.mp3",
+            "length": 597,
+            "size": 14342785,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 05 - Money.mp3",
+            "length": 496,
+            "size": 11912740,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 06 - Us And Them.mp3",
+            "length": 527,
+            "size": 12655675,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 07 - Any Colour You Like.mp3",
+            "length": 456,
+            "size": 10959194,
+            "isLocked": false
+          },
+          {
+            "bitRate": 192,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Electronic\\Orb, The\\The Orb - Dark Side of the Moon remixed\\Orb-Pink Floyd Remixes - The Dark Side Of The Moon - Trance Remix - 08 - Brain Damage.mp3",
+            "length": 807,
+            "size": 19382103,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pink Floyd - Dark Side of the Moon - DSOTM - dts\\DSOTM_DTS.cue",
+            "size": 1033,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pink Floyd - Dark Side of the Moon - DSOTM - dts\\DSOTM_DTS.dts",
+            "size": 454881324,
+            "isLocked": false
+          },
+          {
+            "bitRate": 190,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 01 - Speak To Me.mp3",
+            "length": 73,
+            "size": 1746650,
+            "isLocked": false
+          },
+          {
+            "bitRate": 198,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 02 - Breathe.mp3",
+            "length": 165,
+            "size": 4092673,
+            "isLocked": false
+          },
+          {
+            "bitRate": 207,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 03 - On The Run.mp3",
+            "length": 214,
+            "size": 5567777,
+            "isLocked": false
+          },
+          {
+            "bitRate": 204,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 04 - Time.mp3",
+            "length": 424,
+            "size": 10816125,
+            "isLocked": false
+          },
+          {
+            "bitRate": 187,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 05 - The Great Gig In The Sky.mp3",
+            "length": 287,
+            "size": 6724185,
+            "isLocked": false
+          },
+          {
+            "bitRate": 202,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 06 - Money.mp3",
+            "length": 383,
+            "size": 9698794,
+            "isLocked": false
+          },
+          {
+            "bitRate": 196,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 07 - Us And Them.mp3",
+            "length": 469,
+            "size": 11517779,
+            "isLocked": false
+          },
+          {
+            "bitRate": 214,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 08 - Any Colour You Like.mp3",
+            "length": 205,
+            "size": 5509064,
+            "isLocked": false
+          },
+          {
+            "bitRate": 196,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 09 - Brain Damage.mp3",
+            "length": 230,
+            "size": 5630379,
+            "isLocked": false
+          },
+          {
+            "bitRate": 190,
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\Pink Floyd - The Dark Side Of The Moon - 10 - Eclipse.mp3",
+            "length": 124,
+            "size": 2959492,
+            "isLocked": false
+          },
+          {
+            "code": 1,
+            "extension": "",
+            "filename": "@@share\\Lossy Formats\\Vintage\\Pitchfork Top 100 Albums of the 1970s\\070. Pink Floyd - 1973 - The Dark Side of the Moon\\folder.gif",
+            "size": 2954,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 31,
+        "token": 850,
+        "uploadSpeed": 582354,
+        "username": "peer5"
+      }
+    ]
+  }
+}

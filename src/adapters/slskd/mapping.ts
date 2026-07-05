@@ -5,31 +5,17 @@ import type {
   SourceReliability,
 } from '../../domain/candidate/candidate.js';
 import type { TargetType } from '../../domain/target/target.js';
+import type { SlskdSearchFile, SlskdSearchResponse } from './schemas.js';
 
 /**
  * Pure mapping from slskd search responses to source-agnostic {@link Candidate}s (D11, the
  * anti-corruption layer). Grouping follows the target's granularity — one candidate per file for a
  * track, one candidate per source folder for a release. Advertised audio attributes are carried as
  * hints only; validation inspects the real bytes later (D5). slskd advertises bitrate in kbps and
- * duration in seconds — both are normalized here to the domain's bits/sec and milliseconds.
+ * duration in seconds — both are normalized here to the domain's bits/sec and milliseconds. The
+ * responses arrive already validated against the contract schema (D2), so this consumes the
+ * inferred types directly.
  */
-
-interface SlskdSearchFile {
-  readonly filename?: string;
-  readonly size?: number;
-  readonly bitRate?: number; // kbps
-  readonly sampleRate?: number; // Hz
-  readonly bitDepth?: number; // bits per sample
-  readonly length?: number; // seconds
-}
-
-interface SlskdSearchResponse {
-  readonly username?: string;
-  readonly hasFreeUploadSlot?: boolean;
-  readonly uploadSpeed?: number; // bytes/sec
-  readonly queueLength?: number;
-  readonly files?: readonly SlskdSearchFile[];
-}
 
 /** Soulseek paths are Windows-style; split on either separator to be safe. */
 function lastSeparator(path: string): number {
@@ -108,9 +94,11 @@ function folderCandidates(
   });
 }
 
-/** Group raw slskd search responses into candidates at the target's granularity. */
-export function mapSearchResponses(json: unknown, targetType: TargetType): Candidate[] {
-  const responses = (json as readonly SlskdSearchResponse[] | undefined) ?? [];
+/** Group slskd search responses into candidates at the target's granularity. */
+export function mapSearchResponses(
+  responses: readonly SlskdSearchResponse[],
+  targetType: TargetType,
+): Candidate[] {
   return responses.flatMap((response) => {
     const username = response.username ?? '';
     const source = reliabilityOf(response);

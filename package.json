@@ -17,8 +17,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
+    "test:contract": "vitest run --config test/contract/vitest.config.ts",
     "test:e2e": "bash test/e2e/run.sh",
-    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov"
+    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract"
   },
   "dependencies": {
     "@fastify/swagger": "^9.7.0",

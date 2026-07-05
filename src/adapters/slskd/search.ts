@@ -8,6 +8,7 @@ import type { Logger } from '../../application/logging/logger.js';
 import { SlskdClient } from './client.js';
 import type { SlskdConfig } from './client.js';
 import { mapSearchResponses } from './mapping.js';
+import { slskdSearchResponsesSchema, slskdSearchStateSchema } from './schemas.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
 
@@ -15,16 +16,12 @@ import type { Timer } from './timer.js';
  * The slskd `SearchPort` adapter (D11). A search is created, polled until slskd reports it complete
  * or a timeout elapses, and its responses are grouped into source-agnostic candidates at the
  * target's granularity. An empty result is a valid `Ok` (a business fact, not an infra fault); only
- * transport faults or unexpected HTTP statuses surface as an `InfraError`.
+ * transport faults, unexpected HTTP statuses, or contract-violating bodies surface as an
+ * `InfraError` (D2 — responses are validated against the contract schema before mapping).
  */
 
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 15_000;
-
-interface SlskdSearchState {
-  readonly id?: string;
-  readonly isComplete?: boolean;
-}
 
 export class SlskdSearch implements SearchPort {
   private readonly client: SlskdClient;
@@ -51,12 +48,14 @@ export class SlskdSearch implements SearchPort {
   private async doSearch(target: Target, round: number): Promise<readonly Candidate[]> {
     const searchText = buildQuery(target);
     this.logger.debug({ searchText, round }, 'creating slskd search');
-    const created = (await this.client.post('/api/v0/searches', {
-      searchText,
-    })) as SlskdSearchState;
+    const created = slskdSearchStateSchema.parse(
+      await this.client.post('/api/v0/searches', { searchText }),
+    );
     const id = created.id ?? '';
     await this.awaitCompletion(id);
-    const responses = await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}/responses`);
+    const responses = slskdSearchResponsesSchema.parse(
+      await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}/responses`),
+    );
     const candidates = mapSearchResponses(responses, target.type);
     this.logger.debug({ round, candidateCount: candidates.length }, 'slskd search complete');
     return candidates;
@@ -65,9 +64,9 @@ export class SlskdSearch implements SearchPort {
   private async awaitCompletion(id: string): Promise<void> {
     const deadline = this.timer.now() + this.searchTimeoutMs;
     for (;;) {
-      const state = (await this.client.get(
-        `/api/v0/searches/${encodeURIComponent(id)}`,
-      )) as SlskdSearchState;
+      const state = slskdSearchStateSchema.parse(
+        await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}`),
+      );
       if (state.isComplete === true) return;
       if (this.timer.now() >= deadline) return;
       await this.timer.sleep(this.pollIntervalMs);

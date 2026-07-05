@@ -1,0 +1,537 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-07-05",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release/be701edc-c9c7-484a-9ed2-aeef051c19be",
+    "query": {
+      "inc": "recordings artist-credits",
+      "fmt": "json"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "date": "2016",
+      "packaging": "Gatefold Cover",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "type": "Group",
+            "disambiguation": "",
+            "name": "Pink Floyd",
+            "id": "83d91898-7763-47d7-b03b-b92132375c47",
+            "sort-name": "Pink Floyd",
+            "country": "GB"
+          },
+          "name": "Pink Floyd"
+        }
+      ],
+      "release-events": [
+        {
+          "area": {
+            "sort-name": "United States",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "name": "United States",
+            "type-id": null,
+            "type": null
+          },
+          "date": "2016"
+        }
+      ],
+      "country": "US",
+      "id": "be701edc-c9c7-484a-9ed2-aeef051c19be",
+      "media": [
+        {
+          "track-count": 10,
+          "id": "a61a7def-1caa-3baa-8a73-d8817ef02e7c",
+          "position": 1,
+          "title": "",
+          "track-offset": 0,
+          "format": "CD",
+          "tracks": [
+            {
+              "recording": {
+                "title": "Speak to Me",
+                "disambiguation": "original stereo mix",
+                "length": 68346,
+                "artist-credit": [
+                  {
+                    "artist": {
+                      "type": "Group",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "disambiguation": "",
+                      "name": "Pink Floyd",
+                      "sort-name": "Pink Floyd",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "country": "GB"
+                    },
+                    "name": "Pink Floyd",
+                    "joinphrase": ""
+                  }
+                ],
+                "first-release-date": "1973-03-24",
+                "id": "bef3fddb-5aca-49f5-b2fd-d56a23268d63",
+                "video": false
+              },
+              "id": "25f0bfca-252b-4ee2-8ba6-dac6e089dd72",
+              "number": "1",
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "name": "Pink Floyd",
+                  "artist": {
+                    "country": "GB",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "sort-name": "Pink Floyd",
+                    "name": "Pink Floyd",
+                    "disambiguation": "",
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+                  }
+                }
+              ],
+              "title": "Speak to Me",
+              "position": 1,
+              "length": 67173
+            },
+            {
+              "number": "2",
+              "title": "Breathe (In the Air)",
+              "position": 2,
+              "length": 169533,
+              "artist-credit": [
+                {
+                  "artist": {
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "type": "Group",
+                    "disambiguation": "",
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "sort-name": "Pink Floyd",
+                    "country": "GB"
+                  },
+                  "name": "Pink Floyd",
+                  "joinphrase": ""
+                }
+              ],
+              "id": "7feb257d-f1ed-486e-9f05-6eace0585bbf",
+              "recording": {
+                "first-release-date": "1973-03-24",
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "artist": {
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "country": "GB",
+                      "name": "Pink Floyd",
+                      "disambiguation": "",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "type": "Group"
+                    },
+                    "name": "Pink Floyd"
+                  }
+                ],
+                "disambiguation": "original studio stereo mix",
+                "length": 168720,
+                "title": "Breathe",
+                "video": false,
+                "id": "ecbc7c9b-e79d-4ec8-ac77-44e4a7f7f1b8"
+              }
+            },
+            {
+              "title": "On the Run",
+              "position": 3,
+              "length": 225386,
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "artist": {
+                    "name": "Pink Floyd",
+                    "sort-name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "type": "Group",
+                    "disambiguation": ""
+                  },
+                  "name": "Pink Floyd"
+                }
+              ],
+              "number": "3",
+              "recording": {
+                "id": "747a79a7-644e-42d4-be86-9adaf44393d8",
+                "video": false,
+                "title": "On the Run",
+                "disambiguation": "original studio stereo mix",
+                "length": 225386,
+                "artist-credit": [
+                  {
+                    "artist": {
+                      "name": "Pink Floyd",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "country": "GB",
+                      "sort-name": "Pink Floyd",
+                      "type": "Group",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "disambiguation": ""
+                    },
+                    "name": "Pink Floyd",
+                    "joinphrase": ""
+                  }
+                ],
+                "first-release-date": "1973-03-24"
+              },
+              "id": "31632686-e479-44da-a60b-a22805232f20"
+            },
+            {
+              "recording": {
+                "id": "41959321-f2bb-4580-aa19-16248fe665d3",
+                "video": false,
+                "length": 413000,
+                "disambiguation": "original studio stereo mix",
+                "title": "Time",
+                "first-release-date": "1973-03-24",
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "artist": {
+                      "name": "Pink Floyd",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "country": "GB",
+                      "type": "Group",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "disambiguation": ""
+                    },
+                    "name": "Pink Floyd"
+                  }
+                ]
+              },
+              "id": "a8372a33-af55-4f26-9e02-379ef7198ac9",
+              "length": 413386,
+              "position": 4,
+              "title": "Time",
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "artist": {
+                    "name": "Pink Floyd",
+                    "sort-name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "type": "Group",
+                    "disambiguation": ""
+                  },
+                  "name": "Pink Floyd"
+                }
+              ],
+              "number": "4"
+            },
+            {
+              "number": "5",
+              "length": 284066,
+              "position": 5,
+              "title": "The Great Gig in the Sky",
+              "artist-credit": [
+                {
+                  "name": "Pink Floyd",
+                  "artist": {
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "sort-name": "Pink Floyd",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "type": "Group",
+                    "disambiguation": ""
+                  },
+                  "joinphrase": ""
+                }
+              ],
+              "id": "cee841b9-b501-4c66-85a9-643cb9cc2365",
+              "recording": {
+                "video": false,
+                "id": "73b01cea-2dad-4fc2-9e61-02a31477c1b1",
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "artist": {
+                      "disambiguation": "",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "type": "Group",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "country": "GB",
+                      "name": "Pink Floyd"
+                    },
+                    "name": "Pink Floyd"
+                  }
+                ],
+                "first-release-date": "1973-03-24",
+                "title": "The Great Gig in the Sky",
+                "length": 284066,
+                "disambiguation": "original studio stereo mix"
+              }
+            },
+            {
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "artist": {
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "disambiguation": "",
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "sort-name": "Pink Floyd"
+                  },
+                  "name": "Pink Floyd"
+                }
+              ],
+              "title": "Money",
+              "position": 6,
+              "length": 383200,
+              "number": "6",
+              "id": "43080a52-1f52-4fdd-b1fb-df6896052986",
+              "recording": {
+                "id": "7fef22bd-76aa-4803-b56b-93a5d6e70662",
+                "video": false,
+                "title": "Money",
+                "disambiguation": "original studio stereo mix",
+                "length": 382746,
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "artist": {
+                      "country": "GB",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "name": "Pink Floyd",
+                      "disambiguation": "",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "type": "Group"
+                    },
+                    "name": "Pink Floyd"
+                  }
+                ],
+                "first-release-date": "1973-03-24"
+              }
+            },
+            {
+              "length": 469226,
+              "title": "Us and Them",
+              "position": 7,
+              "artist-credit": [
+                {
+                  "artist": {
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "disambiguation": "",
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "sort-name": "Pink Floyd",
+                    "country": "GB"
+                  },
+                  "name": "Pink Floyd",
+                  "joinphrase": ""
+                }
+              ],
+              "number": "7",
+              "id": "b34f0abb-45a4-447b-8f86-bbb2802663c2",
+              "recording": {
+                "video": false,
+                "id": "2d1201cf-59bb-4ffa-9f52-f5b3afa13346",
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "artist": {
+                      "name": "Pink Floyd",
+                      "country": "GB",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "type": "Group",
+                      "disambiguation": ""
+                    },
+                    "name": "Pink Floyd"
+                  }
+                ],
+                "first-release-date": "1973-03-24",
+                "title": "Us and Them",
+                "length": 469853,
+                "disambiguation": "original studio stereo mix"
+              }
+            },
+            {
+              "id": "ee834a6f-32f1-4df8-9976-e669395654f8",
+              "recording": {
+                "id": "7c278a16-ae04-460c-88ea-39155cadcd09",
+                "video": false,
+                "title": "Any Colour You Like",
+                "disambiguation": "original studio stereo mix",
+                "length": 205773,
+                "first-release-date": "1973-03-24",
+                "artist-credit": [
+                  {
+                    "artist": {
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "country": "GB",
+                      "sort-name": "Pink Floyd",
+                      "name": "Pink Floyd",
+                      "disambiguation": "",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "type": "Group"
+                    },
+                    "name": "Pink Floyd",
+                    "joinphrase": ""
+                  }
+                ]
+              },
+              "position": 8,
+              "title": "Any Colour You Like",
+              "length": 206426,
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "artist": {
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "sort-name": "Pink Floyd",
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "disambiguation": ""
+                  },
+                  "name": "Pink Floyd"
+                }
+              ],
+              "number": "8"
+            },
+            {
+              "id": "4f05b0fe-eeb3-43de-91d5-ff5d15d01f5a",
+              "recording": {
+                "artist-credit": [
+                  {
+                    "artist": {
+                      "disambiguation": "",
+                      "type": "Group",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "country": "GB",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "sort-name": "Pink Floyd",
+                      "name": "Pink Floyd"
+                    },
+                    "name": "Pink Floyd",
+                    "joinphrase": ""
+                  }
+                ],
+                "first-release-date": "1973-03-24",
+                "length": 228000,
+                "disambiguation": "original studio stereo mix",
+                "title": "Brain Damage",
+                "video": false,
+                "id": "71c0e054-b700-4fd2-a35b-95c7afc566cb"
+              },
+              "number": "9",
+              "artist-credit": [
+                {
+                  "joinphrase": "",
+                  "name": "Pink Floyd",
+                  "artist": {
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                    "disambiguation": "",
+                    "name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "sort-name": "Pink Floyd",
+                    "country": "GB"
+                  }
+                }
+              ],
+              "length": 226666,
+              "position": 9,
+              "title": "Brain Damage"
+            },
+            {
+              "artist-credit": [
+                {
+                  "name": "Pink Floyd",
+                  "artist": {
+                    "sort-name": "Pink Floyd",
+                    "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                    "country": "GB",
+                    "name": "Pink Floyd",
+                    "disambiguation": "",
+                    "type": "Group",
+                    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+                  },
+                  "joinphrase": ""
+                }
+              ],
+              "length": 132600,
+              "position": 10,
+              "title": "Eclipse",
+              "number": "10",
+              "id": "cc5a1eb6-2891-46b8-9e9a-d7d1fd51f8e1",
+              "recording": {
+                "video": false,
+                "id": "c46641c1-fdbc-4401-8b1d-23a4062a207a",
+                "first-release-date": "1973-03-24",
+                "artist-credit": [
+                  {
+                    "joinphrase": "",
+                    "name": "Pink Floyd",
+                    "artist": {
+                      "disambiguation": "",
+                      "type": "Group",
+                      "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                      "country": "GB",
+                      "sort-name": "Pink Floyd",
+                      "name": "Pink Floyd"
+                    }
+                  }
+                ],
+                "title": "Eclipse",
+                "disambiguation": "",
+                "length": 126400
+              }
+            }
+          ],
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31"
+        }
+      ],
+      "barcode": "888751709126",
+      "disambiguation": "",
+      "title": "The Dark Side of the Moon",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "cover-art-archive": {
+        "back": true,
+        "count": 14,
+        "darkened": false,
+        "artwork": true,
+        "front": true
+      },
+      "status": "Official",
+      "asin": null,
+      "quality": "normal"
+    }
+  }
+}

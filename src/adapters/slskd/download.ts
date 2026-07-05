@@ -15,6 +15,7 @@ import { candidateStagingDir } from '../filesystem/paths.js';
 import { SlskdClient } from './client.js';
 import type { SlskdConfig } from './client.js';
 import { remoteFilename } from './mapping.js';
+import { slskdTransfersSchema } from './schemas.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
 import { aggregate, flattenDownloads } from './transfers.js';
@@ -80,8 +81,11 @@ export class SlskdDownload implements DownloadPort {
     let lastBytes = 0;
     let lastProgressAt = start;
     for (;;) {
-      const mine = flattenDownloads(await this.client.get(this.downloadsPath(username))).filter(
-        (transfer) => wanted.has(transfer.filename ?? ''),
+      const payload = slskdTransfersSchema.parse(
+        await this.client.get(this.downloadsPath(username)),
+      );
+      const mine = flattenDownloads(payload).filter((transfer) =>
+        wanted.has(transfer.filename ?? ''),
       );
       const status = aggregate(mine);
       onProgress(status.progress);

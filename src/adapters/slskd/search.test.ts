@@ -128,4 +128,13 @@ describe('SlskdSearch', () => {
       operation: 'slskd.search',
     });
   });
+
+  it('surfaces a contract-violating responses body as an InfraError', async () => {
+    const result = await searcher({ responses: json({ not: 'an array' }) }).search(albumTarget, 1);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.search',
+    });
+  });
 });

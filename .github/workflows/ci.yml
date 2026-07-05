@@ -42,3 +42,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Test @ 100% coverage
         run: pnpm run test:cov
+      - name: Contract tests (frozen fixtures; no network)
+        run: pnpm run test:contract
