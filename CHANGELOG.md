@@ -1,3 +1,19 @@
+# [2.0.0](https://github.com/jgchk/music-downloader/compare/v1.0.2...v2.0.0) (2026-07-05)
+
+
+* feat(mcp)!: serve MCP over streamable HTTP, drop stdio transport ([f4758d4](https://github.com/jgchk/music-downloader/commit/f4758d470ef1e6e2ccabbceee565b762f838a879))
+
+
+### BREAKING CHANGES
+
+* the stdio MCP transport is removed. Spawn-the-process client
+configs (command/args) no longer work and must move to the streamable HTTP URL
+(http://<host>:<port>/mcp). Owner-approved, per-change exemption from the
+no-breaking-change policy; MCP tool and resource contracts are unchanged.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01T5dwkdccyQVXWZreja9kKP
+
 ## [1.0.2](https://github.com/jgchk/music-downloader/compare/v1.0.1...v1.0.2) (2026-07-05)
 
 
