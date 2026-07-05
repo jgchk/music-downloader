@@ -176,6 +176,9 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           TAG="${{ steps.ver.outputs.tag }}"
           pnpm tsx scripts/release/changelog-section.ts "$VERSION" > /tmp/notes.md
+          # The runner has no git identity; an annotated tag needs a tagger.
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -a "$TAG" -m "Release $TAG" "$GITHUB_SHA"
           git push origin "$TAG"
           gh release create "$TAG" --verify-tag --title "$TAG" --notes-file /tmp/notes.md
