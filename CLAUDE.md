@@ -19,6 +19,7 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 - **No breaking changes** to public contracts. Additive-only within a version; enforced by contract tests. → `api-compatibility.md`
 - **Every commit passes the gate** — build, lint, typecheck, format, tests. → `development-workflow.md`
 - **Config comes from the environment.** No secrets in source. → `twelve-factor.md`
+- **Use `jj`, never `git`, for all VCS operations.** This repo is driven by jujutsu (git-backed). Commit, describe, split, rebase, branch, and push with `jj` — do not run `git commit`/`git branch`/`git push` etc. Read-only `git` inspection is fine when no `jj` equivalent fits. → `development-workflow.md`
 
 ## Development constitution — `docs/development/`
 
@@ -36,7 +37,7 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 
 ## Stack
 
-Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · vitest · SQLite · ffmpeg. Local VCS: jujutsu (git-backed).
+Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · vitest · SQLite · ffmpeg. **VCS: jujutsu (`jj`), git-backed — drive all version control through `jj`, not `git` (see Non-negotiables).**
 
 ## Where things live
 
