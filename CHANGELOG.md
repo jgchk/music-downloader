@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/jgchk/music-downloader/compare/v2.0.0...v2.0.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **contract:** tolerate slskd's {version} path templating in drift checker ([70cab98](https://github.com/jgchk/music-downloader/commit/70cab98c89dbaf7757160497533a2df36a628554))
+
 # [2.0.0](https://github.com/jgchk/music-downloader/compare/v1.0.2...v2.0.0) (2026-07-05)
 
 
