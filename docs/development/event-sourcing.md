@@ -10,7 +10,7 @@ An event records something that happened, in the past tense, as an immutable fac
 
 - **decide** `(command, state) -> events` — the decision logic. Pure. Validates a command against current state and yields the events it produces (or a domain error). **All intelligence lives here.**
 - **evolve** `(state, event) -> state` — folds an event into state. Pure and total.
-- **react** `(event, state) -> effects` — a thin reflex that turns an event into descriptions of side effects. No logic, no I/O.
+- **react** `(event, state) -> effects` — a thin reflex that turns an event into descriptions of side effects. No logic, no I/O. `state` is the state **as of the event** — the fold up to and including it — so a reaction always sees the event's own post-state, deterministically, at first delivery and on redelivery alike.
 
 An imperative shell runs the loop: load events → fold to state → decide → persist events → react → run effects → feed results back as new commands. The decider stays pure; only the shell touches the outside world.
 

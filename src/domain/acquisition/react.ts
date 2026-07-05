@@ -23,17 +23,19 @@ export type Effect =
   | { readonly type: 'Cleanup'; readonly candidate: CandidateIdentity };
 
 /**
- * `state` is the aggregate's *current* folded state — NOT strictly the state right after `event`.
- * The reactor folds the whole stream before reacting (see `Reactor.process`), so when `decide`
- * co-emits `event` with a follow-on (e.g. `Imported`, always trailed by `AcquisitionFulfilled`),
- * `state` is already the *later* phase (`Fulfilled`), not `event`'s post-state (`Importing`). This
- * also holds under at-least-once redelivery: a re-reacted event sees whatever state the stream has
- * since reached. Two rules follow:
- *   1. A reaction that must fire for a non-final co-emitted event MUST key off the event's own
- *      payload, never the folded state (e.g. `Imported` → `Cleanup(event.candidate)`).
- *   2. A reaction that reads `state` narrows on its phase and falls through to no effects when the
- *      pairing does not match — consistent with `evolve`'s tolerant fold, and doubling as a guard
- *      that suppresses re-emitting an effect whose consequences the stream already records.
+ * `state` is the state *as of* `event`: the fold of the stream prefix up to and including it (the
+ * reactor slices the stream before reacting — see `Reactor.process`). So `event`'s post-state is
+ * exactly what a reaction reads, both for co-emitted batches (reacting to a non-final event sees its
+ * own phase, not a batch successor's) and under at-least-once redelivery (a re-reacted event sees
+ * the same state it saw at first delivery, regardless of how far the stream has since advanced).
+ *
+ * The phase narrowings below are TypeScript refinements over the `AcquisitionState` union; for a
+ * well-formed history each guard's phase is implied by the event just folded. They also fall through
+ * to no effects when the pairing does not match — consistent with `evolve`'s tolerant fold, which
+ * ignores an event that does not fit the reached phase (possible only for a corrupted or externally
+ * edited history). Re-firing under redelivery is safe by contract, not by suppression here: effects
+ * are idempotent and their follow-on commands pass back through `decide`, which rejects stale
+ * outcomes (see the reactor's checkpoint semantics and `docs/development/event-sourcing.md`).
  */
 export function react(event: AcquisitionEvent, state: AcquisitionState): readonly Effect[] {
   switch (event.type) {
@@ -69,7 +71,8 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
       return [{ type: 'Cleanup', candidate: event.candidate }];
     case 'Imported':
       // The imported candidate's now-empty staging directory is removed. Keyed off the event's own
-      // candidate because the folded post-state is already Fulfilled (see the note above).
+      // candidate (event-carried data): `evolve` treats `Imported` as a state no-op, so the identity
+      // lives on the event, not in the post-state.
       return [{ type: 'Cleanup', candidate: event.candidate }];
     case 'ImportConflicted':
       // The downloaded release will never be imported (the location is occupied) — discard staging.
