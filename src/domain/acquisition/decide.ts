@@ -85,6 +85,15 @@ function rejectAndAdvance(
   ];
 }
 
+/**
+ * A download aborted by a cancellation has settled: reject the pending candidate so its staged files
+ * are cleaned up (via `react`), leaving the acquisition cancelled. Fires exactly once — a later
+ * duplicate settlement folds to no `pending` and is absorbed by the terminal-state tolerance above.
+ */
+function settleCancelled(pending: Candidate): readonly AcquisitionEvent[] {
+  return [{ type: 'CandidateRejected', candidate: pending.identity }];
+}
+
 export function decide(command: AcquisitionCommand, state: AcquisitionState): Decision {
   switch (command.type) {
     case 'SubmitAcquisition':
@@ -126,6 +135,8 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
     }
 
     case 'RecordDownloadCompleted':
+      if (state.phase === 'Cancelled' && state.pending !== undefined)
+        return ok(settleCancelled(state.pending));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok([
@@ -133,6 +144,8 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       ]);
 
     case 'RecordDownloadFailed':
+      if (state.phase === 'Cancelled' && state.pending !== undefined)
+        return ok(settleCancelled(state.pending));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok(

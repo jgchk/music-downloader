@@ -4,3 +4,4 @@ export * from './mapping.js';
 export * from './transfers.js';
 export * from './search.js';
 export * from './download.js';
+export * from './resource-remover.js';

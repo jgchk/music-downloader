@@ -43,12 +43,37 @@ export class SlskdClient {
     return this.request('DELETE', path);
   }
 
+  /**
+   * DELETE a resource, treating a 404 (already absent) as success — the resource is in the desired
+   * end state, so cancel+remove is idempotent. Any other non-2xx still throws. Used for the removals
+   * where "already gone" must converge rather than error (settled-transfer cleanup, the sweep).
+   */
+  async delIfPresent(path: string): Promise<void> {
+    const response = await this.dispatch('DELETE', path);
+    if (response.status === 404) return;
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`slskd responded ${response.status} for DELETE ${path}`);
+    }
+  }
+
   private async request(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body?: unknown,
   ): Promise<unknown> {
-    const response = await this.http.send({
+    const response = await this.dispatch(method, path, body);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`slskd responded ${response.status} for ${method} ${path}`);
+    }
+    return response.body === '' ? undefined : JSON.parse(response.body);
+  }
+
+  private dispatch(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    body?: unknown,
+  ): Promise<{ status: number; body: string }> {
+    return this.http.send({
       method,
       url: `${this.baseUrl}${path}`,
       headers: {
@@ -58,9 +83,5 @@ export class SlskdClient {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`slskd responded ${response.status} for ${method} ${path}`);
-    }
-    return response.body === '' ? undefined : JSON.parse(response.body);
   }
 }

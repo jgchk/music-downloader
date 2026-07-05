@@ -1,10 +1,6 @@
-# library-import Specification
+# library-import Delta
 
-## Purpose
-
-Govern how validated downloads move from staging into the library: gating import on validation, organizing files by the naming policy, working across filesystems, and refusing to overwrite existing releases.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Only validated downloads enter the library
 The system SHALL move files into the library only after they pass validation, keeping downloads in a staging area until then so the library contains only valid music. The system SHALL also discard staged files that will never enter the library — a rejected candidate's files, a conflicted import's files, and the staged files of an acquisition cancelled after its transfer has settled — and SHALL remove a candidate's staging directory once its files have been imported, so the staging area does not accumulate orphaned downloads. When an acquisition is cancelled while a candidate's transfer is still in flight, cleanup SHALL NOT run while the source may still be writing into staging; it SHALL instead be deferred until the transfer settles (the transfer having been aborted at the source), at which point the candidate's staged files are discarded.
@@ -39,27 +35,3 @@ The system SHALL move files into the library only after they pass validation, ke
 - **GIVEN** a candidate whose files were imported into the library
 - **WHEN** the import outcome is processed
 - **THEN** the candidate's now-empty staging directory is removed
-
-### Requirement: Imported files are organized by a naming policy
-The system SHALL place imported files at a path rendered from the library naming policy and the target's canonical metadata.
-
-#### Scenario: Files land at the policy path
-- **GIVEN** a library naming policy and a validated album
-- **WHEN** import runs
-- **THEN** the files are placed under a path derived from the album's canonical artist, title, and year
-
-### Requirement: Import works across filesystems
-The system SHALL move files into the library when staging and the library share a filesystem, and SHALL fall back to a copy-then-remove when they do not.
-
-#### Scenario: Cross-filesystem import
-- **GIVEN** a staging area on a different filesystem from the library
-- **WHEN** import runs
-- **THEN** the files are copied to the library and then removed from staging
-
-### Requirement: Existing library releases are never overwritten
-The system SHALL NOT overwrite an existing release in the library; when the target location is already occupied it SHALL report a conflict as the acquisition's terminal outcome.
-
-#### Scenario: Conflict is reported, not clobbered
-- **GIVEN** a library that already contains the target release
-- **WHEN** import runs for a new acquisition of the same release
-- **THEN** the existing files are left untouched and the acquisition terminates reporting a conflict

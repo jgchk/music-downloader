@@ -23,7 +23,7 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
   return {
     metadata: { resolve: vi.fn() },
     search: { search: vi.fn() },
-    download: { download: vi.fn() },
+    download: { download: vi.fn(), abort: vi.fn() },
     probe: { probe: vi.fn() },
     library: { import: vi.fn(), discardStaging: vi.fn() },
     ...overrides,
@@ -108,10 +108,11 @@ describe('interpretEffect — download', () => {
     await seed(selectedHistory([matchingCandidate('a')]));
     const ports = stubPorts({
       download: {
-        download: vi.fn((_c, _p, cb: (progress: DownloadProgress) => void) => {
+        download: vi.fn((_a, _c, _p, cb: (progress: DownloadProgress) => void) => {
           cb({ percent: 50, bytesTransferred: 5, bytesTotal: 10 });
           return okAsync({ kind: 'completed' as const, files: sampleFiles });
         }),
+        abort: vi.fn(),
       },
     });
     await interpretEffect(deps(ports), 'acq-1', {
@@ -130,6 +131,7 @@ describe('interpretEffect — download', () => {
         download: vi.fn(() =>
           okAsync({ kind: 'failed' as const, reason: 'PeerUnavailable' as const }),
         ),
+        abort: vi.fn(),
       },
     });
     await interpretEffect(deps(ports), 'acq-1', {
@@ -138,6 +140,38 @@ describe('interpretEffect — download', () => {
       policy: DEFAULT_DOWNLOAD_POLICY,
     });
     expect(appendedTypes()).toContain('DownloadFailed');
+  });
+
+  it('aborts an in-flight transfer and rejects the pending candidate on cancellation', async () => {
+    const candidate = matchingCandidate('a');
+    await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
+    const abort = vi.fn(() => okAsync(undefined));
+    const ports = stubPorts({ download: { download: vi.fn(), abort } });
+
+    await interpretEffect(deps(ports), 'acq-1', { type: 'AbortDownload', candidate });
+
+    expect(abort).toHaveBeenCalledWith('acq-1', candidate);
+    // The settlement rejects the pending candidate; the acquisition stays cancelled.
+    expect(appendedTypes()).toContain('CandidateRejected');
+  });
+
+  it('propagates an abort infrastructure fault without appending', async () => {
+    const candidate = matchingCandidate('a');
+    await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
+    const ports = stubPorts({
+      download: {
+        download: vi.fn(),
+        abort: vi.fn(() => errAsync(infraError('slskd.abort', 'boom'))),
+      },
+    });
+
+    const result = await interpretEffect(deps(ports), 'acq-1', {
+      type: 'AbortDownload',
+      candidate,
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+    expect(appendedTypes()).not.toContain('CandidateRejected');
   });
 });
 

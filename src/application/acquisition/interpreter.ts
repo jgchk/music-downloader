@@ -59,14 +59,14 @@ export function interpretEffect(
 
     case 'Search':
       return ports.search
-        .search(effect.target, effect.round)
+        .search(acquisitionId, effect.target, effect.round)
         .andThen((candidates) =>
           applyCommand(deps, acquisitionId, { type: 'RecordSearchResults', candidates }),
         );
 
     case 'Download':
       return ports.download
-        .download(effect.candidate, effect.policy, (progress) =>
+        .download(acquisitionId, effect.candidate, effect.policy, (progress) =>
           deps.onProgress(acquisitionId, effect.candidate.identity, progress),
         )
         .andThen((result) =>
@@ -106,5 +106,15 @@ export function interpretEffect(
 
     case 'Cleanup':
       return ports.library.discardStaging(effect.candidate).map((): readonly StoredEvent[] => []);
+
+    case 'AbortDownload':
+      // Stop the in-flight transfer, then feed the settlement back as a failed outcome. `decide`
+      // turns it into the pending candidate's rejection (staging cleanup follows via `react`); the
+      // reported reason is immaterial there, so a plain `Cancelled` stands in.
+      return ports.download
+        .abort(acquisitionId, effect.candidate)
+        .andThen(() =>
+          applyCommand(deps, acquisitionId, { type: 'RecordDownloadFailed', reason: 'Cancelled' }),
+        );
   }
 }

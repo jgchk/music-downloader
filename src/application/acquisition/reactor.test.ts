@@ -32,6 +32,7 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
     search: { search: vi.fn(() => okAsync([])) },
     download: {
       download: vi.fn(() => okAsync({ kind: 'failed' as const, reason: 'Stalled' as const })),
+      abort: vi.fn(() => okAsync(undefined)),
     },
     probe: { probe: vi.fn() },
     library: { import: vi.fn(), discardStaging: vi.fn(() => okAsync(undefined)) },
@@ -162,7 +163,6 @@ describe('Reactor.process', () => {
     await reactor(ports).process(event);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
   });
-
   it('advances the checkpoint when an effect follow-on is rejected as a stale domain transition', async () => {
     // The stream has already advanced past Pending, so the re-fired ResolveMetadata's RecordTarget
     // is an IllegalTransition — a stale-outcome rejection, not an infra fault. It must not wedge the
@@ -172,6 +172,43 @@ describe('Reactor.process', () => {
     const ports = stubPorts(); // metadata.resolve returns a resolved target → RecordTarget
     await reactor(ports).process(requested);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(requested.globalSeq);
+  });
+
+  it('recovers a cancelled-mid-download acquisition across an abort failure, cleaning up on retry', async () => {
+    // A crash between AcquisitionCancelled and its AbortDownload effect: the reactor resumes from the
+    // unadvanced checkpoint and re-fires the abort, which then settles the pending candidate and
+    // discards its staging — closing the design's open question with a test.
+    const a = matchingCandidate('a');
+    await seed([...selectedHistory([a]), { type: 'AcquisitionCancelled' }]);
+    const cancelled = store.all().at(-1)!;
+
+    let abortHealthy = false;
+    const discardStaging = vi.fn(() => okAsync(undefined));
+    const ports = stubPorts({
+      download: {
+        download: vi.fn(),
+        abort: vi.fn(() =>
+          abortHealthy ? okAsync(undefined) : errAsync(infraError('slskd.abort', 'down')),
+        ),
+      },
+      library: { import: vi.fn(), discardStaging },
+    });
+    const r = reactor(ports);
+
+    // First delivery: the abort fails, so nothing is appended and the checkpoint stays put.
+    await r.process(cancelled);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+    expect(store.all().some((event) => event.type === 'CandidateRejected')).toBe(false);
+
+    // Retry once the source is reachable: the pending candidate is rejected.
+    abortHealthy = true;
+    await r.process(cancelled);
+    const rejected = store.all().find((event) => event.type === 'CandidateRejected');
+    expect(rejected).toBeDefined();
+
+    // Processing that rejection cleans up the candidate's staging.
+    await r.process(rejected!);
+    expect(discardStaging).toHaveBeenCalledWith(a.identity);
   });
 });
 
@@ -219,6 +256,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     const ports = stubPorts({
       download: {
         download: vi.fn(() => okAsync({ kind: 'completed' as const, files: sampleFiles })),
+        abort: vi.fn(() => okAsync(undefined)),
       },
     });
     await reactor(ports).process(selected);

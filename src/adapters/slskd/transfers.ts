@@ -49,6 +49,8 @@ export interface TransferAggregate {
   readonly succeeded: boolean;
   /** Every transfer is still queued (nothing has started). */
   readonly allQueued: boolean;
+  /** At least one transfer has failed terminally (dooms the candidate before the rest settle). */
+  readonly hasFailure: boolean;
   /** The reason to report if the candidate is failing (the first failed transfer's reason). */
   readonly failureReason: DownloadFailureReason;
 }
@@ -73,6 +75,7 @@ export function aggregate(transfers: readonly SlskdTransfer[]): TransferAggregat
     settled: statuses.length > 0 && statuses.every((s) => s === 'succeeded' || s === 'failed'),
     succeeded: statuses.length > 0 && statuses.every((s) => s === 'succeeded'),
     allQueued: statuses.length > 0 && statuses.every((s) => s === 'queued'),
+    hasFailure: failed !== undefined,
     failureReason: failed === undefined ? 'TransferError' : reasonFromTransfer(failed),
   };
 }

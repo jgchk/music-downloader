@@ -74,7 +74,19 @@ describe('aggregate', () => {
 
     expect(status.settled).toBe(true);
     expect(status.succeeded).toBe(false);
+    expect(status.hasFailure).toBe(true);
     expect(status.failureReason).toBe('FileUnavailable');
+  });
+
+  it('flags a failure before the whole set settles, to doom a candidate early', () => {
+    const status = aggregate([
+      { state: 'Completed, Errored', size: 100, bytesTransferred: 0 },
+      { state: 'InProgress', size: 100, bytesTransferred: 40 },
+    ]);
+
+    expect(status.settled).toBe(false);
+    expect(status.hasFailure).toBe(true);
+    expect(status.failureReason).toBe('TransferError');
   });
 
   it('flags an all-queued set and surfaces the earliest queue position', () => {

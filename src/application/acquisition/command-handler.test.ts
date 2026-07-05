@@ -3,9 +3,8 @@ import { applyCommand } from './command-handler.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import {
   defaultPolicies,
-  matchingCandidate,
+  resolvedHistory,
   sampleRequest,
-  selectedHistory,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 
 const clock = fixedClock();
@@ -44,12 +43,10 @@ describe('applyCommand', () => {
 
   it('appends nothing when decide ignores a stale command', async () => {
     const d = deps();
-    await d.store.append(
-      'acq-1',
-      0,
-      [...selectedHistory([matchingCandidate('a')]), { type: 'AcquisitionCancelled' }],
-      { acquisitionId: 'acq-1', occurredAt: clock.now().toISOString() },
-    );
+    await d.store.append('acq-1', 0, [...resolvedHistory(), { type: 'AcquisitionCancelled' }], {
+      acquisitionId: 'acq-1',
+      occurredAt: clock.now().toISOString(),
+    });
     const before = d.store.all().length;
     const result = await applyCommand(d, 'acq-1', { type: 'RecordDownloadCompleted', files: [] });
     expect(result._unsafeUnwrap()).toEqual([]);

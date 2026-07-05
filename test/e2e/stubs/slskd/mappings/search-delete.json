@@ -1,0 +1,10 @@
+{
+  "request": {
+    "method": "DELETE",
+    "urlPath": "/api/v0/searches/search-1",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 204
+  }
+}

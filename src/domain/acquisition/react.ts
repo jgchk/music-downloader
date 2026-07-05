@@ -20,7 +20,8 @@ export type Effect =
       readonly matchPolicy: MatchPolicy;
     }
   | { readonly type: 'Import'; readonly files: readonly DownloadedFile[]; readonly target: Target }
-  | { readonly type: 'Cleanup'; readonly candidate: CandidateIdentity };
+  | { readonly type: 'Cleanup'; readonly candidate: CandidateIdentity }
+  | { readonly type: 'AbortDownload'; readonly candidate: Candidate };
 
 /**
  * `state` is the state *as of* `event`: the fold of the stream prefix up to and including it (the
@@ -80,11 +81,15 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
         ? [{ type: 'Cleanup', candidate: state.current.identity }]
         : [];
     case 'AcquisitionCancelled':
-      // Discard staging only when the transfer had settled (the folded Cancelled state kept the
-      // candidate); an in-flight download is left alone (no `current`) to avoid racing the source.
-      return state.phase === 'Cancelled' && state.current !== undefined
-        ? [{ type: 'Cleanup', candidate: state.current.identity }]
-        : [];
+      // A settled transfer (folded to `current`) is discarded straight away. A mid-download transfer
+      // (folded to `pending`) is aborted at the source first; its staging is cleaned up later, when
+      // the resulting settlement rejects the candidate. Once `pending` is cleared by that rejection,
+      // a re-reacted cancellation emits nothing — the redelivery guard.
+      if (state.phase !== 'Cancelled') return [];
+      if (state.current !== undefined)
+        return [{ type: 'Cleanup', candidate: state.current.identity }];
+      if (state.pending !== undefined) return [{ type: 'AbortDownload', candidate: state.pending }];
+      return [];
     case 'MetadataResolutionFailed':
     case 'SearchCompleted':
     case 'CandidatesRanked':

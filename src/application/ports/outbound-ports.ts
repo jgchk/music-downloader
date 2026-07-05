@@ -29,8 +29,16 @@ export interface MetadataPort {
 // --- SearchPort (first adapter: slskd) ---------------------------------------------------------
 
 export interface SearchPort {
-  /** Returns candidates already grouped to the target's granularity; empty is a valid result. */
-  search(target: Target, round: number): ResultAsync<readonly Candidate[], InfraError>;
+  /**
+   * Returns candidates already grouped to the target's granularity; empty is a valid result. The
+   * `acquisitionId` owns any source-side search resource created, so it can be recorded in the
+   * ownership ledger and cleaned up after the results are harvested.
+   */
+  search(
+    acquisitionId: string,
+    target: Target,
+    round: number,
+  ): ResultAsync<readonly Candidate[], InfraError>;
 }
 
 // --- DownloadPort (first adapter: slskd) -------------------------------------------------------
@@ -48,10 +56,19 @@ export type DownloadResult =
 
 export interface DownloadPort {
   download(
+    acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
     onProgress: (progress: DownloadProgress) => void,
   ): ResultAsync<DownloadResult, InfraError>;
+
+  /**
+   * Cancel a candidate's in-flight transfers at the source and remove their records, so a cancelled
+   * acquisition stops downloading rather than running to completion (D: cancellation). Idempotent:
+   * transfers already settled or absent are tolerated, so a redelivered abort is safe. The
+   * `acquisitionId` scopes the transfers to the ones this acquisition owns in the ledger.
+   */
+  abort(acquisitionId: string, candidate: Candidate): ResultAsync<void, InfraError>;
 }
 
 // --- AudioProbePort (first adapter: ffmpeg) ----------------------------------------------------

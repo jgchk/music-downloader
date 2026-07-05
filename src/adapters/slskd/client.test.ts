@@ -59,4 +59,30 @@ describe('SlskdClient', () => {
 
     await expect(client.get('/api/v0/searches/s1')).rejects.toThrow('slskd responded 500');
   });
+
+  describe('delIfPresent', () => {
+    it('resolves on a successful delete', async () => {
+      const { http, sent } = recordingClient({ status: 204, body: '' });
+      const client = new SlskdClient(http);
+
+      await expect(client.delIfPresent('/api/v0/searches/s1')).resolves.toBeUndefined();
+      expect(sent[0]).toMatchObject({ method: 'DELETE' });
+    });
+
+    it('treats a 404 (already absent) as success', async () => {
+      const { http } = recordingClient({ status: 404, body: 'not found' });
+      const client = new SlskdClient(http);
+
+      await expect(client.delIfPresent('/api/v0/searches/gone')).resolves.toBeUndefined();
+    });
+
+    it('still throws on other non-2xx statuses', async () => {
+      const { http } = recordingClient({ status: 500, body: 'boom' });
+      const client = new SlskdClient(http);
+
+      await expect(client.delIfPresent('/api/v0/searches/s1')).rejects.toThrow(
+        'slskd responded 500',
+      );
+    });
+  });
 });

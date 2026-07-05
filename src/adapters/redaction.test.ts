@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FakeResourceLedger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import type { Logger } from '../application/logging/logger.js';
 import { createTarget } from '../domain/target/target.js';
@@ -64,6 +65,7 @@ describe('adapter logging redaction (D15)', () => {
     };
     const search = new SlskdSearch(
       logger,
+      new FakeResourceLedger(),
       new SlskdClient(http, { apiKey: 'topsecret-key' }),
       immediateTimer,
     );
@@ -74,7 +76,7 @@ describe('adapter logging redaction (D15)', () => {
       tracks: [{ position: 1, title: 'T', durationMs: 1000 }],
     })._unsafeUnwrap();
 
-    await search.search(target, 1);
+    await search.search('acq-1', target, 1);
 
     const emitted = output();
     expect(emitted).toContain('creating slskd search');

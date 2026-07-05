@@ -65,12 +65,17 @@ The system SHALL mark an acquisition as fulfilled once a candidate has passed va
 - **THEN** the acquisition reaches a terminal fulfilled state recording the library location
 
 ### Requirement: An acquisition can be cancelled
-The system SHALL allow a non-terminal acquisition to be cancelled, after which it performs no further searches, downloads, or imports.
+The system SHALL allow a non-terminal acquisition to be cancelled, after which it performs no further searches, downloads, or imports. Cancelling an acquisition whose candidate transfer is in flight SHALL abort that transfer at the source; the acquisition SHALL remember the pending candidate until its transfer settles so the settlement can be cleaned up.
 
 #### Scenario: Cancelling in flight
 - **GIVEN** an acquisition that is currently downloading
 - **WHEN** the caller cancels it
 - **THEN** the acquisition reaches a terminal cancelled state and no further work is performed
+
+#### Scenario: Cancelling aborts the in-flight transfer at the source
+- **GIVEN** an acquisition that is currently downloading
+- **WHEN** the caller cancels it
+- **THEN** the in-flight transfers are cancelled at the source rather than left to run to completion
 
 ### Requirement: Processing survives restarts without duplicating effects
 The system SHALL resume in-progress acquisitions after a process restart without starting a second download for a candidate that is already in flight. Within the at-least-once crash window — an effect was dispatched and its follow-on outcome recorded, but the consumer's checkpoint was not yet saved — redelivery SHALL converge: a re-dispatched effect is idempotent or its stale outcome is ignored by the decision logic, the acquisition's recorded history gains no duplicate outcome, and redelivery SHALL NOT wedge processing. A follow-on command rejected by the decision logic as stale or illegal SHALL be recorded and skipped (the checkpoint advances past it); only infrastructure faults SHALL leave the checkpoint unadvanced for retry.
@@ -96,10 +101,15 @@ The system SHALL resume in-progress acquisitions after a process restart without
 - **THEN** the checkpoint is not advanced and the event is processed again on the next catch-up
 
 ### Requirement: Stale external outcomes are ignored
-The system SHALL reject an external outcome (such as a late download result) that does not correspond to the acquisition's current state.
+The system SHALL reject an external outcome (such as a late download result) that does not correspond to the acquisition's current state — except that a download settlement arriving for a cancelled acquisition's still-pending candidate SHALL reject that candidate (triggering its staging cleanup) while the acquisition remains cancelled; any further settlement reports for that candidate are then ignored.
 
-#### Scenario: Late result after cancellation
-- **GIVEN** an acquisition that has been cancelled
-- **WHEN** a download-completed result arrives afterwards for that acquisition
-- **THEN** the result is ignored and the acquisition remains cancelled
+#### Scenario: Settlement after cancellation rejects the pending candidate
+- **GIVEN** an acquisition cancelled while its candidate's transfer was in flight
+- **WHEN** the transfer's settlement (completed or failed) is reported afterwards
+- **THEN** the pending candidate is rejected, its staged files become eligible for cleanup, and the acquisition remains cancelled
+
+#### Scenario: Duplicate settlement after cleanup is ignored
+- **GIVEN** a cancelled acquisition whose pending candidate has already been rejected
+- **WHEN** another settlement report arrives for that candidate
+- **THEN** the report is ignored and the acquisition remains cancelled
 
