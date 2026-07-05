@@ -40,6 +40,14 @@ async function main(): Promise<void> {
   }
   const latestSpec = JSON.parse(await response.text());
 
+  // Guard against a half-ready or wrong endpoint: an (almost) empty paths object is an environment
+  // fault, not "every operation we consume vanished". Fail as an error (2), not a drift signal (1).
+  const pathCount = Object.keys(latestSpec?.paths ?? {}).length;
+  if (pathCount < 10) {
+    console.error(`fetched spec has only ${pathCount} paths — looks empty/unready, not real drift`);
+    process.exit(2);
+  }
+
   const violations = checkSlskdSpec(latestSpec, SLSKD_CONSUMED_OPERATIONS);
   console.log(
     `\nslskd consumed-surface drift: pinned ${provenance.pinnedVersion} → ${LATEST_LABEL}`,

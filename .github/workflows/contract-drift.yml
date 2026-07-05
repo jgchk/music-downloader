@@ -37,7 +37,10 @@ jobs:
       - name: MusicBrainz drift (live replay vs schemas)
         id: mb
         continue-on-error: true
-        run: pnpm tsx test/contract/drift/musicbrainz.ts 2>&1 | tee mb.log
+        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
+        run: |
+          set -o pipefail
+          pnpm tsx test/contract/drift/musicbrainz.ts 2>&1 | tee mb.log
 
       - name: Wait for slskd swagger
         run: |
@@ -54,7 +57,10 @@ jobs:
         env:
           SLSKD_SPEC_URL: http://localhost:5030/swagger/v0/swagger.json
           SLSKD_LATEST_LABEL: latest
-        run: pnpm tsx test/contract/drift/slskd.ts 2>&1 | tee slskd.log
+        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
+        run: |
+          set -o pipefail
+          pnpm tsx test/contract/drift/slskd.ts 2>&1 | tee slskd.log
 
       - name: Open or refresh drift issue
         if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure'

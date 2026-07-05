@@ -24,6 +24,21 @@ describe('slskd consumed surface (pinned snapshot)', () => {
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
   });
 
+  it('matches consumed operations when the spec templates the version as {version}', () => {
+    // slskd's newer OpenAPI emits `/api/v{version}/…` instead of the literal `/api/v0/…`; the
+    // runtime endpoint is unchanged, so this must not read as drift.
+    const versioned = {
+      paths: Object.fromEntries(
+        Object.entries(spec.paths).map(([p, item]) => [
+          (p as string).replace('/api/v0/', '/api/v{version}/'),
+          item,
+        ]),
+      ),
+      components: spec.components,
+    };
+    expect(checkSlskdSpec(versioned, SLSKD_CONSUMED_OPERATIONS)).toEqual([]);
+  });
+
   it('detects a manifest operation the spec does not declare', () => {
     const violations = checkSlskdSpec(spec, [
       {

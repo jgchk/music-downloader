@@ -20,6 +20,15 @@ function asObject(value: unknown): Json | undefined {
   return typeof value === 'object' && value !== null ? (value as Json) : undefined;
 }
 
+/**
+ * Canonicalize the API version segment so a spec that templates it as `/api/v{version}/…` matches a
+ * manifest (and adapter) that uses the literal `/api/v0/…`. slskd's newer OpenAPI emits the version
+ * as a path parameter; the runtime endpoint is unchanged, so this is not consumed-surface drift.
+ */
+function normalizeVersion(path: string): string {
+  return path.replace(/\/v(?:\d+|\{[^}]+\})(?=\/|$)/, '/v{V}');
+}
+
 /** Resolve a local `#/components/schemas/Name` reference to its schema object. */
 function resolveRef(spec: Json, ref: unknown): Json | undefined {
   if (typeof ref !== 'string' || !ref.startsWith('#/')) return undefined;
@@ -56,10 +65,16 @@ function requestBodySchema(spec: Json, operation: Json): Json | undefined {
 export function checkSlskdSpec(spec: Json, operations: readonly SlskdOperation[]): SpecViolation[] {
   const violations: SpecViolation[] = [];
   const paths = asObject(spec.paths) ?? {};
+  // Index the spec's paths by version-normalized key so `/api/v0/…` and `/api/v{version}/…` match.
+  const byPath = new Map<string, Json>();
+  for (const [key, value] of Object.entries(paths)) {
+    const item = asObject(value);
+    if (item !== undefined) byPath.set(normalizeVersion(key), item);
+  }
 
   for (const op of operations) {
     const label = `${op.method.toUpperCase()} ${op.path}`;
-    const pathItem = asObject(paths[op.path]);
+    const pathItem = byPath.get(normalizeVersion(op.path));
     if (pathItem === undefined) {
       violations.push({ operation: label, problem: 'path not found in spec' });
       continue;
