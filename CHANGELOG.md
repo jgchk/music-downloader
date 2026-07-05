@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/jgchk/music-downloader/compare/v1.0.1...v1.0.2) (2026-07-05)
+
+
+### Bug Fixes
+
+* **slskd:** parse the real per-user downloads response shape ([491fc54](https://github.com/jgchk/music-downloader/commit/491fc548b5f33d003ea83813530163898e5c3113))
+
 ## [1.0.1](https://github.com/jgchk/music-downloader/compare/v1.0.0...v1.0.1) (2026-07-05)
 
 
