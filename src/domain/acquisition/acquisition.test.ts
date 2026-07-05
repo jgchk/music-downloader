@@ -328,11 +328,8 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     { type: 'CandidatesRanked', ranked: [] },
     { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
     { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
-    { type: 'Imported', candidate: a.identity, location: '/x' },
     { type: 'AcquisitionFulfilled', location: '/x' },
     { type: 'AcquisitionExhausted' },
-    { type: 'ImportConflicted', location: '/x' },
-    { type: 'AcquisitionCancelled' },
   ];
 
   it.each(inertEvents)('emits no effect for $type', (event) => {
@@ -343,6 +340,62 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     expect(
       Acquisition.fromHistory([]).reactTo({ type: 'CandidateRejected', candidate: a.identity }),
     ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+  });
+
+  it('cleans up staging after a successful import', () => {
+    // The reactor folds the whole stream, so the post-Imported state is already Fulfilled; the
+    // Cleanup keys off the event's own candidate, not folded state.
+    expect(
+      Acquisition.fromHistory(fulfilledHistory).reactTo({
+        type: 'Imported',
+        candidate: a.identity,
+        location: '/library/x',
+      }),
+    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+  });
+
+  it('cleans up the conflicted candidate’s staging on an import conflict', () => {
+    expect(
+      Acquisition.fromHistory(conflictedHistory).reactTo({
+        type: 'ImportConflicted',
+        location: '/library/x',
+      }),
+    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+  });
+
+  it('cleans up staging when cancelling after the transfer has settled', () => {
+    const cancelledFromValidating: AcquisitionEvent[] = [
+      ...validatingHistory([a]),
+      { type: 'AcquisitionCancelled' },
+    ];
+    expect(
+      Acquisition.fromHistory(cancelledFromValidating).reactTo({ type: 'AcquisitionCancelled' }),
+    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+  });
+
+  it('does not clean up staging when cancelling an in-flight download', () => {
+    // cancelledHistory cancels from Downloading, where the transfer may still be writing.
+    expect(
+      Acquisition.fromHistory(cancelledHistory).reactTo({ type: 'AcquisitionCancelled' }),
+    ).toEqual([]);
+  });
+
+  it('emits no effect when a state-dependent event lands on a mismatched phase', () => {
+    // Out-of-protocol pairings (post-state does not match the event) react to nothing.
+    const empty = Acquisition.fromHistory([]);
+    expect(empty.reactTo({ type: 'SearchRequested', round: 2 })).toEqual([]);
+    expect(empty.reactTo({ type: 'CandidateSelected', candidate: a })).toEqual([]);
+    expect(empty.reactTo({ type: 'DownloadCompleted', candidate: a.identity, files: [] })).toEqual(
+      [],
+    );
+    expect(
+      empty.reactTo({
+        type: 'ValidationPassed',
+        candidate: a.identity,
+        verdict: { confidence: 1, reasons: [] },
+      }),
+    ).toEqual([]);
+    expect(empty.reactTo({ type: 'ImportConflicted', location: '/x' })).toEqual([]);
   });
 });
 
@@ -385,6 +438,36 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
 
     const fulfilled = Acquisition.fromHistory(fulfilledHistory).snapshot;
     expect(fulfilled.location).toBe('/library/x');
+  });
+
+  it('projects an empty acquisition with zeroed counters and no candidate or location', () => {
+    const empty = Acquisition.fromHistory([]).snapshot;
+    expect(empty).toEqual({
+      phase: 'Empty',
+      currentCandidate: undefined,
+      attempts: 0,
+      rejectedCount: 0,
+      location: undefined,
+    });
+  });
+
+  it('does not leak an in-flight candidate into a terminal snapshot', () => {
+    // Cancelled from Downloading: the transfer was in flight, so the snapshot reports no candidate.
+    const cancelledInFlight = Acquisition.fromHistory(cancelledHistory).snapshot;
+    expect(cancelledInFlight.phase).toBe('Cancelled');
+    expect(cancelledInFlight.currentCandidate).toBeUndefined();
+  });
+
+  it('retains the settled candidate and location on terminal snapshots that keep them', () => {
+    const cancelledFromValidating = Acquisition.fromHistory([
+      ...validatingHistory([a]),
+      { type: 'AcquisitionCancelled' },
+    ]).snapshot;
+    expect(cancelledFromValidating.currentCandidate).toEqual(a.identity);
+
+    const conflicted = Acquisition.fromHistory(conflictedHistory).snapshot;
+    expect(conflicted.currentCandidate).toEqual(a.identity);
+    expect(conflicted.location).toBe('/library/x');
   });
 });
 

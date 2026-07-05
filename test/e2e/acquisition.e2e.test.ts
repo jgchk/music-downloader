@@ -106,5 +106,14 @@ describe('out-of-process acquisition E2E (HTTP)', () => {
 
     // The store is durable, not in-memory: events were persisted to an on-disk SQLite file.
     expect(existsSync(join(DATA_DIR, 'events.db'))).toBe(true);
+
+    // The Imported cleanup removes the now-empty candidate staging directory. It is dispatched
+    // around the same time the status turns Fulfilled, so poll briefly for the directory to vanish.
+    const stagingDir = candidateStagingDir(STAGING_DIR, IDENTITY);
+    const deadline = Date.now() + 10_000;
+    while (existsSync(stagingDir) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    expect(existsSync(stagingDir)).toBe(false);
   });
 });

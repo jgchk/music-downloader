@@ -37,6 +37,16 @@ export interface AcquisitionSnapshot {
   readonly location?: string;
 }
 
+/**
+ * The in-flight candidate's identity, for phases that track one. Terminal phases only retain it
+ * when the candidate's staged files still matter (a conflict, or a cancellation after the transfer
+ * settled) — so a cancelled-in-flight or exhausted acquisition reports none.
+ */
+function currentIdentityOf(state: AcquisitionState): CandidateIdentity | undefined {
+  if (state.phase === 'Cancelled') return state.current?.identity;
+  return 'current' in state ? state.current.identity : undefined;
+}
+
 export class Acquisition {
   private constructor(private readonly state: AcquisitionState) {}
 
@@ -65,12 +75,13 @@ export class Acquisition {
 
   /** The read-model projection of this aggregate's folded state. */
   get snapshot(): AcquisitionSnapshot {
+    const state = this.state;
     return {
-      phase: this.state.phase,
-      currentCandidate: this.state.current?.identity,
-      attempts: this.state.attempts,
-      rejectedCount: this.state.rejected.length,
-      location: this.state.location,
+      phase: state.phase,
+      currentCandidate: currentIdentityOf(state),
+      attempts: 'attempts' in state ? state.attempts : 0,
+      rejectedCount: 'rejected' in state ? state.rejected.length : 0,
+      location: 'location' in state ? state.location : undefined,
     };
   }
 }
