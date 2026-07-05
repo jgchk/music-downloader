@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MusicBrainzMetadata } from '../../src/adapters/musicbrainz/metadata.js';
-import { bestMatchId } from '../../src/adapters/musicbrainz/mapping.js';
+import { bestMatchId, releaseCandidateIds } from '../../src/adapters/musicbrainz/mapping.js';
 import {
   mbRecordingSearchSchema,
   mbReleaseSearchSchema,
@@ -73,15 +73,21 @@ describe('MusicBrainz contract (tier 1)', () => {
     expect(sent.query).toEqual(byName('recording-lookup.json').request.query);
   });
 
-  // For the descriptor path, the adapter searches and then applies the confidence/ambiguity guard
-  // to the real result set. These famous entities legitimately return many equally-scored hits, so
-  // the guard yields `unresolved` — the contract test pins that the adapter sends the recorded
-  // search query and interprets the real response exactly as the domain rule dictates.
-  it('sends the recorded release search and applies the ambiguity guard to real hits', async () => {
+  // For an album descriptor the adapter groups the real hits by release group and selects an edition
+  // within the confident identity. This famous album's recorded hits are all editions of one release
+  // group, so it resolves (where the old flat guard read the edition ties as ambiguity). The test
+  // pins that the adapter sends the recorded search query, attempts the canonical pick first, and
+  // resolves the release it can fetch.
+  it('sends the recorded release search and resolves the famous album by grouping its editions', async () => {
     const releases = mbReleaseSearchSchema.parse(
       byName('release-search.json').response.body,
     ).releases;
-    const expectedId = bestMatchId(releases);
+    const candidates = releaseCandidateIds(releases, 'The Dark Side of the Moon');
+    const lookupId = mbidFromPath('release-lookup.json');
+
+    // one confident release-group identity spanning many editions; the fetchable release is among them
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates).toContain(lookupId);
 
     const result = (
       await adapter().resolve({
@@ -94,14 +100,8 @@ describe('MusicBrainz contract (tier 1)', () => {
 
     const search = server.requests.find((r) => r.path === '/release')!;
     expect(search.query).toMatchObject(byName('release-search.json').request.query!);
-    if (expectedId === undefined) {
-      expect(result).toEqual({ kind: 'unresolved' });
-    } else {
-      expect(result).toMatchObject({
-        kind: 'resolved',
-        target: { type: 'album', mbid: expectedId },
-      });
-    }
+    expect(server.requests.some((r) => r.path === `/release/${candidates[0]}`)).toBe(true);
+    expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid: lookupId } });
   });
 
   it('sends the recorded recording search and applies the ambiguity guard to real hits', async () => {

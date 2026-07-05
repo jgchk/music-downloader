@@ -1,10 +1,6 @@
-# metadata-resolution Specification
+# metadata-resolution Delta
 
-## Purpose
-
-Define how a musical request is resolved into a canonical, source-agnostic target via a metadata source, and how unresolvable or ambiguous requests fail cleanly before any search begins.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: A request resolves to a canonical target
 The system SHALL resolve a musical request into a canonical target — carrying the normalized artist, title, track list, per-track durations, and release year — via a metadata source, independent of which source is configured. For an album request carrying an artist and title but no identifier, the system SHALL resolve the request's *identity* to a single release group (the album), judging match confidence and ambiguity across release groups rather than across individual releases, and SHALL then select one release (edition) within that group: releases whose title equals the request title after normalization (case, punctuation, and whitespace insensitive; exact equality only, no fuzzy matching) take precedence, ordered by canonical preference — official status first, then earliest release date; when no release title equals the request title, canonical preference alone orders the group. A selected release that cannot yield a valid target SHALL be skipped in favor of the next release in selection order.
@@ -57,11 +53,3 @@ The system SHALL, when a request cannot be resolved to a confident match, termin
 - **GIVEN** a resolved release group in which no release in selection order can yield a valid target
 - **WHEN** the request is resolved
 - **THEN** the acquisition terminates with a metadata-resolution failure
-
-### Requirement: The target model is source-agnostic
-The system SHALL express the resolved target in a normalized model that does not depend on metadata-source-specific fields, so that additional metadata sources can be added without changing downstream matching.
-
-#### Scenario: Downstream matching consumes the normalized target
-- **GIVEN** a target produced by the MusicBrainz source
-- **WHEN** matching scores a candidate against it
-- **THEN** matching reads only normalized target fields, not source-specific ones

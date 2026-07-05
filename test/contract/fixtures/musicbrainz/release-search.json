@@ -10,7 +10,7 @@
     "query": {
       "query": "release:\"The Dark Side of the Moon\" AND artist:\"Pink Floyd\"",
       "fmt": "json",
-      "limit": "5"
+      "limit": "100"
     }
   },
   "response": {

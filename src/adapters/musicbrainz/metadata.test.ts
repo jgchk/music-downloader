@@ -82,6 +82,108 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
+  it('reports unresolved when the album identity is ambiguous across release groups', async () => {
+    const result = (
+      await resolver([
+        [
+          '/release?query=',
+          ok({
+            releases: [
+              { id: 'a', score: 100, title: 'Album', 'release-group': { id: 'rg-1' } },
+              { id: 'b', score: 100, title: 'Album', 'release-group': { id: 'rg-2' } },
+            ],
+          }),
+        ],
+      ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' })
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('honors an edition named in the descriptor text', async () => {
+    const search = ok({
+      releases: [
+        {
+          id: 'std',
+          score: 100,
+          title: 'Album',
+          status: 'Official',
+          date: '2020-01-01',
+          'release-group': { id: 'rg' },
+        },
+        {
+          id: 'deluxe',
+          score: 100,
+          title: 'Album (Deluxe)',
+          status: 'Official',
+          date: '2020-02-01',
+          'release-group': { id: 'rg' },
+        },
+      ],
+    });
+    const result = (
+      await resolver([
+        ['/release?query=', search],
+        ['/release/deluxe', releaseFixture('deluxe')],
+      ]).resolve({
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'Artist',
+        title: 'Album (Deluxe)',
+      })
+    )._unsafeUnwrap();
+
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'deluxe' } });
+  });
+
+  it('falls through to the next release when the canonical pick has unusable data', async () => {
+    const search = ok({
+      releases: [
+        {
+          id: 'early',
+          score: 100,
+          title: 'Album',
+          status: 'Official',
+          date: '2010',
+          'release-group': { id: 'rg' },
+        },
+        {
+          id: 'late',
+          score: 100,
+          title: 'Album',
+          status: 'Official',
+          date: '2020',
+          'release-group': { id: 'rg' },
+        },
+      ],
+    });
+    const sparse = ok({ id: 'early', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
+    const result = (
+      await resolver([
+        ['/release?query=', search],
+        ['/release/early', sparse], // earliest official, but no tracks → no valid target
+        ['/release/late', releaseFixture('late')],
+      ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' })
+    )._unsafeUnwrap();
+
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'late' } });
+  });
+
+  it('reports unresolved when no release in the group yields a valid target', async () => {
+    const search = ok({
+      releases: [{ id: 'only', score: 100, title: 'Album', 'release-group': { id: 'rg' } }],
+    });
+    const sparse = ok({ id: 'only', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
+    const result = (
+      await resolver([
+        ['/release?query=', search],
+        ['/release/only', sparse],
+      ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' })
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
   it('resolves a recording by MBID into a single-track target', async () => {
     const result = (
       await resolver([['/recording/rec-1', recordingFixture('rec-1')]]).resolve(trackById)
@@ -127,6 +229,26 @@ describe('MusicBrainzMetadata', () => {
     )._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('escapes quotes in the descriptor search so a quoted title stays a valid Lucene phrase', async () => {
+    const urls: string[] = [];
+    const capturing: HttpClient = {
+      send: ({ url }) => {
+        urls.push(url);
+        return Promise.resolve(ok({ releases: [] }));
+      },
+    };
+
+    await new MusicBrainzMetadata(silentLogger(), capturing).resolve({
+      kind: 'descriptor',
+      targetType: 'album',
+      artist: 'David Bowie',
+      title: '"Heroes"',
+    });
+
+    const query = new URL(urls[0]!).searchParams.get('query');
+    expect(query).toBe('release:"\\"Heroes\\"" AND artist:"David Bowie"');
   });
 
   it('surfaces an unexpected HTTP status as an InfraError', async () => {

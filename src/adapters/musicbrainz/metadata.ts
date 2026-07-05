@@ -7,7 +7,7 @@ import type { Logger } from '../../application/logging/logger.js';
 import type { ZodType } from 'zod';
 import { fetchHttpClient } from '../support/http.js';
 import type { HttpClient } from '../support/http.js';
-import { bestMatchId, recordingToTarget, releaseToTarget } from './mapping.js';
+import { bestMatchId, recordingToTarget, releaseCandidateIds, releaseToTarget } from './mapping.js';
 import {
   mbRecordingSchema,
   mbRecordingSearchSchema,
@@ -17,16 +17,27 @@ import {
 
 /**
  * The MusicBrainz `MetadataPort` adapter (D12). Resolves a request — by MBID or by structured
- * descriptor — into a canonical {@link Target}. A descriptor first searches, accepts the top hit
- * only when it is confident and unambiguous ({@link bestMatchId}), then fetches the full entity.
- * Not-found / no-confident-match is the *business* outcome `unresolved`; only transport faults or
- * unexpected HTTP statuses become an `InfraError`.
+ * descriptor — into a canonical {@link Target}. An album descriptor searches, resolves the album's
+ * identity to a confident, unambiguous release group and selects an edition within it
+ * ({@link releaseCandidateIds}), then fetches releases in order until one yields a target; a track
+ * descriptor uses the flat {@link bestMatchId} guard. Not-found / no-confident-match is the
+ * *business* outcome `unresolved`; only transport faults or unexpected HTTP statuses become an
+ * `InfraError`.
  */
 
 const UNRESOLVED: MetadataResolution = { kind: 'unresolved' };
 
 const DEFAULT_BASE_URL = 'https://musicbrainz.org/ws/2';
 const DEFAULT_USER_AGENT = 'music-downloader/0.0 (https://github.com/anthropics/music-downloader)';
+
+// A popular album returns many editions of one release group, so the album search must see enough of
+// them to resolve one identity and pick an edition; MusicBrainz allows up to 100 hits per request.
+const RELEASE_SEARCH_LIMIT = 100;
+
+/** Escape a value for interpolation inside a quoted Lucene phrase (backslash and the quote). */
+function lucenePhrase(value: string): string {
+  return `"${value.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
+}
 
 export interface MusicBrainzConfig {
   readonly baseUrl?: string;
@@ -91,24 +102,29 @@ export class MusicBrainzMetadata implements MetadataPort {
     artist: string,
     title: string,
   ): Promise<MetadataResolution> {
-    const query = `release:"${title}" AND artist:"${artist}"`;
-    const json = await this.getJson(this.searchUrl('release', query), mbReleaseSearchSchema);
-    const id = bestMatchId(json?.releases);
-    return id === undefined ? UNRESOLVED : this.resolveReleaseById(id);
+    const query = `release:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
+    const url = this.searchUrl('release', query, RELEASE_SEARCH_LIMIT);
+    const json = await this.getJson(url, mbReleaseSearchSchema);
+    for (const id of releaseCandidateIds(json?.releases, title)) {
+      const resolution = await this.resolveReleaseById(id);
+      if (resolution.kind === 'resolved') return resolution;
+    }
+    return UNRESOLVED;
   }
 
   private async resolveRecordingByDescriptor(
     artist: string,
     title: string,
   ): Promise<MetadataResolution> {
-    const query = `recording:"${title}" AND artist:"${artist}"`;
-    const json = await this.getJson(this.searchUrl('recording', query), mbRecordingSearchSchema);
+    const query = `recording:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
+    const url = this.searchUrl('recording', query, this.searchLimit);
+    const json = await this.getJson(url, mbRecordingSearchSchema);
     const id = bestMatchId(json?.recordings);
     return id === undefined ? UNRESOLVED : this.resolveRecordingById(id);
   }
 
-  private searchUrl(entity: 'release' | 'recording', query: string): string {
-    return `${this.baseUrl}/${entity}?query=${encodeURIComponent(query)}&fmt=json&limit=${this.searchLimit}`;
+  private searchUrl(entity: 'release' | 'recording', query: string, limit: number): string {
+    return `${this.baseUrl}/${entity}?query=${encodeURIComponent(query)}&fmt=json&limit=${limit}`;
   }
 
   /**
