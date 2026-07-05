@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.1.2](https://github.com/jgchk/music-downloader/compare/v2.1.1...v2.1.2) (2026-07-05)
+
+
+### Bug Fixes
+
+* **acquisition:** react against post-event state via prefix fold ([49f7145](https://github.com/jgchk/music-downloader/commit/49f7145dd7785e476fee3794302dcef80cb8dab6))
+
 ## [2.1.1](https://github.com/jgchk/music-downloader/compare/v2.1.0...v2.1.1) (2026-07-05)
 
 
