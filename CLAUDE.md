@@ -53,3 +53,5 @@ Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · v
 - `openspec/` — change design, capability specs, and tasks (_what_ we're building).
 - `docs/development/` — the constitution (_how_ we build).
 - `src/{domain,application,adapters,interfaces,composition}` — the layers.
+
+**Keep the two at their right altitude.** `docs/development/*.md` is constitutional: durable, largely project-agnostic principles for _how_ we build. Write them without domain specifics — no aggregate names, no source names, no schemas. Code-level, project-specific design (the actual aggregate, ports, event schema, policies, endpoints) belongs in OpenSpec under `openspec/changes/<change>/`, which already carries that detail. If a development doc starts needing concrete design specifics, that's the signal it belongs in OpenSpec instead.
