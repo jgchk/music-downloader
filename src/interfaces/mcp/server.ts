@@ -68,9 +68,9 @@ function resource(
   return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(payload) }] };
 }
 
-export function buildMcpServer(deps: UseCaseDeps, logger: Logger): Server {
+export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: string): Server {
   const server = new Server(
-    { name: 'music-downloader', version: '1.0.0' },
+    { name: 'music-downloader', version },
     { capabilities: { tools: {}, resources: {} } },
   );
 
@@ -166,7 +166,12 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger): Server {
  * uses only to open or tear down server-push SSE streams — are refused with a method-not-allowed
  * JSON-RPC error, since this stateless surface never pushes to clients.
  */
-export function registerMcpEndpoint(app: FastifyInstance, deps: UseCaseDeps, logger: Logger): void {
+export function registerMcpEndpoint(
+  app: FastifyInstance,
+  deps: UseCaseDeps,
+  logger: Logger,
+  version: string,
+): void {
   // `hide: true` keeps MCP off the derived OpenAPI document: `/mcp` is a JSON-RPC surface, not part
   // of the versioned REST contract the OpenAPI snapshot guards.
   const hidden = { schema: { hide: true } };
@@ -178,7 +183,7 @@ export function registerMcpEndpoint(app: FastifyInstance, deps: UseCaseDeps, log
       request: { raw: IncomingMessage; body?: unknown },
       reply: { hijack: () => void; raw: ServerResponse },
     ): Promise<void> => {
-      const server = buildMcpServer(deps, logger);
+      const server = buildMcpServer(deps, logger, version);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       reply.raw.on('close', () => {
         void transport.close();

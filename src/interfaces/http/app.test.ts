@@ -26,7 +26,7 @@ describe('HTTP API v1', () => {
 
   beforeEach(async () => {
     wiring = testWiring();
-    app = await buildHttpApp(wiring.deps, silentLogger());
+    app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test');
   });
 
   afterEach(async () => {

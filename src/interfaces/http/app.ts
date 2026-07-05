@@ -50,7 +50,11 @@ export function statusForCommandError(error: CommandError): 500 | 409 {
   return error.kind === 'InfraError' ? 500 : 409;
 }
 
-export async function buildHttpApp(deps: UseCaseDeps, logger: Logger): Promise<FastifyInstance> {
+export async function buildHttpApp(
+  deps: UseCaseDeps,
+  logger: Logger,
+  version: string,
+): Promise<FastifyInstance> {
   let requestSeq = 0;
   // Widen to Fastify's logger interface so the instance keeps the default logger generic; the pino
   // Logger type is stricter (adds `msgPrefix`) and would otherwise fight Fastify's internal typing.
@@ -69,14 +73,14 @@ export async function buildHttpApp(deps: UseCaseDeps, logger: Logger): Promise<F
 
   await app.register(fastifySwagger, {
     openapi: {
-      info: { title: 'Music Downloader API', version: '1.0.0' },
+      info: { title: 'Music Downloader API', version },
     },
     transform: jsonSchemaTransform,
   });
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
   registerAcquisitionRoutes(app, deps);
-  registerMcpEndpoint(app, deps, logger);
+  registerMcpEndpoint(app, deps, logger, version);
 
   await app.ready();
   return app;

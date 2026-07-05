@@ -1,6 +1,6 @@
 {
   "name": "music-downloader",
-  "version": "0.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "An extensible, event-sourced music downloader.",
   "type": "module",
@@ -18,8 +18,10 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:contract": "vitest run --config test/contract/vitest.config.ts",
+    "test:release": "vitest run --config scripts/release/vitest.config.ts",
     "test:e2e": "bash test/e2e/run.sh",
-    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract"
+    "version:prep": "tsx scripts/release/version-prep.ts",
+    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release"
   },
   "dependencies": {
     "@fastify/swagger": "^9.7.0",
@@ -36,6 +38,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",
+    "commit-and-tag-version": "^12.7.3",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-import-resolver-typescript": "^4.0.0",
