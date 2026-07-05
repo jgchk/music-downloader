@@ -1,7 +1,7 @@
 import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
+import { Acquisition } from '../../domain/acquisition/acquisition.js';
+import type { AcquisitionPhase } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionEvent, DownloadFailureReason } from '../../domain/acquisition/events.js';
-import { foldEvents } from '../../domain/acquisition/state.js';
-import type { AcquisitionPhase } from '../../domain/acquisition/state.js';
 import type { ValidationReason } from '../../domain/validation/verdict.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
@@ -42,7 +42,7 @@ export function projectStatus(
   acquisitionId: string,
   events: readonly AcquisitionEvent[],
 ): AcquisitionStatusView {
-  const state = foldEvents(events);
+  const snapshot = Acquisition.fromHistory(events).snapshot;
   const history: StatusHistoryEntry[] = [];
   for (const event of events) {
     if (event.type === 'CandidateSelected') {
@@ -61,11 +61,11 @@ export function projectStatus(
   }
   return {
     acquisitionId,
-    status: state.phase,
-    currentCandidate: state.current?.identity,
-    attempts: state.attempts,
-    rejectedCount: state.rejected.length,
-    location: state.location,
+    status: snapshot.phase,
+    currentCandidate: snapshot.currentCandidate,
+    attempts: snapshot.attempts,
+    rejectedCount: snapshot.rejectedCount,
+    location: snapshot.location,
     history,
   };
 }

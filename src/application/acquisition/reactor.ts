@@ -1,5 +1,4 @@
-import { foldEvents } from '../../domain/acquisition/state.js';
-import { react } from '../../domain/acquisition/react.js';
+import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { Logger } from '../logging/logger.js';
 import type {
   CheckpointStore,
@@ -68,8 +67,8 @@ export class Reactor {
       return;
     }
 
-    const state = foldEvents(stream.value.map((entry) => entry.event));
-    for (const effect of react(stored.event, state)) {
+    const acquisition = Acquisition.fromHistory(stream.value.map((entry) => entry.event));
+    for (const effect of acquisition.reactTo(stored.event)) {
       const result = await interpretEffect(this.deps.interpreter, stored.streamId, effect);
       if (result.isErr()) {
         // Leave the checkpoint unadvanced so the effect is retried; do not swallow the fault.

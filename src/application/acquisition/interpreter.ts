@@ -1,6 +1,6 @@
 import type { ResultAsync } from 'neverthrow';
 import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
-import type { Effect } from '../../domain/acquisition/react.js';
+import type { Effect } from '../../domain/acquisition/acquisition.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type {
   AudioProbePort,

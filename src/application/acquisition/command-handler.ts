@@ -1,9 +1,8 @@
 import { errAsync, okAsync } from 'neverthrow';
 import type { ResultAsync } from 'neverthrow';
+import { Acquisition } from '../../domain/acquisition/acquisition.js';
+import type { DomainError } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
-import { decide } from '../../domain/acquisition/decide.js';
-import type { DomainError } from '../../domain/acquisition/decide.js';
-import { foldEvents } from '../../domain/acquisition/state.js';
 import type {
   AppendError,
   EventMetadata,
@@ -30,8 +29,8 @@ export function applyCommand(
   command: AcquisitionCommand,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   return deps.store.readStream(acquisitionId).andThen((stored) => {
-    const state = foldEvents(stored.map((entry) => entry.event));
-    const decision = decide(command, state);
+    const acquisition = Acquisition.fromHistory(stored.map((entry) => entry.event));
+    const decision = acquisition.execute(command);
     if (decision.isErr()) return errAsync(decision.error);
     if (decision.value.length === 0) return okAsync<readonly StoredEvent[], CommandError>([]);
     const metadata: EventMetadata = {

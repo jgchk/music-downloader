@@ -25,6 +25,32 @@ const layerBoundaryZones = [
   { target: './src/interfaces', from: './src/composition' },
 ];
 
+/**
+ * The acquisition decider internals — the folded state, `decide`, and `react` — are private to the
+ * aggregate. Only `src/domain/acquisition/*` may import them; every other layer goes through the
+ * `Acquisition` facade (`acquisition.js`), which re-exports the public types. A violation fails
+ * lint and therefore CI.
+ */
+const acquisitionInternals = [
+  './src/domain/acquisition/state.ts',
+  './src/domain/acquisition/decide.ts',
+  './src/domain/acquisition/react.ts',
+];
+const aggregateExternalConsumers = [
+  './src/application',
+  './src/adapters',
+  './src/interfaces',
+  './src/composition',
+];
+const aggregateEncapsulationZones = aggregateExternalConsumers.flatMap((target) =>
+  acquisitionInternals.map((from) => ({
+    target,
+    from,
+    message:
+      'Acquisition decider internals are private to the aggregate — import the Acquisition facade from domain/acquisition/acquisition.js instead.',
+  })),
+);
+
 export default tseslint.config(
   {
     // test/e2e is an out-of-process, Docker-driven black-box suite verified by execution, not part
@@ -60,7 +86,10 @@ export default tseslint.config(
       },
     },
     rules: {
-      'import/no-restricted-paths': ['error', { zones: layerBoundaryZones }],
+      'import/no-restricted-paths': [
+        'error',
+        { zones: [...layerBoundaryZones, ...aggregateEncapsulationZones] },
+      ],
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
