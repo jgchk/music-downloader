@@ -18,10 +18,14 @@ export interface SlskdTransfer {
   readonly exception?: string;
 }
 
-/** slskd's `GET …/downloads/{username}` groups transfers by directory; flatten to a file list. */
+/**
+ * slskd's `GET …/downloads/{username}` returns a single user object whose transfers are grouped by
+ * directory under `directories`; flatten those groups to a flat file list.
+ */
 export function flattenDownloads(json: unknown): SlskdTransfer[] {
-  const directories = (json as readonly { files?: readonly SlskdTransfer[] }[] | undefined) ?? [];
-  return directories.flatMap((directory) => directory.files ?? []);
+  const payload = json as
+    { directories?: readonly { files?: readonly SlskdTransfer[] }[] } | undefined;
+  return (payload?.directories ?? []).flatMap((directory) => directory.files ?? []);
 }
 
 type TransferStatus = 'succeeded' | 'failed' | 'queued' | 'transferring';

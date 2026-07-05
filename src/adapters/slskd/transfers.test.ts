@@ -6,13 +6,22 @@ describe('flattenDownloads', () => {
     expect(flattenDownloads(undefined)).toEqual([]);
   });
 
-  it('flattens transfers across directory groups, tolerating empty groups', () => {
-    const flat = flattenDownloads([
-      { files: [{ id: 't1' }, { id: 't2' }] },
-      { directory: 'empty' },
-    ]);
+  it("flattens transfers across a user payload's directory groups, tolerating empty groups", () => {
+    // slskd's `GET …/downloads/{username}` returns a single user object whose transfers are nested
+    // under `directories` — not a bare array of directory groups (verified against slskd 0.22.5).
+    const flat = flattenDownloads({
+      username: 'nathan_988',
+      directories: [
+        { directory: 'a', files: [{ id: 't1' }, { id: 't2' }] },
+        { directory: 'empty' },
+      ],
+    });
 
     expect(flat.map((t) => t.id)).toEqual(['t1', 't2']);
+  });
+
+  it('returns nothing when the payload carries no directories', () => {
+    expect(flattenDownloads({ username: 'u', directories: [] })).toEqual([]);
   });
 });
 

@@ -10,19 +10,23 @@
   "response": {
     "status": 200,
     "headers": { "Content-Type": "application/json" },
-    "jsonBody": [
-      {
-        "directory": "@@music\\Test Artist\\Test Album",
-        "files": [
-          {
-            "id": "transfer-1",
-            "filename": "@@music\\Test Artist\\Test Album\\01 Track One.flac",
-            "state": "InProgress, Transferring",
-            "size": 1234567,
-            "bytesTransferred": 617283
-          }
-        ]
-      }
-    ]
+    "jsonBody": {
+      "username": "peer1",
+      "directories": [
+        {
+          "directory": "@@music\\Test Artist\\Test Album",
+          "fileCount": 1,
+          "files": [
+            {
+              "id": "transfer-1",
+              "filename": "@@music\\Test Artist\\Test Album\\01 Track One.flac",
+              "state": "InProgress, Transferring",
+              "size": 1234567,
+              "bytesTransferred": 617283
+            }
+          ]
+        }
+      ]
+    }
   }
 }

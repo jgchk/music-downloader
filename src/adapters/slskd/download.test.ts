@@ -30,7 +30,12 @@ function transfer(name: string, extra: Record<string, unknown> = {}): Record<str
 }
 
 function poll(files: readonly unknown[]): HttpResponse {
-  return { status: 200, body: JSON.stringify([{ directory: 'd', files }]) };
+  // Mirror slskd's real per-user download payload: a single object whose transfers hang off
+  // `directories`, each group carrying a `files` array (verified against slskd 0.22.5).
+  return {
+    status: 200,
+    body: JSON.stringify({ username: 'u1', directories: [{ directory: 'd', files }] }),
+  };
 }
 
 function fakeTimer(): Timer {
@@ -60,7 +65,7 @@ function downloader(opts: Opts): { adapter: SlskdDownload; deletes: string[] } {
         return Promise.resolve({ status: 204, body: '' });
       }
       const next = queue.length > 1 ? queue.shift() : queue[0];
-      return Promise.resolve(next ?? { status: 200, body: '[]' });
+      return Promise.resolve(next ?? { status: 200, body: '{"directories":[]}' });
     },
   };
   const adapter = new SlskdDownload(
