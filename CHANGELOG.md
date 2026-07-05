@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.1.3](https://github.com/jgchk/music-downloader/compare/v2.1.2...v2.1.3) (2026-07-05)
+
+
+### Bug Fixes
+
+* **metadata:** resolve descriptor albums via release-group grouping ([ba9e3e7](https://github.com/jgchk/music-downloader/commit/ba9e3e7ffcab6bd708a1b14574dd8ff9668b33d9))
+
 ## [2.1.2](https://github.com/jgchk/music-downloader/compare/v2.1.1...v2.1.2) (2026-07-05)
 
 
