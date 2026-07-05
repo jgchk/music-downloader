@@ -19,7 +19,7 @@ import {
   LibraryViewProjection,
   ProgressReadModel,
 } from '../application/projections/read-models.js';
-import type { AcquisitionPhase } from '../domain/acquisition/state.js';
+import type { AcquisitionPhase } from '../domain/acquisition/acquisition.js';
 import {
   matchingCandidate,
   sampleTarget,
