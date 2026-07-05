@@ -3,9 +3,7 @@
 ## Purpose
 
 Define the encapsulation boundary of the acquisition domain: its decision logic (the functional decide/evolve/react decider and the folded state) is a private engine wrapped behind a single pure, immutable `Acquisition` aggregate facade. Every other layer interacts with acquisition behavior only through that facade, while commands, events, domain errors, effects, and phase remain the public contract.
-
 ## Requirements
-
 ### Requirement: The Acquisition aggregate is the sole entry point to acquisition decision logic
 The domain SHALL expose acquisition decision logic exclusively through an `Acquisition` aggregate facade providing rehydration from history, command execution, and event reaction. Code outside the domain's acquisition module MUST NOT be able to import the decider internals (the state shape, initial state, fold, decision function, or reaction function); such an import SHALL fail the lint gate and therefore CI.
 
@@ -60,3 +58,15 @@ Rehydrating an acquisition from its event history SHALL be a total fold: it SHAL
 #### Scenario: Every event type is ignored by every non-matching phase
 - **WHEN** each acquisition event type is applied, in isolation, to a state in each phase that is not a legal source phase for that event
 - **THEN** the fold returns the input state unchanged in every combination
+
+### Requirement: Reactions are computed against the state as of the event
+When the system reacts to a stored event, the effects SHALL be computed against the acquisition state folded from the stream prefix up to and including that event — never from events recorded after it. Reaction is therefore a deterministic function of the stream prefix: reacting to the same event of the same stream SHALL yield the same effects at first delivery, at redelivery, and during replay, regardless of how far the stream has since advanced.
+
+#### Scenario: A non-final co-emitted event reacts against its own post-state
+- **WHEN** a decision co-emits an import event together with its fulfilment event, and the reactor reacts to the import event
+- **THEN** the state used for the reaction reflects only the history up to and including the import event (the importing-phase data, with the current candidate available), not the fulfilled successor state
+
+#### Scenario: A redelivered event produces the same effects as first delivery
+- **WHEN** an already-reacted event is delivered again after the stream has recorded further events
+- **THEN** reacting to it yields exactly the effects that were produced at first delivery
+

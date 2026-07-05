@@ -6,8 +6,18 @@ import type {
   EventStorePort,
   StoredEvent,
 } from '../ports/event-store-port.js';
+import type { CommandError } from './command-handler.js';
 import { interpretEffect } from './interpreter.js';
 import type { InterpreterDeps } from './interpreter.js';
+
+/**
+ * An effect follow-on that fails is either a transient infrastructure fault — retry it by leaving
+ * the checkpoint unadvanced — or a domain rejection (a stale/illegal outcome the stream has already
+ * settled), which retrying can never resolve. Only the former is retryable (D5).
+ */
+function isRetryable(error: CommandError): boolean {
+  return error.kind === 'InfraError' || error.kind === 'ConcurrencyConflict';
+}
 
 /**
  * The durable reactor / process manager (D8): the one component that fires real effects, so it
@@ -67,16 +77,29 @@ export class Reactor {
       return;
     }
 
-    const acquisition = Acquisition.fromHistory(stream.value.map((entry) => entry.event));
+    // React against the state as of `stored` — the fold of the stream prefix up to and including it
+    // — not the whole stream (D1). This keeps `react` a deterministic function of the prefix: a
+    // co-emitted or redelivered event sees its own post-state, never a later one.
+    const prefix = stream.value.filter((entry) => entry.version <= stored.version);
+    const acquisition = Acquisition.fromHistory(prefix.map((entry) => entry.event));
     for (const effect of acquisition.reactTo(stored.event)) {
       const result = await interpretEffect(this.deps.interpreter, stored.streamId, effect);
       if (result.isErr()) {
-        // Leave the checkpoint unadvanced so the effect is retried; do not swallow the fault.
-        this.deps.logger.error(
+        if (isRetryable(result.error)) {
+          // Transient fault: leave the checkpoint unadvanced so the effect is retried.
+          this.deps.logger.error(
+            { acquisitionId: stored.streamId, effect: effect.type, err: result.error },
+            'effect dispatch failed',
+          );
+          return;
+        }
+        // Stale/illegal outcome — the stream has already settled it. Record and advance past it
+        // (D5); retrying would only re-fire the same rejection forever.
+        this.deps.logger.warn(
           { acquisitionId: stored.streamId, effect: effect.type, err: result.error },
-          'effect dispatch failed',
+          'effect follow-on rejected as stale; advancing past it',
         );
-        return;
+        break;
       }
       this.deps.logger.debug(
         { acquisitionId: stored.streamId, effect: effect.type },
