@@ -6,7 +6,7 @@
 # localhost:3000 and seeding the audio fixture into the shared ./.e2e-tmp staging volume.
 services:
   mb-stub:
-    image: wiremock/wiremock:3.9.2
+    image: wiremock/wiremock:3.13.2
     command: ['--disable-banner']
     volumes:
       - ./test/e2e/stubs/musicbrainz:/home/wiremock
@@ -14,7 +14,7 @@ services:
       - '8081:8080'
 
   slskd-stub:
-    image: wiremock/wiremock:3.9.2
+    image: wiremock/wiremock:3.13.2
     command: ['--disable-banner']
     volumes:
       - ./test/e2e/stubs/slskd:/home/wiremock
