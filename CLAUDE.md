@@ -6,7 +6,7 @@ This file orients anyone — human or AI — working in this repository. Read th
 
 An extensible, event-sourced music downloader. Given a musical intent and a quality policy, it finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release across pluggable sources, exposed over HTTP and MCP.
 
-**Status: pre-implementation.** The design, capability specs, and task breakdown live in `openspec/changes/bootstrap-acquisition-core/` (`design.md`, `specs/`, `tasks.md`) — the source of truth for _what_ we build. The docs below are the source of truth for _how_ we build.
+Design, capability specs, and task breakdowns live under `openspec/changes/` (active) and `openspec/changes/archive/` (shipped) — the source of truth for _what_ we build. The docs below are the source of truth for _how_ we build.
 
 ## Non-negotiables
 
@@ -35,12 +35,21 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 - [twelve-factor.md](docs/development/twelve-factor.md) — the twelve-factor method as we apply it
 - [development-workflow.md](docs/development/development-workflow.md) — trunk-based dev, jujutsu, conventional commits, CI/CD
 
+## Commands
+
+- `pnpm check` — the full gate: format → lint → typecheck → build → test w/ coverage. Every commit must pass it.
+- `pnpm test` / `pnpm test:watch` / `pnpm test:cov` — unit + integration (vitest).
+- `pnpm test:e2e` — out-of-process E2E against a live slskd (`test/e2e/run.sh`).
+- `pnpm format:write` — apply prettier fixes.
+
+Runtime: Node ≥24, pnpm 11. After switching Node versions locally, run `pnpm rebuild better-sqlite3` (native module).
+
 ## Stack
 
-Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · vitest · SQLite · ffmpeg. **VCS: jujutsu (`jj`), git-backed — drive all version control through `jj`, not `git` (see Non-negotiables).**
+Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · vitest · SQLite · ffmpeg. VCS: jujutsu (`jj`), git-backed — see Non-negotiables.
 
 ## Where things live
 
 - `openspec/` — change design, capability specs, and tasks (_what_ we're building).
 - `docs/development/` — the constitution (_how_ we build).
-- `src/{domain,application,adapters,interfaces,composition}` — the layers (once implemented).
+- `src/{domain,application,adapters,interfaces,composition}` — the layers.
