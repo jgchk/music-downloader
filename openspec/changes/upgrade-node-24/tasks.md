@@ -28,9 +28,9 @@
 - [x] 5.1 Run the quality gate on Node 24: `pnpm run format`, `lint`, `typecheck`, `build` — all green (via `fnm exec --using 24.18.0`)
 - [x] 5.2 Run the full suite at 100% coverage on Node 24: `pnpm run test:cov` — **336/336 pass, 100% coverage**. Note: required `pnpm rebuild better-sqlite3` locally after the Node switch (native ABI); CI/Docker install fresh so are unaffected
 - [x] 5.3 Build the image and run the out-of-process Docker E2E against `node:24.18.0-slim` — **passes unchanged** (better-sqlite3 built for Node 24 inside the container, real ffmpeg + import over HTTP)
-- [ ] 5.4 Push the branch and confirm CI/CD is green and emits **no** Node runtime deprecation warnings (validates the runtime-baseline spec)
+- [x] 5.4 Push the branch and confirm CI/CD is green and emits **no** Node runtime deprecation warnings (validates the runtime-baseline spec) — CI run #28724570494 **green** (quality + test); **zero** Actions-runtime deprecation annotations. (The only `DEP0176 fs.R_OK` log line is better-sqlite3's own install script, not an Actions warning.)
 
 ## 6. Wrap up
 
 - [x] 6.1 Update any docs that state the Node version (e.g. `docs/development/twelve-factor.md` dev/prod-parity notes, README/stack lists) to Node 24 — **no-op**: no doc hardcodes a version; README already points to `.nvmrc` (single source of truth), twelve-factor parity note is version-agnostic
-- [ ] 6.2 Commit with a conventional message and open the PR; archive the change once merged
+- [x] 6.2 Commit with a conventional message and open the PR (**#2**, https://github.com/jgchk/music-downloader/pull/2); archive the change once merged (archive pending merge)
