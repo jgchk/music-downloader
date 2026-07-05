@@ -1,13 +1,13 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`OpenAPI contract > matches the published contract snapshot 1`] = `
+exports[`OpenAPI contract > matches the published contract snapshot (version-normalized) 1`] = `
 {
   "components": {
     "schemas": {},
   },
   "info": {
     "title": "Music Downloader API",
-    "version": "1.0.0",
+    "version": "0.0.0",
   },
   "openapi": "3.0.3",
   "paths": {

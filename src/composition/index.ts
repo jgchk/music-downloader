@@ -26,6 +26,7 @@ import {
 } from '../application/projections/read-models.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { loadConfig } from './config.js';
+import { readAppVersion } from './version.js';
 
 /**
  * The composition root (D9): the one place that constructs concretes and injects them into the
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
   // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
   // process that raced this one's reactor and read stale projections.
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
-  const httpApp = await buildHttpApp(deps, logger);
+  const httpApp = await buildHttpApp(deps, logger, readAppVersion());
   await httpApp.listen({ port: config.httpPort, host: config.host });
 
   logger.info({ port: config.httpPort, host: config.host }, 'music-downloader started');

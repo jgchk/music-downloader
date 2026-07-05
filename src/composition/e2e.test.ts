@@ -118,7 +118,7 @@ afterEach(async () => {
 async function startHttp(opts: E2eOptions) {
   const w = wire(opts);
   await w.reactor.start();
-  const app = await buildHttpApp(w.deps, silentLogger());
+  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test');
   cleanups.push(
     () => app.close(),
     () => w.reactor.stop(),
@@ -220,7 +220,7 @@ describe('acquisition E2E', () => {
     const w = wire(happyOptions);
     await w.reactor.start();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await buildMcpServer(w.deps, silentLogger()).connect(serverTransport);
+    await buildMcpServer(w.deps, silentLogger(), '0.0.0-test').connect(serverTransport);
     const client = new Client({ name: 'e2e', version: '0' });
     await client.connect(clientTransport);
     cleanups.push(

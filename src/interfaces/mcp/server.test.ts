@@ -31,7 +31,7 @@ describe('MCP server', () => {
   beforeEach(async () => {
     wiring = testWiring();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await buildMcpServer(wiring.deps, silentLogger()).connect(serverTransport);
+    await buildMcpServer(wiring.deps, silentLogger(), '9.9.9').connect(serverTransport);
     client = new Client({ name: 'test', version: '0' });
     await client.connect(clientTransport);
   });
@@ -48,6 +48,10 @@ describe('MCP server', () => {
     wiring.sync();
     return (JSON.parse(result.content[0]!.text) as { acquisitionId: string }).acquisitionId;
   }
+
+  it('advertises the injected release version as its server version', () => {
+    expect(client.getServerVersion()?.version).toBe('9.9.9');
+  });
 
   it('advertises the submit and cancel tools with derived input schemas', async () => {
     const { tools } = await client.listTools();
@@ -181,7 +185,7 @@ describe('MCP over streamable HTTP', () => {
 
   beforeEach(async () => {
     wiring = testWiring();
-    app = await buildHttpApp(wiring.deps, silentLogger());
+    app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test');
     await app.listen({ port: 0, host: '127.0.0.1' });
     const { port } = app.server.address() as AddressInfo;
     baseUrl = `http://127.0.0.1:${port}`;

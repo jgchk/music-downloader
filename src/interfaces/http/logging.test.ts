@@ -40,7 +40,7 @@ describe('HTTP request correlation', () => {
 
   beforeEach(async () => {
     capture = capturingLogger();
-    app = await buildHttpApp(testWiring().deps, capture.logger);
+    app = await buildHttpApp(testWiring().deps, capture.logger, '0.0.0-test');
   });
 
   afterEach(async () => {
