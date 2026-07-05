@@ -1,3 +1,14 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
+## [2.1.0](https://github.com/jgchk/music-downloader/compare/v2.0.1...v2.1.0) (2026-07-05)
+
+
+### Features
+
+* **release:** pre-merge version bump + idempotent release pipeline ([7a2ec81](https://github.com/jgchk/music-downloader/commit/7a2ec8109e16a0d800ee6abb7549cdb76baa0276))
+
 ## [2.0.1](https://github.com/jgchk/music-downloader/compare/v2.0.0...v2.0.1) (2026-07-05)
 
 
