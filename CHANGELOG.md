@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.2.0](https://github.com/jgchk/music-downloader/compare/v2.1.3...v2.2.0) (2026-07-06)
+
+
+### Features
+
+* **acquisition:** steward slskd resources via an ownership ledger ([08d7939](https://github.com/jgchk/music-downloader/commit/08d7939967448eb79267ceb6de5f0fcdec2d7059))
+
 ## [2.1.3](https://github.com/jgchk/music-downloader/compare/v2.1.2...v2.1.3) (2026-07-05)
 
 
