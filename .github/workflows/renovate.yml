@@ -38,7 +38,7 @@ jobs:
       - name: Self-hosted Renovate
         # This action publishes only full-version tags (no floating major), so pin the exact version.
         # Renovate keeps this pin updated once it is running.
-        uses: renovatebot/github-action@v46.1.17
+        uses: renovatebot/github-action@v46.1.19
         with:
           token: ${{ secrets.RENOVATE_TOKEN }}
         env:
