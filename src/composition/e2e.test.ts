@@ -47,6 +47,9 @@ const PROBES: Record<string, ProbedAudio> = {
 };
 const COMPLETED: DownloadResult = { kind: 'completed', files: DOWNLOADED_FILES };
 const FAILED: DownloadResult = { kind: 'failed', reason: 'Stalled' };
+/** Files the source had already completed into staging when a multi-file candidate was abandoned. */
+const PARTIAL_FILES = [{ path: 'staging/partial-01.flac', name: '01.flac' }];
+const ABANDONED: DownloadResult = { kind: 'failed', reason: 'Stalled', files: PARTIAL_FILES };
 const IMPORTED: ImportResult = { kind: 'imported', location: '/library/Radiohead/Kid A (2000)' };
 const CONFLICT: ImportResult = { kind: 'conflict', location: '/library/Radiohead/Kid A (2000)' };
 
@@ -88,7 +91,7 @@ function wire(opts: E2eOptions) {
         }
         return okAsync(result);
       },
-      abort: () => okAsync(undefined),
+      abort: () => okAsync([]),
     },
     probe: { probe: (path) => okAsync(PROBES[path]!) },
     library: { import: () => okAsync(opts.importResult), discardStaging },
@@ -186,6 +189,31 @@ describe('acquisition E2E', () => {
     expect(view.attempts).toBe(2);
     expect(view.rejectedCount).toBe(1);
     expect(view.history.some((entry) => entry.kind === 'download-failed')).toBe(true);
+  });
+
+  it('discards an abandoned candidate’s completed subset, keeping its failure reason', async () => {
+    const { w, app } = await startHttp({
+      searchByRound: (round) =>
+        round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
+      downloadByUser: { a: ABANDONED, b: COMPLETED },
+      importResult: IMPORTED,
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/acquisitions',
+      payload: SUBMIT_BODY,
+    });
+    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    await settle(w, id, 'Fulfilled');
+
+    // The abandoned candidate's already-completed files are discarded from staging — no residue —
+    // via the same cleanup path a rejected candidate uses (D2).
+    await vi.waitFor(() => {
+      expect(w.discardStaging).toHaveBeenCalledWith(PARTIAL_FILES);
+    });
+    // The abandonment was still recorded as a failure with its reason, not swallowed.
+    expect(w.status.get(id)!.history.some((entry) => entry.kind === 'download-failed')).toBe(true);
   });
 
   it('exhausts when every candidate fails and re-search finds nothing', async () => {

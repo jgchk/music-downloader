@@ -48,7 +48,7 @@ The system SHALL delete its search from the source after collecting responses, b
 - **THEN** the search is deleted from the source, stopping it, and the harvested candidates are still returned
 
 ### Requirement: Transfer records are removed from the source once settled
-The system SHALL remove its transfers' tracked records from the source after the transfers settle, on every settlement path — completion, failure, policy abandonment, and cancellation — marking the ledger entries removed, so records from a previous attempt can never contaminate a later attempt's outcome. Removal of an already-absent record SHALL be a tolerated no-op.
+The system SHALL remove its transfers' tracked records from the source after the transfers settle, on every settlement path — completion, failure, policy abandonment, and cancellation — marking the ledger entries removed, so records from a previous attempt can never contaminate a later attempt's outcome. When a transfer is still in flight at teardown, cancelling it MAY leave a terminal-but-still-tracked record at the source; the system SHALL confirm the record is actually gone — removing the now-terminal record if it persists — before marking its ledger entry removed. A ledger entry whose record cannot be confirmed removed SHALL be left live so the startup sweep converges it, rather than marked removed. Removal of an already-absent record SHALL be a tolerated no-op.
 
 #### Scenario: Records are removed after a completed download
 - **WHEN** a candidate's transfers all complete and the outcome is reported
@@ -58,6 +58,12 @@ The system SHALL remove its transfers' tracked records from the source after the
 - **GIVEN** a candidate that was attempted before, whose settled records were removed
 - **WHEN** the same candidate is enqueued again by a later acquisition
 - **THEN** the new attempt's outcome reflects only the new transfers
+
+#### Scenario: An abandoned candidate's in-flight transfers leave no lingering record
+- **GIVEN** a candidate abandoned (stalled, queue-timed-out, or cancelled) with some transfers still in flight
+- **WHEN** its teardown cancels those transfers at the source
+- **THEN** each cancelled transfer's now-terminal record is removed from the source, leaving no lingering cancelled record
+- **AND** a ledger entry whose record is not confirmed gone is left live so the startup sweep retires it, rather than being marked removed
 
 ### Requirement: A startup sweep converges the system's own unfinished removals
 The system SHALL, at startup and before reacting to events, find ledger entries still live whose owning acquisition is terminal, remove the corresponding resources from the source (cancelling first if still active), and mark the entries removed. Entries owned by non-terminal acquisitions SHALL be left untouched. A failure on one entry SHALL NOT stop the sweep; unconverged entries remain live for the next startup.

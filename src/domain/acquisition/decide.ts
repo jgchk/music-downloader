@@ -82,14 +82,19 @@ function stagedFilesOf(state: AcquisitionState): readonly DownloadedFile[] {
   return 'downloadedFiles' in state ? state.downloadedFiles : [];
 }
 
-/** After a candidate fails, reject it and decide the next move in one batch. */
+/**
+ * After a candidate fails, reject it and decide the next move in one batch. `files` are the rejected
+ * candidate's staged files to clean up (via `react`): the source-reported partial subset for a failed
+ * download (the domain never saw them staged), or the folded `downloadedFiles` for a failed validation.
+ */
 function rejectAndAdvance(
   state: DownloadingState | ValidatingState,
   failure: AcquisitionEvent,
+  files: readonly DownloadedFile[],
 ): readonly AcquisitionEvent[] {
   return [
     failure,
-    { type: 'CandidateRejected', candidate: state.current.identity, files: stagedFilesOf(state) },
+    { type: 'CandidateRejected', candidate: state.current.identity, files },
     selectNext(state),
   ];
 }
@@ -99,8 +104,11 @@ function rejectAndAdvance(
  * are cleaned up (via `react`), leaving the acquisition cancelled. Fires exactly once — a later
  * duplicate settlement folds to no `pending` and is absorbed by the terminal-state tolerance above.
  */
-function settleCancelled(pending: Candidate): readonly AcquisitionEvent[] {
-  return [{ type: 'CandidateRejected', candidate: pending.identity }];
+function settleCancelled(
+  pending: Candidate,
+  files: readonly DownloadedFile[],
+): readonly AcquisitionEvent[] {
+  return [{ type: 'CandidateRejected', candidate: pending.identity, files }];
 }
 
 export function decide(command: AcquisitionCommand, state: AcquisitionState): Decision {
@@ -145,7 +153,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
 
     case 'RecordDownloadCompleted':
       if (state.phase === 'Cancelled' && state.pending !== undefined)
-        return ok(settleCancelled(state.pending));
+        return ok(settleCancelled(state.pending, command.files));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok([
@@ -154,15 +162,19 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
 
     case 'RecordDownloadFailed':
       if (state.phase === 'Cancelled' && state.pending !== undefined)
-        return ok(settleCancelled(state.pending));
+        return ok(settleCancelled(state.pending, command.files ?? []));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok(
-        rejectAndAdvance(state, {
-          type: 'DownloadFailed',
-          candidate: state.current.identity,
-          reason: command.reason,
-        }),
+        rejectAndAdvance(
+          state,
+          {
+            type: 'DownloadFailed',
+            candidate: state.current.identity,
+            reason: command.reason,
+          },
+          command.files ?? [],
+        ),
       );
 
     case 'RecordValidationPassed':
@@ -176,11 +188,15 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Validating') return err(illegal(command.type, state));
       return ok(
-        rejectAndAdvance(state, {
-          type: 'ValidationFailed',
-          candidate: state.current.identity,
-          verdict: command.verdict,
-        }),
+        rejectAndAdvance(
+          state,
+          {
+            type: 'ValidationFailed',
+            candidate: state.current.identity,
+            verdict: command.verdict,
+          },
+          stagedFilesOf(state),
+        ),
       );
 
     case 'RecordImported':

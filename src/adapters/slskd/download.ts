@@ -21,7 +21,12 @@ import { slskdEventsSchema, slskdOptionsSchema, slskdTransfersSchema } from './s
 import { resolveStagedPaths } from './staged-location.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
-import { aggregate, flattenDownloads } from './transfers.js';
+import {
+  aggregate,
+  flattenDownloads,
+  isTransferComplete,
+  isTransferSucceeded,
+} from './transfers.js';
 import type { SlskdTransfer } from './transfers.js';
 
 /**
@@ -35,13 +40,21 @@ import type { SlskdTransfer } from './transfers.js';
  * `DownloadFileComplete` events (`localFilename`, correlated by `transfer.id`) and re-rooted onto
  * `STAGING_ROOT` — so the library adapter imports (or `discardStaging`s) real, existing paths rather
  * than a location recomputed from candidate identity (design D1/D2). The staged location is never
- * derived from slskd's OS / destination template / sanitizer; those are slskd's alone.
+ * derived from slskd's OS / destination template / sanitizer; those are slskd's alone. On an abandoned
+ * or doomed candidate the *already-completed* subset is resolved the same way and reported on the
+ * failed outcome, so the domain's `discardStaging` cleans those partial files rather than orphaning
+ * them (design D2). Resolving that subset is best-effort (D3): a lag or fault yields no files, never
+ * an infra fault — the adapter itself never touches the filesystem.
  *
- * Every transfer is recorded in the ownership ledger write-ahead (before enqueue) and its record is
- * removed from slskd on every terminal outcome — completed, failed, doomed, or abandoned — so records
- * from one attempt can never contaminate a later attempt's outcome (D: source-resource stewardship).
- * Ledger bookkeeping is best-effort: the adapter's own correctness rests on the in-memory owned set
- * and the live slskd payload, so a ledger fault degrades sweep coverage but never a working download.
+ * Every transfer is recorded in the ownership ledger write-ahead (before enqueue) and torn down on
+ * every terminal outcome — completed, failed, doomed, or abandoned — so records from one attempt can
+ * never contaminate a later attempt's outcome (D: source-resource stewardship). Because slskd's remove
+ * is guarded on the terminal flag, teardown is two-step: an in-flight transfer is cancelled, re-polled
+ * until terminal, then removed, and a ledger row is marked removed **only** once its record is
+ * confirmed gone (design D1). A row not confirmed within the bound stays live so the startup sweep
+ * retires it — the backstop for unconfirmed removals. Ledger bookkeeping is best-effort: the adapter's
+ * own correctness rests on the in-memory owned set and the live slskd payload, so a ledger fault
+ * degrades sweep coverage but never a working download.
  *
  * Deployment prerequisites (out of this codebase, tracked in the deploy repo): `STAGING_ROOT` must
  * point at the same volume as slskd's downloads directory, and slskd must run as `PUID/PGID=1000`
@@ -54,11 +67,25 @@ const SLSKD_SOURCE = 'slskd';
 const EVENTS_PAGE_LIMIT = 100;
 /** How many times to re-poll the events log for an id whose completion event still lags. */
 const MAX_EVENT_POLLS = 5;
+/**
+ * How many cancel→poll→remove rounds teardown attempts before leaving an unconfirmed transfer to the
+ * startup sweep (design D1). Cancellation transitions a transfer to terminal asynchronously, so a
+ * small bound absorbs that lag without blocking a settled/abandoned outcome on a flaky transition.
+ */
+const MAX_REMOVE_ROUNDS = 3;
 
 export interface SlskdDownloadConfig extends SlskdConfig {
   /** Root under which each candidate's files are staged (shared with the filesystem library). */
   readonly stagingRoot: string;
 }
+
+/** The remote filename half of a transfer ledger key (`${username}|${filename}`). */
+function filenameOfKey(key: SourceResourceKey): string {
+  return key.resourceKey.slice(key.resourceKey.indexOf('|') + 1);
+}
+
+/** A transfer we own: narrowed to a known `filename` (the poll filters foreign/filenameless ones). */
+type OwnedTransfer = SlskdTransfer & { readonly filename: string };
 
 export class SlskdDownload implements DownloadPort {
   private readonly client: SlskdClient;
@@ -136,11 +163,13 @@ export class SlskdDownload implements DownloadPort {
         return { kind: 'completed', files };
       }
       if (status.hasFailure) {
-        // One failed file dooms the candidate: cancel the rest (via the `?remove=true` sweep below)
-        // and report the original failure, not the cancellation it triggers.
+        // One failed file dooms the candidate: cancel the rest (confirming their records are gone)
+        // and report the original failure, not the cancellation it triggers. Files that succeeded
+        // before the doom are reported so their staging is cleaned (design D2).
         this.logger.warn({ username, reason: status.failureReason }, 'slskd download failed');
+        const files = await this.completedStagedFiles(mine, candidate);
         await this.removeOwned(username, mine, ownedKeys);
-        return { kind: 'failed', reason: status.failureReason };
+        return { kind: 'failed', reason: status.failureReason, files };
       }
 
       const now = this.timer.now();
@@ -149,10 +178,10 @@ export class SlskdDownload implements DownloadPort {
         lastProgressAt = now;
       }
       if (status.allQueued && now - start >= policy.maxQueueWaitMs) {
-        return this.abandon(username, mine, ownedKeys, 'QueueTimeout');
+        return this.abandon(username, mine, ownedKeys, 'QueueTimeout', candidate);
       }
       if (!status.allQueued && now - lastProgressAt >= policy.stallTimeoutMs) {
-        return this.abandon(username, mine, ownedKeys, 'Stalled');
+        return this.abandon(username, mine, ownedKeys, 'Stalled', candidate);
       }
       await this.timer.sleep(this.pollIntervalMs);
     }
@@ -163,13 +192,19 @@ export class SlskdDownload implements DownloadPort {
    * cancellation). Called when a downloading acquisition is cancelled; idempotent, so a transfer
    * already settled or absent is tolerated and a redelivered abort is safe.
    */
-  abort(acquisitionId: string, candidate: Candidate): ResultAsync<void, InfraError> {
+  abort(
+    acquisitionId: string,
+    candidate: Candidate,
+  ): ResultAsync<readonly DownloadedFile[], InfraError> {
     return ResultAsync.fromPromise(this.doAbort(acquisitionId, candidate), (cause) =>
       infraError('slskd.abort', String(cause), cause),
     );
   }
 
-  private async doAbort(acquisitionId: string, candidate: Candidate): Promise<void> {
+  private async doAbort(
+    acquisitionId: string,
+    candidate: Candidate,
+  ): Promise<readonly DownloadedFile[]> {
     const { username } = candidate.identity;
     const filenames = candidate.files.map((file) =>
       remoteFilename(candidate.identity.path, file.name),
@@ -179,46 +214,125 @@ export class SlskdDownload implements DownloadPort {
       this.transferKey(acquisitionId, username, filename),
     );
     const payload = slskdTransfersSchema.parse(await this.client.get(this.downloadsPath(username)));
-    const mine = flattenDownloads(payload).filter((transfer) =>
-      wanted.has(transfer.filename ?? ''),
+    const mine = flattenDownloads(payload).filter(
+      (transfer): transfer is OwnedTransfer =>
+        transfer.filename !== undefined && wanted.has(transfer.filename),
     );
     this.logger.debug({ username, count: mine.length }, 'aborting slskd download');
+    // Resolve the already-completed subset before removal (the events log outlives the record), so
+    // the caller can clean its staging even though the domain never saw a completion (design D2).
+    const files = await this.completedStagedFiles(mine, candidate);
     await this.removeOwned(username, mine, ownedKeys);
-  }
-
-  /** Report a policy abandonment: cancel + remove the owned transfers, then surface the reason. */
-  private async abandon(
-    username: string,
-    mine: readonly SlskdTransfer[],
-    ownedKeys: readonly SourceResourceKey[],
-    reason: DownloadFailureReason,
-  ): Promise<DownloadResult> {
-    this.logger.warn({ username, reason }, 'abandoning slskd download');
-    await this.removeOwned(username, mine, ownedKeys);
-    return { kind: 'failed', reason };
+    return files;
   }
 
   /**
-   * Cancel + remove each present owned transfer (`?remove=true`) and mark the ledger rows removed.
-   * Best-effort: the outcome is already decided, so a removal fault (or a record slskd already
-   * dropped) must never turn a settled download into an error — the sweep retires any leftover.
+   * Report a policy abandonment: cancel + confirm-remove the owned transfers, then surface the
+   * reason together with the subset the source already completed into staging, so its files are
+   * cleaned via the domain (design D2).
+   */
+  private async abandon(
+    username: string,
+    mine: readonly OwnedTransfer[],
+    ownedKeys: readonly SourceResourceKey[],
+    reason: DownloadFailureReason,
+    candidate: Candidate,
+  ): Promise<DownloadResult> {
+    this.logger.warn({ username, reason }, 'abandoning slskd download');
+    const files = await this.completedStagedFiles(mine, candidate);
+    await this.removeOwned(username, mine, ownedKeys);
+    return { kind: 'failed', reason, files };
+  }
+
+  /**
+   * Tear down each owned transfer at the source, then mark a ledger row removed **only** once its
+   * record is confirmed gone (design D1). Best-effort: the outcome is already decided, so a removal
+   * fault (or a record slskd already dropped) never turns a settled download into an error. A record
+   * not confirmed gone within the bound leaves its ledger row live, so the startup sweep converges it
+   * (rather than the old bug of marking it removed while a cancelled record lingered at the source).
    */
   private async removeOwned(
     username: string,
-    mine: readonly SlskdTransfer[],
+    mine: readonly OwnedTransfer[],
     ownedKeys: readonly SourceResourceKey[],
   ): Promise<void> {
-    for (const transfer of mine) {
-      try {
-        await this.client.delIfPresent(
-          `${this.downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=true`,
-        );
-      } catch (err) {
-        this.logger.warn({ err, username }, 'failed to remove a settled slskd transfer');
-      }
-    }
-    for (const key of ownedKeys)
+    const wanted = new Set(ownedKeys.map((key) => filenameOfKey(key)));
+    const stillPresent = await this.teardownTransfers(username, mine, wanted);
+    for (const key of ownedKeys) {
+      if (stillPresent.has(filenameOfKey(key))) continue; // unconfirmed — leave live for the sweep
       await this.record(this.ledger.markRemoved(key), 'mark transfer removed');
+    }
+  }
+
+  /**
+   * Cancel each present transfer and remove its record once terminal, confirming the record is gone
+   * (design D1). slskd's synchronous remove is guarded on the `Completed` flag, so an in-flight
+   * transfer is cancelled with `?remove=false` (a `?remove=true` would 500), then re-polled until it
+   * carries the flag and removed with `?remove=true`; an already-terminal transfer is removed on the
+   * first pass with no re-poll. Bounded by {@link MAX_REMOVE_ROUNDS}; returns the filenames still
+   * present at the source when the bound is hit, so the caller keeps their ledger rows live.
+   */
+  private async teardownTransfers(
+    username: string,
+    present: readonly OwnedTransfer[],
+    wanted: ReadonlySet<string>,
+  ): Promise<Set<string>> {
+    let current = present;
+    for (let round = 1; ; round++) {
+      const unconfirmed: OwnedTransfer[] = [];
+      for (const transfer of current) {
+        const terminal = isTransferComplete(transfer);
+        try {
+          await this.client.delIfPresent(
+            `${this.downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=${terminal}`,
+          );
+          if (!terminal) unconfirmed.push(transfer); // cancelled — must re-poll to confirm removal
+        } catch (err) {
+          this.logger.warn({ err, username }, 'failed to tear down a slskd transfer');
+          unconfirmed.push(transfer);
+        }
+      }
+      if (unconfirmed.length === 0) return new Set(); // every terminal record removed cleanly
+      if (round >= MAX_REMOVE_ROUNDS)
+        return new Set(unconfirmed.map((transfer) => transfer.filename));
+      await this.timer.sleep(this.pollIntervalMs);
+      current = await this.pollMine(username, wanted);
+      if (current.length === 0) return new Set(); // the cancelled records transitioned and are gone
+    }
+  }
+
+  /** Re-poll the user's downloads, narrowed to the transfers this teardown owns. */
+  private async pollMine(username: string, wanted: ReadonlySet<string>): Promise<OwnedTransfer[]> {
+    const payload = slskdTransfersSchema.parse(await this.client.get(this.downloadsPath(username)));
+    return flattenDownloads(payload).filter(
+      (transfer): transfer is OwnedTransfer =>
+        transfer.filename !== undefined && wanted.has(transfer.filename),
+    );
+  }
+
+  /**
+   * Resolve the staged locations of the transfers that succeeded before the candidate was abandoned
+   * or doomed, so the domain can clean them (design D2). Best-effort (D3): a resolution fault (the
+   * events log lagging, a bad options body) yields no files rather than turning the settled failure
+   * into an infra fault — the orphaned files fall to a later reconciliation instead of wedging retry.
+   */
+  private async completedStagedFiles(
+    mine: readonly OwnedTransfer[],
+    candidate: Candidate,
+  ): Promise<readonly DownloadedFile[]> {
+    const completed = mine.filter(
+      (transfer) => isTransferSucceeded(transfer) && transfer.id !== undefined,
+    );
+    if (completed.length === 0) return [];
+    try {
+      return await this.stagedFiles(completed, candidate);
+    } catch (err) {
+      this.logger.warn(
+        { err, username: candidate.identity.username },
+        'could not resolve the abandoned candidate’s completed files',
+      );
+      return [];
+    }
   }
 
   /** Attach each newly-seen transfer's slskd GUID to its ledger row, so the sweep can delete it. */

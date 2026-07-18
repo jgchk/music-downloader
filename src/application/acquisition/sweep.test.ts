@@ -16,17 +16,27 @@ const resource = (acquisitionId: string): SourceResource => ({
   acquisitionId,
 });
 
-/** A remover that records what it removed and can be told to fail for specific acquisitions. */
-function fakeRemover(): SourceResourceRemover & { removed: SourceResource[]; fail: Set<string> } {
+/**
+ * A remover that records what it removed and can be told to fail (an infra fault) or to report a
+ * record as *not confirmed gone* (`unconfirmed`) for specific acquisitions.
+ */
+function fakeRemover(): SourceResourceRemover & {
+  removed: SourceResource[];
+  fail: Set<string>;
+  unconfirmed: Set<string>;
+} {
   const removed: SourceResource[] = [];
   const fail = new Set<string>();
+  const unconfirmed = new Set<string>();
   return {
     removed,
     fail,
+    unconfirmed,
     remove(target: SourceResource) {
       if (fail.has(target.acquisitionId)) return errAsync(infraError('remove', 'boom'));
+      if (unconfirmed.has(target.acquisitionId)) return okAsync(false);
       removed.push(target);
-      return okAsync(undefined);
+      return okAsync(true);
     },
   };
 }
@@ -88,6 +98,18 @@ describe('SourceResourceSweep', () => {
     // acq-a's removal failed so its row stays live; acq-b was removed and marked.
     expect(remover.removed.map((r) => r.acquisitionId)).toEqual(['acq-b']);
     expect(await liveAcquisitionIds()).toEqual(['acq-a']);
+  });
+
+  it('leaves a row live when its record is not yet confirmed gone', async () => {
+    await seed('acq-lingering', true);
+    const remover = fakeRemover();
+    remover.unconfirmed.add('acq-lingering');
+
+    await sweep(remover).run();
+
+    // The cancelled record has not transitioned to removable — its row stays live for the next boot.
+    expect(remover.removed).toEqual([]);
+    expect(await liveAcquisitionIds()).toEqual(['acq-lingering']);
   });
 
   it('logs and stops when the ledger cannot be read', async () => {
