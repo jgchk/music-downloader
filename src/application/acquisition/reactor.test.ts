@@ -32,7 +32,7 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
     search: { search: vi.fn(() => okAsync([])) },
     download: {
       download: vi.fn(() => okAsync({ kind: 'failed' as const, reason: 'Stalled' as const })),
-      abort: vi.fn(() => okAsync(undefined)),
+      abort: vi.fn(() => okAsync([])),
     },
     probe: { probe: vi.fn() },
     library: { import: vi.fn(), discardStaging: vi.fn(() => okAsync(undefined)) },
@@ -193,7 +193,7 @@ describe('Reactor.process', () => {
       download: {
         download: vi.fn(),
         abort: vi.fn(() =>
-          abortHealthy ? okAsync(undefined) : errAsync(infraError('slskd.abort', 'down')),
+          abortHealthy ? okAsync([]) : errAsync(infraError('slskd.abort', 'down')),
         ),
       },
       library: { import: vi.fn(), discardStaging },
@@ -262,7 +262,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     const ports = stubPorts({
       download: {
         download: vi.fn(() => okAsync({ kind: 'completed' as const, files: sampleFiles })),
-        abort: vi.fn(() => okAsync(undefined)),
+        abort: vi.fn(() => okAsync([])),
       },
     });
     await reactor(ports).process(selected);

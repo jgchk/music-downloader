@@ -56,6 +56,15 @@ export class SourceResourceSweep {
       );
       return;
     }
+    if (!removed.value) {
+      // The record was cancelled but has not yet transitioned to removable — leave the row live so
+      // the next boot's sweep converges it (design D1), rather than marking a lingering record gone.
+      this.deps.logger.debug(
+        { acquisitionId },
+        'sweep: record not yet confirmed gone; will retry next boot',
+      );
+      return;
+    }
     const marked = await this.deps.ledger.markRemoved(resource);
     if (marked.isErr()) {
       this.deps.logger.warn({ err: marked.error, acquisitionId }, 'sweep: markRemoved failed');

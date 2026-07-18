@@ -52,7 +52,14 @@ export interface DownloadProgress {
 
 export type DownloadResult =
   | { readonly kind: 'completed'; readonly files: readonly DownloadedFile[] }
-  | { readonly kind: 'failed'; readonly reason: DownloadFailureReason };
+  | {
+      readonly kind: 'failed';
+      readonly reason: DownloadFailureReason;
+      // Files the source had already completed into staging before the candidate was abandoned or
+      // doomed. Threaded through the domain so staging-cleanup removes them (design D2); best-effort,
+      // so an unresolvable subset simply yields none rather than failing the outcome (D3).
+      readonly files?: readonly DownloadedFile[];
+    };
 
 export interface DownloadPort {
   download(
@@ -67,8 +74,15 @@ export interface DownloadPort {
    * acquisition stops downloading rather than running to completion (D: cancellation). Idempotent:
    * transfers already settled or absent are tolerated, so a redelivered abort is safe. The
    * `acquisitionId` scopes the transfers to the ones this acquisition owns in the ledger.
+   *
+   * Returns the files the source had already completed into staging before the abort, so the caller
+   * can thread them into the settlement for staging-cleanup (design D2). Best-effort: an unresolvable
+   * subset yields none rather than failing the abort (D3).
    */
-  abort(acquisitionId: string, candidate: Candidate): ResultAsync<void, InfraError>;
+  abort(
+    acquisitionId: string,
+    candidate: Candidate,
+  ): ResultAsync<readonly DownloadedFile[], InfraError>;
 }
 
 // --- AudioProbePort (first adapter: ffmpeg) ----------------------------------------------------

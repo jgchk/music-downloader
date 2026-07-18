@@ -31,6 +31,20 @@ function statusOf(state: string): TransferStatus {
   return 'transferring';
 }
 
+/**
+ * Whether a transfer has reached slskd's terminal `Completed` flag — the guard slskd's synchronous
+ * record removal is gated on (design D1). A terminal transfer can be removed (`?remove=true`); an
+ * in-flight one must first be cancelled and left to transition before its record can be removed.
+ */
+export function isTransferComplete(transfer: SlskdTransfer): boolean {
+  return (transfer.state ?? '').toLowerCase().includes('completed');
+}
+
+/** Whether a transfer completed *successfully* — its file is staged and can be resolved (D2). */
+export function isTransferSucceeded(transfer: SlskdTransfer): boolean {
+  return statusOf(transfer.state ?? '') === 'succeeded';
+}
+
 /** Translate a Soulseek failure into the domain's source-agnostic reason (D10). */
 export function reasonFromTransfer(transfer: SlskdTransfer): DownloadFailureReason {
   const text = `${transfer.state ?? ''} ${transfer.exception ?? ''}`.toLowerCase();

@@ -275,7 +275,12 @@ describe('SlskdDownload', () => {
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
+    // 01 completed before the doom, so its staged path is surfaced for cleanup (default events stub).
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'failed',
+      reason: 'TransferError',
+      files: [{ name: '01.flac', path: stagedPath('01.flac') }],
+    });
   });
 
   it('normalizes an offline peer to a peer-unavailable outcome', async () => {
@@ -290,39 +295,64 @@ describe('SlskdDownload', () => {
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'PeerUnavailable' });
+    // Neither file completed, so there is nothing staged to clean up.
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'failed',
+      reason: 'PeerUnavailable',
+      files: [],
+    });
   });
 
-  it('abandons a stalled transfer once the stall timeout elapses', async () => {
-    const { adapter, deletes } = downloader({
-      polls: [
-        poll([
-          transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
-          transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
-        ]),
-      ],
+  it('abandons a stalled transfer, cancelling then confirming its records removed', async () => {
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
+    ]);
+    const cancelled = poll([
+      transfer('01.flac', { state: 'Completed, Cancelled' }),
+      transfer('02.flac', { state: 'Completed, Cancelled' }),
+      { id: 'foreign', filename: '@@a\\Other\\9.flac', state: 'InProgress' }, // another candidate
+      { id: 'nameless', state: 'InProgress' }, // a transfer with no filename
+    ]);
+    const { adapter, deletes, ledger } = downloader({
+      // Two identical in-flight polls advance the clock to the stall; the teardown then re-polls a
+      // cancelled-terminal set, and a final empty poll confirms the records are gone.
+      polls: [inFlight, inFlight, cancelled, poll([])],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(50, 100000), () => undefined);
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled' });
-    expect(deletes).toHaveLength(2);
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
+    // Each transfer is cancelled (remove=false), then removed once terminal (remove=true).
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
+    ]);
+    expect(ledger.removed).toHaveLength(2); // both confirmed gone
   });
 
   it('abandons a hopelessly-queued transfer once the queue wait elapses', async () => {
-    const { adapter, deletes } = downloader({
-      polls: [
-        poll([
-          transfer('01.flac', { state: 'Queued, Remotely', size: 100, placeInQueue: 4 }),
-          { filename: '@@a\\Album\\02.flac', state: 'Queued, Remotely', size: 100 }, // no id
-        ]),
-      ],
+    const queued = poll([
+      transfer('01.flac', { state: 'Queued, Remotely', size: 100, placeInQueue: 4 }),
+      { filename: '@@a\\Album\\02.flac', state: 'Queued, Remotely', size: 100 }, // no id
+    ]);
+    const { adapter, deletes, ledger } = downloader({
+      // Two identical queued polls advance the clock past the queue wait; the teardown then finds
+      // the cancelled transfers already gone on its re-poll.
+      polls: [queued, queued, poll([])],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(100000, 50), () => undefined);
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout' });
-    expect(deletes).toHaveLength(2);
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
+    // Both queued (non-terminal) transfers are cancelled; the re-poll then finds them gone.
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=false',
+    ]);
+    expect(ledger.removed).toHaveLength(2);
   });
 
   it('surfaces live progress while transferring and completes on the next poll', async () => {
@@ -425,22 +455,105 @@ describe('SlskdDownload', () => {
           transfer('01.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
           transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 30 }),
         ]),
+        // The teardown re-poll: the failed file is already gone; the cancelled one is now terminal.
+        poll([transfer('02.flac', { state: 'Completed, Cancelled' })]),
+        poll([]),
       ],
     });
 
     // Generous policy timeouts: the failure — not a stall — is what ends the download.
     const result = await adapter.download(ACQ, candidate, policy(100000, 100000), () => undefined);
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
-    // Both the failed file and the still-in-flight one are cancelled and removed.
+    // Neither file succeeded, so there is no partial subset to clean.
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
+    // The failed file (terminal) is removed at once; the in-flight one is cancelled then removed.
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
     expect(ledger.removed).toHaveLength(2);
   });
 
-  it('still completes when removing a settled record fails at the source', async () => {
+  it('leaves a row live when a cancelled transfer never turns removable', async () => {
+    // A single in-flight poll that never settles: every re-poll sees the same non-terminal state.
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
+    ]);
+    const { adapter, deletes, ledger } = downloader({ polls: [inFlight] });
+
+    const result = await adapter.download(ACQ, candidate, policy(50, 100000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
+    // Cancelled each round but never confirmed terminal, so no row is marked removed — the startup
+    // sweep converges them next boot. Only cancels (remove=false) are ever issued.
+    expect(deletes.every((url) => url.endsWith('?remove=false'))).toBe(true);
+    expect(ledger.removed).toHaveLength(0);
+  });
+
+  it('reports the completed subset when a candidate is doomed mid-download', async () => {
+    const { adapter } = downloader({
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+          transfer('02.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
+        ]),
+        poll([]),
+      ],
+      events: [eventsPage([{ id: '01.flac', local: localOf('01.flac') }])],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(100000, 100000), () => undefined);
+
+    // The already-staged file is surfaced for cleanup; the reported reason is the original failure.
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'failed',
+      reason: 'TransferError',
+      files: [{ name: '01.flac', path: stagedPath('01.flac') }],
+    });
+  });
+
+  it('still fails without files when the completed subset cannot be resolved (best-effort)', async () => {
+    const { adapter } = downloader({
+      polls: [
+        poll([
+          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+          transfer('02.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
+        ]),
+        poll([]),
+      ],
+      events: [eventsPage([])], // the events log never reports the completed file's location
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(100000, 100000), () => undefined);
+
+    // Resolution failing does not turn the doomed failure into an infra fault — just no files.
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'failed',
+      reason: 'TransferError',
+      files: [],
+    });
+  });
+
+  it('skips a completed file whose transfer id was never captured', async () => {
+    const { adapter } = downloader({
+      polls: [
+        poll([
+          { filename: '@@a\\Album\\01.flac', state: 'Completed, Succeeded' }, // succeeded, but no id
+          transfer('02.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
+        ]),
+        poll([]),
+      ],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(100000, 100000), () => undefined);
+
+    // Without an id the staged path cannot be resolved, so it is left out rather than mis-reported.
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
+  });
+
+  it('still completes when removing a settled record fails, leaving the rows for the sweep', async () => {
     const { adapter, ledger } = downloader({
       deleteStatus: 500, // the cancel+remove DELETE errors, but the download already succeeded
       polls: [bothSucceeded],
@@ -450,8 +563,9 @@ describe('SlskdDownload', () => {
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrap().kind).toBe('completed');
-    // The ledger rows are still marked removed; the sweep will retire the leftover source records.
-    expect(ledger.removed).toHaveLength(2);
+    // The records were never confirmed gone, so the rows stay live for the startup sweep to retire —
+    // never falsely marked removed while a record lingers at the source (the bug this change fixes).
+    expect(ledger.removed).toHaveLength(0);
   });
 
   it('completes even when ledger bookkeeping fails, leaving the ledger untouched', async () => {
@@ -464,26 +578,110 @@ describe('SlskdDownload', () => {
     expect(ledger.created).toEqual([]);
   });
 
+  it('drives an abandoned candidate’s in-flight transfers to fully removed at the source', async () => {
+    // A stateful slskd double modelling the real cancel/remove guard (design D1): `?remove=true` on a
+    // non-terminal transfer 500s; `?remove=false` cancels it (→ Completed, Cancelled); `?remove=true`
+    // on a terminal transfer deletes the record. After teardown, no residual record must remain.
+    const store = new Map<string, Record<string, unknown>>([
+      [
+        '01.flac',
+        {
+          id: '01.flac',
+          filename: '@@a\\Album\\01.flac',
+          state: 'InProgress',
+          size: 100,
+          bytesTransferred: 50,
+        },
+      ],
+      [
+        '02.flac',
+        {
+          id: '02.flac',
+          filename: '@@a\\Album\\02.flac',
+          state: 'InProgress',
+          size: 100,
+          bytesTransferred: 0,
+        },
+      ],
+    ]);
+    const http: HttpClient = {
+      send: ({ method, url }) => {
+        if (method === 'DELETE') {
+          const match = /downloads\/u1\/([^?]*)\?remove=(true|false)/.exec(url)!;
+          const id = decodeURIComponent(match[1]!);
+          const transfer = store.get(id);
+          if (transfer === undefined) return Promise.resolve({ status: 404, body: '' });
+          const terminal = String(transfer.state).toLowerCase().includes('completed');
+          if (match[2] === 'true') {
+            if (!terminal) return Promise.resolve({ status: 500, body: 'not terminal' });
+            store.delete(id);
+          } else {
+            transfer.state = 'Completed, Cancelled';
+          }
+          return Promise.resolve({ status: 204, body: '' });
+        }
+        return Promise.resolve(poll([...store.values()]));
+      },
+    };
+    const ledger = new FakeResourceLedger();
+    const adapter = new SlskdDownload(
+      silentLogger(),
+      ledger,
+      { stagingRoot: STAGING, pollIntervalMs: 1 },
+      new SlskdClient(http),
+      fakeTimer(),
+    );
+
+    const result = await adapter.download(ACQ, candidate, policy(1, 100000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toMatchObject({ kind: 'failed', reason: 'Stalled' });
+    // The source double is queried for residual records after teardown — none linger.
+    expect(store.size).toBe(0);
+    expect(ledger.removed).toHaveLength(2);
+  });
+
   describe('abort', () => {
-    it('cancels and removes the candidate’s transfers, tolerating missing ids and filenames', async () => {
-      const { adapter, deletes } = downloader({
+    it('cancels the candidate’s transfers, tolerating missing ids, then confirms them gone', async () => {
+      const { adapter, deletes, ledger } = downloader({
         polls: [
           poll([
             transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
-            { filename: '@@a\\Album\\02.flac', state: 'Queued, Remotely' }, // ours, but no id
+            { filename: '@@a\\Album\\02.flac' }, // ours, but no id and no state yet
             { id: 'x', state: 'InProgress' }, // no filename → not one of ours
             { id: 'other', filename: '@@a\\Other\\99.flac', state: 'InProgress' }, // another dir
           ]),
+          poll([]), // the teardown re-poll: both cancelled transfers are gone
         ],
       });
 
       const result = await adapter.abort(ACQ, candidate);
 
-      expect(result._unsafeUnwrap()).toBeUndefined();
+      expect(result._unsafeUnwrap()).toEqual([]); // nothing had completed into staging
+      // In-flight transfers are cancelled (remove=false); the re-poll then finds them gone.
       expect(deletes).toEqual([
-        'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
-        'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=true',
+        'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
+        'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=false',
       ]);
+      expect(ledger.removed).toHaveLength(2);
+    });
+
+    it('reports the subset already completed into staging so it can be cleaned', async () => {
+      const { adapter, ledger } = downloader({
+        polls: [
+          poll([
+            transfer('01.flac', { state: 'Completed, Succeeded' }), // already staged
+            transfer('02.flac', { state: 'InProgress' }), // still in flight when cancelled
+          ]),
+          poll([]), // both gone after teardown
+        ],
+        events: [eventsPage([{ id: '01.flac', local: localOf('01.flac') }])],
+      });
+
+      const result = await adapter.abort(ACQ, candidate);
+
+      // The completed file's source-reported staged path is returned for the domain to discard.
+      expect(result._unsafeUnwrap()).toEqual([{ name: '01.flac', path: stagedPath('01.flac') }]);
+      expect(ledger.removed).toHaveLength(2);
     });
 
     it('is a no-op when the candidate has no transfers left', async () => {
@@ -491,7 +689,7 @@ describe('SlskdDownload', () => {
 
       const result = await adapter.abort(ACQ, candidate);
 
-      expect(result._unsafeUnwrap()).toBeUndefined();
+      expect(result._unsafeUnwrap()).toEqual([]);
       expect(deletes).toEqual([]);
     });
 

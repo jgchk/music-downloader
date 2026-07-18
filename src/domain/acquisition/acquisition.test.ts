@@ -324,6 +324,22 @@ describe('Acquisition.execute — cleanup events carry the staged files (D3)', (
     expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
   });
 
+  it('stamps an abandoned download’s already-completed files onto its rejection', () => {
+    // The domain never saw a completion for the abandoned candidate; the adapter reports the partial
+    // subset on the failed command, and `decide` stamps it onto the rejection for cleanup (D2).
+    const events = Acquisition.fromHistory(selectedHistory([a, matchingCandidate('b')]))
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', files: sampleFiles })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
+  });
+
+  it('stamps an aborted candidate’s completed files onto the cancelled-settlement rejection', () => {
+    const events = Acquisition.fromHistory(cancelledHistory)
+      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', files: sampleFiles })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
+  });
+
   it('stamps the imported candidate’s staged files onto the Imported event', () => {
     const events = Acquisition.fromHistory(importingHistory([a]))
       .execute({ type: 'RecordImported', location: '/library/x' })

@@ -18,7 +18,14 @@ export type AcquisitionCommand =
   | { readonly type: 'RecordMetadataFailed' }
   | { readonly type: 'RecordSearchResults'; readonly candidates: readonly Candidate[] }
   | { readonly type: 'RecordDownloadCompleted'; readonly files: readonly DownloadedFile[] }
-  | { readonly type: 'RecordDownloadFailed'; readonly reason: DownloadFailureReason }
+  | {
+      readonly type: 'RecordDownloadFailed';
+      readonly reason: DownloadFailureReason;
+      // The already-completed staged files of the abandoned/aborted candidate, reported by the
+      // adapter so `decide` can stamp them onto the rejection for cleanup (design D2). Optional:
+      // a download that failed before staging (or with an unresolvable subset) carries none.
+      readonly files?: readonly DownloadedFile[];
+    }
   | { readonly type: 'RecordValidationPassed'; readonly verdict: ValidationVerdict }
   | { readonly type: 'RecordValidationFailed'; readonly verdict: ValidationVerdict }
   | { readonly type: 'RecordImported'; readonly location: string }

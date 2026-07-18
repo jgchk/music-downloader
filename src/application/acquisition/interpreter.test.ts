@@ -145,7 +145,7 @@ describe('interpretEffect — download', () => {
   it('aborts an in-flight transfer and rejects the pending candidate on cancellation', async () => {
     const candidate = matchingCandidate('a');
     await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
-    const abort = vi.fn(() => okAsync(undefined));
+    const abort = vi.fn(() => okAsync([]));
     const ports = stubPorts({ download: { download: vi.fn(), abort } });
 
     await interpretEffect(deps(ports), 'acq-1', { type: 'AbortDownload', candidate });
@@ -153,6 +153,43 @@ describe('interpretEffect — download', () => {
     expect(abort).toHaveBeenCalledWith('acq-1', candidate);
     // The settlement rejects the pending candidate; the acquisition stays cancelled.
     expect(appendedTypes()).toContain('CandidateRejected');
+  });
+
+  it('threads a failed download’s partial files into the rejection for cleanup', async () => {
+    await seed(selectedHistory([matchingCandidate('a')]));
+    const ports = stubPorts({
+      download: {
+        download: vi.fn(() =>
+          okAsync({ kind: 'failed' as const, reason: 'Stalled' as const, files: sampleFiles }),
+        ),
+        abort: vi.fn(),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'Download',
+      candidate: matchingCandidate('a'),
+      policy: DEFAULT_DOWNLOAD_POLICY,
+    });
+    const rejected = store.all().find((entry) => entry.type === 'CandidateRejected')?.event as
+      Extract<AcquisitionEvent, { type: 'CandidateRejected' }> | undefined;
+    expect(rejected?.files).toEqual(sampleFiles);
+  });
+
+  it('cleans an aborted candidate’s already-completed files reported by the abort', async () => {
+    const candidate = matchingCandidate('a');
+    await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
+    const abort = vi.fn(() => okAsync(sampleFiles));
+    const discardStaging = vi.fn(() => okAsync(undefined));
+    const ports = stubPorts({
+      download: { download: vi.fn(), abort },
+      library: { import: vi.fn(), discardStaging },
+    });
+
+    await interpretEffect(deps(ports), 'acq-1', { type: 'AbortDownload', candidate });
+
+    const rejected = store.all().find((entry) => entry.type === 'CandidateRejected')?.event as
+      Extract<AcquisitionEvent, { type: 'CandidateRejected' }> | undefined;
+    expect(rejected?.files).toEqual(sampleFiles);
   });
 
   it('propagates an abort infrastructure fault without appending', async () => {

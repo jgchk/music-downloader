@@ -42,7 +42,11 @@ export interface ResourceLedgerStore {
 /**
  * Removes a recorded resource from the source (cancel-if-active, then delete). The startup sweep's
  * source-specific arm — the slskd adapter implements it — so the sweep itself stays source-agnostic.
+ *
+ * Resolves to whether the record is *confirmed gone*: cancelling an in-flight transfer only makes it
+ * removable once it transitions to terminal, so a still-lingering record resolves `false` and the
+ * sweep leaves its ledger row live to retry next boot, rather than marking a lingering record removed.
  */
 export interface SourceResourceRemover {
-  remove(resource: SourceResource): ResultAsync<void, InfraError>;
+  remove(resource: SourceResource): ResultAsync<boolean, InfraError>;
 }

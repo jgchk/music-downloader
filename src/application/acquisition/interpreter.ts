@@ -75,7 +75,7 @@ export function interpretEffect(
             acquisitionId,
             result.kind === 'completed'
               ? { type: 'RecordDownloadCompleted', files: result.files }
-              : { type: 'RecordDownloadFailed', reason: result.reason },
+              : { type: 'RecordDownloadFailed', reason: result.reason, files: result.files },
           ),
         );
 
@@ -110,11 +110,14 @@ export function interpretEffect(
     case 'AbortDownload':
       // Stop the in-flight transfer, then feed the settlement back as a failed outcome. `decide`
       // turns it into the pending candidate's rejection (staging cleanup follows via `react`); the
-      // reported reason is immaterial there, so a plain `Cancelled` stands in.
-      return ports.download
-        .abort(acquisitionId, effect.candidate)
-        .andThen(() =>
-          applyCommand(deps, acquisitionId, { type: 'RecordDownloadFailed', reason: 'Cancelled' }),
-        );
+      // reported reason is immaterial there, so a plain `Cancelled` stands in. The abort reports the
+      // subset the source already completed into staging, so its files are cleaned too (design D2).
+      return ports.download.abort(acquisitionId, effect.candidate).andThen((files) =>
+        applyCommand(deps, acquisitionId, {
+          type: 'RecordDownloadFailed',
+          reason: 'Cancelled',
+          files,
+        }),
+      );
   }
 }
