@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.2.2](https://github.com/jgchk/music-downloader/compare/v2.2.1...v2.2.2) (2026-07-18)
+
+
+### Bug Fixes
+
+* **slskd:** fully tear down abandoned candidates ([b150fe1](https://github.com/jgchk/music-downloader/commit/b150fe1fb5b1dca858b3d26c2638d9696dd4c971))
+
 ## [2.2.1](https://github.com/jgchk/music-downloader/compare/v2.2.0...v2.2.1) (2026-07-18)
 
 
