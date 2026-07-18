@@ -68,7 +68,7 @@ function wire(opts: E2eOptions) {
   const bus = new InProcessEventBus();
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
-  const discardStaging = vi.fn((_candidate) => okAsync<void>(undefined));
+  const discardStaging = vi.fn((_files) => okAsync<void>(undefined));
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
   const libraryView = new LibraryViewProjection();
@@ -218,7 +218,7 @@ describe('acquisition E2E', () => {
     await settle(w, id, 'Conflicted');
     // The conflicted candidate's staged files must not be left orphaned in staging.
     await vi.waitFor(() => {
-      expect(w.discardStaging).toHaveBeenCalledWith(matchingCandidate('a').identity);
+      expect(w.discardStaging).toHaveBeenCalledWith(DOWNLOADED_FILES);
     });
   });
 

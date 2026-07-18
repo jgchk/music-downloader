@@ -1,0 +1,21 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "GET /api/v0/options — only directories.downloads is consumed (the downloads root)"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/options"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "directories": {
+        "incomplete": "/app/incomplete",
+        "downloads": "/app/downloads"
+      }
+    }
+  }
+}

@@ -2,8 +2,6 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { candidateStagingDir } from '../../src/adapters/filesystem/paths.js';
-import type { CandidateIdentity } from '../../src/domain/candidate/candidate.js';
 
 /**
  * Out-of-process E2E (change: add-out-of-process-e2e). Drives the REAL built image over a real
@@ -12,7 +10,12 @@ import type { CandidateIdentity } from '../../src/domain/candidate/candidate.js'
  * for real, including the real ffmpeg probe of a real FLAC and the real filesystem import.
  *
  * The harness (docker-compose.test.yml, brought up by test/e2e/run.sh) shares ./.e2e-tmp with the
- * container as /data, so this test seeds the downloaded file where the app will look for it.
+ * container as /data. The slskd stub reports the completed download's on-disk location via
+ * `GET /api/v0/events` (`DownloadFileComplete.localFilename`, under the `GET /api/v0/options`
+ * downloads root); this test seeds the fixture at exactly that reported location — mapped onto the
+ * shared staging volume — NOT at a path the adapter recomputes for itself. So the tier exercises the
+ * adapter's real event-based resolution: a regression that reintroduced a recomputed or mismatched
+ * location would fail here.
  */
 
 const BASE_URL = process.env['TARGET_BASE_URL'] ?? 'http://localhost:3000';
@@ -20,14 +23,13 @@ const SLSKD_ADMIN = process.env['SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__a
 const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e-tmp');
 const STAGING_DIR = join(DATA_DIR, 'staging');
 
-// Must agree with the WireMock slskd fixtures (test/e2e/stubs/slskd/mappings): the search response
-// advertises this peer, folder path, total size, and a single .flac file.
-const IDENTITY: CandidateIdentity = {
-  username: 'peer1',
-  path: '@@music\\Test Artist\\Test Album',
-  sizeBytes: 1234567,
-};
+// The slskd events stub reports `localFilename = /downloads/Test Album/01 Track One.flac` under the
+// options downloads root `/downloads`; the app re-roots that onto STAGING_ROOT (/data/staging), so
+// the file resolves to <staging>/Test Album/01 Track One.flac. Seed it there, and keep this in
+// agreement with test/e2e/stubs/slskd/mappings/{options,events}.json and the transfers-stub id.
+const STAGED_SUBDIR = 'Test Album';
 const FILE_NAME = '01 Track One.flac';
+const STAGED_DIR = join(STAGING_DIR, STAGED_SUBDIR);
 const FIXTURE = fileURLToPath(new URL('./fixtures/track.flac', import.meta.url));
 
 const SUBMIT_BODY = {
@@ -101,11 +103,10 @@ async function waitForDeletes(
 
 describe('out-of-process acquisition E2E (HTTP)', () => {
   beforeAll(async () => {
-    // Seed the "downloaded" file where the real download adapter will report it, using the app's
-    // own path function so the location cannot drift from production.
-    const dir = candidateStagingDir(STAGING_DIR, IDENTITY);
-    mkdirSync(dir, { recursive: true });
-    copyFileSync(FIXTURE, join(dir, FILE_NAME));
+    // Seed the "downloaded" file at the location the slskd stub reports for it (re-rooted onto the
+    // shared staging volume) — the same resolution the real adapter performs from the events log.
+    mkdirSync(STAGED_DIR, { recursive: true });
+    copyFileSync(FIXTURE, join(STAGED_DIR, FILE_NAME));
 
     await waitForOk('http://localhost:8081/__admin/mappings'); // mb-stub
     await waitForOk('http://localhost:8082/__admin/mappings'); // slskd-stub
@@ -132,14 +133,14 @@ describe('out-of-process acquisition E2E (HTTP)', () => {
     // The store is durable, not in-memory: events were persisted to an on-disk SQLite file.
     expect(existsSync(join(DATA_DIR, 'events.db'))).toBe(true);
 
-    // The Imported cleanup removes the now-empty candidate staging directory. It is dispatched
-    // around the same time the status turns Fulfilled, so poll briefly for the directory to vanish.
-    const stagingDir = candidateStagingDir(STAGING_DIR, IDENTITY);
+    // The Imported cleanup removes the emptied staging directory (the files having been moved into
+    // the library). It is dispatched around the same time the status turns Fulfilled, so poll
+    // briefly for the directory to vanish.
     const deadline = Date.now() + 10_000;
-    while (existsSync(stagingDir) && Date.now() < deadline) {
+    while (existsSync(STAGED_DIR) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
-    expect(existsSync(stagingDir)).toBe(false);
+    expect(existsSync(STAGED_DIR)).toBe(false);
 
     // Source-resource stewardship: the app deletes the search it created and removes the completed
     // transfer's record — and issues no DELETE against any resource it does not own.

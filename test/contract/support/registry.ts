@@ -6,6 +6,8 @@ import {
   mbReleaseSearchSchema,
 } from '../../../src/adapters/musicbrainz/schemas.js';
 import {
+  slskdEventsSchema,
+  slskdOptionsSchema,
   slskdSearchResponsesSchema,
   slskdSearchStateSchema,
   slskdTransfersSchema,
@@ -30,6 +32,8 @@ export const fixtureSchemas: Record<string, ZodType> = {
   'slskd/search-state.json': slskdSearchStateSchema,
   'slskd/search-responses.json': slskdSearchResponsesSchema,
   'slskd/transfers-poll.json': slskdTransfersSchema,
+  'slskd/events.json': slskdEventsSchema,
+  'slskd/options.json': slskdOptionsSchema,
 };
 
 /** E2E WireMock stub filename → schema. */
@@ -41,4 +45,6 @@ export const stubSchemas: Record<string, ZodType> = {
   'slskd/search-responses.json': slskdSearchResponsesSchema,
   'slskd/transfers-poll-inprogress.json': slskdTransfersSchema,
   'slskd/transfers-poll-completed.json': slskdTransfersSchema,
+  'slskd/events.json': slskdEventsSchema,
+  'slskd/options.json': slskdOptionsSchema,
 };

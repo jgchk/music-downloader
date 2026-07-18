@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
+import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { Target } from '../../domain/target/target.js';
 import type { ProbedAudio } from '../../domain/validation/validators.js';
@@ -85,6 +85,10 @@ export type ImportResult =
 
 export interface LibraryPort {
   import(files: readonly DownloadedFile[], target: Target): ResultAsync<ImportResult, InfraError>;
-  /** Remove a rejected candidate's staged files so only valid music reaches the library (D13). */
-  discardStaging(candidate: CandidateIdentity): ResultAsync<void, InfraError>;
+  /**
+   * Remove the given staged files so only valid music reaches the library (D13), and prune their
+   * now-emptied staging directory. The files are the source-reported staged locations, carried on
+   * the cleanup-triggering event (D3), so cleanup never recomputes a path from candidate identity.
+   */
+  discardStaging(files: readonly DownloadedFile[]): ResultAsync<void, InfraError>;
 }

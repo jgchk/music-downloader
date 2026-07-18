@@ -105,7 +105,7 @@ export function interpretEffect(
         );
 
     case 'Cleanup':
-      return ports.library.discardStaging(effect.candidate).map((): readonly StoredEvent[] => []);
+      return ports.library.discardStaging(effect.files).map((): readonly StoredEvent[] => []);
 
     case 'AbortDownload':
       // Stop the in-flight transfer, then feed the settlement back as a failed outcome. `decide`

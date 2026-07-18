@@ -1,4 +1,4 @@
-import type { Candidate, CandidateIdentity } from '../candidate/candidate.js';
+import type { Candidate } from '../candidate/candidate.js';
 import type { DownloadPolicy, MatchPolicy } from '../policy/policies.js';
 import type { Target } from '../target/target.js';
 import type { AcquisitionEvent, AcquisitionRequest, DownloadedFile } from './events.js';
@@ -20,7 +20,7 @@ export type Effect =
       readonly matchPolicy: MatchPolicy;
     }
   | { readonly type: 'Import'; readonly files: readonly DownloadedFile[]; readonly target: Target }
-  | { readonly type: 'Cleanup'; readonly candidate: CandidateIdentity }
+  | { readonly type: 'Cleanup'; readonly files: readonly DownloadedFile[] }
   | { readonly type: 'AbortDownload'; readonly candidate: Candidate };
 
 /**
@@ -68,26 +68,25 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
         ? [{ type: 'Import', files: state.downloadedFiles, target: state.target }]
         : [];
     case 'CandidateRejected':
-      // A rejected candidate's staged files must never reach the library (D13).
-      return [{ type: 'Cleanup', candidate: event.candidate }];
+      // A rejected candidate's staged files must never reach the library (D13). The files ride on
+      // the event (stamped by `decide` at mint time), so cleanup targets slskd's reported location
+      // rather than a path recomputed from identity (D3); legacy history without them upcasts to none.
+      return [{ type: 'Cleanup', files: event.files ?? [] }];
     case 'Imported':
-      // The imported candidate's now-empty staging directory is removed. Keyed off the event's own
-      // candidate (event-carried data): `evolve` treats `Imported` as a state no-op, so the identity
-      // lives on the event, not in the post-state.
-      return [{ type: 'Cleanup', candidate: event.candidate }];
+      // The imported candidate's now-emptied staging directory is pruned. Keyed off the event's own
+      // carried files: `evolve` treats `Imported` as a state no-op, so the files live on the event,
+      // not in the post-state (D3).
+      return [{ type: 'Cleanup', files: event.files ?? [] }];
     case 'ImportConflicted':
       // The downloaded release will never be imported (the location is occupied) — discard staging.
-      return state.phase === 'Conflicted'
-        ? [{ type: 'Cleanup', candidate: state.current.identity }]
-        : [];
+      return state.phase === 'Conflicted' ? [{ type: 'Cleanup', files: event.files ?? [] }] : [];
     case 'AcquisitionCancelled':
-      // A settled transfer (folded to `current`) is discarded straight away. A mid-download transfer
-      // (folded to `pending`) is aborted at the source first; its staging is cleaned up later, when
-      // the resulting settlement rejects the candidate. Once `pending` is cleared by that rejection,
-      // a re-reacted cancellation emits nothing — the redelivery guard.
+      // A settled transfer (folded to `current`) is discarded straight away, from the files carried
+      // on the event (D3). A mid-download transfer (folded to `pending`) is aborted at the source
+      // first; its staging is cleaned up later, when the resulting settlement rejects the candidate.
+      // Once `pending` is cleared by that rejection, a re-reacted cancellation emits nothing.
       if (state.phase !== 'Cancelled') return [];
-      if (state.current !== undefined)
-        return [{ type: 'Cleanup', candidate: state.current.identity }];
+      if (state.current !== undefined) return [{ type: 'Cleanup', files: event.files ?? [] }];
       if (state.pending !== undefined) return [{ type: 'AbortDownload', candidate: state.pending }];
       return [];
     case 'MetadataResolutionFailed':

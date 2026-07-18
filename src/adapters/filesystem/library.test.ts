@@ -8,7 +8,6 @@ import type { DownloadedFile } from '../../domain/acquisition/events.js';
 import type { Target } from '../../domain/target/target.js';
 import { FilesystemLibrary, nodeLibraryFileSystem } from './library.js';
 import type { LibraryConfig, LibraryFileSystem } from './library.js';
-import { candidateStagingDir } from './paths.js';
 
 const TARGET: Target = {
   type: 'album',
@@ -108,38 +107,96 @@ describe('FilesystemLibrary.import', () => {
 });
 
 describe('FilesystemLibrary.discardStaging', () => {
-  const identity = { username: 'peer', path: '/music/album', sizeBytes: 42 };
+  /** Stage `names` inside a leaf staging folder, returning them as the download reported them. */
+  async function stageLeaf(
+    stagingRoot: string,
+    names: readonly string[],
+  ): Promise<DownloadedFile[]> {
+    const leaf = join(stagingRoot, 'Some Album');
+    await mkdir(leaf, { recursive: true });
+    const files: DownloadedFile[] = [];
+    for (const name of names) {
+      const path = join(leaf, name);
+      await writeFile(path, `staged-${name}`);
+      files.push({ path, name });
+    }
+    return files;
+  }
 
-  it('removes a rejected candidate’s staged files', async () => {
+  it('removes exactly the given files and prunes their emptied directory', async () => {
     const ws = await workspace();
-    const dir = candidateStagingDir(ws.stagingRoot, identity);
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'junk.flac'), 'partial');
+    const files = await stageLeaf(ws.stagingRoot, ['01.flac', '02.flac']);
     const lib = new FilesystemLibrary(ws, silentLogger());
 
-    (await lib.discardStaging(identity))._unsafeUnwrap();
+    (await lib.discardStaging(files))._unsafeUnwrap();
 
-    expect(existsSync(dir)).toBe(false);
+    expect(existsSync(files[0]!.path)).toBe(false);
+    expect(existsSync(join(ws.stagingRoot, 'Some Album'))).toBe(false);
   });
 
-  it('is a no-op when nothing was staged', async () => {
+  it('removes only the given files, leaving a directory slskd shares between candidates', async () => {
     const ws = await workspace();
+    const [ours] = await stageLeaf(ws.stagingRoot, ['01.flac']);
+    const others = join(ws.stagingRoot, 'Some Album', 'another.flac');
+    await writeFile(others, 'not ours');
     const lib = new FilesystemLibrary(ws, silentLogger());
 
-    const result = await lib.discardStaging(identity);
+    (await lib.discardStaging([ours!]))._unsafeUnwrap();
 
-    expect(result.isOk()).toBe(true);
+    expect(existsSync(ours!.path)).toBe(false);
+    expect(existsSync(others)).toBe(true); // the shared leaf folder is left in place
   });
 
-  it('surfaces a filesystem fault as an InfraError', async () => {
+  it('tolerates files already moved out by a successful import, still pruning the folder', async () => {
+    const ws = await workspace();
+    const leaf = join(ws.stagingRoot, 'Some Album');
+    await mkdir(leaf, { recursive: true }); // emptied by import — the files no longer exist
+    const files: DownloadedFile[] = [{ path: join(leaf, '01.flac'), name: '01.flac' }];
+    const lib = new FilesystemLibrary(ws, silentLogger());
+
+    (await lib.discardStaging(files))._unsafeUnwrap();
+
+    expect(existsSync(leaf)).toBe(false);
+  });
+
+  it('is a no-op when nothing was staged (files and folder already gone)', async () => {
+    const ws = await workspace();
+    const files: DownloadedFile[] = [
+      { path: join(ws.stagingRoot, 'Gone', '01.flac'), name: '01.flac' },
+    ];
+    const lib = new FilesystemLibrary(ws, silentLogger());
+
+    expect((await lib.discardStaging(files)).isOk()).toBe(true);
+  });
+
+  it('surfaces an unexpected file-removal fault as an InfraError', async () => {
     const ws = await workspace();
     const failing: LibraryFileSystem = {
       ...nodeLibraryFileSystem,
-      rm: () => Promise.reject(new Error('permission denied')),
+      rmFile: () => Promise.reject(new Error('permission denied')),
     };
     const lib = new FilesystemLibrary(ws, silentLogger(), failing);
 
-    const result = await lib.discardStaging(identity);
+    const result = await lib.discardStaging([
+      { path: join(ws.stagingRoot, 'x', '01.flac'), name: '01.flac' },
+    ]);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'library.discardStaging',
+    });
+  });
+
+  it('surfaces an unexpected directory-prune fault as an InfraError', async () => {
+    const ws = await workspace();
+    const files = await stageLeaf(ws.stagingRoot, ['01.flac']);
+    const failing: LibraryFileSystem = {
+      ...nodeLibraryFileSystem,
+      rmdir: () => Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' })),
+    };
+    const lib = new FilesystemLibrary(ws, silentLogger(), failing);
+
+    const result = await lib.discardStaging(files);
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',

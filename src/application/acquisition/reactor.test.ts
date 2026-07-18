@@ -71,7 +71,12 @@ function storedOfType(type: AcquisitionEvent['type']): StoredEvent {
 
 const importedThenFulfilled = (cands: readonly ReturnType<typeof matchingCandidate>[]) => [
   ...importingHistory(cands),
-  { type: 'Imported' as const, candidate: cands[0]!.identity, location: '/lib/kid-a' },
+  {
+    type: 'Imported' as const,
+    candidate: cands[0]!.identity,
+    location: '/lib/kid-a',
+    files: sampleFiles,
+  },
   { type: 'AcquisitionFulfilled' as const, location: '/lib/kid-a' },
 ];
 
@@ -206,9 +211,10 @@ describe('Reactor.process', () => {
     const rejected = store.all().find((event) => event.type === 'CandidateRejected');
     expect(rejected).toBeDefined();
 
-    // Processing that rejection cleans up the candidate's staging.
+    // Processing that rejection runs staging cleanup. The aborted candidate never completed a
+    // download, so no source-reported files were staged — cleanup is over an empty set (D3).
     await r.process(rejected!);
-    expect(discardStaging).toHaveBeenCalledWith(a.identity);
+    expect(discardStaging).toHaveBeenCalledWith([]);
   });
 });
 
@@ -243,7 +249,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
       },
     });
     await reactor(ports).process(imported);
-    expect(ports.library.discardStaging).toHaveBeenCalledWith(matchingCandidate('a').identity);
+    expect(ports.library.discardStaging).toHaveBeenCalledWith(sampleFiles);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(imported.globalSeq);
   });
 

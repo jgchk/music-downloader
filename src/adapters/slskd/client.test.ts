@@ -53,6 +53,33 @@ describe('SlskdClient', () => {
     expect(await client.del('/api/v0/transfers/downloads/u1/t1')).toBeUndefined();
   });
 
+  it('reads the events log with an authorized, paginated GET', async () => {
+    const { http, sent } = recordingClient({ status: 200, body: JSON.stringify([]) });
+    const client = new SlskdClient(http, { baseUrl: 'http://slskd:1234', apiKey: 'secret' });
+
+    const body = await client.events(50, 100);
+
+    expect(body).toEqual([]);
+    expect(sent[0]).toMatchObject({
+      method: 'GET',
+      url: 'http://slskd:1234/api/v0/events?offset=50&limit=100',
+      headers: { 'X-API-Key': 'secret' },
+    });
+  });
+
+  it('reads the options with an authorized GET', async () => {
+    const { http, sent } = recordingClient({
+      status: 200,
+      body: JSON.stringify({ directories: { downloads: '/app/downloads' } }),
+    });
+    const client = new SlskdClient(http, { apiKey: 'secret' });
+
+    const body = await client.options();
+
+    expect(body).toEqual({ directories: { downloads: '/app/downloads' } });
+    expect(sent[0]).toMatchObject({ method: 'GET', url: 'http://localhost:5030/api/v0/options' });
+  });
+
   it('throws on a non-2xx status so the adapter can map it to an InfraError', async () => {
     const { http } = recordingClient({ status: 500, body: 'boom' });
     const client = new SlskdClient(http);

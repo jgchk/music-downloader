@@ -4,13 +4,13 @@ import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
-import { candidateStagingDir } from '../filesystem/paths.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { SlskdClient } from './client.js';
 import { SlskdDownload } from './download.js';
 import type { Timer } from './timer.js';
 
 const STAGING = '/staging';
+const DOWNLOADS_ROOT = '/downloads';
 const ACQ = 'acq-1';
 const candidate: Candidate = {
   identity: { username: 'u1', path: '@@a\\Album', sizeBytes: 200 },
@@ -39,6 +39,41 @@ function poll(files: readonly unknown[]): HttpResponse {
   };
 }
 
+interface Completion {
+  readonly id: string;
+  readonly local: string;
+}
+
+/** A page of the slskd events log: one `DownloadFileComplete` record per completion. */
+function eventsPage(completions: readonly Completion[]): HttpResponse {
+  return {
+    status: 200,
+    body: JSON.stringify(
+      completions.map((completion) => ({
+        type: 'DownloadFileComplete',
+        data: JSON.stringify({
+          localFilename: completion.local,
+          transfer: { id: completion.id },
+        }),
+      })),
+    ),
+  };
+}
+
+/** slskd's downloads-root under its own container path — what `localFilename` is reported against. */
+function localOf(name: string, onDisk = name): string {
+  return `${DOWNLOADS_ROOT}/Album/${onDisk}`;
+}
+
+function optionsResponse(downloads = DOWNLOADS_ROOT): HttpResponse {
+  return { status: 200, body: JSON.stringify({ directories: { downloads } }) };
+}
+
+/** Where the adapter should report a completed file: slskd's path re-rooted onto STAGING. */
+function stagedPath(onDisk: string): string {
+  return join(STAGING, 'Album', onDisk);
+}
+
 function fakeTimer(): Timer {
   let current = 0;
   return {
@@ -50,20 +85,43 @@ function fakeTimer(): Timer {
   };
 }
 
+const bothSucceeded = poll([
+  transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+  transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
+]);
+
+const bothCompleted = eventsPage([
+  { id: '01.flac', local: localOf('01.flac') },
+  { id: '02.flac', local: localOf('02.flac') },
+]);
+
 interface Opts {
   enqueue?: HttpResponse;
   polls: HttpResponse[];
+  events?: HttpResponse[];
+  options?: HttpResponse;
   deleteStatus?: number; // status returned for record-removal DELETEs (default 204)
 }
 
-function downloader(opts: Opts): {
+interface Harness {
   adapter: SlskdDownload;
   deletes: string[];
   ledger: FakeResourceLedger;
-} {
+  counts: { options: number; events: number };
+}
+
+function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
+  return (queue.length > 1 ? queue.shift() : queue[0]) ?? fallback;
+}
+
+function downloader(opts: Opts): Harness {
   const deletes: string[] = [];
   const ledger = new FakeResourceLedger();
-  const queue = [...opts.polls];
+  const counts = { options: 0, events: 0 };
+  const polls = [...opts.polls];
+  // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
+  // its staged files without every test having to spell out the events stub.
+  const events = [...(opts.events ?? [bothCompleted])];
   const http: HttpClient = {
     send: ({ method, url }) => {
       if (method === 'POST') return Promise.resolve(opts.enqueue ?? { status: 200, body: '' });
@@ -71,8 +129,15 @@ function downloader(opts: Opts): {
         deletes.push(url);
         return Promise.resolve({ status: opts.deleteStatus ?? 204, body: '' });
       }
-      const next = queue.length > 1 ? queue.shift() : queue[0];
-      return Promise.resolve(next ?? { status: 200, body: '{"directories":[]}' });
+      if (url.includes('/api/v0/options')) {
+        counts.options += 1;
+        return Promise.resolve(opts.options ?? optionsResponse());
+      }
+      if (url.includes('/api/v0/events')) {
+        counts.events += 1;
+        return Promise.resolve(drain(events, eventsPage([])));
+      }
+      return Promise.resolve(drain(polls, { status: 200, body: '{"directories":[]}' }));
     },
   };
   const adapter = new SlskdDownload(
@@ -82,15 +147,11 @@ function downloader(opts: Opts): {
     new SlskdClient(http),
     fakeTimer(),
   );
-  return { adapter, deletes, ledger };
-}
-
-function stagedPath(name: string): string {
-  return join(candidateStagingDir(STAGING, candidate.identity), name);
+  return { adapter, deletes, ledger, counts };
 }
 
 describe('SlskdDownload', () => {
-  it('aggregates a fully-transferred multi-file candidate into one completed outcome', async () => {
+  it('reports a completed multi-file candidate at the slskd-reported on-disk location', async () => {
     const progress: DownloadProgress[] = [];
     const { adapter } = downloader({
       polls: [
@@ -100,6 +161,7 @@ describe('SlskdDownload', () => {
           { state: 'InProgress' }, // an unrelated transfer with no filename is ignored
         ]),
       ],
+      events: [bothCompleted],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), (p) =>
@@ -114,6 +176,91 @@ describe('SlskdDownload', () => {
       ],
     });
     expect(progress.at(-1)?.percent).toBe(100);
+  });
+
+  it('keeps the clean candidate name while pointing at slskd’s renamed on-disk file', async () => {
+    // slskd sanitized/de-duplicated 01.flac to 01_123456.flac; the event carries the real name.
+    const { adapter } = downloader({
+      polls: [bothSucceeded],
+      events: [
+        eventsPage([
+          { id: '01.flac', local: localOf('01.flac', '01_123456.flac') },
+          { id: '02.flac', local: localOf('02.flac') },
+        ]),
+      ],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'completed',
+      files: [
+        { name: '01.flac', path: stagedPath('01_123456.flac') },
+        { name: '02.flac', path: stagedPath('02.flac') },
+      ],
+    });
+  });
+
+  it('pages older events until every completed transfer id resolves', async () => {
+    const { adapter, counts } = downloader({
+      polls: [bothSucceeded],
+      events: [
+        eventsPage([{ id: '01.flac', local: localOf('01.flac') }]), // offset 0 — only one of ours
+        eventsPage([{ id: '02.flac', local: localOf('02.flac') }]), // offset 100 — the other
+      ],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(counts.events).toBe(2);
+  });
+
+  it('re-polls the events log when a completion event lags the transfer-state flip', async () => {
+    const { adapter, counts } = downloader({
+      polls: [bothSucceeded],
+      events: [eventsPage([]), bothCompleted], // empty on first poll, complete on the next
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(counts.events).toBe(2);
+  });
+
+  it('gives up as an InfraError when the events log never reports the completion', async () => {
+    const { adapter } = downloader({ polls: [bothSucceeded], events: [eventsPage([])] });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.download',
+    });
+  });
+
+  it('reads the downloads root once and caches it across downloads', async () => {
+    const { adapter, counts } = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+
+    await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+    await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(counts.options).toBe(1);
+  });
+
+  it('surfaces a contract-violating options body as an InfraError', async () => {
+    const { adapter } = downloader({
+      polls: [bothSucceeded],
+      events: [bothCompleted],
+      options: { status: 200, body: JSON.stringify({ directories: {} }) },
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.download',
+    });
   });
 
   it('fails the whole candidate when a file does not transfer', async () => {
@@ -191,11 +338,9 @@ describe('SlskdDownload', () => {
           }),
           transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
         ]),
-        poll([
-          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-        ]),
+        bothSucceeded,
       ],
+      events: [bothCompleted],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(100000, 100000), (p) =>
@@ -209,23 +354,12 @@ describe('SlskdDownload', () => {
 
   it('falls back to the default poll interval when unconfigured', async () => {
     const http: HttpClient = {
-      send: ({ method }) =>
-        Promise.resolve(
-          method === 'POST'
-            ? { status: 200, body: '' }
-            : poll([
-                transfer('01.flac', {
-                  state: 'Completed, Succeeded',
-                  size: 100,
-                  bytesTransferred: 100,
-                }),
-                transfer('02.flac', {
-                  state: 'Completed, Succeeded',
-                  size: 100,
-                  bytesTransferred: 100,
-                }),
-              ]),
-        ),
+      send: ({ method, url }) => {
+        if (method === 'POST') return Promise.resolve({ status: 200, body: '' });
+        if (url.includes('/api/v0/options')) return Promise.resolve(optionsResponse());
+        if (url.includes('/api/v0/events')) return Promise.resolve(bothCompleted);
+        return Promise.resolve(bothSucceeded);
+      },
     };
     const adapter = new SlskdDownload(
       silentLogger(),
@@ -265,12 +399,8 @@ describe('SlskdDownload', () => {
 
   it('records transfers write-ahead, captures their ids, and removes records on completion', async () => {
     const { adapter, deletes, ledger } = downloader({
-      polls: [
-        poll([
-          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-        ]),
-      ],
+      polls: [bothSucceeded],
+      events: [bothCompleted],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
@@ -313,12 +443,8 @@ describe('SlskdDownload', () => {
   it('still completes when removing a settled record fails at the source', async () => {
     const { adapter, ledger } = downloader({
       deleteStatus: 500, // the cancel+remove DELETE errors, but the download already succeeded
-      polls: [
-        poll([
-          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-        ]),
-      ],
+      polls: [bothSucceeded],
+      events: [bothCompleted],
     });
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
@@ -329,14 +455,7 @@ describe('SlskdDownload', () => {
   });
 
   it('completes even when ledger bookkeeping fails, leaving the ledger untouched', async () => {
-    const { adapter, ledger } = downloader({
-      polls: [
-        poll([
-          transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-          transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
-        ]),
-      ],
-    });
+    const { adapter, ledger } = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
     ledger.fail = true;
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);

@@ -35,6 +35,16 @@ export class SlskdClient {
     return this.request('GET', path);
   }
 
+  /** `GET /api/v0/events` — the newest-first, paginated activity log (used to resolve staged paths). */
+  events(offset: number, limit: number): Promise<unknown> {
+    return this.get(`/api/v0/events?offset=${offset}&limit=${limit}`);
+  }
+
+  /** `GET /api/v0/options` — slskd's effective configuration (used to read the downloads root). */
+  options(): Promise<unknown> {
+    return this.get('/api/v0/options');
+  }
+
   post(path: string, body: unknown): Promise<unknown> {
     return this.request('POST', path, body);
   }

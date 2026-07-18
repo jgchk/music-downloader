@@ -54,8 +54,42 @@ export const slskdTransfersSchema = z.object({
   directories: z.array(z.object({ files: z.array(slskdTransferSchema).optional() })).optional(),
 });
 
+/**
+ * `GET /api/v0/events` — a persisted, newest-first, paginated log. Each record's `data` is a
+ * JSON-encoded *string* (not an inline object); the concrete payload varies by `type`, so the
+ * record keeps `data` as an opaque string here and the resolver decodes only the records it wants.
+ * `type` and `data` are consumed (missing/mistyped fails parse); `timestamp`/`id` are tolerated.
+ */
+const slskdEventRecordSchema = z.object({
+  type: z.string(),
+  data: z.string(),
+  timestamp: z.string().optional(),
+  id: z.string().optional(),
+});
+
+/** `GET /api/v0/events` — a flat array of event records. */
+export const slskdEventsSchema = z.array(slskdEventRecordSchema);
+
+/**
+ * The `data` payload of a `DownloadFileComplete` event, decoded from the record's JSON string.
+ * `localFilename` (the authoritative absolute path slskd wrote) and `transfer.id` (the correlation
+ * key back to our poll) are consumed and required; `remoteFilename` is carried but tolerated.
+ */
+export const slskdDownloadFileCompleteSchema = z.object({
+  localFilename: z.string(),
+  remoteFilename: z.string().optional(),
+  transfer: z.object({ id: z.string() }),
+});
+
+/** `GET /api/v0/options` — the only field consumed is the configured downloads root. */
+export const slskdOptionsSchema = z.object({
+  directories: z.object({ downloads: z.string() }),
+});
+
 export type SlskdSearchState = z.infer<typeof slskdSearchStateSchema>;
 export type SlskdSearchFile = z.infer<typeof slskdSearchFileSchema>;
 export type SlskdSearchResponse = z.infer<typeof slskdSearchResponseSchema>;
 export type SlskdTransfer = z.infer<typeof slskdTransferSchema>;
 export type SlskdTransfersPayload = z.infer<typeof slskdTransfersSchema>;
+export type SlskdEventRecord = z.infer<typeof slskdEventRecordSchema>;
+export type SlskdDownloadFileComplete = z.infer<typeof slskdDownloadFileCompleteSchema>;

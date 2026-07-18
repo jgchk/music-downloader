@@ -300,6 +300,59 @@ describe('Acquisition.execute — cancellation and guards', () => {
   });
 });
 
+describe('Acquisition.execute — cleanup events carry the staged files (D3)', () => {
+  function eventOf<T extends AcquisitionEvent['type']>(
+    events: readonly AcquisitionEvent[],
+    type: T,
+  ): Extract<AcquisitionEvent, { type: T }> {
+    const found = events.find((event) => event.type === type);
+    if (found === undefined) throw new Error(`no ${type} event`);
+    return found as Extract<AcquisitionEvent, { type: T }>;
+  }
+
+  it('stamps the validating candidate’s staged files onto its rejection', () => {
+    const events = Acquisition.fromHistory(validatingHistory([a, matchingCandidate('b')]))
+      .execute({ type: 'RecordValidationFailed', verdict: { confidence: 0, reasons: [] } })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
+  });
+
+  it('carries no staged files on a rejection from a download that never staged anything', () => {
+    const events = Acquisition.fromHistory(selectedHistory([a, matchingCandidate('b')]))
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
+  });
+
+  it('stamps the imported candidate’s staged files onto the Imported event', () => {
+    const events = Acquisition.fromHistory(importingHistory([a]))
+      .execute({ type: 'RecordImported', location: '/library/x' })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'Imported').files).toEqual(sampleFiles);
+  });
+
+  it('stamps the staged files onto an import conflict', () => {
+    const events = Acquisition.fromHistory(importingHistory([a]))
+      .execute({ type: 'RecordImportConflict', location: '/library/x' })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'ImportConflicted').files).toEqual(sampleFiles);
+  });
+
+  it('stamps the staged files onto a cancellation after the transfer settled', () => {
+    const events = Acquisition.fromHistory(validatingHistory([a]))
+      .execute({ type: 'CancelAcquisition' })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'AcquisitionCancelled').files).toEqual(sampleFiles);
+  });
+
+  it('carries no files on an in-flight cancellation', () => {
+    const events = Acquisition.fromHistory(selectedHistory([a]))
+      .execute({ type: 'CancelAcquisition' })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'AcquisitionCancelled').files).toEqual([]);
+  });
+});
+
 describe('Acquisition.reactTo — the event → effect table', () => {
   it('resolves metadata after a request', () => {
     const acq = Acquisition.fromHistory(requestedHistory());
@@ -369,41 +422,49 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     expect(Acquisition.fromHistory([]).reactTo(event)).toEqual([]);
   });
 
-  it('cleans up staging when a candidate is rejected', () => {
+  it('cleans up a rejected candidate’s staged files, carried on the event (D3)', () => {
     expect(
-      Acquisition.fromHistory([]).reactTo({ type: 'CandidateRejected', candidate: a.identity }),
-    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+      Acquisition.fromHistory([]).reactTo({
+        type: 'CandidateRejected',
+        candidate: a.identity,
+        files: sampleFiles,
+      }),
+    ).toEqual([{ type: 'Cleanup', files: sampleFiles }]);
   });
 
-  it('cleans up staging after a successful import', () => {
+  it('upcasts a legacy cleanup event with no carried files to an empty cleanup', () => {
     // The reactor folds the whole stream, so the post-Imported state is already Fulfilled; the
-    // Cleanup keys off the event's own candidate, not folded state.
+    // Cleanup keys off the event's own carried files, not folded state. A pre-D3 Imported has none.
     expect(
       Acquisition.fromHistory(fulfilledHistory).reactTo({
         type: 'Imported',
         candidate: a.identity,
         location: '/library/x',
       }),
-    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+    ).toEqual([{ type: 'Cleanup', files: [] }]);
   });
 
-  it('cleans up the conflicted candidate’s staging on an import conflict', () => {
+  it('cleans up the conflicted candidate’s staged files on an import conflict', () => {
     expect(
       Acquisition.fromHistory(conflictedHistory).reactTo({
         type: 'ImportConflicted',
         location: '/library/x',
+        files: sampleFiles,
       }),
-    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+    ).toEqual([{ type: 'Cleanup', files: sampleFiles }]);
   });
 
-  it('cleans up staging when cancelling after the transfer has settled', () => {
+  it('cleans up staged files when cancelling after the transfer has settled', () => {
     const cancelledFromValidating: AcquisitionEvent[] = [
       ...validatingHistory([a]),
-      { type: 'AcquisitionCancelled' },
+      { type: 'AcquisitionCancelled', files: sampleFiles },
     ];
     expect(
-      Acquisition.fromHistory(cancelledFromValidating).reactTo({ type: 'AcquisitionCancelled' }),
-    ).toEqual([{ type: 'Cleanup', candidate: a.identity }]);
+      Acquisition.fromHistory(cancelledFromValidating).reactTo({
+        type: 'AcquisitionCancelled',
+        files: sampleFiles,
+      }),
+    ).toEqual([{ type: 'Cleanup', files: sampleFiles }]);
   });
 
   it('aborts the transfer instead of cleaning up when cancelling an in-flight download', () => {
@@ -429,6 +490,31 @@ describe('Acquisition.reactTo — the event → effect table', () => {
       { type: 'CandidateRejected', candidate: a.identity },
     ]);
     expect(settled.reactTo({ type: 'AcquisitionCancelled' })).toEqual([]);
+  });
+
+  it('upcasts a legacy rejection with no carried files to an empty cleanup', () => {
+    expect(
+      Acquisition.fromHistory([]).reactTo({ type: 'CandidateRejected', candidate: a.identity }),
+    ).toEqual([{ type: 'Cleanup', files: [] }]);
+  });
+
+  it('upcasts a legacy import conflict with no carried files to an empty cleanup', () => {
+    expect(
+      Acquisition.fromHistory(conflictedHistory).reactTo({
+        type: 'ImportConflicted',
+        location: '/library/x',
+      }),
+    ).toEqual([{ type: 'Cleanup', files: [] }]);
+  });
+
+  it('upcasts a legacy settled cancellation with no carried files to an empty cleanup', () => {
+    const cancelledFromValidating: AcquisitionEvent[] = [
+      ...validatingHistory([a]),
+      { type: 'AcquisitionCancelled' },
+    ];
+    expect(
+      Acquisition.fromHistory(cancelledFromValidating).reactTo({ type: 'AcquisitionCancelled' }),
+    ).toEqual([{ type: 'Cleanup', files: [] }]);
   });
 
   it('emits no effect when a state-dependent event lands on a mismatched phase', () => {
