@@ -1,21 +1,22 @@
-import { access, copyFile, mkdir, rename, rm, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, copyFile, mkdir, rename, rm, rmdir, unlink } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { ResultAsync } from 'neverthrow';
-import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
 import type { DownloadedFile } from '../../domain/acquisition/events.js';
 import type { Target } from '../../domain/target/target.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { ImportResult, LibraryPort } from '../../application/ports/outbound-ports.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { candidateStagingDir, renderReleaseDir } from './paths.js';
+import { renderReleaseDir } from './paths.js';
 
 /**
  * The filesystem `LibraryPort` adapter (D13). Validated staging files are organized into the
  * library by {@link renderReleaseDir}; the existing release is *never* clobbered — an occupied
  * location is a business `conflict` (an `Ok` outcome), not an infra fault. Import prefers a rename
- * and falls back to copy-then-remove across filesystems (`EXDEV`). `discardStaging` removes a
- * rejected candidate's staged files so only valid music reaches the library.
+ * and falls back to copy-then-remove across filesystems (`EXDEV`). `discardStaging` removes exactly
+ * the staged files it is handed (the source-reported locations carried on the cleanup event, D3)
+ * and prunes their emptied directory — never an identity-recomputed path, never an `rm -rf` of a
+ * folder slskd may share between candidates.
  */
 
 /** The filesystem operations the adapter needs, as a seam so the EXDEV fallback is testable. */
@@ -24,7 +25,10 @@ export interface LibraryFileSystem {
   copyFile(src: string, dest: string): Promise<void>;
   unlink(path: string): Promise<void>;
   mkdir(dir: string): Promise<void>;
-  rm(dir: string): Promise<void>;
+  /** Remove a single file, tolerating its absence (it may already have been moved by import). */
+  rmFile(path: string): Promise<void>;
+  /** Remove a directory only if empty (used to prune a candidate's emptied staging folder). */
+  rmdir(dir: string): Promise<void>;
   exists(path: string): Promise<boolean>;
 }
 
@@ -33,7 +37,8 @@ export const nodeLibraryFileSystem: LibraryFileSystem = {
   copyFile: (src, dest) => copyFile(src, dest),
   unlink: (path) => unlink(path),
   mkdir: (dir) => mkdir(dir, { recursive: true }).then(() => undefined),
-  rm: (dir) => rm(dir, { recursive: true, force: true }),
+  rmFile: (path) => rm(path, { force: true }),
+  rmdir: (dir) => rmdir(dir),
   exists: (path) =>
     access(path).then(
       () => true,
@@ -59,12 +64,31 @@ export class FilesystemLibrary implements LibraryPort {
     );
   }
 
-  discardStaging(candidate: CandidateIdentity): ResultAsync<void, InfraError> {
-    const dir = candidateStagingDir(this.config.stagingRoot, candidate);
-    this.logger.debug({ dir }, 'discarding staged candidate');
-    return ResultAsync.fromPromise(this.fs.rm(dir), (cause) =>
+  discardStaging(files: readonly DownloadedFile[]): ResultAsync<void, InfraError> {
+    this.logger.debug({ fileCount: files.length }, 'discarding staged files');
+    return ResultAsync.fromPromise(this.runDiscard(files), (cause) =>
       infraError('library.discardStaging', String(cause), cause),
     );
+  }
+
+  private async runDiscard(files: readonly DownloadedFile[]): Promise<void> {
+    const dirs = new Set(files.map((file) => dirname(file.path)));
+    for (const file of files) await this.fs.rmFile(file.path);
+    for (const dir of dirs) await this.pruneIfEmpty(dir);
+  }
+
+  /**
+   * Prune the candidate's now-emptied staging directory. A directory slskd disambiguated between
+   * candidates (still holding another's files) stays, and one already gone is fine — both are
+   * expected, so only an unexpected fault propagates.
+   */
+  private async pruneIfEmpty(dir: string): Promise<void> {
+    try {
+      await this.fs.rmdir(dir);
+    } catch (cause) {
+      const code = (cause as { code?: string }).code;
+      if (code !== 'ENOTEMPTY' && code !== 'ENOENT') throw cause;
+    }
   }
 
   private async runImport(files: readonly DownloadedFile[], target: Target): Promise<ImportResult> {

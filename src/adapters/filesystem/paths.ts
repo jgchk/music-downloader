@@ -1,6 +1,4 @@
 import { join } from 'node:path';
-import { candidateKey } from '../../domain/candidate/candidate.js';
-import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
 import type { Target } from '../../domain/target/target.js';
 
 /**
@@ -23,13 +21,4 @@ export function sanitizeSegment(raw: string): string {
 export function renderReleaseDir(target: Target): string {
   const release = target.year !== undefined ? `${target.title} (${target.year})` : target.title;
   return join(sanitizeSegment(target.artist), sanitizeSegment(release));
-}
-
-/**
- * Where a candidate's files are staged before import — derived deterministically from the stable
- * candidate identity so the download adapter (which writes here) and the library adapter (which
- * imports from and cleans it) agree without threading paths through the domain.
- */
-export function candidateStagingDir(stagingRoot: string, identity: CandidateIdentity): string {
-  return join(stagingRoot, sanitizeSegment(candidateKey(identity)));
 }

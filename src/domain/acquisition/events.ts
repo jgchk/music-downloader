@@ -61,7 +61,13 @@ export type AcquisitionEvent =
       readonly candidate: CandidateIdentity;
       readonly reason: DownloadFailureReason;
     }
-  | { readonly type: 'CandidateRejected'; readonly candidate: CandidateIdentity }
+  | {
+      readonly type: 'CandidateRejected';
+      readonly candidate: CandidateIdentity;
+      // The rejected candidate's staged files, stamped at mint time so staging-cleanup targets the
+      // source-reported location (design D3). Optional/additive: legacy history upcasts to none.
+      readonly files?: readonly DownloadedFile[];
+    }
   | {
       readonly type: 'ValidationPassed';
       readonly candidate: CandidateIdentity;
@@ -72,10 +78,19 @@ export type AcquisitionEvent =
       readonly candidate: CandidateIdentity;
       readonly verdict: ValidationVerdict;
     }
-  | { readonly type: 'Imported'; readonly candidate: CandidateIdentity; readonly location: string }
+  | {
+      readonly type: 'Imported';
+      readonly candidate: CandidateIdentity;
+      readonly location: string;
+      readonly files?: readonly DownloadedFile[]; // staged files to clean after the move (D3)
+    }
   | { readonly type: 'AcquisitionFulfilled'; readonly location: string }
   | { readonly type: 'AcquisitionExhausted' }
-  | { readonly type: 'ImportConflicted'; readonly location: string }
-  | { readonly type: 'AcquisitionCancelled' };
+  | {
+      readonly type: 'ImportConflicted';
+      readonly location: string;
+      readonly files?: readonly DownloadedFile[]; // staged files to discard, never imported (D3)
+    }
+  | { readonly type: 'AcquisitionCancelled'; readonly files?: readonly DownloadedFile[] };
 
 export type AcquisitionEventType = AcquisitionEvent['type'];

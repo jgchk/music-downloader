@@ -256,9 +256,9 @@ describe('interpretEffect — import and cleanup', () => {
     });
     const result = await interpretEffect(deps(ports), 'acq-1', {
       type: 'Cleanup',
-      candidate: matchingCandidate('a').identity,
+      files: sampleFiles,
     });
     expect(result._unsafeUnwrap()).toEqual([]);
-    expect(discardStaging).toHaveBeenCalledOnce();
+    expect(discardStaging).toHaveBeenCalledWith(sampleFiles);
   });
 });

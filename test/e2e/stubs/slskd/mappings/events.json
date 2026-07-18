@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v0/events",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": [
+      {
+        "timestamp": "2026-07-05T15:44:54Z",
+        "type": "DownloadFileComplete",
+        "id": "evt-1",
+        "data": "{\"localFilename\":\"/downloads/Test Album/01 Track One.flac\",\"transfer\":{\"id\":\"transfer-1\"}}"
+      }
+    ]
+  }
+}

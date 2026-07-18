@@ -111,6 +111,27 @@ describe('evolve — totality: out-of-protocol events are ignored', () => {
   }
 });
 
+describe('evolve — cleanup events carry inert staged files (D3, additive/optional)', () => {
+  it('folds a rejection identically whether or not it carries staged files', () => {
+    const base: AcquisitionEvent[] = [
+      ...validatingHistory([a, b]),
+      { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
+    ];
+    const withFiles = foldEvents([
+      ...base,
+      {
+        type: 'CandidateRejected',
+        candidate: a.identity,
+        files: [{ path: '/staging/Album/01.flac', name: '01.flac' }],
+      },
+    ]);
+    const legacy = foldEvents([...base, { type: 'CandidateRejected', candidate: a.identity }]);
+
+    expect(withFiles).toEqual(legacy); // the carried files never touch the fold
+    expect(withFiles.phase).toBe('Selecting');
+  });
+});
+
 describe('evolve — cancellation edge cases', () => {
   it('cancels an empty acquisition into a terminal cancelled state with zeroed progress', () => {
     const cancelled = foldEvents([{ type: 'AcquisitionCancelled' }]);

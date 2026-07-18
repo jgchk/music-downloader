@@ -66,4 +66,17 @@ export const SLSKD_CONSUMED_OPERATIONS: readonly SlskdOperation[] = [
     pathParams: ['username', 'id'],
     usedBy: 'SlskdDownload — abandon a transfer',
   },
+  {
+    method: 'get',
+    path: '/api/v0/events',
+    pathParams: [],
+    usedBy:
+      'SlskdDownload — resolve a completed download’s on-disk location (DownloadFileComplete)',
+  },
+  {
+    method: 'get',
+    path: '/api/v0/options',
+    pathParams: [],
+    usedBy: 'SlskdDownload — read the downloads root (directories.downloads)',
+  },
 ];

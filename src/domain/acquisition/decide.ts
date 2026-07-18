@@ -4,7 +4,7 @@ import type { Candidate } from '../candidate/candidate.js';
 import { candidateKey } from '../candidate/candidate.js';
 import { rankCandidates } from '../ranking/ranking.js';
 import type { AcquisitionCommand, AcquisitionCommandType } from './commands.js';
-import type { AcquisitionEvent } from './events.js';
+import type { AcquisitionEvent, DownloadedFile } from './events.js';
 import { isTerminal } from './state.js';
 import type {
   AcquisitionPhase,
@@ -73,6 +73,15 @@ function selectNext(state: DownloadingState | ValidatingState): AcquisitionEvent
   return { type: 'AcquisitionExhausted' };
 }
 
+/**
+ * The staged files a cleanup-triggering event must carry so cleanup targets the source-reported
+ * location (design D3). Only `Validating`/`Importing` states hold them; from any other state
+ * (e.g. a download that failed before staging) there is nothing staged to clean.
+ */
+function stagedFilesOf(state: AcquisitionState): readonly DownloadedFile[] {
+  return 'downloadedFiles' in state ? state.downloadedFiles : [];
+}
+
 /** After a candidate fails, reject it and decide the next move in one batch. */
 function rejectAndAdvance(
   state: DownloadingState | ValidatingState,
@@ -80,7 +89,7 @@ function rejectAndAdvance(
 ): readonly AcquisitionEvent[] {
   return [
     failure,
-    { type: 'CandidateRejected', candidate: state.current.identity },
+    { type: 'CandidateRejected', candidate: state.current.identity, files: stagedFilesOf(state) },
     selectNext(state),
   ];
 }
@@ -178,17 +187,24 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Importing') return err(illegal(command.type, state));
       return ok([
-        { type: 'Imported', candidate: state.current.identity, location: command.location },
+        {
+          type: 'Imported',
+          candidate: state.current.identity,
+          location: command.location,
+          files: state.downloadedFiles,
+        },
         { type: 'AcquisitionFulfilled', location: command.location },
       ]);
 
     case 'RecordImportConflict':
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Importing') return err(illegal(command.type, state));
-      return ok([{ type: 'ImportConflicted', location: command.location }]);
+      return ok([
+        { type: 'ImportConflicted', location: command.location, files: state.downloadedFiles },
+      ]);
 
     case 'CancelAcquisition':
       if (isTerminal(state)) return ok([]);
-      return ok([{ type: 'AcquisitionCancelled' }]);
+      return ok([{ type: 'AcquisitionCancelled', files: stagedFilesOf(state) }]);
   }
 }
