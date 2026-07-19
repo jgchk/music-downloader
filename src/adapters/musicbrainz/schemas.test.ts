@@ -86,7 +86,7 @@ describe('MusicBrainz contract schemas', () => {
           title: 'Album (Deluxe Edition)',
           status: 'Official',
           date: '2016-11-04',
-          'release-group': { id: 'rg-1', title: 'Album' }, // title unknown to the contract
+          'release-group': { id: 'rg-1', title: 'Album', 'primary-type': 'Album' }, // primary-type unknown to the contract
         },
       ],
     }).releases!;
@@ -97,7 +97,7 @@ describe('MusicBrainz contract schemas', () => {
       title: 'Album (Deluxe Edition)',
       status: 'Official',
       date: '2016-11-04',
-      'release-group': { id: 'rg-1' },
+      'release-group': { id: 'rg-1', title: 'Album' },
     });
   });
 
