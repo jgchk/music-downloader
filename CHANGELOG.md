@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.4.1](https://github.com/jgchk/music-downloader/compare/v2.4.0...v2.4.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **musicbrainz:** prefer the exactly-titled release group over derivative-named siblings ([3f565a0](https://github.com/jgchk/music-downloader/commit/3f565a0f22b2fcd4d91fe838bac2fe2ab63e402f))
+
 ## [2.4.0](https://github.com/jgchk/music-downloader/compare/v2.3.0...v2.4.0) (2026-07-19)
 
 
