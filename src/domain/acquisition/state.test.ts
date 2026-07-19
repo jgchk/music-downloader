@@ -4,8 +4,10 @@ import { evolve, foldEvents } from './state.js';
 import type { AcquisitionPhase, AcquisitionState } from './state.js';
 import {
   defaultPolicies,
+  fulfilledHistory,
   importingHistory,
   matchingCandidate,
+  rankedOf,
   requestedHistory,
   resolvedHistory,
   sampleRequest,
@@ -34,11 +36,7 @@ const stateByPhase: Record<AcquisitionPhase, AcquisitionState> = {
   Validating: foldEvents(validatingHistory([a])),
   Importing: foldEvents(importingHistory([a])),
   MetadataFailed: foldEvents([...requestedHistory(), { type: 'MetadataResolutionFailed' }]),
-  Fulfilled: foldEvents([
-    ...importingHistory([a]),
-    { type: 'Imported', candidate: a.identity, location: '/library/x' },
-    { type: 'AcquisitionFulfilled', location: '/library/x' },
-  ]),
+  Fulfilled: foldEvents(fulfilledHistory([a])),
   Conflicted: foldEvents([...importingHistory([a]), { type: 'ImportConflicted', location: '/x' }]),
   Exhausted: foldEvents([...selectingHistory, { type: 'AcquisitionExhausted' }]),
   Cancelled: foldEvents([...selectedHistory([a]), { type: 'AcquisitionCancelled' }]),
@@ -60,6 +58,7 @@ const allEvents: AcquisitionEvent[] = [
   { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
   { type: 'Imported', candidate: a.identity, location: '/x' },
   { type: 'AcquisitionFulfilled', location: '/x' },
+  { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
   { type: 'AcquisitionExhausted' },
   { type: 'ImportConflicted', location: '/x' },
   { type: 'AcquisitionCancelled' },
@@ -91,6 +90,7 @@ const legalSources: Record<AcquisitionEvent['type'], readonly AcquisitionPhase[]
   ValidationFailed: [],
   Imported: [],
   AcquisitionFulfilled: ['Importing'],
+  FulfillmentRejected: ['Fulfilled'],
   AcquisitionExhausted: ['Selecting'],
   ImportConflicted: ['Importing'],
   AcquisitionCancelled: NON_TERMINAL,
@@ -129,6 +129,72 @@ describe('evolve — cleanup events carry inert staged files (D3, additive/optio
 
     expect(withFiles).toEqual(legacy); // the carried files never touch the fold
     expect(withFiles.phase).toBe('Selecting');
+  });
+});
+
+describe('evolve — fulfilment retains the ladder-resume context (defeasible Fulfilled, D3)', () => {
+  type Fulfilled = Extract<AcquisitionState, { phase: 'Fulfilled' }>;
+  const fulfilled = matchingCandidate('a');
+  const runnerUp = matchingCandidate('b');
+  // Ranking puts equal candidates in search order: 'a' wins, 'b' remains in the working set.
+  const modern = foldEvents(fulfilledHistory([fulfilled, runnerUp])) as Fulfilled;
+  const legacy = foldEvents([
+    ...importingHistory([fulfilled, runnerUp]),
+    { type: 'Imported', candidate: fulfilled.identity, location: '/library/x' },
+    { type: 'AcquisitionFulfilled', location: '/library/x' },
+  ]) as Fulfilled;
+
+  it('retains the fulfilled candidate and the context needed to resume the ladder', () => {
+    expect(modern.phase).toBe('Fulfilled');
+    expect(modern.location).toBe('/library/x');
+    expect(modern.resume?.candidate).toEqual(fulfilled);
+    expect(modern.resume?.target).toEqual(sampleTarget);
+    expect(modern.resume?.policies).toEqual(defaultPolicies());
+    expect(modern.resume?.request).toEqual(sampleRequest);
+    expect(modern.resume?.working.map((r) => r.candidate)).toEqual([runnerUp]);
+  });
+
+  it('folds a legacy fulfilment (no candidate on the event) with no retained context', () => {
+    expect(legacy.phase).toBe('Fulfilled');
+    expect(legacy.location).toBe('/library/x');
+    expect(legacy.resume).toBeUndefined();
+  });
+
+  it('folds FulfillmentRejected back into the rejection path, resuming the retained context', () => {
+    const revived = evolve(modern, {
+      type: 'FulfillmentRejected',
+      candidate: fulfilled.identity,
+      reasons: ['corrupt stub'],
+    });
+    expect(revived).toMatchObject({
+      phase: 'Validating',
+      current: fulfilled,
+      target: sampleTarget,
+      request: sampleRequest,
+      downloadedFiles: [],
+      attempts: 1,
+    });
+  });
+
+  it('folds the whole revival batch through the existing rejection/selection cases', () => {
+    const ranked = rankedOf([fulfilled, runnerUp]);
+    const state = foldEvents([
+      ...fulfilledHistory([fulfilled, runnerUp]),
+      { type: 'FulfillmentRejected', candidate: fulfilled.identity, reasons: [] },
+      { type: 'CandidateRejected', candidate: fulfilled.identity, files: [] },
+      { type: 'CandidateSelected', candidate: ranked[1]!.candidate },
+    ]);
+    expect(state).toMatchObject({ phase: 'Downloading', current: runnerUp, attempts: 2 });
+    expect((state as Extract<AcquisitionState, { phase: 'Downloading' }>).rejected).toHaveLength(1);
+  });
+
+  it('ignores FulfillmentRejected on a legacy fulfilment with no retained context', () => {
+    const event: AcquisitionEvent = {
+      type: 'FulfillmentRejected',
+      candidate: fulfilled.identity,
+      reasons: [],
+    };
+    expect(evolve(legacy, event)).toBe(legacy); // unchanged, same reference
   });
 });
 

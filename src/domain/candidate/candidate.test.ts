@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { candidateKey, fileCount, sameCandidate } from './candidate.js';
+import { candidateKey, fileCount, refersTo, sameCandidate } from './candidate.js';
 import type { Candidate, CandidateIdentity } from './candidate.js';
 
 const identity: CandidateIdentity = { username: 'peer1', path: '/music/album', sizeBytes: 4200 };
@@ -32,6 +32,22 @@ describe('sameCandidate', () => {
   it('is true for identical identities and false otherwise', () => {
     expect(sameCandidate(identity, { ...identity })).toBe(true);
     expect(sameCandidate(identity, { ...identity, sizeBytes: 1 })).toBe(false);
+  });
+});
+
+describe('refersTo', () => {
+  it('matches on username, path, and size when all are given', () => {
+    expect(refersTo({ ...identity }, identity)).toBe(true);
+    expect(refersTo({ ...identity, sizeBytes: 1 }, identity)).toBe(false);
+  });
+
+  it('matches on username and path alone when the reference omits size', () => {
+    expect(refersTo({ username: 'peer1', path: '/music/album' }, identity)).toBe(true);
+  });
+
+  it('rejects a reference naming a different username or path', () => {
+    expect(refersTo({ username: 'peer2', path: '/music/album' }, identity)).toBe(false);
+    expect(refersTo({ username: 'peer1', path: '/other' }, identity)).toBe(false);
   });
 });
 

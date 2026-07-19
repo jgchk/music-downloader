@@ -112,7 +112,7 @@ describe('loadConfig', () => {
         WEBHOOK_URLS: 'https://a.example/hook',
         WEBHOOK_SECRET: 'not a secret!',
       })._unsafeUnwrapErr();
-      expect(error).toEqual({ kind: 'InvalidWebhookSecret' });
+      expect(error).toEqual({ kind: 'InvalidWebhookSecret', name: 'WEBHOOK_SECRET' });
     });
 
     it('fails on an unparseable subscriber url', () => {
@@ -122,6 +122,32 @@ describe('loadConfig', () => {
         WEBHOOK_SECRET: SECRET,
       })._unsafeUnwrapErr();
       expect(error).toEqual({ kind: 'InvalidWebhookUrl', value: 'not-a-url' });
+    });
+  });
+
+  describe('the verdict webhook receiver (config-dormant)', () => {
+    const SECRET = 'whsec_cmVjZWl2ZXIta2V5';
+
+    it('is absent when VERDICT_WEBHOOK_SECRET is unset — the endpoint stays dormant', () => {
+      expect(loadConfig(base)._unsafeUnwrap().verdictWebhook).toBeUndefined();
+    });
+
+    it('treats a blank secret as absent', () => {
+      const config = loadConfig({ ...base, VERDICT_WEBHOOK_SECRET: '   ' })._unsafeUnwrap();
+      expect(config.verdictWebhook).toBeUndefined();
+    });
+
+    it('parses a well-formed receiver secret', () => {
+      const config = loadConfig({ ...base, VERDICT_WEBHOOK_SECRET: SECRET })._unsafeUnwrap();
+      expect(config.verdictWebhook).toEqual({ secret: SECRET });
+    });
+
+    it('fails on a malformed receiver secret (must be whsec_<base64>)', () => {
+      const error = loadConfig({
+        ...base,
+        VERDICT_WEBHOOK_SECRET: 'nope',
+      })._unsafeUnwrapErr();
+      expect(error).toEqual({ kind: 'InvalidWebhookSecret', name: 'VERDICT_WEBHOOK_SECRET' });
     });
   });
 });

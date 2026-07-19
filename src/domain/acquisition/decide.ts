@@ -1,8 +1,10 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Candidate } from '../candidate/candidate.js';
-import { candidateKey } from '../candidate/candidate.js';
+import { candidateKey, refersTo } from '../candidate/candidate.js';
+import type { AcquisitionPolicies } from '../policy/policies.js';
 import { rankCandidates } from '../ranking/ranking.js';
+import type { RankedCandidate } from '../ranking/ranking.js';
 import type { AcquisitionCommand, AcquisitionCommandType } from './commands.js';
 import type { AcquisitionEvent, DownloadedFile } from './events.js';
 import { isTerminal } from './state.js';
@@ -58,11 +60,22 @@ function usableCandidates(
 }
 
 /**
+ * The slice of state the ladder's next-move choice reads — carried by the in-flight phases and by
+ * a revivable fulfilment's retained context alike.
+ */
+interface LadderContext {
+  readonly policies: AcquisitionPolicies;
+  readonly working: readonly RankedCandidate[];
+  readonly attempts: number;
+  readonly searchRounds: number;
+}
+
+/**
  * After a rejection (or search) leaves the working set as-is, choose the next move: try the
  * next-best candidate, request a fresh bounded re-search, or give up (D6). `RetryPolicy` bounds
  * guarantee termination.
  */
-function selectNext(state: DownloadingState | ValidatingState): AcquisitionEvent {
+function selectNext(state: LadderContext): AcquisitionEvent {
   const retry = state.policies.retry;
   if (state.attempts >= retry.maxTotalAttempts) return { type: 'AcquisitionExhausted' };
   const next = state.working[0];
@@ -209,7 +222,13 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
           location: command.location,
           files: state.downloadedFiles,
         },
-        { type: 'AcquisitionFulfilled', location: command.location },
+        // The fulfilment names its candidate so the folded state retains the resume context an
+        // external verdict needs (fulfillment-external-verdict D3).
+        {
+          type: 'AcquisitionFulfilled',
+          location: command.location,
+          candidate: state.current.identity,
+        },
       ]);
 
     case 'RecordImportConflict':
@@ -218,6 +237,35 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       return ok([
         { type: 'ImportConflicted', location: command.location, files: state.downloadedFiles },
       ]);
+
+    case 'RecordExternalValidationFailed': {
+      // Fulfilled is stable-but-defeasible (fulfillment-external-verdict D2): this one command may
+      // revive it — the single narrow exception to terminal absorption, guarded right here. Every
+      // other phase converges silently: absorbing terminals stay absorbed, a legacy fulfilment has
+      // no retained candidate to judge, a mismatched reference is stale, and a redelivery after
+      // the revival finds the acquisition already back in flight.
+      if (state.phase !== 'Fulfilled') return ok([]);
+      const resume = state.resume;
+      if (resume === undefined || !refersTo(command.candidate, resume.candidate.identity)) {
+        return ok([]);
+      }
+      // The exact reject-and-advance shape of every other rejection, spending the same budgets:
+      // nothing is staged any more (the files were imported), so the rejection carries no files.
+      return ok([
+        {
+          type: 'FulfillmentRejected',
+          candidate: resume.candidate.identity,
+          reasons: command.reasons,
+        },
+        { type: 'CandidateRejected', candidate: resume.candidate.identity, files: [] },
+        selectNext({
+          policies: resume.policies,
+          working: resume.working,
+          attempts: state.attempts,
+          searchRounds: state.searchRounds,
+        }),
+      ]);
+    }
 
     case 'CancelAcquisition':
       if (isTerminal(state)) return ok([]);

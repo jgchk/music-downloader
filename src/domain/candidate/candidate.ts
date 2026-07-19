@@ -46,6 +46,25 @@ export function sameCandidate(a: CandidateIdentity, b: CandidateIdentity): boole
   return candidateKey(a) === candidateKey(b);
 }
 
+/**
+ * A candidate reference as an external reporter names it: username and path are required, size is
+ * corroborating detail the reporter may not have retained.
+ */
+export interface CandidateRef {
+  readonly username: string;
+  readonly path: string;
+  readonly sizeBytes?: number;
+}
+
+/** Whether an external reference names this identity: username+path must match; size when given. */
+export function refersTo(ref: CandidateRef, identity: CandidateIdentity): boolean {
+  return (
+    ref.username === identity.username &&
+    ref.path === identity.path &&
+    (ref.sizeBytes === undefined || ref.sizeBytes === identity.sizeBytes)
+  );
+}
+
 export function fileCount(candidate: Candidate): number {
   return candidate.files.length;
 }

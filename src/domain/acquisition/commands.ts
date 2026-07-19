@@ -1,4 +1,4 @@
-import type { Candidate } from '../candidate/candidate.js';
+import type { Candidate, CandidateRef } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { Target } from '../target/target.js';
 import type { ValidationVerdict } from '../validation/verdict.js';
@@ -30,6 +30,15 @@ export type AcquisitionCommand =
   | { readonly type: 'RecordValidationFailed'; readonly verdict: ValidationVerdict }
   | { readonly type: 'RecordImported'; readonly location: string }
   | { readonly type: 'RecordImportConflict'; readonly location: string }
+  | {
+      // Validation that ran outside the system judged a delivered candidate unacceptable
+      // (fulfillment-external-verdict D1). On a Fulfilled acquisition whose retained candidate the
+      // reference names, `decide` revives the retry ladder; anywhere else — stale, mismatched,
+      // legacy, or redelivered — it converges to a no-op, never an error.
+      readonly type: 'RecordExternalValidationFailed';
+      readonly candidate: CandidateRef;
+      readonly reasons: readonly string[];
+    }
   | { readonly type: 'CancelAcquisition' };
 
 export type AcquisitionCommandType = AcquisitionCommand['type'];

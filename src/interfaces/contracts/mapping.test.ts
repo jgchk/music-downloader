@@ -65,6 +65,7 @@ describe('statusViewToDto', () => {
         { kind: 'download-failed', candidate, reason: 'Stalled' },
         { kind: 'validation-failed', candidate, reasons: ['Unplayable'] },
         { kind: 'imported', candidate, location: '/lib/a' },
+        { kind: 'fulfillment-rejected', candidate, reasons: ['corrupt stub'] },
       ],
     };
 
@@ -76,6 +77,7 @@ describe('statusViewToDto', () => {
       'download-failed',
       'validation-failed',
       'imported',
+      'fulfillment-rejected',
     ]);
   });
 

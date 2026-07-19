@@ -95,6 +95,9 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
     case 'DownloadFailed':
     case 'ValidationFailed':
     case 'AcquisitionFulfilled':
+    // A revival needs no effect of its own: the co-emitted CandidateRejected drives cleanup, and
+    // the batch's CandidateSelected/SearchRequested drive the revival's work.
+    case 'FulfillmentRejected':
     case 'AcquisitionExhausted':
       return [];
   }

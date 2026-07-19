@@ -124,6 +124,12 @@ export const historyEntrySchema = z.discriminatedUnion('kind', [
     candidate: candidateIdentitySchema,
     location: z.string(),
   }),
+  z.object({
+    // A delivered candidate rejected by validation outside the system (free-form reasons).
+    kind: z.literal('fulfillment-rejected'),
+    candidate: candidateIdentitySchema,
+    reasons: z.array(z.string()),
+  }),
 ]);
 
 export const acquisitionStatusResponseSchema = z.object({

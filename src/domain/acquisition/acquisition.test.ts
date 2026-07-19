@@ -5,6 +5,7 @@ import type { AcquisitionCommand } from './commands.js';
 import type { AcquisitionEvent } from './events.js';
 import {
   defaultPolicies,
+  fulfilledHistory,
   importingHistory,
   matchingCandidate,
   requestedHistory,
@@ -30,7 +31,9 @@ function effectTypes(effects: readonly Effect[]): string[] {
 // give the read snapshot something to project. Assertions on phase/isTerminal/snapshot stand in for
 // the old direct `evolve` observations — state itself is now private to the aggregate.
 const a = matchingCandidate('a');
-const fulfilledHistory: AcquisitionEvent[] = [
+// Fulfilled before the external-verdict capability existed: the event names no candidate, so the
+// folded state retains no resume context and the acquisition cannot be revived.
+const legacyFulfilledHistory: AcquisitionEvent[] = [
   ...importingHistory([a]),
   { type: 'Imported', candidate: a.identity, location: '/library/x' },
   { type: 'AcquisitionFulfilled', location: '/library/x' },
@@ -214,6 +217,149 @@ describe('Acquisition.execute — retry loop', () => {
       ._unsafeUnwrap();
     const rankedEvent = events[1] as Extract<AcquisitionEvent, { type: 'CandidatesRanked' }>;
     expect(rankedEvent.ranked.map((r) => r.candidate.identity.username)).toEqual(['y']);
+  });
+});
+
+describe('Acquisition.execute — an external validation failure revives fulfilment', () => {
+  const b = matchingCandidate('b');
+  const verdict = (
+    candidate: { username: string; path: string; sizeBytes?: number },
+    reasons: readonly string[] = [],
+  ): AcquisitionCommand => ({ type: 'RecordExternalValidationFailed', candidate, reasons });
+
+  it('rejects the fulfilled candidate and advances to the next-best candidate', () => {
+    const events = Acquisition.fromHistory(fulfilledHistory([a, b]))
+      .execute(verdict(a.identity, ['corrupt stub']))
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual([
+      'FulfillmentRejected',
+      'CandidateRejected',
+      'CandidateSelected',
+    ]);
+    expect(events[0]).toEqual({
+      type: 'FulfillmentRejected',
+      candidate: a.identity,
+      reasons: ['corrupt stub'],
+    });
+    // Nothing is staged any more (the files were imported) — the rejection carries no files.
+    expect(events[1]).toEqual({ type: 'CandidateRejected', candidate: a.identity, files: [] });
+    const selected = events[2] as Extract<AcquisitionEvent, { type: 'CandidateSelected' }>;
+    expect(selected.candidate.identity.username).toBe('b');
+  });
+
+  it('re-searches within bounds when the retained working set is empty', () => {
+    const events = Acquisition.fromHistory(fulfilledHistory([a]))
+      .execute(verdict(a.identity))
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['FulfillmentRejected', 'CandidateRejected', 'SearchRequested']);
+    expect(events[2]).toEqual({ type: 'SearchRequested', round: 2 });
+  });
+
+  it('exhausts when no candidate remains and the search budget is spent', () => {
+    const oneRound = defaultPolicies({ retry: { maxSearchRounds: 1, maxTotalAttempts: 15 } });
+    const events = Acquisition.fromHistory(fulfilledHistory([a], oneRound))
+      .execute(verdict(a.identity))
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual([
+      'FulfillmentRejected',
+      'CandidateRejected',
+      'AcquisitionExhausted',
+    ]);
+  });
+
+  it('exhausts when the attempts budget is spent even with candidates left', () => {
+    const oneAttempt = defaultPolicies({ retry: { maxSearchRounds: 3, maxTotalAttempts: 1 } });
+    const events = Acquisition.fromHistory(fulfilledHistory([a, b], oneAttempt))
+      .execute(verdict(a.identity))
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual([
+      'FulfillmentRejected',
+      'CandidateRejected',
+      'AcquisitionExhausted',
+    ]);
+  });
+
+  it('matches on username and path alone when the report omits sizeBytes', () => {
+    const events = Acquisition.fromHistory(fulfilledHistory([a, b]))
+      .execute(verdict({ username: a.identity.username, path: a.identity.path }))
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual([
+      'FulfillmentRejected',
+      'CandidateRejected',
+      'CandidateSelected',
+    ]);
+  });
+
+  it('ignores a verdict naming a candidate other than the fulfilled one', () => {
+    const acq = Acquisition.fromHistory(fulfilledHistory([a, b]));
+    expect(acq.execute(verdict(b.identity))._unsafeUnwrap()).toEqual([]);
+    expect(
+      acq.execute(verdict({ ...a.identity, sizeBytes: a.identity.sizeBytes + 1 }))._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('ignores a verdict on a legacy fulfilment with no retained candidate', () => {
+    expect(
+      Acquisition.fromHistory(legacyFulfilledHistory).execute(verdict(a.identity))._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('ignores a verdict on absorbing terminal states', () => {
+    const absorbing: AcquisitionEvent[][] = [
+      [
+        ...selectedHistory([a]),
+        { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+        { type: 'CandidateRejected', candidate: a.identity },
+        { type: 'AcquisitionExhausted' },
+      ],
+      cancelledHistory,
+      metadataFailedHistory,
+      conflictedHistory,
+    ];
+    for (const history of absorbing) {
+      expect(Acquisition.fromHistory(history).execute(verdict(a.identity))._unsafeUnwrap()).toEqual(
+        [],
+      );
+    }
+  });
+
+  it('ignores a redelivered verdict once the revival has occurred', () => {
+    const revived = Acquisition.fromHistory([
+      ...fulfilledHistory([a, b]),
+      { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
+      { type: 'CandidateRejected', candidate: a.identity, files: [] },
+      { type: 'CandidateSelected', candidate: b },
+    ]);
+    expect(revived.phase).toBe('Downloading');
+    expect(revived.execute(verdict(a.identity))._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('ignores a verdict on an acquisition that never fulfilled', () => {
+    expect(Acquisition.fromHistory([]).execute(verdict(a.identity))._unsafeUnwrap()).toEqual([]);
+    expect(
+      Acquisition.fromHistory(selectedHistory([a]))
+        .execute(verdict(a.identity))
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('a verdict against a re-fulfilled acquisition revives again; the old candidate stays stale', () => {
+    const refulfilled = Acquisition.fromHistory([
+      ...fulfilledHistory([a, b]),
+      { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
+      { type: 'CandidateRejected', candidate: a.identity, files: [] },
+      { type: 'CandidateSelected', candidate: b },
+      { type: 'DownloadCompleted', candidate: b.identity, files: sampleFiles },
+      { type: 'ValidationPassed', candidate: b.identity, verdict: { confidence: 1, reasons: [] } },
+      { type: 'Imported', candidate: b.identity, location: '/library/x' },
+      { type: 'AcquisitionFulfilled', location: '/library/x', candidate: b.identity },
+    ]);
+    expect(refulfilled.phase).toBe('Fulfilled');
+    // A slow verdict against the first candidate is stale — ignored.
+    expect(refulfilled.execute(verdict(a.identity))._unsafeUnwrap()).toEqual([]);
+    // A verdict against the newly fulfilled candidate is a legitimate new judgment.
+    const events = refulfilled.execute(verdict(b.identity))._unsafeUnwrap();
+    expect(types(events)).toEqual(['FulfillmentRejected', 'CandidateRejected', 'SearchRequested']);
   });
 });
 
@@ -431,11 +577,23 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
     { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
     { type: 'AcquisitionFulfilled', location: '/x' },
+    // A revival needs no effect of its own: the co-emitted CandidateRejected drives cleanup, and
+    // CandidateSelected/SearchRequested drive the revival's work.
+    { type: 'FulfillmentRejected', candidate: a.identity, reasons: ['corrupt stub'] },
     { type: 'AcquisitionExhausted' },
   ];
 
   it.each(inertEvents)('emits no effect for $type', (event) => {
     expect(Acquisition.fromHistory([]).reactTo(event)).toEqual([]);
+  });
+
+  it('emits no effect for a FulfillmentRejected folded onto its revivable state', () => {
+    expect(
+      Acquisition.fromHistory([
+        ...fulfilledHistory([a, matchingCandidate('b')]),
+        { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
+      ]).reactTo({ type: 'FulfillmentRejected', candidate: a.identity, reasons: [] }),
+    ).toEqual([]);
   });
 
   it('cleans up a rejected candidate’s staged files, carried on the event (D3)', () => {
@@ -452,7 +610,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     // The reactor folds the whole stream, so the post-Imported state is already Fulfilled; the
     // Cleanup keys off the event's own carried files, not folded state. A pre-D3 Imported has none.
     expect(
-      Acquisition.fromHistory(fulfilledHistory).reactTo({
+      Acquisition.fromHistory(legacyFulfilledHistory).reactTo({
         type: 'Imported',
         candidate: a.identity,
         location: '/library/x',
@@ -562,7 +720,7 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
     expect(Acquisition.fromHistory(selectedHistory([a])).phase).toBe('Downloading');
     expect(Acquisition.fromHistory(validatingHistory([a])).phase).toBe('Validating');
     expect(Acquisition.fromHistory(importingHistory([a])).phase).toBe('Importing');
-    expect(Acquisition.fromHistory(fulfilledHistory).phase).toBe('Fulfilled');
+    expect(Acquisition.fromHistory(legacyFulfilledHistory).phase).toBe('Fulfilled');
     expect(Acquisition.fromHistory(metadataFailedHistory).phase).toBe('MetadataFailed');
     expect(Acquisition.fromHistory(conflictedHistory).phase).toBe('Conflicted');
     expect(Acquisition.fromHistory(cancelledHistory).phase).toBe('Cancelled');
@@ -570,7 +728,7 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
   });
 
   it('reports terminal and non-terminal phases', () => {
-    expect(Acquisition.fromHistory(fulfilledHistory).isTerminal).toBe(true);
+    expect(Acquisition.fromHistory(legacyFulfilledHistory).isTerminal).toBe(true);
     expect(Acquisition.fromHistory(conflictedHistory).isTerminal).toBe(true);
     expect(Acquisition.fromHistory(cancelledHistory).isTerminal).toBe(true);
     expect(Acquisition.fromHistory(metadataFailedHistory).isTerminal).toBe(true);
@@ -590,7 +748,7 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
     expect(afterRejection.currentCandidate).toBeUndefined();
     expect(afterRejection.rejectedCount).toBe(1);
 
-    const fulfilled = Acquisition.fromHistory(fulfilledHistory).snapshot;
+    const fulfilled = Acquisition.fromHistory(legacyFulfilledHistory).snapshot;
     expect(fulfilled.location).toBe('/library/x');
   });
 

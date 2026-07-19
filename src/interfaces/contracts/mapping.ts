@@ -69,6 +69,8 @@ function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
       return { kind: 'validation-failed', candidate, reasons: [...entry.reasons] };
     case 'imported':
       return { kind: 'imported', candidate, location: entry.location };
+    case 'fulfillment-rejected':
+      return { kind: 'fulfillment-rejected', candidate, reasons: [...entry.reasons] };
   }
 }
 

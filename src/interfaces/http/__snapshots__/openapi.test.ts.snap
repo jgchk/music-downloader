@@ -227,6 +227,49 @@ exports[`OpenAPI contract > matches the published contract snapshot (version-nor
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "candidate": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "path": {
+                                          "type": "string",
+                                        },
+                                        "sizeBytes": {
+                                          "type": "number",
+                                        },
+                                        "username": {
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "username",
+                                        "path",
+                                        "sizeBytes",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "fulfillment-rejected",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "reasons": {
+                                      "items": {
+                                        "type": "string",
+                                      },
+                                      "type": "array",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "candidate",
+                                    "reasons",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "type": "array",
@@ -755,6 +798,49 @@ exports[`OpenAPI contract > matches the published contract snapshot (version-nor
                               "kind",
                               "candidate",
                               "location",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "candidate": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "path": {
+                                    "type": "string",
+                                  },
+                                  "sizeBytes": {
+                                    "type": "number",
+                                  },
+                                  "username": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "username",
+                                  "path",
+                                  "sizeBytes",
+                                ],
+                                "type": "object",
+                              },
+                              "kind": {
+                                "enum": [
+                                  "fulfillment-rejected",
+                                ],
+                                "type": "string",
+                              },
+                              "reasons": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "candidate",
+                              "reasons",
                             ],
                             "type": "object",
                           },

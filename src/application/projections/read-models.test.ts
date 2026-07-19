@@ -70,6 +70,20 @@ describe('projectStatus', () => {
   });
 });
 
+describe('projectStatus — an external fulfilment rejection', () => {
+  it('is recorded in the history with its reasons', () => {
+    const view = projectStatus('acq-1', [
+      ...history,
+      { type: 'FulfillmentRejected', candidate: c.identity, reasons: ['corrupt stub'] },
+    ]);
+    expect(view.history.at(-1)).toEqual({
+      kind: 'fulfillment-rejected',
+      candidate: c.identity,
+      reasons: ['corrupt stub'],
+    });
+  });
+});
+
 describe('AcquisitionStatusProjection', () => {
   it('applies events, reads a view, lists, and rebuilds from the log', () => {
     const projection = new AcquisitionStatusProjection();

@@ -49,10 +49,11 @@ describe('acquisitionStatusResponseSchema', () => {
         { kind: 'download-failed', candidate, reason: 'Stalled' },
         { kind: 'validation-failed', candidate, reasons: ['Unplayable'] },
         { kind: 'imported', candidate, location: '/lib/a' },
+        { kind: 'fulfillment-rejected', candidate, reasons: ['corrupt stub'] },
       ],
     });
 
-    expect(parsed.history).toHaveLength(4);
+    expect(parsed.history).toHaveLength(5);
   });
 
   it('rejects an unknown status', () => {

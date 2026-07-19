@@ -84,7 +84,22 @@ export type AcquisitionEvent =
       readonly location: string;
       readonly files?: readonly DownloadedFile[]; // staged files to clean after the move (D3)
     }
-  | { readonly type: 'AcquisitionFulfilled'; readonly location: string }
+  | {
+      readonly type: 'AcquisitionFulfilled';
+      readonly location: string;
+      // The fulfilled candidate, stamped at mint time so the folded Fulfilled state can retain it
+      // as the stale-guard for external verdicts (fulfillment-external-verdict D3). Optional/
+      // additive: a legacy fulfilment names no candidate and cannot be revived.
+      readonly candidate?: CandidateIdentity;
+    }
+  | {
+      // Validation that ran *outside* the system judged the delivered outcome unacceptable:
+      // rejects the fulfilled candidate (distinct from ValidationFailed, which rejects an
+      // in-flight candidate during Validating) and re-enters the retry ladder.
+      readonly type: 'FulfillmentRejected';
+      readonly candidate: CandidateIdentity;
+      readonly reasons: readonly string[];
+    }
   | { readonly type: 'AcquisitionExhausted' }
   | {
       readonly type: 'ImportConflicted';
