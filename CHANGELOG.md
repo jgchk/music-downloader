@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.3.0](https://github.com/jgchk/music-downloader/compare/v2.2.2...v2.3.0) (2026-07-19)
+
+
+### Features
+
+* **events:** publish acquisition.fulfilled to webhook subscribers ([61b70e6](https://github.com/jgchk/music-downloader/commit/61b70e6efc02657a4e6758f3ecf277571c31524e))
+
 ## [2.2.2](https://github.com/jgchk/music-downloader/compare/v2.2.1...v2.2.2) (2026-07-18)
 
 
