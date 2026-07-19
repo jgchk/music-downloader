@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.4.0](https://github.com/jgchk/music-downloader/compare/v2.3.0...v2.4.0) (2026-07-19)
+
+
+### Features
+
+* **acquisition:** revive fulfilled acquisitions on external validation failure ([4c15cc4](https://github.com/jgchk/music-downloader/commit/4c15cc492833542c6df558a8447f460b1cdc738b))
+
 ## [2.3.0](https://github.com/jgchk/music-downloader/compare/v2.2.2...v2.3.0) (2026-07-19)
 
 
