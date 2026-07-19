@@ -299,6 +299,162 @@ describe('releaseCandidateIds', () => {
     expect(ids).toEqual(['unscored', 'scored']);
   });
 
+  it('prefers the exactly-titled group over a within-margin derivative-named sibling', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'disc-orig',
+          title: 'Discovery',
+          date: '2001-03-12',
+          'release-group': { id: 'rg-base', title: 'Discovery' },
+        }),
+        hit({
+          id: 'disc-reissue',
+          title: 'Discovery',
+          date: '2014-01-01',
+          'release-group': { id: 'rg-base', title: 'Discovery' },
+        }),
+        hit({
+          id: 'remixed',
+          score: 94,
+          title: 'Discovery Remixed',
+          'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+        }),
+      ],
+      'Discovery',
+    );
+
+    // rg-remix is within the margin of rg-base, but only rg-base bears the requested title
+    expect(ids).toEqual(['disc-orig', 'disc-reissue']);
+  });
+
+  it('resolves the derivative group when the request names it (the preference is symmetric)', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'base',
+          score: 100,
+          title: 'Discovery',
+          'release-group': { id: 'rg-base', title: 'Discovery' },
+        }),
+        hit({
+          id: 'remixed',
+          score: 94,
+          title: 'Discovery Remixed',
+          'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+        }),
+      ],
+      'Discovery Remixed',
+    );
+
+    expect(ids).toEqual(['remixed']);
+  });
+
+  it('fails safe when multiple high-confidence groups bear the requested title', () => {
+    expect(
+      releaseCandidateIds(
+        [
+          hit({
+            id: 'blue',
+            score: 100,
+            title: 'Weezer',
+            'release-group': { id: 'rg-blue', title: 'Weezer' },
+          }),
+          hit({
+            id: 'green',
+            score: 95,
+            title: 'Weezer',
+            'release-group': { id: 'rg-green', title: 'Weezer' },
+          }),
+        ],
+        'Weezer',
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps margin behavior when no group bears the requested title: clear winner resolves', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'deluxe',
+          score: 100,
+          title: 'Album (Deluxe)',
+          'release-group': { id: 'rg-1', title: 'Album (Deluxe)' },
+        }),
+        hit({
+          id: 'live',
+          score: 80,
+          title: 'Album Live',
+          'release-group': { id: 'rg-2', title: 'Album Live' },
+        }),
+      ],
+      'Album',
+    );
+
+    expect(ids).toEqual(['deluxe']);
+  });
+
+  it('keeps margin behavior when no group bears the requested title: close scores stay ambiguous', () => {
+    expect(
+      releaseCandidateIds(
+        [
+          hit({
+            id: 'deluxe',
+            score: 100,
+            title: 'Album (Deluxe)',
+            'release-group': { id: 'rg-1', title: 'Album (Deluxe)' },
+          }),
+          hit({
+            id: 'live',
+            score: 95,
+            title: 'Album Live',
+            'release-group': { id: 'rg-2', title: 'Album Live' },
+          }),
+        ],
+        'Album',
+      ),
+    ).toEqual([]);
+  });
+
+  it('does not let an exact title waive the confidence floor', () => {
+    expect(
+      releaseCandidateIds(
+        [
+          hit({
+            id: 'base',
+            score: 85,
+            title: 'Discovery',
+            'release-group': { id: 'rg-base', title: 'Discovery' },
+          }),
+          hit({
+            id: 'remixed',
+            score: 80,
+            title: 'Discovery Remixed',
+            'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+          }),
+        ],
+        'Discovery',
+      ),
+    ).toEqual([]);
+  });
+
+  it('lets a singleton hit without a release-group id win the preference via its release title', () => {
+    const ids = releaseCandidateIds(
+      [
+        { id: 'solo', score: 100, title: 'Discovery', status: 'Official', date: '2001' },
+        hit({
+          id: 'remixed',
+          score: 94,
+          title: 'Discovery Remixed',
+          'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+        }),
+      ],
+      'Discovery',
+    );
+
+    expect(ids).toEqual(['solo']);
+  });
+
   it('groups a hit lacking a release-group id as its own identity', () => {
     // two ungrouped hits are two singleton groups scoring alike → ambiguous
     expect(

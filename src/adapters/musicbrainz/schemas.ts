@@ -48,8 +48,9 @@ const scoredEntrySchema = z.object({ id: z.string().optional(), score: z.number(
 /**
  * A scored release-search hit. Beyond the scored id, the release entity carries the fields that let
  * the adapter resolve an album's *identity* (its release group) apart from its *editions*: the
- * `release-group` id groups editions of one album, while `title`, `status`, and `date` drive
- * edition selection within the resolved group. All are optional — a missing field degrades
+ * `release-group` id groups editions of one album and its `title` names that identity (the
+ * exact-title preference compares it against the request), while `title`, `status`, and `date`
+ * drive edition selection within the resolved group. All are optional — a missing field degrades
  * selection, never the scored-id contract the recording path also relies on.
  */
 const scoredReleaseSchema = z.object({
@@ -58,7 +59,7 @@ const scoredReleaseSchema = z.object({
   title: z.string().optional(),
   status: z.string().optional(),
   date: z.string().optional(),
-  'release-group': z.object({ id: z.string().optional() }).optional(),
+  'release-group': z.object({ id: z.string().optional(), title: z.string().optional() }).optional(),
 });
 
 /** `GET /release?query=…&fmt=json` — the scored hit list with each hit's identity/edition fields. */

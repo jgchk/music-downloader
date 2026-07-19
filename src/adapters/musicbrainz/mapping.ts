@@ -97,6 +97,13 @@ interface GroupedRelease {
   readonly title: string;
   readonly status: string | undefined;
   readonly date: string | undefined;
+  /**
+   * The identity title of the group this release belongs to: the release-group title, or — for the
+   * singleton fallback of a hit without a release-group id — the release's own title. Compared
+   * against the request title (via {@link normalizeTitle}) by the exact-title preference in
+   * {@link releaseCandidateIds}.
+   */
+  readonly groupTitle: string;
 }
 
 // Real MusicBrainz dates are year-leading (`2013`, `2016-11-04`), so they order chronologically
@@ -129,13 +136,20 @@ function compareReleases(wantedTitle: string) {
 
 /**
  * The ordered release ids to try for an album descriptor, best first — empty when the results are
- * empty, weak, or ambiguous. Hits are grouped by release group (the album identity), and the
- * confidence/ambiguity guard is applied *across groups*: the best group must score at least
- * {@link HIGH_CONFIDENCE} and beat the runner-up group by at least {@link AMBIGUITY_MARGIN} (a
- * group's score is its top hit's). Many equally-scored editions of one album are therefore a single
- * unambiguous identity, not an ambiguous result. Within the winning group, releases are ordered by
- * {@link compareReleases}; the caller fetches them in order and takes the first that yields a valid
- * target, so a release with unusable metadata falls through to the next.
+ * empty, weak, or ambiguous. Hits are grouped by release group (the album identity), and identity
+ * is resolved across groups in two steps. First, the exact-title preference: when exactly one
+ * high-confidence group (score ≥ {@link HIGH_CONFIDENCE}; a group's score is its top hit's) has an
+ * identity title equal to the request title under {@link normalizeTitle}, the request text itself
+ * disambiguates and that group wins regardless of how closely derivative-named siblings score
+ * (e.g. "Discovery" over a within-margin "Discovery Remixed" — and symmetrically, requesting
+ * "Discovery Remixed" wins the remix group). Otherwise — no titled group (typos, partial titles)
+ * or several (distinct albums genuinely sharing a title) — the confidence/ambiguity guard decides
+ * over the full ranking: the best group must score at least {@link HIGH_CONFIDENCE} and beat the
+ * runner-up group by at least {@link AMBIGUITY_MARGIN}, so ties fail safe as before. Many
+ * equally-scored editions of one album are therefore a single unambiguous identity, not an
+ * ambiguous result. Within the winning group, releases are ordered by {@link compareReleases}; the
+ * caller fetches them in order and takes the first that yields a valid target, so a release with
+ * unusable metadata falls through to the next.
  */
 export function releaseCandidateIds(
   releases: readonly MbScoredRelease[] | undefined,
@@ -146,13 +160,16 @@ export function releaseCandidateIds(
     if (release.id === undefined) continue;
     // A hit without a release-group id cannot be grouped by identity, so it forms its own singleton
     // group keyed by its release id — conservative, since it can only widen apparent ambiguity.
-    const key = release['release-group']?.id ?? `release:${release.id}`;
+    const group = release['release-group'];
+    const key = group?.id ?? `release:${release.id}`;
+    const title = release.title ?? '';
     const member: GroupedRelease = {
       id: release.id,
       score: release.score ?? 0,
-      title: release.title ?? '',
+      title,
       status: release.status,
       date: release.date,
+      groupTitle: group?.id === undefined ? title : (group.title ?? ''),
     };
     const existing = groups.get(key);
     if (existing === undefined) groups.set(key, [member]);
@@ -163,11 +180,21 @@ export function releaseCandidateIds(
     .map((members) => ({ members, score: Math.max(...members.map((m) => m.score)) }))
     .sort((a, b) => b.score - a.score);
 
-  const best = ranked[0];
-  const second = ranked[1];
-  if (best === undefined || best.score < HIGH_CONFIDENCE) return [];
-  if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return [];
-
   const wanted = normalizeTitle(requestTitle);
-  return [...best.members].sort(compareReleases(wanted)).map((m) => m.id);
+  const titled = ranked.filter(
+    (group) =>
+      group.score >= HIGH_CONFIDENCE &&
+      group.members.some((m) => normalizeTitle(m.groupTitle) === wanted),
+  );
+
+  let winner = titled.length === 1 ? titled[0] : undefined;
+  if (winner === undefined) {
+    const best = ranked[0];
+    const second = ranked[1];
+    if (best === undefined || best.score < HIGH_CONFIDENCE) return [];
+    if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return [];
+    winner = best;
+  }
+
+  return [...winner.members].sort(compareReleases(wanted)).map((m) => m.id);
 }
