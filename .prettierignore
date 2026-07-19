@@ -15,3 +15,6 @@ CHANGELOG.md
 # Recorded contract fixtures & the pinned slskd OpenAPI snapshot — verbatim captures, not code.
 test/contract/fixtures/
 test/contract/slskd-spec/swagger-*.json
+
+# Generated published-event JSON Schema artifacts (pnpm contracts:events), not hand-edited.
+contracts/events/

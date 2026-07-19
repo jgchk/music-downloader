@@ -16,11 +16,20 @@ export interface AppConfig {
   readonly logLevel: string;
   readonly musicbrainz: { readonly baseUrl?: string; readonly userAgent?: string };
   readonly slskd: { readonly baseUrl?: string; readonly apiKey?: string };
+  /**
+   * Outbound webhook publishing (change: acquisition-outbound-events). Present only when
+   * `WEBHOOK_URLS` names at least one subscriber — absent, the publisher never starts and the tool
+   * behaves exactly as before (config-dormant). URLs configured without `WEBHOOK_SECRET` are a
+   * startup failure: publishing unsigned is impossible.
+   */
+  readonly webhooks?: { readonly urls: readonly string[]; readonly secret: string };
 }
 
 export type ConfigError =
   | { readonly kind: 'MissingVar'; readonly name: string }
-  | { readonly kind: 'InvalidNumber'; readonly name: string; readonly value: string };
+  | { readonly kind: 'InvalidNumber'; readonly name: string; readonly value: string }
+  | { readonly kind: 'InvalidWebhookUrl'; readonly value: string }
+  | { readonly kind: 'InvalidWebhookSecret' }; // never echoes the secret
 
 type Env = Record<string, string | undefined>;
 
@@ -43,12 +52,31 @@ function optional(env: Env, name: string): string | undefined {
   return value !== undefined && value.trim() !== '' ? value : undefined;
 }
 
+/** `whsec_` + base64 — the Standard Webhooks signing-secret format. */
+const WEBHOOK_SECRET_PATTERN = /^whsec_[A-Za-z0-9+/]+={0,2}$/;
+
+function webhooksVar(env: Env): Result<AppConfig['webhooks'], ConfigError> {
+  const raw = optional(env, 'WEBHOOK_URLS');
+  const urls = (raw ?? '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter((url) => url !== '');
+  if (urls.length === 0) return ok(undefined); // dormant: no subscribers, no publisher
+  const invalid = urls.find((url) => !URL.canParse(url));
+  if (invalid !== undefined) return err({ kind: 'InvalidWebhookUrl', value: invalid });
+  const secret = optional(env, 'WEBHOOK_SECRET');
+  if (secret === undefined) return err({ kind: 'MissingVar', name: 'WEBHOOK_SECRET' });
+  if (!WEBHOOK_SECRET_PATTERN.test(secret)) return err({ kind: 'InvalidWebhookSecret' });
+  return ok({ urls, secret });
+}
+
 export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
   return Result.combine([
     requireVar(env, 'LIBRARY_ROOT'),
     requireVar(env, 'STAGING_ROOT'),
     numberVar(env, 'HTTP_PORT', 3000),
-  ]).map(([libraryRoot, stagingRoot, httpPort]) => ({
+    webhooksVar(env),
+  ]).map(([libraryRoot, stagingRoot, httpPort, webhooks]) => ({
     httpPort,
     host: optional(env, 'HTTP_HOST') ?? '0.0.0.0',
     databaseFile: optional(env, 'DATABASE_FILE') ?? 'data/events.db',
@@ -63,5 +91,6 @@ export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
       baseUrl: optional(env, 'SLSKD_BASE_URL'),
       apiKey: optional(env, 'SLSKD_API_KEY'),
     },
+    webhooks,
   }));
 }
