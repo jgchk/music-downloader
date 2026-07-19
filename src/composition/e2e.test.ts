@@ -26,6 +26,12 @@ import {
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import type { Candidate } from '../domain/candidate/candidate.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
+import { createHmac } from 'node:crypto';
+import { WebhookDispatcher } from '../adapters/webhook/dispatcher.js';
+import type { HttpClient, HttpRequest } from '../adapters/support/http.js';
+import { WebhookPublisher } from '../application/events/webhook-publisher.js';
+import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
+import type { AcquisitionFulfilledEvent } from '../interfaces/contracts/events/schemas.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { buildMcpServer } from '../interfaces/mcp/server.js';
 
@@ -110,7 +116,18 @@ function wire(opts: E2eOptions) {
     status,
     progress: progressModel,
   };
-  return { db, reactor, status, progressModel, libraryView, deps, discardStaging };
+  return {
+    db,
+    store,
+    bus,
+    checkpoints,
+    reactor,
+    status,
+    progressModel,
+    libraryView,
+    deps,
+    discardStaging,
+  };
 }
 
 type Wiring = ReturnType<typeof wire>;
@@ -248,6 +265,77 @@ describe('acquisition E2E', () => {
     await vi.waitFor(() => {
       expect(w.discardStaging).toHaveBeenCalledWith(DOWNLOADED_FILES);
     });
+  });
+
+  it('announces a fulfilled acquisition to a webhook subscriber — signed, self-contained, and idempotent across redelivery', async () => {
+    const SECRET_KEY = Buffer.from('e2e-signing-key-0123456789abcdef');
+    const SECRET = `whsec_${SECRET_KEY.toString('base64')}`;
+    const SUBSCRIBER = 'https://importer.example/hooks/music';
+    const received: HttpRequest[] = [];
+    const stubSubscriber: HttpClient = {
+      send: (request) => {
+        received.push(request);
+        return Promise.resolve({ status: 200, body: '' });
+      },
+    };
+    const { w, app } = await startHttp(happyOptions);
+    const publisherOf = (checkpoints: Wiring['checkpoints']) =>
+      new WebhookPublisher({
+        store: w.store,
+        bus: w.bus,
+        checkpoints,
+        logger: silentLogger(),
+        mapping: publishedEventMapping,
+        deliver: new WebhookDispatcher(silentLogger(), stubSubscriber, fixedClock(), {
+          secret: SECRET,
+        }),
+        subscribers: [SUBSCRIBER],
+        retry: { attempts: 1, baseDelayMs: 0 },
+        sleep: () => Promise.resolve(),
+      });
+    const publisher = publisherOf(w.checkpoints);
+    await publisher.start();
+    cleanups.push(() => publisher.stop());
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/acquisitions',
+      payload: SUBMIT_BODY,
+    });
+    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    await settle(w, id, 'Fulfilled');
+    await vi.waitFor(() => {
+      expect(received).toHaveLength(1);
+    });
+
+    // The Standard Webhooks envelope, signed with the shared secret.
+    const delivery = received[0]!;
+    expect(delivery.method).toBe('POST');
+    expect(delivery.url).toBe(SUBSCRIBER);
+    const headers = delivery.headers!;
+    const signedContent = `${headers['webhook-id']!}.${headers['webhook-timestamp']!}.${delivery.body!}`;
+    const expectedSignature = createHmac('sha256', SECRET_KEY)
+      .update(signedContent)
+      .digest('base64');
+    expect(headers['webhook-signature']).toBe(`v1,${expectedSignature}`);
+
+    // The fat payload: everything a consumer needs to act, no callback required.
+    const envelope = JSON.parse(delivery.body!) as AcquisitionFulfilledEvent;
+    expect(envelope.type).toBe('acquisition.fulfilled');
+    expect(envelope.data.acquisitionId).toBe(id);
+    expect(envelope.data.target).toMatchObject({ artist: 'Radiohead', title: 'Kid A' });
+    expect(envelope.data.location).toBe(IMPORTED.location);
+    expect(envelope.data.files.map((file) => file.name)).toEqual(['01.flac', '02.flac']);
+    expect(envelope.data.files[0]!.path).toBe(`${IMPORTED.location}/01.flac`);
+
+    // Simulated redelivery (lost acknowledgement → fresh checkpoints): same idempotency id.
+    const redeliverer = publisherOf(new SqliteCheckpointStore(openEventDatabase(':memory:')));
+    await redeliverer.start();
+    redeliverer.stop();
+    expect(received).toHaveLength(2);
+    expect(received[1]!.headers!['webhook-id']).toBe(headers['webhook-id']);
+    const secondEnvelope = JSON.parse(received[1]!.body!) as AcquisitionFulfilledEvent;
+    expect(secondEnvelope).toEqual(envelope);
   });
 
   it('fulfills an acquisition submitted over MCP', async () => {
