@@ -1,0 +1,179 @@
+name: Pipeline
+
+# One pipeline, two trigger paths (mirrors music-downloader's release pipeline).
+#   • pull_request — fast, may have mutated the branch: verify the version bump was prepped, then the
+#     quality gate and the test pyramid. These are the required checks for merging into main.
+#   • push to main — idempotent: re-run the full gate, build the image, gate it through E2E, and only
+#     then (if this version is not already tagged) tag, release, and publish. Nothing here commits to
+#     main; a re-run of an already-released commit is a no-op.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  # Cancel superseded PR runs; never cancel a main run mid-release.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # PR only: the branch must already carry the computed version bump + CHANGELOG. This job never
+  # pushes — if the branch is not prepped it fails with the exact local command to run.
+  version-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0 # full history + tags for the merge-base recompute
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify version + CHANGELOG are prepped
+        run: pnpm version:prep --check
+
+  # Static checks that need no runtime dependencies; runs in parallel with tests. Gates the release.
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format
+        run: pnpm run format
+      - name: Lint (incl. dependency-rule boundaries)
+        run: pnpm run lint
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Build
+        run: pnpm run build
+
+  # Test pyramid — unit » integration » e2e-in-process in one coverage run, plus the release-tooling
+  # unit tests.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Test @ 100% coverage
+        run: pnpm run test:cov
+      - name: Release-tooling tests
+        run: pnpm run test:release
+
+  # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
+  # tier, then — only if package.json's version is not already tagged — tag, release, and publish.
+  # The version is read from package.json (bumped pre-merge), never recomputed here.
+  release:
+    if: github.event_name == 'push'
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release tag + GitHub Release
+      packages: write # push the GHCR image
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # need tags for the already-released guard
+
+      # Read the release version and decide whether this commit still needs releasing.
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "minor=v$(echo "$VERSION" | cut -d. -f1-2)" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${TAG} already released — build + E2E will run, publish will be skipped"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ steps.ver.outputs.tag }}
+            type=raw,value=${{ steps.ver.outputs.minor }}
+            type=raw,value=latest
+            type=sha
+
+      # Build once, load locally as `music-importer:e2e`, cache to gha so the publish step below
+      # reuses the exact same layers (no rebuild).
+      - name: Build image (load, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: music-importer:e2e
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # THE GATE: stand up the freshly built image, drive it end to end over a real socket, tear
+      # down. A failure here fails the job and blocks the publish + release steps below.
+      - name: Out-of-process E2E gate
+        env:
+          E2E_SKIP_BUILD: '1'
+        run: pnpm test:e2e
+
+      # Everything below is the release, guarded on the version not already being tagged. Order:
+      # publish the image, then tag + GitHub Release — so `latest`/semver only move on a green E2E.
+      - name: Publish image
+        if: steps.ver.outputs.released == 'false'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Tag + GitHub Release
+        if: steps.ver.outputs.released == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          TAG="${{ steps.ver.outputs.tag }}"
+          pnpm tsx scripts/release/changelog-section.ts "$VERSION" > /tmp/notes.md
+          # The runner has no git identity; an annotated tag needs a tagger.
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "Release $TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file /tmp/notes.md
