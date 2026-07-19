@@ -34,6 +34,7 @@ import {
 } from '../application/projections/read-models.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
+import { VERDICT_WEBHOOK_PATH } from '../interfaces/http/verdict-webhook.js';
 import { loadConfig } from './config.js';
 import { readAppVersion } from './version.js';
 
@@ -156,7 +157,16 @@ async function main(): Promise<void> {
   // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
   // process that raced this one's reactor and read stale projections.
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
-  const httpApp = await buildHttpApp(deps, logger, readAppVersion());
+  const httpApp = await buildHttpApp(deps, logger, readAppVersion(), {
+    verdictWebhook: config.verdictWebhook,
+  });
+  // The inbound verdict receiver is config-dormant (fulfillment-external-verdict D4): without
+  // VERDICT_WEBHOOK_SECRET the route does not exist and the tool behaves exactly as before.
+  if (config.verdictWebhook !== undefined) {
+    logger.info({ path: VERDICT_WEBHOOK_PATH }, 'verdict webhook receiver active');
+  } else {
+    logger.info('verdict webhook receiver dormant (no VERDICT_WEBHOOK_SECRET)');
+  }
   await httpApp.listen({ port: config.httpPort, host: config.host });
 
   logger.info({ port: config.httpPort, host: config.host }, 'music-downloader started');

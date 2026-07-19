@@ -1,5 +1,6 @@
 import type { ResultAsync } from 'neverthrow';
 import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
+import type { CandidateRef } from '../../domain/candidate/candidate.js';
 import type { AcquisitionPolicies } from '../../domain/policy/policies.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { IdGenerator } from '../ports/system-ports.js';
@@ -43,6 +44,29 @@ export function cancelAcquisition(
   acquisitionId: string,
 ): ResultAsync<void, CommandError> {
   return applyCommand(deps, acquisitionId, { type: 'CancelAcquisition' }).map(() => undefined);
+}
+
+/** What an external adjudicator reported about a delivered candidate (fulfillment-external-verdict). */
+export interface ExternalValidationFailureInput {
+  readonly candidate: CandidateRef;
+  readonly reasons: readonly string[];
+}
+
+/**
+ * Record an external validation failure against an acquisition. `decide` is the single guard: a
+ * matching verdict on a revivable fulfilment revives the retry ladder; anything stale, mismatched,
+ * or redelivered converges to a no-op — never an error — so webhook redelivery is safe end-to-end.
+ */
+export function recordExternalValidationFailure(
+  deps: CommandDeps,
+  acquisitionId: string,
+  input: ExternalValidationFailureInput,
+): ResultAsync<void, CommandError> {
+  return applyCommand(deps, acquisitionId, {
+    type: 'RecordExternalValidationFailed',
+    candidate: input.candidate,
+    reasons: input.reasons,
+  }).map(() => undefined);
 }
 
 export function getAcquisition(

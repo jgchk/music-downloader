@@ -33,6 +33,8 @@ import {
 } from '../contracts/index.js';
 import { progressToDto } from '../contracts/mapping.js';
 import { registerMcpEndpoint } from '../mcp/server.js';
+import { registerVerdictWebhook } from './verdict-webhook.js';
+import type { VerdictWebhookConfig } from './verdict-webhook.js';
 
 /**
  * The versioned HTTP API (D12). A thin inbound adapter: it validates against the shared zod
@@ -50,10 +52,19 @@ export function statusForCommandError(error: CommandError): 500 | 409 {
   return error.kind === 'InfraError' ? 500 : 409;
 }
 
+export interface HttpAppOptions {
+  /**
+   * The inbound verdict webhook receiver (fulfillment-external-verdict D4). Config-dormant:
+   * absent, the endpoint is not registered and the HTTP surface is exactly what it was before.
+   */
+  readonly verdictWebhook?: VerdictWebhookConfig;
+}
+
 export async function buildHttpApp(
   deps: UseCaseDeps,
   logger: Logger,
   version: string,
+  options: HttpAppOptions = {},
 ): Promise<FastifyInstance> {
   let requestSeq = 0;
   // Widen to Fastify's logger interface so the instance keeps the default logger generic; the pino
@@ -80,6 +91,9 @@ export async function buildHttpApp(
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
   registerAcquisitionRoutes(app, deps);
+  if (options.verdictWebhook !== undefined) {
+    await registerVerdictWebhook(app, deps, options.verdictWebhook);
+  }
   registerMcpEndpoint(app, deps, logger, version);
 
   await app.ready();

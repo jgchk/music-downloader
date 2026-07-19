@@ -21,11 +21,11 @@ export type AcquisitionPhase =
   | 'Downloading' // one candidate in flight
   | 'Validating' // downloaded, awaiting validation
   | 'Importing' // validated, awaiting import
-  | 'Fulfilled' // terminal
-  | 'Exhausted' // terminal
-  | 'Cancelled' // terminal
-  | 'MetadataFailed' // terminal
-  | 'Conflicted'; // terminal
+  | 'Fulfilled' // terminal, stable-but-defeasible: an external verdict may revive it (see FulfilledState)
+  | 'Exhausted' // terminal, absorbing
+  | 'Cancelled' // terminal, absorbing
+  | 'MetadataFailed' // terminal, absorbing
+  | 'Conflicted'; // terminal, absorbing
 
 // --- Shared payload bases: fields accrete as an acquisition advances through its phases. ---
 
@@ -80,9 +80,30 @@ export interface ImportingState extends Targeted {
 export interface MetadataFailedState extends Requested {
   readonly phase: 'MetadataFailed';
 }
+/**
+ * The ladder-resume context a fulfilment retains (fulfillment-external-verdict D3): the fulfilled
+ * candidate — whose identity is the stale-guard for external verdicts — and everything needed to
+ * re-enter the retry ladder should that candidate be rejected after delivery. Retained only when
+ * the `AcquisitionFulfilled` event names its candidate; a legacy fulfilment folds without it and
+ * cannot be revived — the correct degraded behavior.
+ */
+export interface FulfilledResume {
+  readonly request: AcquisitionRequest;
+  readonly policies: AcquisitionPolicies;
+  readonly target: Target;
+  readonly working: readonly RankedCandidate[]; // untried candidates, still ranked
+  readonly candidate: Candidate; // the fulfilled candidate
+}
+/**
+ * Fulfilled is terminal for every existing purpose (`isTerminal` reports true), yet stable-but-
+ * defeasible rather than absorbing (D2): one command — an external validation failure naming the
+ * retained candidate — may revive it into the retry ladder via `FulfillmentRejected`. All other
+ * terminal phases stay absorbing.
+ */
 export interface FulfilledState extends Progress {
   readonly phase: 'Fulfilled';
   readonly location: string; // library location once imported
+  readonly resume?: FulfilledResume;
 }
 export interface ConflictedState extends Progress {
   readonly phase: 'Conflicted';
@@ -212,15 +233,49 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       // A state no-op: the co-emitted AcquisitionFulfilled carries the location; the import itself
       // is observed via `react` (staging cleanup), not folded into state.
       return state;
-    case 'AcquisitionFulfilled':
+    case 'AcquisitionFulfilled': {
       if (state.phase !== 'Importing') return state;
-      return {
+      const fulfilled: FulfilledState = {
         phase: 'Fulfilled',
         location: event.location,
         rejected: state.rejected,
         searchRounds: state.searchRounds,
         attempts: state.attempts,
       };
+      // A fulfilment that names its candidate retains the ladder-resume context (D3); a legacy
+      // event that does not folds to an unrevivable Fulfilled state.
+      if (event.candidate === undefined) return fulfilled;
+      return {
+        ...fulfilled,
+        resume: {
+          request: state.request,
+          policies: state.policies,
+          target: state.target,
+          working: state.working,
+          candidate: state.current,
+        },
+      };
+    }
+    case 'FulfillmentRejected': {
+      // The revival edge (D1/D2): a Fulfilled acquisition with retained context re-enters the
+      // ladder as if its candidate had just failed validation; the co-emitted rejection/selection
+      // events then fold through the existing cases. Nothing is staged any more (the files were
+      // imported), so the transient Validating state carries no downloaded files.
+      if (state.phase !== 'Fulfilled' || state.resume === undefined) return state;
+      const resume = state.resume;
+      return {
+        phase: 'Validating',
+        request: resume.request,
+        policies: resume.policies,
+        target: resume.target,
+        working: resume.working,
+        current: resume.candidate,
+        downloadedFiles: [],
+        rejected: state.rejected,
+        searchRounds: state.searchRounds,
+        attempts: state.attempts,
+      };
+    }
     case 'AcquisitionExhausted':
       if (state.phase !== 'Selecting') return state;
       return {

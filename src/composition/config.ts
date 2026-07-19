@@ -23,13 +23,19 @@ export interface AppConfig {
    * startup failure: publishing unsigned is impossible.
    */
   readonly webhooks?: { readonly urls: readonly string[]; readonly secret: string };
+  /**
+   * The inbound verdict webhook receiver (change: fulfillment-external-verdict). Present only when
+   * `VERDICT_WEBHOOK_SECRET` is set — absent, the endpoint is never registered and the HTTP
+   * surface is exactly what it was before (config-dormant).
+   */
+  readonly verdictWebhook?: { readonly secret: string };
 }
 
 export type ConfigError =
   | { readonly kind: 'MissingVar'; readonly name: string }
   | { readonly kind: 'InvalidNumber'; readonly name: string; readonly value: string }
   | { readonly kind: 'InvalidWebhookUrl'; readonly value: string }
-  | { readonly kind: 'InvalidWebhookSecret' }; // never echoes the secret
+  | { readonly kind: 'InvalidWebhookSecret'; readonly name: string }; // never echoes the secret
 
 type Env = Record<string, string | undefined>;
 
@@ -66,8 +72,19 @@ function webhooksVar(env: Env): Result<AppConfig['webhooks'], ConfigError> {
   if (invalid !== undefined) return err({ kind: 'InvalidWebhookUrl', value: invalid });
   const secret = optional(env, 'WEBHOOK_SECRET');
   if (secret === undefined) return err({ kind: 'MissingVar', name: 'WEBHOOK_SECRET' });
-  if (!WEBHOOK_SECRET_PATTERN.test(secret)) return err({ kind: 'InvalidWebhookSecret' });
+  if (!WEBHOOK_SECRET_PATTERN.test(secret)) {
+    return err({ kind: 'InvalidWebhookSecret', name: 'WEBHOOK_SECRET' });
+  }
   return ok({ urls, secret });
+}
+
+function verdictWebhookVar(env: Env): Result<AppConfig['verdictWebhook'], ConfigError> {
+  const secret = optional(env, 'VERDICT_WEBHOOK_SECRET');
+  if (secret === undefined) return ok(undefined); // dormant: no secret, no receiver endpoint
+  if (!WEBHOOK_SECRET_PATTERN.test(secret)) {
+    return err({ kind: 'InvalidWebhookSecret', name: 'VERDICT_WEBHOOK_SECRET' });
+  }
+  return ok({ secret });
 }
 
 export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
@@ -76,7 +93,8 @@ export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
     requireVar(env, 'STAGING_ROOT'),
     numberVar(env, 'HTTP_PORT', 3000),
     webhooksVar(env),
-  ]).map(([libraryRoot, stagingRoot, httpPort, webhooks]) => ({
+    verdictWebhookVar(env),
+  ]).map(([libraryRoot, stagingRoot, httpPort, webhooks, verdictWebhook]) => ({
     httpPort,
     host: optional(env, 'HTTP_HOST') ?? '0.0.0.0',
     databaseFile: optional(env, 'DATABASE_FILE') ?? 'data/events.db',
@@ -92,5 +110,6 @@ export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
       apiKey: optional(env, 'SLSKD_API_KEY'),
     },
     webhooks,
+    verdictWebhook,
   }));
 }

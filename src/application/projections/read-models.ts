@@ -26,7 +26,14 @@ export type StatusHistoryEntry =
       readonly candidate: CandidateIdentity;
       readonly reasons: readonly ValidationReason[];
     }
-  | { readonly kind: 'imported'; readonly candidate: CandidateIdentity; readonly location: string };
+  | { readonly kind: 'imported'; readonly candidate: CandidateIdentity; readonly location: string }
+  | {
+      // A delivered candidate judged unacceptable by validation outside the system: the fulfilment
+      // was rejected and the acquisition revived into the retry ladder.
+      readonly kind: 'fulfillment-rejected';
+      readonly candidate: CandidateIdentity;
+      readonly reasons: readonly string[];
+    };
 
 export interface AcquisitionStatusView {
   readonly acquisitionId: string;
@@ -57,6 +64,12 @@ export function projectStatus(
       });
     } else if (event.type === 'Imported') {
       history.push({ kind: 'imported', candidate: event.candidate, location: event.location });
+    } else if (event.type === 'FulfillmentRejected') {
+      history.push({
+        kind: 'fulfillment-rejected',
+        candidate: event.candidate,
+        reasons: event.reasons,
+      });
     }
   }
   return {

@@ -33,6 +33,8 @@ import { WebhookPublisher } from '../application/events/webhook-publisher.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import type { AcquisitionFulfilledEvent } from '../interfaces/contracts/events/schemas.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
+import type { HttpAppOptions } from '../interfaces/http/app.js';
+import { VERDICT_WEBHOOK_PATH } from '../interfaces/http/verdict-webhook.js';
 import { buildMcpServer } from '../interfaces/mcp/server.js';
 
 /**
@@ -137,10 +139,10 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function startHttp(opts: E2eOptions) {
+async function startHttp(opts: E2eOptions, appOptions: HttpAppOptions = {}) {
   const w = wire(opts);
   await w.reactor.start();
-  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test');
+  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test', appOptions);
   cleanups.push(
     () => app.close(),
     () => w.reactor.stop(),
@@ -336,6 +338,89 @@ describe('acquisition E2E', () => {
     expect(received[1]!.headers!['webhook-id']).toBe(headers['webhook-id']);
     const secondEnvelope = JSON.parse(received[1]!.body!) as AcquisitionFulfilledEvent;
     expect(secondEnvelope).toEqual(envelope);
+  });
+
+  it('revives a fulfilled acquisition on a signed external rejection and re-fulfils with the next candidate', async () => {
+    const RECEIVER_KEY = Buffer.from('verdict-receiver-key-0123456789ab');
+    const RECEIVER_SECRET = `whsec_${RECEIVER_KEY.toString('base64')}`;
+    // Two ranked candidates: 'a' wins the first pass; 'b' stays in the retained working set.
+    const { w, app } = await startHttp(
+      {
+        searchByRound: (round) =>
+          round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
+        downloadByUser: { a: COMPLETED, b: COMPLETED },
+        importResult: IMPORTED,
+      },
+      { verdictWebhook: { secret: RECEIVER_SECRET } },
+    );
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/acquisitions',
+      payload: SUBMIT_BODY,
+    });
+    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    await settle(w, id, 'Fulfilled');
+    expect(w.status.get(id)!.attempts).toBe(1);
+
+    const fulfilledIdentity = matchingCandidate('a').identity;
+    const verdictBody = JSON.stringify({
+      type: 'import.rejected', // sender envelope fields beyond `data` are ignored
+      data: {
+        acquisitionId: id,
+        candidate: fulfilledIdentity,
+        verdict: 'rejected',
+        reasons: ['corrupt stub'],
+      },
+    });
+    const deliver = (deliveryId: string) => {
+      const timestamp = String(Math.floor(fixedClock().now().getTime() / 1000));
+      const signature = createHmac('sha256', RECEIVER_KEY)
+        .update(`${deliveryId}.${timestamp}.${verdictBody}`)
+        .digest('base64');
+      return app.inject({
+        method: 'POST',
+        url: VERDICT_WEBHOOK_PATH,
+        headers: {
+          'content-type': 'application/json',
+          'webhook-id': deliveryId,
+          'webhook-timestamp': timestamp,
+          'webhook-signature': `v1,${signature}`,
+        },
+        payload: verdictBody,
+      });
+    };
+
+    const accepted = await deliver('verdict-1');
+    expect(accepted.statusCode).toBe(204);
+
+    // The revival re-enters the existing ladder: candidate 'b' downloads and the acquisition
+    // re-fulfils, spending a second attempt.
+    await vi.waitFor(() => {
+      const view = w.status.get(id)!;
+      expect(view.status).toBe('Fulfilled');
+      expect(view.attempts).toBe(2);
+    });
+    const view = w.status.get(id)!;
+    expect(view.rejectedCount).toBe(1);
+    expect(view.location).toBe(IMPORTED.location);
+    expect(
+      view.history.some(
+        (entry) => entry.kind === 'fulfillment-rejected' && entry.reasons[0] === 'corrupt stub',
+      ),
+    ).toBe(true);
+    const selections = view.history.filter((entry) => entry.kind === 'selected');
+    expect(selections.at(-1)!.candidate.username).toBe('b');
+
+    // A duplicate delivery converges: acknowledged, and nothing about the acquisition changes.
+    const eventCount = (await w.store.readAll(0))._unsafeUnwrap().length;
+    const redelivered = await deliver('verdict-1');
+    expect(redelivered.statusCode).toBe(204);
+    // A late verdict naming the *first* candidate again is stale against the new fulfilment.
+    const stale = await deliver('verdict-2');
+    expect(stale.statusCode).toBe(204);
+    expect((await w.store.readAll(0))._unsafeUnwrap()).toHaveLength(eventCount);
+    expect(w.status.get(id)!.attempts).toBe(2);
   });
 
   it('fulfills an acquisition submitted over MCP', async () => {

@@ -125,3 +125,20 @@ export function importingHistory(
     },
   ];
 }
+
+/**
+ * History through a completed import of the best candidate — a revivable Fulfilled state whose
+ * `AcquisitionFulfilled` names the fulfilled candidate (fulfillment-external-verdict D3).
+ */
+export function fulfilledHistory(
+  candidates: readonly Candidate[],
+  policies: AcquisitionPolicies = defaultPolicies(),
+  location = '/library/x',
+): AcquisitionEvent[] {
+  const selected = rankedOf(candidates, policies)[0]!.candidate;
+  return [
+    ...importingHistory(candidates, policies),
+    { type: 'Imported', candidate: selected.identity, location, files: sampleFiles },
+    { type: 'AcquisitionFulfilled', location, candidate: selected.identity },
+  ];
+}
