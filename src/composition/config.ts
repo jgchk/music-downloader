@@ -29,13 +29,26 @@ export interface AppConfig {
    * surface is exactly what it was before (config-dormant).
    */
   readonly verdictWebhook?: { readonly secret: string };
+  /**
+   * The MCP endpoint's OAuth 2.1 Resource Server posture (change: mcp-oauth-resource-server).
+   * Present only when `OAUTH_ISSUER` is set — absent, `/mcp` stays unauthenticated and the
+   * protected-resource-metadata route is not registered (config-dormant). `resource` is this
+   * server's canonical resource identifier (its public MCP URL); tokens must be audience-bound to
+   * it. `jwksUri`, when absent, is discovered from the issuer's OIDC document at startup.
+   */
+  readonly oauth?: {
+    readonly issuer: string;
+    readonly resource: string;
+    readonly jwksUri: string | undefined;
+  };
 }
 
 export type ConfigError =
   | { readonly kind: 'MissingVar'; readonly name: string }
   | { readonly kind: 'InvalidNumber'; readonly name: string; readonly value: string }
   | { readonly kind: 'InvalidWebhookUrl'; readonly value: string }
-  | { readonly kind: 'InvalidWebhookSecret'; readonly name: string }; // never echoes the secret
+  | { readonly kind: 'InvalidWebhookSecret'; readonly name: string } // never echoes the secret
+  | { readonly kind: 'InvalidOAuthUrl'; readonly name: string; readonly value: string };
 
 type Env = Record<string, string | undefined>;
 
@@ -87,6 +100,31 @@ function verdictWebhookVar(env: Env): Result<AppConfig['verdictWebhook'], Config
   return ok({ secret });
 }
 
+/**
+ * The MCP OAuth resource-server config (config-dormant). `OAUTH_ISSUER` is the master switch: absent,
+ * the feature is off. When present, `OAUTH_RESOURCE` is required — a Resource Server that cannot
+ * check audience must not accept tokens, so a missing resource is a fail-loud startup error rather
+ * than an insecure fallback. `OAUTH_JWKS_URI` is optional; absent, the JWKS URI is discovered from
+ * the issuer's OIDC document at startup.
+ */
+function oauthVar(env: Env): Result<AppConfig['oauth'], ConfigError> {
+  const issuer = optional(env, 'OAUTH_ISSUER');
+  if (issuer === undefined) return ok(undefined); // dormant: no issuer, no enforcement
+  if (!URL.canParse(issuer)) {
+    return err({ kind: 'InvalidOAuthUrl', name: 'OAUTH_ISSUER', value: issuer });
+  }
+  const resource = optional(env, 'OAUTH_RESOURCE');
+  if (resource === undefined) return err({ kind: 'MissingVar', name: 'OAUTH_RESOURCE' });
+  if (!URL.canParse(resource)) {
+    return err({ kind: 'InvalidOAuthUrl', name: 'OAUTH_RESOURCE', value: resource });
+  }
+  const jwksUri = optional(env, 'OAUTH_JWKS_URI');
+  if (jwksUri !== undefined && !URL.canParse(jwksUri)) {
+    return err({ kind: 'InvalidOAuthUrl', name: 'OAUTH_JWKS_URI', value: jwksUri });
+  }
+  return ok({ issuer, resource, jwksUri });
+}
+
 export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
   return Result.combine([
     requireVar(env, 'LIBRARY_ROOT'),
@@ -94,7 +132,8 @@ export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
     numberVar(env, 'HTTP_PORT', 3000),
     webhooksVar(env),
     verdictWebhookVar(env),
-  ]).map(([libraryRoot, stagingRoot, httpPort, webhooks, verdictWebhook]) => ({
+    oauthVar(env),
+  ]).map(([libraryRoot, stagingRoot, httpPort, webhooks, verdictWebhook, oauth]) => ({
     httpPort,
     host: optional(env, 'HTTP_HOST') ?? '0.0.0.0',
     databaseFile: optional(env, 'DATABASE_FILE') ?? 'data/events.db',
@@ -111,5 +150,6 @@ export function loadConfig(env: Env): Result<AppConfig, ConfigError> {
     },
     webhooks,
     verdictWebhook,
+    oauth,
   }));
 }

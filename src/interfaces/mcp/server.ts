@@ -28,10 +28,27 @@ import {
   statusViewToDto,
 } from '../contracts/index.js';
 import {
+  PROTECTED_RESOURCE_METADATA_PATH,
+  protectedResourceMetadata,
+  resourceMetadataUrl,
+} from './auth.js';
+import type { TokenVerifier } from './auth.js';
+import {
   submitAcquisitionToolDescription,
   submitAcquisitionToolSchema,
   toSubmitAcquisitionDto,
 } from './tool-schemas.js';
+
+/**
+ * The MCP endpoint's OAuth 2.1 Resource Server configuration (change: mcp-oauth-resource-server).
+ * Present only when an issuer is configured; absent, `/mcp` is served exactly as before —
+ * unauthenticated, with no protected-resource-metadata route (config-dormant).
+ */
+export interface McpAuthConfig {
+  readonly verifier: TokenVerifier;
+  readonly issuer: string;
+  readonly resource: string;
+}
 
 /**
  * The MCP inbound adapter (D12): the same application use-cases, exposed idiomatically. Commands
@@ -171,20 +188,34 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
  * transport write the raw response directly. `GET`/`DELETE` — which the streamable HTTP protocol
  * uses only to open or tear down server-push SSE streams — are refused with a method-not-allowed
  * JSON-RPC error, since this stateless surface never pushes to clients.
+ *
+ * When `auth` is supplied (change: mcp-oauth-resource-server), the endpoint becomes an OAuth 2.1
+ * Resource Server: it publishes RFC 9728 Protected Resource Metadata at the well-known path and
+ * guards `POST /mcp` with a preHandler that requires a valid bearer token, challenging every reject
+ * with a `WWW-Authenticate: Bearer resource_metadata="…"` header. Absent `auth`, none of this exists
+ * and the surface is byte-for-byte what it was before.
  */
 export function registerMcpEndpoint(
   app: FastifyInstance,
   deps: UseCaseDeps,
   logger: Logger,
   version: string,
+  auth?: McpAuthConfig,
 ): void {
   // `hide: true` keeps MCP off the derived OpenAPI document: `/mcp` is a JSON-RPC surface, not part
   // of the versioned REST contract the OpenAPI snapshot guards.
   const hidden = { schema: { hide: true } };
 
+  const post = auth === undefined ? hidden : { ...hidden, preHandler: bearerGuard(auth) };
+  if (auth !== undefined) {
+    app.get(PROTECTED_RESOURCE_METADATA_PATH, hidden, () =>
+      protectedResourceMetadata(auth.issuer, auth.resource),
+    );
+  }
+
   app.post(
     MCP_PATH,
-    hidden,
+    post,
     async (
       request: { raw: IncomingMessage; body?: unknown },
       reply: { hijack: () => void; raw: ServerResponse },
@@ -213,4 +244,33 @@ export function registerMcpEndpoint(
   };
   app.get(MCP_PATH, hidden, methodNotAllowed);
   app.delete(MCP_PATH, hidden, methodNotAllowed);
+}
+
+/**
+ * The bearer-enforcement preHandler for `POST /mcp`. It runs before the transport hijacks the reply:
+ * on a verifier reject it answers `401` with the RFC 9728 §5.1 challenge and stops the lifecycle
+ * (returning the reply); on success it falls through untouched and the MCP handler proceeds. The
+ * challenge points at this resource's protected-resource-metadata document so a client can discover
+ * the authorization server. Every reject — missing, malformed, unverifiable, expired, wrong issuer,
+ * or wrong audience — yields the same `401`, since a Resource Server must not leak which check failed.
+ */
+function bearerGuard(auth: McpAuthConfig) {
+  const challenge = `Bearer resource_metadata="${resourceMetadataUrl(auth.resource)}"`;
+  return async (
+    request: { headers: Record<string, string | string[] | undefined> },
+    reply: {
+      header: (
+        name: string,
+        value: string,
+      ) => { code: (status: number) => { send: (body: unknown) => unknown } };
+    },
+  ): Promise<unknown> => {
+    const header = request.headers['authorization'];
+    const authorization = typeof header === 'string' ? header : undefined;
+    const result = await auth.verifier.verify(authorization);
+    if (result.isErr()) {
+      return reply.header('WWW-Authenticate', challenge).code(401).send({ error: 'unauthorized' });
+    }
+    return undefined;
+  };
 }

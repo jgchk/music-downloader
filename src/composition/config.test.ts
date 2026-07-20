@@ -150,4 +150,79 @@ describe('loadConfig', () => {
       expect(error).toEqual({ kind: 'InvalidWebhookSecret', name: 'VERDICT_WEBHOOK_SECRET' });
     });
   });
+
+  describe('the OAuth resource server (config-dormant)', () => {
+    const ISSUER = 'https://auth.jake.cafe/realms/homelab';
+    const RESOURCE = 'https://music-dl.jake.cafe/mcp';
+
+    it('is absent when OAUTH_ISSUER is unset — the MCP endpoint stays open', () => {
+      expect(loadConfig(base)._unsafeUnwrap().oauth).toBeUndefined();
+    });
+
+    it('treats a blank issuer as absent', () => {
+      const config = loadConfig({ ...base, OAUTH_ISSUER: '   ' })._unsafeUnwrap();
+      expect(config.oauth).toBeUndefined();
+    });
+
+    it('parses issuer + resource, deriving JWKS from discovery by default', () => {
+      const config = loadConfig({
+        ...base,
+        OAUTH_ISSUER: ISSUER,
+        OAUTH_RESOURCE: RESOURCE,
+      })._unsafeUnwrap();
+      expect(config.oauth).toEqual({ issuer: ISSUER, resource: RESOURCE, jwksUri: undefined });
+    });
+
+    it('carries an explicit JWKS URI when provided', () => {
+      const JWKS = 'https://auth.jake.cafe/realms/homelab/protocol/openid-connect/certs';
+      const config = loadConfig({
+        ...base,
+        OAUTH_ISSUER: ISSUER,
+        OAUTH_RESOURCE: RESOURCE,
+        OAUTH_JWKS_URI: JWKS,
+      })._unsafeUnwrap();
+      expect(config.oauth).toEqual({ issuer: ISSUER, resource: RESOURCE, jwksUri: JWKS });
+    });
+
+    it('fails loudly when the issuer is set without a resource (audience checking is mandatory)', () => {
+      const error = loadConfig({ ...base, OAUTH_ISSUER: ISSUER })._unsafeUnwrapErr();
+      expect(error).toEqual({ kind: 'MissingVar', name: 'OAUTH_RESOURCE' });
+    });
+
+    it('fails on an unparseable issuer URL', () => {
+      const error = loadConfig({
+        ...base,
+        OAUTH_ISSUER: 'not-a-url',
+        OAUTH_RESOURCE: RESOURCE,
+      })._unsafeUnwrapErr();
+      expect(error).toEqual({ kind: 'InvalidOAuthUrl', name: 'OAUTH_ISSUER', value: 'not-a-url' });
+    });
+
+    it('fails on an unparseable resource URL', () => {
+      const error = loadConfig({
+        ...base,
+        OAUTH_ISSUER: ISSUER,
+        OAUTH_RESOURCE: 'not-a-url',
+      })._unsafeUnwrapErr();
+      expect(error).toEqual({
+        kind: 'InvalidOAuthUrl',
+        name: 'OAUTH_RESOURCE',
+        value: 'not-a-url',
+      });
+    });
+
+    it('fails on an unparseable explicit JWKS URI', () => {
+      const error = loadConfig({
+        ...base,
+        OAUTH_ISSUER: ISSUER,
+        OAUTH_RESOURCE: RESOURCE,
+        OAUTH_JWKS_URI: 'not-a-url',
+      })._unsafeUnwrapErr();
+      expect(error).toEqual({
+        kind: 'InvalidOAuthUrl',
+        name: 'OAUTH_JWKS_URI',
+        value: 'not-a-url',
+      });
+    });
+  });
 });

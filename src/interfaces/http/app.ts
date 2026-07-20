@@ -33,6 +33,7 @@ import {
 } from '../contracts/index.js';
 import { progressToDto } from '../contracts/mapping.js';
 import { registerMcpEndpoint } from '../mcp/server.js';
+import type { McpAuthConfig } from '../mcp/server.js';
 import { registerVerdictWebhook } from './verdict-webhook.js';
 import type { VerdictWebhookConfig } from './verdict-webhook.js';
 
@@ -58,6 +59,12 @@ export interface HttpAppOptions {
    * absent, the endpoint is not registered and the HTTP surface is exactly what it was before.
    */
   readonly verdictWebhook?: VerdictWebhookConfig;
+  /**
+   * The MCP endpoint's OAuth 2.1 Resource Server config (mcp-oauth-resource-server). Config-dormant:
+   * absent, `/mcp` is unauthenticated and no protected-resource-metadata route exists, exactly as
+   * before.
+   */
+  readonly mcpAuth?: McpAuthConfig;
 }
 
 export async function buildHttpApp(
@@ -94,7 +101,7 @@ export async function buildHttpApp(
   if (options.verdictWebhook !== undefined) {
     await registerVerdictWebhook(app, deps, options.verdictWebhook);
   }
-  registerMcpEndpoint(app, deps, logger, version);
+  registerMcpEndpoint(app, deps, logger, version, options.mcpAuth);
 
   await app.ready();
   return app;
