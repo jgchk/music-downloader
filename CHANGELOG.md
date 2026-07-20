@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.5.0](https://github.com/jgchk/music-downloader/compare/v2.4.2...v2.5.0) (2026-07-20)
+
+
+### Features
+
+* **mcp:** OAuth resource-server auth on the MCP endpoint (config-dormant) ([8f7f924](https://github.com/jgchk/music-downloader/commit/8f7f924e4d51d1caa0381bbb061249c8e7befbbc))
+
 ## [2.4.2](https://github.com/jgchk/music-downloader/compare/v2.4.1...v2.4.2) (2026-07-20)
 
 
