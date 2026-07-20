@@ -26,8 +26,12 @@ import {
   requestToDomain,
   resolvePolicies,
   statusViewToDto,
-  submitAcquisitionRequestSchema,
 } from '../contracts/index.js';
+import {
+  submitAcquisitionToolDescription,
+  submitAcquisitionToolSchema,
+  toSubmitAcquisitionDto,
+} from './tool-schemas.js';
 
 /**
  * The MCP inbound adapter (D12): the same application use-cases, exposed idiomatically. Commands
@@ -78,8 +82,8 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
     tools: [
       {
         name: 'submit_acquisition',
-        description: 'Submit an acquisition request; returns the acquisition id.',
-        inputSchema: z.toJSONSchema(submitAcquisitionRequestSchema),
+        description: submitAcquisitionToolDescription,
+        inputSchema: z.toJSONSchema(submitAcquisitionToolSchema),
       },
       {
         name: 'cancel_acquisition',
@@ -92,12 +96,14 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     if (name === 'submit_acquisition') {
-      const parsed = submitAcquisitionRequestSchema.safeParse(args);
-      if (!parsed.success) return toolError('invalid arguments');
-      const policies = resolvePolicies(parsed.data);
+      const parsed = submitAcquisitionToolSchema.safeParse(args);
+      if (!parsed.success)
+        return toolError(parsed.error.issues.map((issue) => issue.message).join('; '));
+      const dto = toSubmitAcquisitionDto(parsed.data);
+      const policies = resolvePolicies(dto);
       if (policies.isErr()) return toolError('InvalidPolicy');
       const result = await submitAcquisition(deps, {
-        request: requestToDomain(parsed.data.request),
+        request: requestToDomain(dto.request),
         policies: policies.value,
       });
       return result.match(

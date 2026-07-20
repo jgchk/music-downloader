@@ -19,6 +19,20 @@ interface CallToolResult {
   content: { type: string; text: string }[];
 }
 
+/** Recursively assert a JSON Schema contains no union keyword (unusable by Anthropic tool-use). */
+function assertNoUnionKeywords(schema: unknown): void {
+  if (Array.isArray(schema)) {
+    schema.forEach(assertNoUnionKeywords);
+    return;
+  }
+  if (schema === null || typeof schema !== 'object') return;
+  const record = schema as Record<string, unknown>;
+  for (const keyword of ['oneOf', 'anyOf', 'allOf']) {
+    expect(record[keyword], `schema must not contain ${keyword}`).toBeUndefined();
+  }
+  Object.values(record).forEach(assertNoUnionKeywords);
+}
+
 /** Parse the first (text) content of a resource read, sidestepping the text|blob content union. */
 function firstJson(res: { contents: unknown[] }): unknown {
   return JSON.parse((res.contents[0] as { text: string }).text);
@@ -61,7 +75,30 @@ describe('MCP server', () => {
     expect(submit?.inputSchema).toMatchObject({ type: 'object' });
   });
 
-  it('submits an acquisition and returns its id', async () => {
+  it('advertises submit_acquisition with a flat, union-free request schema', async () => {
+    const { tools } = await client.listTools();
+    const submit = tools.find((t) => t.name === 'submit_acquisition');
+    const schema = submit!.inputSchema as {
+      type: string;
+      properties: { request: { type: string; properties: Record<string, unknown> } };
+    };
+
+    // No oneOf/anyOf/allOf anywhere — Anthropic tool-use cannot consume unions.
+    assertNoUnionKeywords(schema);
+    // A flat top-level object whose `request` is itself a flat object with the discriminator field.
+    expect(schema.type).toBe('object');
+    expect(schema.properties.request.type).toBe('object');
+    expect(Object.keys(schema.properties.request.properties).sort()).toEqual([
+      'album',
+      'artist',
+      'kind',
+      'mbid',
+      'targetType',
+      'title',
+    ]);
+  });
+
+  it('submits a descriptor acquisition and returns its id', async () => {
     const result = (await client.callTool({
       name: 'submit_acquisition',
       arguments: descriptorArgs,
@@ -71,14 +108,68 @@ describe('MCP server', () => {
     expect(JSON.parse(result.content[0]!.text)).toEqual({ acquisitionId: 'acq-1' });
   });
 
-  it('reports invalid submit arguments as a tool error', async () => {
+  it('submits a descriptor acquisition carrying an optional album', async () => {
     const result = (await client.callTool({
       name: 'submit_acquisition',
-      arguments: { request: { kind: 'nope' } },
+      arguments: {
+        request: { kind: 'descriptor', targetType: 'track', artist: 'A', title: 'T', album: 'Alb' },
+      },
+    })) as CallToolResult;
+
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0]!.text)).toEqual({ acquisitionId: 'acq-1' });
+  });
+
+  it('submits a musicbrainz acquisition and returns its id', async () => {
+    const result = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: { request: { kind: 'musicbrainz', targetType: 'album', mbid: 'mbid-1' } },
+    })) as CallToolResult;
+
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0]!.text)).toEqual({ acquisitionId: 'acq-1' });
+  });
+
+  it('rejects a musicbrainz request missing its mbid with a specific error', async () => {
+    const result = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: { request: { kind: 'musicbrainz', targetType: 'album' } },
     })) as CallToolResult;
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toBe('invalid arguments');
+    expect(result.content[0]!.text).toBe('kind=musicbrainz requires mbid');
+  });
+
+  it('rejects a descriptor request missing artist/title with a specific error', async () => {
+    const result = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: { request: { kind: 'descriptor', targetType: 'album', title: 'T' } },
+    })) as CallToolResult;
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toBe('kind=descriptor requires artist and title');
+  });
+
+  it('rejects a descriptor request missing only its title with a specific error', async () => {
+    const result = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: { request: { kind: 'descriptor', targetType: 'album', artist: 'A' } },
+    })) as CallToolResult;
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toBe('kind=descriptor requires artist and title');
+  });
+
+  it('reports malformed submit arguments as a tool error naming the problem', async () => {
+    const result = (await client.callTool({
+      name: 'submit_acquisition',
+      arguments: { request: { kind: 'nope', targetType: 'album' } },
+    })) as CallToolResult;
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).not.toBe('');
+    // The message names the offending field's allowed values rather than a bare "invalid arguments".
+    expect(result.content[0]!.text).toContain('musicbrainz');
   });
 
   it('reports an inconsistent policy as a tool error', async () => {
