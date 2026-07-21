@@ -45,8 +45,8 @@
 - [x] 6.3 Cancel acquisition flow — ?/cancel action on the detail page, shown while non-terminal
 - [x] 6.4 Import review queue + resolution flow (importer facade; resolve semantics unchanged from MCP tool) — /reviews + /reviews/[id]; all 9 verbs incl. per-track manual tags; retry verb always offered, NoRetainedCandidate refusal rendered (parity with the MCP tool's behavior)
 - [x] 6.5 Playwright e2e covering the parity flows against a dev instance — tests/serve.sh boots the REAL adapter-node build (real beets validation, scratch roots, closed-port third parties, ORIGIN set); 5 specs green
-- [ ] 6.6 Remove MCP interfaces + SDK dependency and the Fastify HTTP layer from both modules; delete Fastify dependency; parity demonstrated first
-- [ ] 6.7 Consolidate env config (webhook/peer-URL vars gone, single process config); update `.env.example`
+- [x] 6.6 Remove MCP interfaces + SDK dependency and the Fastify HTTP layer from both modules; delete Fastify dependency; parity demonstrated first — interfaces/{http,mcp} + per-module entries/config/version deleted from both; module deps now better-sqlite3/neverthrow/pino/zod only; module e2e suite drives the facade; contracts + seam consumers kept
+- [x] 6.7 Consolidate env config (webhook/peer-URL vars gone, single process config); update `.env.example` — one root .env.example (composed surface incl. BRIDGE_SCRIPT for bundled deployments); module-level examples deleted; webhook-era-inert scenario pinned in the composed config test
 
 ## 7. Release and pipeline
 

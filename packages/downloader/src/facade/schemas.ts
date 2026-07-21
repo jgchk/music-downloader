@@ -1,12 +1,10 @@
 import { z } from 'zod';
 
 /**
- * The versioned wire contracts (D12): one zod source of truth that drives HTTP request/response
- * validation (via `fastify-type-provider-zod`), the published OpenAPI document (via
- * `@fastify/swagger`), and the MCP tool JSON Schemas (via `z.toJSONSchema`) — so the three surfaces
- * cannot drift. These DTOs are deliberately *separate* from the domain models (inbound
- * anti-corruption): they evolve additively within `/api/v1` and never expose domain types on the
- * wire.
+ * The module's wire-shaped DTO contracts: one zod source of truth consumed by every interface
+ * through the facade (today the web BFF; any future HTTP/CLI/MCP binding projects these same
+ * schemas onto its transport). Deliberately *separate* from the domain models (inbound
+ * anti-corruption): they evolve additively and never expose domain types on the wire.
  */
 
 // --- Enumerations (wire copies, intentionally decoupled from the domain's own enums) -----------

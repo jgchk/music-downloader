@@ -59,7 +59,7 @@ interface. Background processing never depends on page traffic.
 ```bash
 corepack enable
 pnpm install
-cp packages/web/.env.example packages/web/.env   # then edit the roots + slskd/beets settings
+cp .env.example packages/web/.env                 # then edit the roots + slskd/beets settings
 pnpm dev                                          # Vite dev server, real daemon booted in-process
 ```
 

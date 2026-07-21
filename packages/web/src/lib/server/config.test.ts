@@ -19,6 +19,18 @@ describe('loadComposedConfig', () => {
     expect(config.logLevel).toBe('info');
   });
 
+  it('ignores webhook-era settings entirely (runtime-baseline: inert, never read)', () => {
+    const clean = loadComposedConfig(VALID)._unsafeUnwrap();
+    const carrying = loadComposedConfig({
+      ...VALID,
+      WEBHOOK_SUBSCRIBER_URLS: 'http://peer/webhook',
+      WEBHOOK_SIGNING_SECRET: 'whsec_abc',
+      VERDICT_WEBHOOK_SECRET: 'whsec_def',
+      INTAKE_WEBHOOK_SECRET: 'whsec_ghi',
+    })._unsafeUnwrap();
+    expect(carrying).toEqual(clean);
+  });
+
   it('defaults the intake source root to the staging root (same box, same namespace)', () => {
     expect(loadComposedConfig(VALID)._unsafeUnwrap().intakeSourceRoot).toBe('/staging');
     expect(

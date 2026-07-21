@@ -1,12 +1,10 @@
 import { z } from 'zod';
 
 /**
- * The versioned wire contracts: one zod source of truth that drives HTTP request/response
- * validation (via `fastify-type-provider-zod`), the published OpenAPI document (via
- * `@fastify/swagger`), and the MCP tool JSON Schemas (via `z.toJSONSchema`) — so the three
- * surfaces cannot drift. These DTOs are deliberately *separate* from the domain models (inbound
- * anti-corruption): they evolve additively within `/api/v1` and never expose domain types on the
- * wire.
+ * The module's wire-shaped DTO contracts: one zod source of truth consumed by every interface
+ * through the facade (today the web BFF; any future HTTP/CLI/MCP binding projects these same
+ * schemas onto its transport). Deliberately *separate* from the domain models (inbound
+ * anti-corruption): they evolve additively and never expose domain types on the wire.
  */
 
 // --- Enumerations (wire copies, intentionally decoupled from the domain's own unions) ----------
@@ -223,10 +221,9 @@ export const errorResponseSchema = z.object({
   message: z.string().optional(),
 });
 
-// Note: the `resolve_review` MCP tool no longer derives its schema here. Anthropic tool-use cannot
-// represent the `oneOf` that a discriminated-union resolution emits, so the MCP adapter presents a
-// flat, union-free equivalent (`src/interfaces/mcp/resolve-review-tool.ts`) and translates back
-// onto `ResolveReviewRequestDto`. The HTTP/OpenAPI surface keeps the union unchanged.
+// Note: if an MCP transport binding ever returns, Anthropic tool-use cannot represent the `oneOf`
+// a discriminated-union resolution emits — present a flat, union-free equivalent at that binding
+// and translate back onto `ResolveReviewRequestDto` (see the retired adapter in git history).
 
 // --- Inferred DTO types (the interface layer's public vocabulary) ------------------------------
 

@@ -95,6 +95,22 @@ describe('createDownloaderFacade', () => {
   });
 
   describe('cancelAcquisition', () => {
+    it('maps a cancel-time infrastructure fault to a modeled error value', async () => {
+      const wiring = testWiring();
+      const facade = createDownloaderFacade(wiring.deps);
+      const submitted = await facade.submitAcquisition(VALID_SUBMIT);
+      if (!submitted.ok) throw new Error('submit failed');
+
+      wiring.store.failReads = true;
+      const result = await facade.cancelAcquisition({ id: submitted.value.acquisitionId });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('InfraError');
+        expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
+      }
+    });
+
     it('cancels a live acquisition', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);

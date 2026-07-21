@@ -1,7 +1,5 @@
 import { ok, okAsync } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   InProcessEventBus,
   SqliteCheckpointStore,
@@ -34,13 +32,12 @@ import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js
 import type { AcquisitionFulfilledEvent } from '../interfaces/contracts/events/schemas.js';
 import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
 import { createDownloaderFacade } from '../facade/index.js';
-import { buildHttpApp } from '../interfaces/http/app.js';
-import { buildMcpServer } from '../interfaces/mcp/server.js';
 
 /**
- * The E2E tier (D4): the whole app wired for real — SQLite event store, in-process bus,
- * projections, the durable reactor, and the HTTP + MCP interfaces — driven end to end against
- * fake outbound ports (slskd / MusicBrainz / ffmpeg / library). It exercises the reactor cascade
+ * The E2E tier (D4): the whole module wired for real — SQLite event store, in-process bus,
+ * projections, the durable reactor — driven end to end through the wire-shaped facade (the
+ * module's sole entry point since the interface consolidation) against fake outbound ports
+ * (slskd / MusicBrainz / ffmpeg / library). It exercises the reactor cascade
  * (resolve → search → rank → download → validate → import) that the unit tiers only touch in
  * isolation, covering the happy path, retry-then-succeed, exhaustion, and an import conflict.
  */
@@ -139,18 +136,24 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function startHttp(opts: E2eOptions) {
+async function startApp(opts: E2eOptions) {
   const w = wire(opts);
   await w.reactor.start();
-  const app = await buildHttpApp(createDownloaderFacade(w.deps), silentLogger(), '0.0.0-test');
+  const facade = createDownloaderFacade(w.deps);
   cleanups.push(
-    () => app.close(),
     () => w.reactor.stop(),
     () => {
       w.db.close();
     },
   );
-  return { w, app };
+  return { w, facade };
+}
+
+async function submit(facade: ReturnType<typeof createDownloaderFacade>): Promise<string> {
+  const result = await facade.submitAcquisition(SUBMIT_BODY);
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error('unreachable');
+  return result.value.acquisitionId;
 }
 
 async function settle(w: Wiring, id: string, phase: AcquisitionPhase): Promise<void> {
@@ -166,42 +169,29 @@ const happyOptions: E2eOptions = {
 };
 
 describe('acquisition E2E', () => {
-  it('fulfills an acquisition end to end over HTTP', async () => {
-    const { w, app } = await startHttp(happyOptions);
+  it('fulfills an acquisition end to end through the facade', async () => {
+    const { w, facade } = await startApp(happyOptions);
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
     await settle(w, id, 'Fulfilled');
 
-    const status = await app.inject({ method: 'GET', url: `/api/v1/acquisitions/${id}` });
-    expect(status.json<{ location: string }>().location).toBe(IMPORTED.location);
+    const status = facade.getAcquisition({ id });
+    expect(status.ok && status.value.location).toBe(IMPORTED.location);
 
-    const progress = await app.inject({
-      method: 'GET',
-      url: `/api/v1/acquisitions/${id}/progress`,
-    });
-    expect(progress.json<{ percent: number }>().percent).toBe(100);
+    const progress = facade.getAcquisitionProgress({ id });
+    expect(progress.ok && progress.value.percent).toBe(100);
     expect(w.libraryView.list()).toHaveLength(1);
   });
 
   it('rejects a failed candidate and succeeds with the next best (retry-then-succeed)', async () => {
-    const { w, app } = await startHttp({
+    const { w, facade } = await startApp({
       searchByRound: (round) =>
         round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
       downloadByUser: { a: FAILED, b: COMPLETED },
       importResult: IMPORTED,
     });
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
     await settle(w, id, 'Fulfilled');
 
     const view = w.status.get(id)!;
@@ -211,19 +201,14 @@ describe('acquisition E2E', () => {
   });
 
   it('discards an abandoned candidate’s completed subset, keeping its failure reason', async () => {
-    const { w, app } = await startHttp({
+    const { w, facade } = await startApp({
       searchByRound: (round) =>
         round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
       downloadByUser: { a: ABANDONED, b: COMPLETED },
       importResult: IMPORTED,
     });
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
     await settle(w, id, 'Fulfilled');
 
     // The abandoned candidate's already-completed files are discarded from staging — no residue —
@@ -236,31 +221,21 @@ describe('acquisition E2E', () => {
   });
 
   it('exhausts when every candidate fails and re-search finds nothing', async () => {
-    const { w, app } = await startHttp({
+    const { w, facade } = await startApp({
       searchByRound: (round) => (round === 1 ? [candidateWithSpeed('a', 100)] : []),
       downloadByUser: { a: FAILED },
       importResult: IMPORTED,
     });
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
 
     await settle(w, id, 'Exhausted');
   });
 
   it('reports an import conflict as a terminal conflicted state', async () => {
-    const { w, app } = await startHttp({ ...happyOptions, importResult: CONFLICT });
+    const { w, facade } = await startApp({ ...happyOptions, importResult: CONFLICT });
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
 
     await settle(w, id, 'Conflicted');
     // The conflicted candidate's staged files must not be left orphaned in staging.
@@ -270,7 +245,7 @@ describe('acquisition E2E', () => {
   });
 
   it('exposes a fulfilled acquisition on the outbound feed — self-contained and stable across redelivery', async () => {
-    const { w, app } = await startHttp(happyOptions);
+    const { w, facade } = await startApp(happyOptions);
 
     // A consuming module's subscription: checkpoint + dead letters in the CONSUMER's own store.
     const consumerDb = openEventDatabase(':memory:');
@@ -299,12 +274,7 @@ describe('acquisition E2E', () => {
     await subscription.start();
     cleanups.push(() => subscription.stop());
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
     await settle(w, id, 'Fulfilled');
     await vi.waitFor(() => {
       expect(received).toHaveLength(1);
@@ -331,19 +301,14 @@ describe('acquisition E2E', () => {
 
   it('revives a fulfilled acquisition on a seam-delivered rejection and re-fulfils with the next candidate', async () => {
     // Two ranked candidates: 'a' wins the first pass; 'b' stays in the retained working set.
-    const { w, app } = await startHttp({
+    const { w, facade } = await startApp({
       searchByRound: (round) =>
         round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
       downloadByUser: { a: COMPLETED, b: COMPLETED },
       importResult: IMPORTED,
     });
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/acquisitions',
-      payload: SUBMIT_BODY,
-    });
-    const id = res.json<{ acquisitionId: string }>().acquisitionId;
+    const id = await submit(facade);
     await settle(w, id, 'Fulfilled');
     expect(w.status.get(id)!.attempts).toBe(1);
 
@@ -414,34 +379,5 @@ describe('acquisition E2E', () => {
     await subscription.poll();
     expect((await w.store.readAll(0))._unsafeUnwrap()).toHaveLength(eventCount);
     expect(w.status.get(id)!.attempts).toBe(2);
-  });
-
-  it('fulfills an acquisition submitted over MCP', async () => {
-    const w = wire(happyOptions);
-    await w.reactor.start();
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await buildMcpServer(createDownloaderFacade(w.deps), silentLogger(), '0.0.0-test').connect(
-      serverTransport,
-    );
-    const client = new Client({ name: 'e2e', version: '0' });
-    await client.connect(clientTransport);
-    cleanups.push(
-      () => client.close(),
-      () => w.reactor.stop(),
-      () => {
-        w.db.close();
-      },
-    );
-
-    const call = (await client.callTool({
-      name: 'submit_acquisition',
-      arguments: SUBMIT_BODY,
-    })) as { content: { text: string }[] };
-    const id = (JSON.parse(call.content[0]!.text) as { acquisitionId: string }).acquisitionId;
-    await settle(w, id, 'Fulfilled');
-
-    const resource = await client.readResource({ uri: `md://acquisitions/${id}` });
-    const view = JSON.parse((resource.contents[0] as { text: string }).text) as { status: string };
-    expect(view.status).toBe('Fulfilled');
   });
 });
