@@ -1,0 +1,41 @@
+# importer-outbound-events — delta for merge-modular-monolith
+
+## ADDED Requirements
+
+### Requirement: Release verdicts are published as events in the importer's own store
+
+Adopted from the music-importer repo's `outbound-events` capability, renamed `importer-outbound-events` on adoption (name collision with the downloader module's capability). The webhook transport is replaced by the cross-module seam: the importer module SHALL record each `release.verdict` as an event in its own event store, which the downloader module consumes via the durable catch-up subscription (see `cross-module-delivery`) — at-least-once, in recorded order, with the consumer's checkpoint holding delivery across crashes and restarts so a verdict is never lost. The payload SHALL carry the originating acquisition id, the delivered candidate's identity, the rejected verdict, and the reviewer's reasons. Redelivery of an already-consumed verdict SHALL converge as a no-op on the consumer side.
+
+#### Scenario: A recorded verdict reaches the downloader module
+
+- **GIVEN** a review resolved with reject-and-retry-download
+- **WHEN** the downloader module's subscription consumes the recorded verdict
+- **THEN** it receives the `release.verdict` payload carrying the acquisition id, candidate identity, and reasons
+
+#### Scenario: A consumer outage loses nothing
+
+- **GIVEN** verdicts recorded while the process was down or the consuming subscription was halted
+- **WHEN** the subscription resumes from its checkpoint
+- **THEN** every recorded verdict is delivered in order and none is lost
+
+#### Scenario: Redelivery converges
+
+- **GIVEN** a verdict already consumed by the downloader module
+- **WHEN** the same event is redelivered after a crash between effect and checkpoint
+- **THEN** the consumer converges as a no-op and no duplicate effect is recorded
+
+### Requirement: The published event contract is producer-owned and additive-only
+
+The importer module SHALL own the schema of the events it publishes across the module seam: the `release.verdict` payload SHALL be defined in a single contract schema from which a JSON Schema document is generated and committed, recorded payloads SHALL validate against it, and recorded fixtures of published events SHALL be kept permanently. A contract gate — in-repo cross-package contract tests — SHALL fail the build on any non-additive schema change; a breaking payload change SHALL be expressed as a new event type instead. The consuming module SHALL read the payload through its own tolerant, consumer-owned schema.
+
+#### Scenario: A non-additive schema change fails the gate
+
+- **GIVEN** a modification that removes or retypes a published field
+- **WHEN** the contract gate runs
+- **THEN** the build fails, pointing at the non-additive difference
+
+#### Scenario: Frozen fixtures pin the wire format
+
+- **GIVEN** the permanently recorded fixture of a published `release.verdict`
+- **WHEN** contract tests run
+- **THEN** the current schema still accepts the recorded event exactly as published
