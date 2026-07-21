@@ -89,7 +89,7 @@ describe('bootRuntimes', () => {
     expect(log).toEqual([
       'downloader:create',
       'importer:create',
-      'acquisitions:connect:/staging',
+      'acquisitions:connect:/library',
       'acquisitions:start',
       'verdicts:start',
     ]);

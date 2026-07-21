@@ -39,8 +39,9 @@ const envSchema = z.object({
   AUTO_APPLY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.04),
   /**
    * The namespace root the downloader's delivered locations fall under, re-rooted onto
-   * INTAKE_ROOT at intake (design D11). In the composed process the sender IS the local
-   * downloader, so this defaults to STAGING_ROOT.
+   * INTAKE_ROOT at intake (design D11). `acquisition.fulfilled` carries the DEPOSITED location —
+   * a directory under the downloader's LIBRARY_ROOT — so that is the default source namespace
+   * (a STAGING_ROOT default would reject every delivery as outside the source root).
    */
   INTAKE_SOURCE_ROOT: z.string().min(1).optional(),
 });
@@ -81,6 +82,6 @@ export function loadComposedConfig(
       bridgeScript: v.BRIDGE_SCRIPT,
       autoApplyThreshold: v.AUTO_APPLY_THRESHOLD,
     },
-    intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? v.STAGING_ROOT,
+    intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? v.LIBRARY_ROOT,
   });
 }

@@ -40,35 +40,85 @@ export interface ReactorDeps {
   readonly bus: EventBus;
   readonly logger: Logger;
   readonly interpret: EffectInterpreter;
+  /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
+  readonly interval?: (fn: () => void, ms: number) => () => void;
+  readonly pollIntervalMs?: number;
 }
+
+const DEFAULT_POLL_INTERVAL_MS = 5_000;
+
+const defaultInterval = (fn: () => void, ms: number): (() => void) => {
+  const handle = setInterval(fn, ms);
+  return () => {
+    clearInterval(handle);
+  };
+};
 
 export class Reactor {
   private lastProcessed = 0;
   private unsubscribe: (() => void) | undefined;
+  private stopInterval: (() => void) | undefined;
+  private running = false;
+  private pending = false;
 
   constructor(private readonly deps: ReactorDeps) {}
 
-  /** Resume from the checkpoint, drain the backlog, then follow live events off the bus. */
+  /**
+   * Resume from the checkpoint and drain to the head, following live wakeups plus a fallback
+   * poll. The bus subscription attaches BEFORE the initial drain: an effect fired from the
+   * backlog appends its own follow-on events mid-drain, and a one-shot snapshot-then-subscribe
+   * would drop them into the gap between the snapshot and the subscription (a crash-resumed
+   * import would stall forever — found by the out-of-process restart e2e). Wakeups are a lossy
+   * latency hint; the fallback poll is the delivery guarantee.
+   */
   async start(): Promise<void> {
     const checkpoint = await this.deps.checkpoints.load(REACTOR_CONSUMER);
     this.lastProcessed = checkpoint.unwrapOr(0);
 
-    const backlog = await this.deps.store.readAll(this.lastProcessed);
-    if (backlog.isErr()) {
-      this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
-    } else {
-      for (const stored of backlog.value) {
-        await this.process(stored);
-      }
-    }
-
-    this.unsubscribe = this.deps.bus.subscribe((stored) => {
-      void this.process(stored);
+    this.unsubscribe = this.deps.bus.subscribe(() => {
+      void this.drain();
     });
+    this.stopInterval = (this.deps.interval ?? defaultInterval)(() => {
+      void this.drain();
+    }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
+
+    await this.drain();
   }
 
   stop(): void {
     this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    this.stopInterval?.();
+    this.stopInterval = undefined;
+  }
+
+  /** Serialized catch-up drain from the checkpoint: concurrent wakeups coalesce into one more pass. */
+  async drain(): Promise<void> {
+    if (this.running) {
+      this.pending = true;
+      return;
+    }
+    this.running = true;
+    try {
+      do {
+        this.pending = false;
+        const backlog = await this.deps.store.readAll(this.lastProcessed);
+        if (backlog.isErr()) {
+          this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
+          return;
+        }
+        for (const stored of backlog.value) {
+          await this.process(stored);
+          if (this.lastProcessed < stored.globalSeq) {
+            // Transient effect failure held the checkpoint: stop here and let the next wakeup or
+            // fallback poll retry, instead of hot-looping over the same failing effect.
+            return;
+          }
+        }
+      } while (this.pending);
+    } finally {
+      this.running = false;
+    }
   }
 
   async process(stored: StoredEvent): Promise<void> {

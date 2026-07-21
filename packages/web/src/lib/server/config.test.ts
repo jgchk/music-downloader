@@ -31,8 +31,11 @@ describe('loadComposedConfig', () => {
     expect(carrying).toEqual(clean);
   });
 
-  it('defaults the intake source root to the staging root (same box, same namespace)', () => {
-    expect(loadComposedConfig(VALID)._unsafeUnwrap().intakeSourceRoot).toBe('/staging');
+  it('defaults the intake source root to the library root (delivered locations are deposits)', () => {
+    // acquisition.fulfilled carries the DEPOSITED location — the downloader's library root, not
+    // its staging root. Defaulting to STAGING_ROOT would reject every delivered location as
+    // outside the source namespace (found by the out-of-process e2e tier).
+    expect(loadComposedConfig(VALID)._unsafeUnwrap().intakeSourceRoot).toBe('/library');
     expect(
       loadComposedConfig({ ...VALID, INTAKE_SOURCE_ROOT: '/elsewhere' })._unsafeUnwrap()
         .intakeSourceRoot,

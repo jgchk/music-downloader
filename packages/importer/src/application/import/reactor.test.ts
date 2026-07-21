@@ -37,8 +37,19 @@ function realInterpret(ports: EffectPorts): EffectInterpreter {
   return (importId, effect) => interpretEffect(deps, importId, effect);
 }
 
-function reactor(interpret: EffectInterpreter): Reactor {
-  return new Reactor({ store, checkpoints, bus, logger: silentLogger(), interpret });
+function reactor(
+  interpret: EffectInterpreter,
+  overrides: { interval?: (fn: () => void, ms: number) => () => void } = {},
+): Reactor {
+  return new Reactor({
+    store,
+    checkpoints,
+    bus,
+    logger: silentLogger(),
+    interpret,
+    // Tests drive drains explicitly; the default real interval is covered by its own test below.
+    interval: overrides.interval ?? (() => () => {}),
+  });
 }
 
 /** Seed history without publishing: detach the bus for the append, as a pre-start backlog. */
@@ -174,6 +185,114 @@ describe('Reactor', () => {
     await r.start();
 
     expect(bus.subscriberCount()).toBe(1); // still follows live events
+    r.stop();
+  });
+
+  it('processes follow-ons appended during the startup drain (no wakeup gap)', async () => {
+    // A backlogged ImportRequested whose re-fired Propose effect appends its own follow-ons while
+    // the drain is mid-pass — the exact restart shape: the appended events must not fall into the
+    // gap between the one-shot backlog snapshot and the live subscription.
+    await seed([requested()]);
+    const apply = vi.fn((_importId: string, _effect: unknown) => okAsync([]));
+    const interpret: EffectInterpreter = (importId, effect) => {
+      if (effect.type === 'Propose') {
+        return store
+          .append(
+            importId,
+            1,
+            [
+              {
+                type: 'CandidatesProposed',
+                candidates: [candidate({ distance: 0.01 })],
+                duplicates: [],
+              },
+              { type: 'AutoApplySelected', ref: candidate().ref, distance: 0.01 },
+            ],
+            { importId, occurredAt: 't' },
+          )
+          .map(() => []);
+      }
+      return apply(importId, effect);
+    };
+    const r = reactor(interpret);
+    await r.start();
+
+    await vi.waitFor(() => {
+      expect(apply).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Apply' }));
+      expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(3);
+    });
+    r.stop();
+  });
+
+  it('retries a transiently failed effect on the fallback poll, with no new event', async () => {
+    await seed([requested()]);
+    const ticks: (() => void)[] = [];
+    const interpret = vi
+      .fn<EffectInterpreter>()
+      .mockReturnValueOnce(errAsync(infraError('bridge.propose', 'spawn failed')))
+      .mockReturnValue(okAsync([]));
+    const r = reactor(interpret, {
+      interval: (fn) => {
+        ticks.push(fn);
+        return () => {};
+      },
+    });
+    await r.start();
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+
+    ticks[0]!(); // the fallback poll fires — nothing else does
+    await vi.waitFor(() => {
+      expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    });
+    r.stop();
+  });
+
+  it('polls on a real timer by default, and stop() clears it', async () => {
+    vi.useFakeTimers();
+    try {
+      const interpret = vi.fn(() => okAsync([]));
+      const r = new Reactor({ store, checkpoints, bus, logger: silentLogger(), interpret });
+      await r.start();
+
+      await seed([requested()]); // appended with the bus detached: only the poll can find it
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
+
+      r.stop();
+      await seed([requested()]);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(interpret).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('coalesces wakeups that arrive while a drain is running', async () => {
+    await seed([requested()]);
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const interpret = vi.fn(() => okAsync([]));
+    const slowFirst = vi.fn<EffectInterpreter>((importId, effect) => {
+      void importId;
+      void effect;
+      if (slowFirst.mock.calls.length === 1) {
+        return okAsync([]).andThen(() => okAsync(gate).map(() => []));
+      }
+      return interpret();
+    });
+    const r = reactor(slowFirst);
+    const started = r.start();
+    // Two wakeups land while the first drain is blocked mid-effect; they coalesce into one more
+    // pass rather than interleaving or being lost.
+    await r.drain();
+    await r.drain();
+    release?.();
+    await started;
+    await vi.waitFor(() => {
+      expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    });
     r.stop();
   });
 

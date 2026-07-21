@@ -48,13 +48,18 @@ function interpreter(ports: EffectPorts): InterpreterDeps {
   return { store, clock: fixedClock(), ports, onProgress: vi.fn() };
 }
 
-function reactor(ports: EffectPorts): Reactor {
+function reactor(
+  ports: EffectPorts,
+  overrides: { interval?: (fn: () => void, ms: number) => () => void } = {},
+): Reactor {
   const deps: ReactorDeps = {
     store,
     checkpoints,
     bus,
     logger: silentLogger(),
     interpreter: interpreter(ports),
+    // Tests drive drains explicitly; the default real interval is covered by its own test below.
+    interval: overrides.interval ?? (() => () => {}),
   };
   return new Reactor(deps);
 }
@@ -177,6 +182,87 @@ describe('Reactor.process', () => {
     const ports = stubPorts(); // metadata.resolve returns a resolved target → RecordTarget
     await reactor(ports).process(requested);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(requested.globalSeq);
+  });
+
+  it('processes events published while the startup drain is running (no wakeup gap)', async () => {
+    // Production stores publish post-commit; an effect fired from the backlog appends (and
+    // publishes) follow-ons mid-drain. The subscription must be attached before the drain and the
+    // wakeup must coalesce into another pass — a snapshot-then-subscribe drops the follow-ons
+    // into the gap and a crash-resumed chain stalls (found by the out-of-process restart e2e).
+    await seed(requestedHistory());
+    const resolution = { kind: 'album', artist: 'a', title: 't', mbid: 'm' };
+    const resolve = vi.fn(() => {
+      if (resolve.mock.calls.length === 1) {
+        // First delivery (acq-1, from the backlog): a second stream lands and publishes while
+        // this very effect is still being processed — the mid-drain wakeup.
+        return store
+          .append('acq-2', 0, requestedHistory(), { acquisitionId: 'acq-2', occurredAt: 't' })
+          .map((appended) => {
+            bus.publish(appended);
+            return resolution;
+          });
+      }
+      return okAsync(resolution);
+    });
+    const ports = stubPorts({ metadata: { resolve: resolve as never } });
+    const r = reactor(ports);
+    await r.start();
+
+    // Both streams' ResolveMetadata effects fired: acq-1 from the backlog, acq-2 from the wakeup
+    // that landed mid-drain and coalesced into the next pass.
+    await vi.waitFor(() => {
+      expect(resolve.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+    r.stop();
+  });
+
+  it('retries a transiently failed effect on the fallback poll, with no new event', async () => {
+    await seed(requestedHistory());
+    const ticks: (() => void)[] = [];
+    const resolve = vi
+      .fn()
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down')))
+      .mockReturnValue(okAsync({ kind: 'album', artist: 'a', title: 't', mbid: 'm' }));
+    const ports = stubPorts({ metadata: { resolve } });
+    const r = reactor(ports, {
+      interval: (fn) => {
+        ticks.push(fn);
+        return () => {};
+      },
+    });
+    await r.start();
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+
+    ticks[0]!(); // the fallback poll fires — nothing else does
+    await vi.waitFor(() => {
+      expect(resolve).toHaveBeenCalledTimes(2);
+    });
+    r.stop();
+  });
+
+  it('polls on a real timer by default, and stop() clears it', async () => {
+    vi.useFakeTimers();
+    try {
+      const ports = stubPorts();
+      const r = new Reactor({
+        store,
+        checkpoints,
+        bus,
+        logger: silentLogger(),
+        interpreter: interpreter(ports),
+      });
+      await r.start();
+
+      await seed(requestedHistory()); // appended without a publish: only the poll can find it
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(ports.metadata.resolve).toHaveBeenCalledOnce();
+
+      r.stop();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(ports.metadata.resolve).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('recovers a cancelled-mid-download acquisition across an abort failure, cleaning up on retry', async () => {
