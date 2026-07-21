@@ -50,9 +50,9 @@
 
 ## 7. Release and pipeline
 
-- [ ] 7.1 Single product versioning at 3.0.0: root version, `version:prep` updated for the workspace, one changelog
-- [ ] 7.2 Pipeline: one workflow runs the whole-workspace gate (browser tests need Playwright/Chromium in CI; e2e job separate and non-gating); one GHCR image built from the composed process
-- [ ] 7.3 Dockerfile: multi-stage build for the workspace; ffmpeg + beets bridge runtime deps carried from both images; both SQLite store paths volumed
+- [x] 7.1 Single product versioning at 3.0.0: root version, `version:prep` updated for the workspace, one changelog — fixed the last-release anchor (git describe is distance-ambiguous now that importer v0.1.x tags are reachable; scripts/release/tags.ts picks the highest semver among tags `--merged origin/main`, unit-tested); dry-run evidence: `version:prep --check` reports "expected version 3.0.0 but package.json has 2.5.1" (major via the branch's `!` commits). The real bump runs pre-PR after group 8. NOTE: the migration PR's generated 3.0.0 CHANGELOG section will include imported importer-lineage commits (catv's range is set-subtraction); hand-curate that one section at bump time — check mode only requires the section to exist.
+- [x] 7.2 Pipeline: one workflow runs the whole-workspace gate (browser tests need Playwright/Chromium in CI; e2e job separate and non-gating); one GHCR image built from the composed process — required-check job names (version-check/quality/test) unchanged, no ruleset edit needed; test job installs Chromium for the browser-mode client project; new non-required `web-e2e` job (Chromium + beets venv w/ BRIDGE_PYTHON); release job unchanged — its `pnpm test:e2e` image gate depends on group 8's rework before anything merges to main.
+- [x] 7.3 Dockerfile: multi-stage build for the workspace; ffmpeg + beets bridge runtime deps carried from both images; both SQLite store paths volumed — node:24.18-slim two-stage; prod deps via clean `pnpm install --prod` (prune can't relink workspace importers); beets pinned via bridge requirements.txt in /opt/beets-venv with ENV BRIDGE_PYTHON/BRIDGE_SCRIPT baked; CMD `node packages/web/build`, EXPOSE 3000, env-driven volume paths. Smoke: `docker build .` then run with scratch env (closed-port third parties, minimal beets config) -> 200 on / , /acquisitions, /reviews; log shows beets 2.12.0 validated before the listener; both event-store files created under the mount.
 
 ## 8. Out-of-process E2E
 
