@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { createRemoteJWKSet } from 'jose';
 import {
   FfmpegAudioProbe,
   FilesystemLibrary,
@@ -36,8 +35,6 @@ import {
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { VERDICT_WEBHOOK_PATH } from '../interfaces/http/verdict-webhook.js';
-import { createTokenVerifier } from '../interfaces/mcp/auth.js';
-import type { McpAuthConfig } from '../interfaces/mcp/server.js';
 import { loadConfig } from './config.js';
 import { readAppVersion } from './version.js';
 
@@ -52,21 +49,6 @@ import { readAppVersion } from './version.js';
 
 const clock: Clock = { now: () => new Date() };
 const ids: IdGenerator = { next: () => randomUUID() };
-
-/**
- * Discover the Authorization Server's JWKS URI from its OIDC document (used when `OAUTH_JWKS_URI` is
- * not given explicitly). Runs once at startup; a failure here fails startup, keeping with 12-factor
- * fail-fast and the "never silently run insecure" stance for the MCP Resource Server.
- */
-async function discoverJwksUri(issuer: string): Promise<string> {
-  const res = await fetch(`${issuer}/.well-known/openid-configuration`);
-  if (!res.ok) throw new Error(`OIDC discovery failed for ${issuer}: HTTP ${res.status}`);
-  const doc = (await res.json()) as { jwks_uri?: unknown };
-  if (typeof doc.jwks_uri !== 'string') {
-    throw new Error(`OIDC discovery document for ${issuer} has no jwks_uri`);
-  }
-  return doc.jwks_uri;
-}
 
 async function main(): Promise<void> {
   const logger = createLogger();
@@ -174,35 +156,9 @@ async function main(): Promise<void> {
   // HTTP or MCP — talks to this one process. That is what lets an acquisition submitted over HTTP be
   // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
   // process that raced this one's reactor and read stale projections.
-  // The MCP endpoint's OAuth 2.1 Resource Server (config-dormant): built only when OAUTH_ISSUER is
-  // configured. Absent, `/mcp` stays unauthenticated and no protected-resource-metadata route
-  // exists. The JWKS URI is taken verbatim from OAUTH_JWKS_URI or discovered from the issuer's OIDC
-  // document; jose's remote JWKS caches keys and refetches on rotation.
-  let mcpAuth: McpAuthConfig | undefined;
-  if (config.oauth !== undefined) {
-    const jwksUri = config.oauth.jwksUri ?? (await discoverJwksUri(config.oauth.issuer));
-    const keySource = createRemoteJWKSet(new URL(jwksUri));
-    mcpAuth = {
-      verifier: createTokenVerifier({
-        issuer: config.oauth.issuer,
-        resource: config.oauth.resource,
-        keySource,
-      }),
-      issuer: config.oauth.issuer,
-      resource: config.oauth.resource,
-    };
-    logger.info(
-      { issuer: config.oauth.issuer, resource: config.oauth.resource, jwksUri },
-      'MCP OAuth resource-server active',
-    );
-  } else {
-    logger.info('MCP OAuth resource-server dormant (no OAUTH_ISSUER)');
-  }
-
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
   const httpApp = await buildHttpApp(deps, logger, readAppVersion(), {
     verdictWebhook: config.verdictWebhook,
-    mcpAuth,
   });
   // The inbound verdict receiver is config-dormant (fulfillment-external-verdict D4): without
   // VERDICT_WEBHOOK_SECRET the route does not exist and the tool behaves exactly as before.
