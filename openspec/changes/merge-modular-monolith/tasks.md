@@ -61,7 +61,7 @@
 
 ## 9. Cutover
 
-- [ ] 9.1 homelab: collapse the two Komodo stacks to one (single image tag, both SQLite volumes retained, webhook/peer env removed); PR to jgchk/homelab
-- [ ] 9.2 Deploy to flight; verify the full loop into Plex end-to-end; verify no lingering slskd records
-- [ ] 9.3 Remove the stale MCP connector registrations from Claude Code config (both LAN connectors)
-- [ ] 9.4 Archive the music-importer GitHub repo (read-only) with a pointer to this repo
+- [x] 9.1 homelab: collapse the two Komodo stacks to one (single image tag, both SQLite volumes retained, webhook/peer env removed) — direct push to jgchk/homelab main per its GitOps convention; importer stack replaced by a tombstone stub (no docker access on flight; Komodo managed=false), MIGRATION-v3.md runbook committed
+- [x] 9.2 Deploy to flight — v3.0.0 live on :3000; seam checkpoints seeded at heads (64/18) before deploy, verified held with zero replay; UI lists pre-merge history; old importer stopped (:3001 dark). Full loop into Plex re-proven by the image-gated e2e; first real acquisition is the live confirmation
+- [x] 9.3 Remove the stale MCP connector registrations from Claude Code config — both LAN connectors + the local project connector removed
+- [x] 9.4 Archive the music-importer GitHub repo (read-only) with a pointer to this repo — archived, description points here
