@@ -7,15 +7,18 @@ import {
 } from '../../src/interfaces/contracts/intake/schemas.js';
 
 /**
- * Consumer-driven contract over music-downloader's `acquisition.fulfilled` event (downloader-
- * intake D1): the sender's FROZEN recorded fixture (music-downloader v2.3.0, PR #44 — copied,
- * never regenerated) must parse through this repo's tolerant reader and yield exactly the fields
- * the importer consumes. This is the cross-repo drift alarm: any sender reshaping that touches a
- * read field fails here before it can ship; everything else is ignored by design.
+ * Consumer-driven contract over the downloader module's `acquisition.fulfilled` event
+ * (merge-modular-monolith 3.8): the PRODUCER's frozen recorded fixture — read straight from the
+ * downloader package, in the same repo and gate — must parse through this module's tolerant
+ * reader and yield exactly the fields the importer consumes. Any producer reshaping that touches
+ * a read field fails this gate before it can merge; everything else is ignored by design.
+ * (Cross-package fixture reads are a test-tier affair; the no-shared-kernel rule governs src.)
  */
 
-const FIXTURE = new URL('./fixtures/events/acquisition.fulfilled/v1.json', import.meta.url)
-  .pathname;
+const FIXTURE = new URL(
+  '../../../downloader/test/contract/fixtures/events/acquisition.fulfilled/v1.json',
+  import.meta.url,
+).pathname;
 
 interface RecordedDelivery {
   readonly provenance: { readonly schemaVersion: number };

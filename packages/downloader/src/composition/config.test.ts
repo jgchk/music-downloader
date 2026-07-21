@@ -74,80 +74,14 @@ describe('loadConfig', () => {
     });
   });
 
-  describe('webhooks (config-dormant)', () => {
-    const SECRET = 'whsec_dGVzdC1zaWduaW5nLWtleQ==';
-
-    it('is absent when WEBHOOK_URLS is unset — the publisher stays dormant', () => {
-      expect(loadConfig(base)._unsafeUnwrap().webhooks).toBeUndefined();
-    });
-
-    it('is absent when WEBHOOK_URLS holds no usable url', () => {
-      const config = loadConfig({ ...base, WEBHOOK_URLS: ' , ', WEBHOOK_SECRET: SECRET });
-      expect(config._unsafeUnwrap().webhooks).toBeUndefined();
-    });
-
-    it('parses a comma-separated url list with its signing secret', () => {
-      const config = loadConfig({
-        ...base,
-        WEBHOOK_URLS: 'https://a.example/hook, https://b.example/hook',
-        WEBHOOK_SECRET: SECRET,
-      })._unsafeUnwrap();
-      expect(config.webhooks).toEqual({
-        urls: ['https://a.example/hook', 'https://b.example/hook'],
-        secret: SECRET,
-      });
-    });
-
-    it('fails loudly on subscriber urls without a signing secret (unsigned publishing is impossible)', () => {
-      const error = loadConfig({
-        ...base,
-        WEBHOOK_URLS: 'https://a.example/hook',
-      })._unsafeUnwrapErr();
-      expect(error).toEqual({ kind: 'MissingVar', name: 'WEBHOOK_SECRET' });
-    });
-
-    it('fails on a malformed secret (must be whsec_<base64>)', () => {
-      const error = loadConfig({
-        ...base,
-        WEBHOOK_URLS: 'https://a.example/hook',
-        WEBHOOK_SECRET: 'not a secret!',
-      })._unsafeUnwrapErr();
-      expect(error).toEqual({ kind: 'InvalidWebhookSecret', name: 'WEBHOOK_SECRET' });
-    });
-
-    it('fails on an unparseable subscriber url', () => {
-      const error = loadConfig({
-        ...base,
-        WEBHOOK_URLS: 'not-a-url',
-        WEBHOOK_SECRET: SECRET,
-      })._unsafeUnwrapErr();
-      expect(error).toEqual({ kind: 'InvalidWebhookUrl', value: 'not-a-url' });
-    });
-  });
-
-  describe('the verdict webhook receiver (config-dormant)', () => {
-    const SECRET = 'whsec_cmVjZWl2ZXIta2V5';
-
-    it('is absent when VERDICT_WEBHOOK_SECRET is unset — the endpoint stays dormant', () => {
-      expect(loadConfig(base)._unsafeUnwrap().verdictWebhook).toBeUndefined();
-    });
-
-    it('treats a blank secret as absent', () => {
-      const config = loadConfig({ ...base, VERDICT_WEBHOOK_SECRET: '   ' })._unsafeUnwrap();
-      expect(config.verdictWebhook).toBeUndefined();
-    });
-
-    it('parses a well-formed receiver secret', () => {
-      const config = loadConfig({ ...base, VERDICT_WEBHOOK_SECRET: SECRET })._unsafeUnwrap();
-      expect(config.verdictWebhook).toEqual({ secret: SECRET });
-    });
-
-    it('fails on a malformed receiver secret (must be whsec_<base64>)', () => {
-      const error = loadConfig({
-        ...base,
-        VERDICT_WEBHOOK_SECRET: 'nope',
-      })._unsafeUnwrapErr();
-      expect(error).toEqual({ kind: 'InvalidWebhookSecret', name: 'VERDICT_WEBHOOK_SECRET' });
-    });
+  it('ignores webhook-era settings — the seam replaced the transport (runtime-baseline)', () => {
+    const config = loadConfig({
+      ...base,
+      WEBHOOK_URLS: 'https://a.example/hook',
+      WEBHOOK_SECRET: 'whsec_dGVzdC1zaWduaW5nLWtleQ==',
+      VERDICT_WEBHOOK_SECRET: 'whsec_cmVjZWl2ZXIta2V5',
+    })._unsafeUnwrap();
+    expect(config).not.toHaveProperty('webhooks');
+    expect(config).not.toHaveProperty('verdictWebhook');
   });
 });

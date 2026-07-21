@@ -12,17 +12,12 @@ import {
   SqliteEventStore,
   SqliteResourceLedger,
   UpcasterRegistry,
-  WebhookDispatcher,
   fetchHttpClient,
   openEventDatabase,
   realTimer,
 } from '../adapters/index.js';
 import { Reactor } from '../application/acquisition/reactor.js';
 import { SourceResourceSweep } from '../application/acquisition/sweep.js';
-import {
-  DEFAULT_WEBHOOK_RETRY,
-  WebhookPublisher,
-} from '../application/events/webhook-publisher.js';
 import type { InterpreterDeps } from '../application/acquisition/interpreter.js';
 import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
 import { createLogger } from '../application/logging/logger.js';
@@ -32,9 +27,7 @@ import {
   LibraryViewProjection,
   ProgressReadModel,
 } from '../application/projections/read-models.js';
-import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
-import { VERDICT_WEBHOOK_PATH } from '../interfaces/http/verdict-webhook.js';
 import { loadConfig } from './config.js';
 import { readAppVersion } from './version.js';
 
@@ -128,45 +121,13 @@ async function main(): Promise<void> {
   const reactor = new Reactor({ store, checkpoints, bus, logger, interpreter });
   await reactor.start();
 
-  // --- The outbound webhook publisher (config-dormant): one more checkpointed consumer of the
-  //     event store (the store IS the outbox), delivering published events to each subscriber
-  //     independently, in order, at-least-once. Absent WEBHOOK_URLS, nothing here exists. ---------
-  let publisher: WebhookPublisher | undefined;
-  if (config.webhooks !== undefined) {
-    const dispatcher = new WebhookDispatcher(logger, fetchHttpClient, clock, {
-      secret: config.webhooks.secret,
-    });
-    publisher = new WebhookPublisher({
-      store,
-      checkpoints,
-      bus,
-      logger,
-      mapping: publishedEventMapping,
-      deliver: dispatcher,
-      subscribers: config.webhooks.urls,
-      retry: DEFAULT_WEBHOOK_RETRY,
-      sleep: (ms) => realTimer.sleep(ms),
-    });
-    await publisher.start();
-    logger.info({ subscribers: config.webhooks.urls.length }, 'webhook publisher started');
-  }
-
   // --- Inbound interfaces: one HTTP server serves both REST and MCP (streamable HTTP) ----------
   // MCP is mounted on the same Fastify app (`POST /mcp`) over the same use-cases, so every client —
   // HTTP or MCP — talks to this one process. That is what lets an acquisition submitted over HTTP be
   // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
   // process that raced this one's reactor and read stale projections.
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
-  const httpApp = await buildHttpApp(deps, logger, readAppVersion(), {
-    verdictWebhook: config.verdictWebhook,
-  });
-  // The inbound verdict receiver is config-dormant (fulfillment-external-verdict D4): without
-  // VERDICT_WEBHOOK_SECRET the route does not exist and the tool behaves exactly as before.
-  if (config.verdictWebhook !== undefined) {
-    logger.info({ path: VERDICT_WEBHOOK_PATH }, 'verdict webhook receiver active');
-  } else {
-    logger.info('verdict webhook receiver dormant (no VERDICT_WEBHOOK_SECRET)');
-  }
+  const httpApp = await buildHttpApp(deps, logger, readAppVersion());
   await httpApp.listen({ port: config.httpPort, host: config.host });
 
   logger.info({ port: config.httpPort, host: config.host }, 'music-downloader started');
@@ -175,7 +136,6 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
     reactor.stop();
-    publisher?.stop();
     await httpApp.close();
     db.close();
     process.exit(0);

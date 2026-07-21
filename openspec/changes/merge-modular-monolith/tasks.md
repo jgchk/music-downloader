@@ -19,10 +19,10 @@
 - [x] 3.2 Implement the catch-up subscription runtime: named resettable checkpoint in the consumer's store, batch drain (~100, yield between batches), checkpoint advancing in the same transaction as consumer effects
 - [x] 3.3 Implement the notify-then-poll loop: post-commit wakeup as lossy hint, seconds-scale fallback poll, always poll on startup; crash-recovery scenario covered by test
 - [x] 3.4 Implement poison-event policy: bounded retries w/ backoff, then per-subscription halt-or-park with dead-letter row in the consumer's file
-- [ ] 3.5 Swap importer intake onto the subscription (tolerant reader + ACL + INTAKE_SOURCE_ROOT re-rooting unchanged); delete intake webhook + verification
-- [ ] 3.6 Swap verdict flow: importer records `release.verdict` in its own store; downloader consumes via subscription through the existing ACL; delete verdict webhook + `DeliveryDedupe`
-- [ ] 3.7 Delete all webhook publisher/dispatcher machinery and webhook config from both modules
-- [ ] 3.8 Replace `contract-drift.yml` with in-repo cross-package contract tests against the frozen fixtures; delete the workflow
+- [x] 3.5 Swap importer intake onto the subscription (tolerant reader + ACL + INTAKE_SOURCE_ROOT re-rooting unchanged); delete intake webhook + verification
+- [x] 3.6 Swap verdict flow: importer records `release.verdict` in its own store; downloader consumes via subscription through the existing ACL; delete verdict webhook + `DeliveryDedupe`
+- [x] 3.7 Delete all webhook publisher/dispatcher machinery and webhook config from both modules
+- [x] 3.8 In-repo cross-package seam contract tests against the producers' frozen fixtures (importer reads downloader's acquisition.fulfilled fixture; downloader reads importer's release.verdict fixture) — DEVIATION: `contract-drift.yml` is kept, it polices the EXTERNAL slskd/MusicBrainz contracts (external-api-contracts capability), not the seam; the proposal mislabeled it
 
 ## 4. Facades and boundary enforcement
 

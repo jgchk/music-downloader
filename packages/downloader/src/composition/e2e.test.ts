@@ -1,4 +1,4 @@
-import { okAsync } from 'neverthrow';
+import { ok, okAsync } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -26,15 +26,14 @@ import {
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import type { Candidate } from '../domain/candidate/candidate.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
-import { createHmac } from 'node:crypto';
-import { WebhookDispatcher } from '../adapters/webhook/dispatcher.js';
-import type { HttpClient, HttpRequest } from '../adapters/support/http.js';
-import { WebhookPublisher } from '../application/events/webhook-publisher.js';
+import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
+import type { SeamEvent } from '../application/events/catch-up-subscription.js';
+import { OutboundFeed } from '../application/events/outbound-feed.js';
+import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import type { AcquisitionFulfilledEvent } from '../interfaces/contracts/events/schemas.js';
+import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
-import type { HttpAppOptions } from '../interfaces/http/app.js';
-import { VERDICT_WEBHOOK_PATH } from '../interfaces/http/verdict-webhook.js';
 import { buildMcpServer } from '../interfaces/mcp/server.js';
 
 /**
@@ -139,10 +138,10 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function startHttp(opts: E2eOptions, appOptions: HttpAppOptions = {}) {
+async function startHttp(opts: E2eOptions) {
   const w = wire(opts);
   await w.reactor.start();
-  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test', appOptions);
+  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test');
   cleanups.push(
     () => app.close(),
     () => w.reactor.stop(),
@@ -269,35 +268,35 @@ describe('acquisition E2E', () => {
     });
   });
 
-  it('announces a fulfilled acquisition to a webhook subscriber — signed, self-contained, and idempotent across redelivery', async () => {
-    const SECRET_KEY = Buffer.from('e2e-signing-key-0123456789abcdef');
-    const SECRET = `whsec_${SECRET_KEY.toString('base64')}`;
-    const SUBSCRIBER = 'https://importer.example/hooks/music';
-    const received: HttpRequest[] = [];
-    const stubSubscriber: HttpClient = {
-      send: (request) => {
-        received.push(request);
-        return Promise.resolve({ status: 200, body: '' });
-      },
-    };
+  it('exposes a fulfilled acquisition on the outbound feed — self-contained and stable across redelivery', async () => {
     const { w, app } = await startHttp(happyOptions);
-    const publisherOf = (checkpoints: Wiring['checkpoints']) =>
-      new WebhookPublisher({
-        store: w.store,
-        bus: w.bus,
-        checkpoints,
+
+    // A consuming module's subscription: checkpoint + dead letters in the CONSUMER's own store.
+    const consumerDb = openEventDatabase(':memory:');
+    const received: SeamEvent[] = [];
+    const subscriptionOf = (db: typeof consumerDb) =>
+      new CatchUpSubscription({
+        name: 'seam:acquisitions',
+        feed: new OutboundFeed(w.store, publishedEventMapping),
+        checkpoints: new SqliteCheckpointStore(db),
+        deadLetters: new SqliteDeadLetterStore(db),
+        handler: (event) => {
+          received.push(event);
+          return Promise.resolve(ok(undefined));
+        },
+        policy: 'halt',
         logger: silentLogger(),
-        mapping: publishedEventMapping,
-        deliver: new WebhookDispatcher(silentLogger(), stubSubscriber, fixedClock(), {
-          secret: SECRET,
-        }),
-        subscribers: [SUBSCRIBER],
+        clock: fixedClock(),
         retry: { attempts: 1, baseDelayMs: 0 },
+        batchSize: 100,
+        pollIntervalMs: 60_000,
         sleep: () => Promise.resolve(),
+        wakeups: { subscribe: (listener) => w.bus.subscribe(() => listener()) },
+        interval: () => () => undefined,
       });
-    const publisher = publisherOf(w.checkpoints);
-    await publisher.start();
-    cleanups.push(() => publisher.stop());
+    const subscription = subscriptionOf(consumerDb);
+    await subscription.start();
+    cleanups.push(() => subscription.stop());
 
     const res = await app.inject({
       method: 'POST',
@@ -310,49 +309,33 @@ describe('acquisition E2E', () => {
       expect(received).toHaveLength(1);
     });
 
-    // The Standard Webhooks envelope, signed with the shared secret.
-    const delivery = received[0]!;
-    expect(delivery.method).toBe('POST');
-    expect(delivery.url).toBe(SUBSCRIBER);
-    const headers = delivery.headers!;
-    const signedContent = `${headers['webhook-id']!}.${headers['webhook-timestamp']!}.${delivery.body!}`;
-    const expectedSignature = createHmac('sha256', SECRET_KEY)
-      .update(signedContent)
-      .digest('base64');
-    expect(headers['webhook-signature']).toBe(`v1,${expectedSignature}`);
-
     // The fat payload: everything a consumer needs to act, no callback required.
-    const envelope = JSON.parse(delivery.body!) as AcquisitionFulfilledEvent;
+    const envelope = received[0]!;
     expect(envelope.type).toBe('acquisition.fulfilled');
-    expect(envelope.data.acquisitionId).toBe(id);
-    expect(envelope.data.target).toMatchObject({ artist: 'Radiohead', title: 'Kid A' });
-    expect(envelope.data.location).toBe(IMPORTED.location);
-    expect(envelope.data.files.map((file) => file.name)).toEqual(['01.flac', '02.flac']);
-    expect(envelope.data.files[0]!.path).toBe(`${IMPORTED.location}/01.flac`);
+    const data = envelope.data as AcquisitionFulfilledEvent['data'];
+    expect(data.acquisitionId).toBe(id);
+    expect(data.target).toMatchObject({ artist: 'Radiohead', title: 'Kid A' });
+    expect(data.location).toBe(IMPORTED.location);
+    expect(data.files.map((file) => file.name)).toEqual(['01.flac', '02.flac']);
+    expect(data.files[0]!.path).toBe(`${IMPORTED.location}/01.flac`);
 
-    // Simulated redelivery (lost acknowledgement → fresh checkpoints): same idempotency id.
-    const redeliverer = publisherOf(new SqliteCheckpointStore(openEventDatabase(':memory:')));
-    await redeliverer.start();
-    redeliverer.stop();
+    // Simulated redelivery (crash before the consumer committed → fresh checkpoint store):
+    // the same event arrives again with the same global position and an identical payload.
+    const redelivered = subscriptionOf(openEventDatabase(':memory:'));
+    await redelivered.start();
+    redelivered.stop();
     expect(received).toHaveLength(2);
-    expect(received[1]!.headers!['webhook-id']).toBe(headers['webhook-id']);
-    const secondEnvelope = JSON.parse(received[1]!.body!) as AcquisitionFulfilledEvent;
-    expect(secondEnvelope).toEqual(envelope);
+    expect(received[1]).toStrictEqual(envelope);
   });
 
-  it('revives a fulfilled acquisition on a signed external rejection and re-fulfils with the next candidate', async () => {
-    const RECEIVER_KEY = Buffer.from('verdict-receiver-key-0123456789ab');
-    const RECEIVER_SECRET = `whsec_${RECEIVER_KEY.toString('base64')}`;
+  it('revives a fulfilled acquisition on a seam-delivered rejection and re-fulfils with the next candidate', async () => {
     // Two ranked candidates: 'a' wins the first pass; 'b' stays in the retained working set.
-    const { w, app } = await startHttp(
-      {
-        searchByRound: (round) =>
-          round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
-        downloadByUser: { a: COMPLETED, b: COMPLETED },
-        importResult: IMPORTED,
-      },
-      { verdictWebhook: { secret: RECEIVER_SECRET } },
-    );
+    const { w, app } = await startHttp({
+      searchByRound: (round) =>
+        round === 1 ? [candidateWithSpeed('a', 200), candidateWithSpeed('b', 100)] : [],
+      downloadByUser: { a: COMPLETED, b: COMPLETED },
+      importResult: IMPORTED,
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -363,36 +346,45 @@ describe('acquisition E2E', () => {
     await settle(w, id, 'Fulfilled');
     expect(w.status.get(id)!.attempts).toBe(1);
 
+    // The importer module's outbound feed, seen structurally: one recorded release verdict.
     const fulfilledIdentity = matchingCandidate('a').identity;
-    const verdictBody = JSON.stringify({
-      type: 'import.rejected', // sender envelope fields beyond `data` are ignored
-      data: {
-        acquisitionId: id,
-        candidate: fulfilledIdentity,
-        verdict: 'rejected',
-        reasons: ['corrupt stub'],
-      },
-    });
-    const deliver = (deliveryId: string) => {
-      const timestamp = String(Math.floor(fixedClock().now().getTime() / 1000));
-      const signature = createHmac('sha256', RECEIVER_KEY)
-        .update(`${deliveryId}.${timestamp}.${verdictBody}`)
-        .digest('base64');
-      return app.inject({
-        method: 'POST',
-        url: VERDICT_WEBHOOK_PATH,
-        headers: {
-          'content-type': 'application/json',
-          'webhook-id': deliveryId,
-          'webhook-timestamp': timestamp,
-          'webhook-signature': `v1,${signature}`,
+    const verdictEvents: SeamEvent[] = [
+      {
+        globalSeq: 1,
+        type: 'release.verdict',
+        timestamp: fixedClock().now().toISOString(),
+        data: {
+          acquisitionId: id,
+          candidate: fulfilledIdentity,
+          verdict: 'rejected',
+          reasons: ['corrupt stub'],
         },
-        payload: verdictBody,
-      });
+      },
+    ];
+    const feed = {
+      read: (from: number) => {
+        const events = verdictEvents.filter((event) => event.globalSeq > from);
+        const scannedTo = events.length > 0 ? events[events.length - 1]!.globalSeq : from;
+        return Promise.resolve(ok({ events, scannedTo }));
+      },
     };
-
-    const accepted = await deliver('verdict-1');
-    expect(accepted.statusCode).toBe(204);
+    const subscription = new CatchUpSubscription({
+      name: 'seam:verdicts',
+      feed,
+      checkpoints: w.checkpoints, // the downloader's OWN store holds this consumer's checkpoint
+      deadLetters: new SqliteDeadLetterStore(w.db),
+      handler: verdictEventConsumer(w.deps),
+      policy: 'halt',
+      logger: silentLogger(),
+      clock: fixedClock(),
+      retry: { attempts: 3, baseDelayMs: 0 },
+      batchSize: 100,
+      pollIntervalMs: 60_000,
+      sleep: () => Promise.resolve(),
+      interval: () => () => undefined,
+    });
+    await subscription.start();
+    cleanups.push(() => subscription.stop());
 
     // The revival re-enters the existing ladder: candidate 'b' downloads and the acquisition
     // re-fulfils, spending a second attempt.
@@ -412,13 +404,13 @@ describe('acquisition E2E', () => {
     const selections = view.history.filter((entry) => entry.kind === 'selected');
     expect(selections.at(-1)!.candidate.username).toBe('b');
 
-    // A duplicate delivery converges: acknowledged, and nothing about the acquisition changes.
+    // Redelivery converges: reset the checkpoint and replay — the decider no-ops, nothing changes.
     const eventCount = (await w.store.readAll(0))._unsafeUnwrap().length;
-    const redelivered = await deliver('verdict-1');
-    expect(redelivered.statusCode).toBe(204);
+    await subscription.reset();
+    await subscription.poll();
     // A late verdict naming the *first* candidate again is stale against the new fulfilment.
-    const stale = await deliver('verdict-2');
-    expect(stale.statusCode).toBe(204);
+    verdictEvents.push({ ...verdictEvents[0]!, globalSeq: 2 });
+    await subscription.poll();
     expect((await w.store.readAll(0))._unsafeUnwrap()).toHaveLength(eventCount);
     expect(w.status.get(id)!.attempts).toBe(2);
   });

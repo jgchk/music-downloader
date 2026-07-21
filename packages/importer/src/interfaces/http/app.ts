@@ -34,8 +34,6 @@ import {
   submitImportRequestSchema,
   submitImportResponseSchema,
 } from '../contracts/index.js';
-import { registerIntakeWebhook } from './intake-webhook.js';
-import type { IntakeWebhookOptions } from './intake-webhook.js';
 import { registerMcpEndpoint } from '../mcp/server.js';
 
 /**
@@ -62,8 +60,6 @@ export function statusForCommandError(error: CommandError): 500 | 404 | 409 {
 export interface HttpAppOptions {
   /** The effective beets configuration reported at startup, exposed on the debug endpoint. */
   readonly beetsConfig?: TaggerConfiguration;
-  /** When configured, the signed acquisition webhook receiver; absent → the route does not exist. */
-  readonly intake?: IntakeWebhookOptions;
 }
 
 export async function buildHttpApp(
@@ -96,9 +92,6 @@ export async function buildHttpApp(
 
   registerImportRoutes(app, deps);
   registerDebugRoutes(app, options);
-  if (options.intake !== undefined) {
-    await registerIntakeWebhook(app, deps, options.intake);
-  }
   registerMcpEndpoint(app, deps, logger, version);
 
   await app.ready();

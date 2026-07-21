@@ -275,6 +275,18 @@ describe('CatchUpSubscription', () => {
     expect(sleeps.filter((ms) => ms === 0).length).toBeGreaterThanOrEqual(2);
   });
 
+  it('holds when the trailing-scan checkpoint advance fails', async () => {
+    checkpoints.failSaves = true;
+    const sub = subscription({
+      feed: { read: (from: number) => Promise.resolve(ok({ events: [], scannedTo: from + 5 })) },
+    });
+
+    await sub.start();
+
+    expect(await checkpointOf()).toBe(0);
+    expect(sub.isHalted).toBe(false); // held, not poisoned — the next cycle retries
+  });
+
   it('advances the checkpoint past batches that contain no published events', async () => {
     const sub = subscription({
       feed: {
