@@ -32,10 +32,11 @@
 
 ## 5. Web UI foundation
 
-- [ ] 5.1 Coverage spike: one real Svelte 5 component through the full three-project vitest config (server/ssr/client-Chromium, merged root coverage, `coverage.include` set, `excludeAfterRemap`) — confirm branch mapping is sane before proceeding; fallback istanbul provider if not
-- [ ] 5.2 Scaffold `packages/web`: SvelteKit, adapter-node, the three-project vitest setup with the 100% gate and named carve-outs; Playwright e2e job scaffolded threshold-free
-- [ ] 5.3 Implement the composed process entry: composition root boots both module runtimes (stores, subscriptions, reactors, pollers) then mounts the SvelteKit handler; graceful shutdown
-- [ ] 5.4 Dev-mode story: Vite dev server with facades wired via SSR; document in README
+- [x] 5.1 Coverage spike: one real Svelte 5 component through the full three-project vitest config (server/ssr/client-Chromium, merged root coverage, `coverage.include` set, `excludeAfterRemap`) — confirm branch mapping is sane before proceeding; fallback istanbul provider if not
+  - VERDICT: 100% honestly achievable on .svelte with v8 (33/33 stmts, 10/10 branches on the spike). Two structural rules learned: (1) SSR+client compile the same source twice and coverage merges position-wise across variants, so every server-renderable state needs an SSR test (make initial UI state prop-drivable) and every interaction a client test; (2) class-attribute interpolation compiles a nullish-guard branch unreachable under typed props — use a static class + data-* attribute (or a pragma). No istanbul fallback needed; no pragmas needed.
+- [x] 5.2 Scaffold `packages/web`: SvelteKit, adapter-node, the three-project vitest setup with the 100% gate and named carve-outs; Playwright e2e job scaffolded threshold-free — svelte-check wired into root typecheck, prettier/eslint svelte support at root, adapter-node build in root build, `test:e2e:web` script + smoke spec passing
+- [x] 5.3 Implement the composed process entry: composition root boots both module runtimes (stores, subscriptions, reactors, pollers) then mounts the SvelteKit handler; graceful shutdown — realized as module `./runtime` factory entries + `$lib/server` composition seam booted by the SvelteKit `init` hook (lint confines runtime imports to $lib/server); facades on `locals`; shutdown via adapter-node `sveltekit:shutdown`
+- [x] 5.4 Dev-mode story: Vite dev server with facades wired via SSR; document in README — dev and prod share the same hooks composition (no mock daemon); `pnpm dev` + packages/web/.env.example; README Running section rewritten (full live-deps dev smoke deferred to the e2e tier, needs slskd+beets)
 
 ## 6. Web UI parity features
 

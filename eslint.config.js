@@ -1,5 +1,6 @@
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
 
 const modulePackages = ['downloader', 'importer'];
@@ -57,9 +58,12 @@ const moduleBoundaryZones = [
   },
   ...modulePackages.flatMap((pkg) => [
     {
+      // The web package sees a module only through its facade — plus the designated runtime
+      // entry, which a files-scoped no-restricted-imports below confines to $lib/server (the
+      // composed process's composition seam, design D8).
       target: './packages/web',
       from: `./packages/${pkg}/src`,
-      except: ['./facade'],
+      except: ['./facade', './composition/runtime.ts'],
       message: `Interface packages import a module only via its facade (@music/${pkg}).`,
     },
   ]),
@@ -115,6 +119,10 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
+      '**/.svelte-kit/**',
+      'packages/web/build/**',
+      'packages/web/tests/**',
+      'packages/web/playwright.config.ts',
       '.e2e-tmp/**',
       'test/e2e/**',
       'test/boundaries/**',
@@ -178,6 +186,38 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // Outside $lib/server, web code must not touch the module runtime entries — routes and
+    // components consume facades via locals only (design D8/D9). $lib/server is the one
+    // composition seam allowed to boot the daemon.
+    files: ['packages/web/src/**/*.ts', 'packages/web/src/**/*.svelte'],
+    ignores: ['packages/web/src/lib/server/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@music/*/runtime'],
+              message:
+                'Only $lib/server may boot module runtimes; interface code consumes facades via locals (design D8).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Svelte components: the plugin's recommended set with TypeScript script blocks. Not
+    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step.
+    files: ['**/*.svelte'],
+    extends: [...svelte.configs['flat/recommended']],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
     },
   },
   {

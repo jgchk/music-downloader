@@ -2,15 +2,15 @@
   "name": "music-downloader",
   "version": "2.5.1",
   "private": true,
-  "description": "An extensible, event-sourced music downloader and importer — a modular monolith.",
+  "description": "An extensible, event-sourced music downloader and importer \u2014 a modular monolith.",
   "type": "module",
   "packageManager": "pnpm@11.13.1",
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p packages/downloader/tsconfig.build.json && tsc -p packages/importer/tsconfig.build.json",
-    "typecheck": "tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json",
+    "build": "tsc -p packages/downloader/tsconfig.build.json && tsc -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
+    "typecheck": "tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json && pnpm --dir packages/web run check:svelte",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
@@ -22,7 +22,9 @@
     "test:e2e": "bash test/e2e/run.sh",
     "contracts:events": "tsx packages/downloader/scripts/contracts/generate-event-schemas.ts && tsx packages/importer/scripts/contracts/generate-event-schemas.ts",
     "version:prep": "tsx scripts/release/version-prep.ts",
-    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release"
+    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release",
+    "test:e2e:web": "pnpm --dir packages/web exec playwright test",
+    "dev": "pnpm --dir packages/web dev"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -33,7 +35,9 @@
     "eslint-config-prettier": "^10.0.0",
     "eslint-import-resolver-typescript": "^4.0.0",
     "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-svelte": "^3.22.0",
     "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^4.1.1",
     "tsx": "^4.19.2",
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.20.0",

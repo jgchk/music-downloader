@@ -18,3 +18,9 @@ packages/downloader/test/contract/slskd-spec/swagger-*.json
 
 # Generated published-event JSON Schema artifacts (pnpm contracts:events), not hand-edited.
 packages/*/contracts/events/
+
+# Generated web artifacts (SvelteKit sync + adapter-node build + Playwright reports)
+packages/web/.svelte-kit/
+packages/web/build/
+packages/web/test-results/
+packages/web/playwright-report/

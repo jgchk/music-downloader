@@ -8,8 +8,14 @@ import config from '../../eslint.config.js';
  * a spec scenario whose enforcement lives in lint.
  */
 
+interface FlatConfigEntry {
+  readonly files?: readonly string[];
+  readonly ignores?: readonly string[];
+  readonly rules?: Record<string, unknown>;
+}
+
 interface Zone {
-  readonly target: string;
+  readonly target: string | readonly string[];
   readonly from: string;
   readonly except?: readonly string[];
 }
@@ -40,7 +46,7 @@ describe('module boundary lint zones', () => {
     expect(hasZone(all, './packages/importer', './packages/downloader')).toBe(true);
   });
 
-  it('lets the web interface package reach a module only through its facade', () => {
+  it('lets the web package reach a module only via its facade and runtime entries', () => {
     const all = zones();
     for (const pkg of ['downloader', 'importer']) {
       const zone = all.find(
@@ -48,8 +54,21 @@ describe('module boundary lint zones', () => {
           candidate.target === './packages/web' && candidate.from === `./packages/${pkg}/src`,
       );
       expect(zone).toBeDefined();
-      expect(zone?.except).toEqual(['./facade']);
+      expect(zone?.except).toEqual(['./facade', './composition/runtime.ts']);
     }
+  });
+
+  it('confines module runtime imports to $lib/server (design D8)', () => {
+    const block = (config as readonly FlatConfigEntry[]).find(
+      (entry) =>
+        Array.isArray(entry.files) &&
+        entry.files.includes('packages/web/src/**/*.ts') &&
+        entry.ignores?.includes('packages/web/src/lib/server/**') === true,
+    );
+    expect(block).toBeDefined();
+    const rule = block?.rules?.['no-restricted-imports'] as
+      [string, { patterns: { group: string[] }[] }] | undefined;
+    expect(rule?.[1].patterns.some((p) => p.group.includes('@music/*/runtime'))).toBe(true);
   });
 
   it('keeps the facade above application and domain only, per package', () => {
@@ -77,12 +96,17 @@ describe('module boundary lint zones', () => {
     }
   });
 
-  it('keeps each module package importable only via its facade entry (package exports)', async () => {
+  it('keeps each module package importable only via its facade and runtime entries', async () => {
     for (const pkg of ['downloader', 'importer']) {
       const manifest = (await import(`../../packages/${pkg}/package.json`, {
         with: { type: 'json' },
       })) as { default: { exports: Record<string, string> } };
-      expect(manifest.default.exports).toEqual({ '.': './src/facade/index.ts' });
+      expect(manifest.default.exports).toEqual({
+        // The facade: the only entry interface code may consume.
+        '.': './src/facade/index.ts',
+        // The runtime factory: consumed exclusively by $lib/server (lint-enforced above).
+        './runtime': './src/composition/runtime.ts',
+      });
     }
   });
 });

@@ -4,7 +4,8 @@
   "description": "The downloader bounded context: finds, downloads, validates, and retries the best-matching release across pluggable sources.",
   "type": "module",
   "exports": {
-    ".": "./src/facade/index.ts"
+    ".": "./src/facade/index.ts",
+    "./runtime": "./src/composition/runtime.ts"
   },
   "dependencies": {
     "@fastify/swagger": "^9.7.0",
