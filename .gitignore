@@ -10,3 +10,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Hermetic venv for recording/re-recording bridge contract fixtures
+packages/importer/test/contract/.venv/

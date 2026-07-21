@@ -2,23 +2,23 @@
 
 ## 1. History merge
 
-- [ ] 1.1 Create a colocated jj workspace for the merge work (branch protection + gh need it)
-- [ ] 1.2 Merge music-importer's history into this repo (jj unrelated-histories merge, importer tree landing under a temporary `importer/` prefix, both lineages preserved)
-- [ ] 1.3 Verify both trees still build and pass their own gates in-place, unmodified
+- [x] 1.1 Create a colocated jj workspace for the merge work (branch protection + gh need it) — main repo is itself colocated and clean; worked there directly
+- [x] 1.2 Merge music-importer's history into this repo (jj unrelated-histories merge, importer tree landing under a temporary `importer/` prefix, both lineages preserved)
+- [x] 1.3 Verify both trees still build and pass their own gates in-place, unmodified — both `pnpm check` gates exit 0 (root + importer/)
 
 ## 2. Workspace restructure
 
-- [ ] 2.1 Convert the repo to a pnpm workspace: `packages/downloader`, `packages/importer`, root-level shared tooling config (tsconfig/eslint/prettier bases)
-- [ ] 2.2 Move each service's `src/` + tests into its package; dedupe devDependencies to the root (they are currently identical)
-- [ ] 2.3 Re-point the root `pnpm check` gate to run format → lint → typecheck → build → test w/ coverage across the whole workspace; gate green
-- [ ] 2.4 Merge the openspec trees: adopt importer archive dirs with provenance notes; retire the importer repo's config.yaml context into this repo's
+- [x] 2.1 Convert the repo to a pnpm workspace: `packages/downloader`, `packages/importer`, root-level shared tooling config (tsconfig/eslint/prettier bases)
+- [x] 2.2 Move each service's `src/` + tests into its package; dedupe devDependencies to the root (they are currently identical)
+- [x] 2.3 Re-point the root `pnpm check` gate to run format → lint → typecheck → build → test w/ coverage across the whole workspace; gate green
+- [x] 2.4 Merge the openspec trees: adopt importer archive dirs with provenance notes; retire the importer repo's config.yaml context into this repo's
 
 ## 3. Cross-module delivery seam
 
-- [ ] 3.1 Expose a readable outbound feed (gapless global position) from each module's event store per `cross-module-delivery`
-- [ ] 3.2 Implement the catch-up subscription runtime: named resettable checkpoint in the consumer's store, batch drain (~100, yield between batches), checkpoint advancing in the same transaction as consumer effects
-- [ ] 3.3 Implement the notify-then-poll loop: post-commit wakeup as lossy hint, seconds-scale fallback poll, always poll on startup; crash-recovery scenario covered by test
-- [ ] 3.4 Implement poison-event policy: bounded retries w/ backoff, then per-subscription halt-or-park with dead-letter row in the consumer's file
+- [x] 3.1 Expose a readable outbound feed (gapless global position) from each module's event store per `cross-module-delivery`
+- [x] 3.2 Implement the catch-up subscription runtime: named resettable checkpoint in the consumer's store, batch drain (~100, yield between batches), checkpoint advancing in the same transaction as consumer effects
+- [x] 3.3 Implement the notify-then-poll loop: post-commit wakeup as lossy hint, seconds-scale fallback poll, always poll on startup; crash-recovery scenario covered by test
+- [x] 3.4 Implement poison-event policy: bounded retries w/ backoff, then per-subscription halt-or-park with dead-letter row in the consumer's file
 - [ ] 3.5 Swap importer intake onto the subscription (tolerant reader + ACL + INTAKE_SOURCE_ROOT re-rooting unchanged); delete intake webhook + verification
 - [ ] 3.6 Swap verdict flow: importer records `release.verdict` in its own store; downloader consumes via subscription through the existing ACL; delete verdict webhook + `DeliveryDedupe`
 - [ ] 3.7 Delete all webhook publisher/dispatcher machinery and webhook config from both modules

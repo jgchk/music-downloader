@@ -9,12 +9,12 @@ pnpm-lock.yaml
 docs/
 openspec/
 
-# Managed by semantic-release (its own changelog format, not Prettier's).
+# Managed by the release tooling (its own changelog format, not Prettier's).
 CHANGELOG.md
 
 # Recorded contract fixtures & the pinned slskd OpenAPI snapshot — verbatim captures, not code.
-test/contract/fixtures/
-test/contract/slskd-spec/swagger-*.json
+packages/*/test/contract/fixtures/
+packages/downloader/test/contract/slskd-spec/swagger-*.json
 
 # Generated published-event JSON Schema artifacts (pnpm contracts:events), not hand-edited.
-contracts/events/
+packages/*/contracts/events/

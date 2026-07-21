@@ -1,3 +1,6 @@
+packages:
+  - packages/*
+
 # pnpm 11 no longer reads settings from the `pnpm` field in package.json, and `allowBuilds`
 # (a name→bool map) replaces the legacy `onlyBuiltDependencies` array. These native packages are
 # permitted to run their install/build scripts. See https://pnpm.io/settings.
