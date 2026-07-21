@@ -46,6 +46,8 @@ export interface ImporterRuntimeConfig {
   readonly beetsConfigPath: string;
   readonly bridgePython: string;
   readonly bridgeTimeoutMs: number;
+  /** Override for bundled deployments where the packaged default beside this module is wrong. */
+  readonly bridgeScript?: string;
   readonly autoApplyThreshold: number;
 }
 
@@ -106,6 +108,7 @@ export async function createImporterRuntime(
       pythonBin: config.bridgePython,
       beetsConfigPath: config.beetsConfigPath,
       timeoutMs: config.bridgeTimeoutMs,
+      bridgeScript: config.bridgeScript,
     });
   const beetsConfig = await tagger.validate();
   if (beetsConfig.isErr()) {

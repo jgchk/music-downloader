@@ -219,6 +219,12 @@ export default tseslint.config(
         parser: tseslint.parser,
       },
     },
+    rules: {
+      // The app serves at the root (no configured base path), and $lib components stay free of
+      // kit-runtime imports so the three-tier component tests can compile them without a kit
+      // context; plain string hrefs are correct here.
+      'svelte/no-navigation-without-resolve': 'off',
+    },
   },
   {
     files: ['**/*.test.ts'],

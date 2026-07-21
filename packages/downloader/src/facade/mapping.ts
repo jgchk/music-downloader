@@ -78,6 +78,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
   return {
     acquisitionId: view.acquisitionId,
     status: view.status,
+    target: view.target ? { ...view.target } : undefined,
     currentCandidate: view.currentCandidate ? { ...view.currentCandidate } : undefined,
     attempts: view.attempts,
     rejectedCount: view.rejectedCount,

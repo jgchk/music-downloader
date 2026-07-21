@@ -21,3 +21,4 @@ packages/importer/test/contract/.venv/
 packages/web/build/
 packages/web/test-results/
 packages/web/playwright-report/
+/packages/web/.e2e-scratch/

@@ -53,7 +53,7 @@ Bounded in-place retries with backoff; on exhaustion, the subscription's declare
 
 ### D8 — Process shape: SvelteKit `adapter-node` custom entry hosts the daemon
 
-Fastify is removed. The composition root becomes a custom server entry that (1) wires both module runtimes — event stores, subscriptions, reactors, slskd polling, timers — then (2) mounts the SvelteKit handler. The process is a daemon that serves pages. Dev runs Vite's dev server with the facades wired in via SSR; prod runs the composed `adapter-node` build. *Alternative:* Fastify hosting SvelteKit's handler as middleware — rejected: with webhooks and MCP gone, Fastify had no remaining job; keeping it would be a framework with zero routes.
+Fastify is removed. The composition root becomes the boot step of the web process: both module runtimes — event stores, subscriptions, reactors, slskd polling, timers — are wired before the SvelteKit handler accepts any request. (Implementation note, recorded at review: realized as module runtime factories `@music/*/runtime` composed in the web package's `$lib/server` and awaited in SvelteKit's `init` hook, with shutdown on `sveltekit:shutdown` — adapter-node's own entry thereby boots the daemon before listening; no hand-rolled server wrapper was needed. The 'runtimes before interface' guarantee is spec-tested.) The process is a daemon that serves pages. Dev runs Vite's dev server with the facades wired in via SSR; prod runs the composed `adapter-node` build. *Alternative:* Fastify hosting SvelteKit's handler as middleware — rejected: with webhooks and MCP gone, Fastify had no remaining job; keeping it would be a framework with zero routes.
 
 ### D9 — BFF: SvelteKit server routes call facades in-process; no business orchestration in interfaces
 

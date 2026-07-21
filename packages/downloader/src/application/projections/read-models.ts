@@ -38,6 +38,8 @@ export type StatusHistoryEntry =
 export interface AcquisitionStatusView {
   readonly acquisitionId: string;
   readonly status: AcquisitionPhase;
+  /** The human description of what is being acquired: resolved metadata, or the descriptor. */
+  readonly target?: { readonly artist: string; readonly title: string };
   readonly currentCandidate?: CandidateIdentity;
   readonly attempts: number;
   readonly rejectedCount: number;
@@ -51,6 +53,14 @@ export function projectStatus(
 ): AcquisitionStatusView {
   const snapshot = Acquisition.fromHistory(events).snapshot;
   const history: StatusHistoryEntry[] = [];
+  let target: { artist: string; title: string } | undefined;
+  for (const event of events) {
+    if (event.type === 'AcquisitionRequested' && event.request.kind === 'descriptor') {
+      target = { artist: event.request.artist, title: event.request.title };
+    } else if (event.type === 'TargetResolved') {
+      target = { artist: event.target.artist, title: event.target.title };
+    }
+  }
   for (const event of events) {
     if (event.type === 'CandidateSelected') {
       history.push({ kind: 'selected', candidate: event.candidate.identity });
@@ -75,6 +85,7 @@ export function projectStatus(
   return {
     acquisitionId,
     status: snapshot.phase,
+    target,
     currentCandidate: snapshot.currentCandidate,
     attempts: snapshot.attempts,
     rejectedCount: snapshot.rejectedCount,

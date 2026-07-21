@@ -8,5 +8,9 @@ export default defineConfig({
     // the server bundle rather than externalizing them. Their native/runtime deps (better-sqlite3,
     // pino, …) remain external as usual.
     noExternal: ['@music/downloader', '@music/importer'],
+    // …but their native/bindings-based deps must NOT be inlined: better-sqlite3's loader walks
+    // `__filename` stack frames and breaks inside an ESM bundle. Not in the web package.json, so
+    // Vite would otherwise bundle them along with the workspace sources.
+    external: ['better-sqlite3', 'pino'],
   },
 });

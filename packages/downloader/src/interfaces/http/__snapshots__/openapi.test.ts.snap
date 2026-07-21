@@ -297,6 +297,22 @@ exports[`OpenAPI contract > matches the published contract snapshot (version-nor
                             ],
                             "type": "string",
                           },
+                          "target": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "artist": {
+                                "type": "string",
+                              },
+                              "title": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "artist",
+                              "title",
+                            ],
+                            "type": "object",
+                          },
                         },
                         "required": [
                           "acquisitionId",
@@ -870,6 +886,22 @@ exports[`OpenAPI contract > matches the published contract snapshot (version-nor
                         "Conflicted",
                       ],
                       "type": "string",
+                    },
+                    "target": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "artist": {
+                          "type": "string",
+                        },
+                        "title": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "artist",
+                        "title",
+                      ],
+                      "type": "object",
                     },
                   },
                   "required": [

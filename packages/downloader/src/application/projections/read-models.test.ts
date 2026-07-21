@@ -53,6 +53,7 @@ describe('projectStatus', () => {
   it('summarizes state and attempt history from the log', () => {
     const view = projectStatus('acq-1', history);
     expect(view.status).toBe('Fulfilled');
+    expect(view.target).toEqual({ artist: sampleTarget.artist, title: sampleTarget.title });
     expect(view.location).toBe('/lib/c');
     expect(view.attempts).toBe(3);
     expect(view.rejectedCount).toBe(2);
@@ -67,6 +68,26 @@ describe('projectStatus', () => {
       'selected',
       'imported',
     ]);
+  });
+});
+
+describe('projectStatus — target description', () => {
+  it('is absent before any target is known for a musicbrainz request', () => {
+    const view = projectStatus('acq-1', [
+      { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+    ]);
+    expect(view.target).toBeUndefined();
+  });
+
+  it('falls back to the descriptor request before resolution', () => {
+    const view = projectStatus('acq-1', [
+      {
+        type: 'AcquisitionRequested',
+        request: { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+        policies: defaultPolicies(),
+      },
+    ]);
+    expect(view.target).toEqual({ artist: 'Artist', title: 'Album' });
   });
 });
 

@@ -38,6 +38,7 @@ describe('loadComposedConfig', () => {
       DOWNLOADER_DATABASE_FILE: '/data/d.db',
       IMPORTER_DATABASE_FILE: '/data/i.db',
       BRIDGE_PYTHON: '/venv/bin/python',
+      BRIDGE_SCRIPT: '/app/bridge.py',
       BRIDGE_TIMEOUT_MS: '1000',
       AUTO_APPLY_THRESHOLD: '0.1',
     })._unsafeUnwrap();
@@ -46,6 +47,7 @@ describe('loadComposedConfig', () => {
     expect(config.downloader.databaseFile).toBe('/data/d.db');
     expect(config.importer.databaseFile).toBe('/data/i.db');
     expect(config.importer.bridgePython).toBe('/venv/bin/python');
+    expect(config.importer.bridgeScript).toBe('/app/bridge.py');
     expect(config.importer.bridgeTimeoutMs).toBe(1000);
     expect(config.importer.autoApplyThreshold).toBe(0.1);
     expect(config.logLevel).toBe('debug');

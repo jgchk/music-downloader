@@ -80,6 +80,17 @@ only, via `event.locals.facades`. Server-only code stays under `$lib/server`, wh
 refuses to bundle into the client — a client-side import of the daemon is a build error, not a
 code-review catch.
 
+### Web e2e smoke (Playwright)
+
+```bash
+pnpm test:e2e:web
+```
+
+Self-contained: `packages/web/tests/serve.sh` builds and serves the **real adapter-node entry**
+against scratch filesystem roots and a minimal real beets config (validated by the real bridge at
+boot); slskd and MusicBrainz point at a closed port, so the smoke drives the true server routes
+without any network. Threshold-free by design — the 100% coverage gate lives in the vitest tiers.
+
 ### Container (ffmpeg included)
 
 ```bash

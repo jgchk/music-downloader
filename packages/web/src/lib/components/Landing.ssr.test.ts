@@ -8,6 +8,8 @@ describe('Landing (SSR)', () => {
       props: { counts: { acquisitions: 3, pendingReviews: 1 } },
     });
     expect(body).toContain('<h1>music</h1>');
+    expect(body).toContain('href="/acquisitions"');
+    expect(body).toContain('href="/reviews"');
     expect(body).toContain('>3<');
     expect(body).toContain('>1<');
   });

@@ -1,0 +1,46 @@
+import { page } from 'vitest/browser';
+import { describe, expect, it } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import AcquisitionForm from './AcquisitionForm.svelte';
+
+describe('AcquisitionForm', () => {
+  it('starts on musicbrainz and swaps the fields when the kind changes', async () => {
+    render(AcquisitionForm, {});
+    await expect.element(page.getByTestId('mbid')).toBeVisible();
+
+    await page.getByTestId('kind').selectOptions('descriptor');
+    await expect.element(page.getByTestId('artist')).toBeVisible();
+    expect(page.getByTestId('mbid').query()).toBeNull();
+
+    await page.getByTestId('kind').selectOptions('musicbrainz');
+    await expect.element(page.getByTestId('mbid')).toBeVisible();
+  });
+
+  it('renders a rejected submission: error banner plus echoed values', async () => {
+    render(AcquisitionForm, {
+      error: 'Invalid input: title required',
+      values: { kind: 'descriptor', targetType: 'track', artist: 'A', title: 'T', album: 'L' },
+    });
+    await expect
+      .element(page.getByTestId('form-error'))
+      .toHaveTextContent('Invalid input: title required');
+    await expect.element(page.getByTestId('artist')).toHaveValue('A');
+  });
+
+  it('renders the policy fields', async () => {
+    render(AcquisitionForm, {
+      values: {
+        mbid: 'mb-7',
+        qualityFloor: 'LOSSLESS',
+        qualityOrder: 'LOSSLESS',
+        matchThreshold: '0.5',
+        maxSearchRounds: '1',
+        maxTotalAttempts: '2',
+        timeBudgetMs: '1000',
+        stallTimeoutMs: '2000',
+        maxQueueWaitMs: '3000',
+      },
+    });
+    await expect.element(page.getByTestId('submit-form')).toBeVisible();
+  });
+});

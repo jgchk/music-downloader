@@ -29,6 +29,12 @@ const envSchema = z.object({
   INTAKE_ROOT: z.string().min(1),
   BEETS_CONFIG: z.string().min(1),
   BRIDGE_PYTHON: z.string().min(1).default('python3'),
+  /**
+   * Where bridge.py lives. The importer's packaged default resolves beside its own module, which
+   * a bundling deployment (the SvelteKit server build) relocates — deployments set this
+   * explicitly; the Docker image points it at the copied script.
+   */
+  BRIDGE_SCRIPT: z.string().min(1).optional(),
   BRIDGE_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   AUTO_APPLY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.04),
   /**
@@ -72,6 +78,7 @@ export function loadComposedConfig(
       beetsConfigPath: v.BEETS_CONFIG,
       bridgePython: v.BRIDGE_PYTHON,
       bridgeTimeoutMs: v.BRIDGE_TIMEOUT_MS,
+      bridgeScript: v.BRIDGE_SCRIPT,
       autoApplyThreshold: v.AUTO_APPLY_THRESHOLD,
     },
     intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? v.STAGING_ROOT,

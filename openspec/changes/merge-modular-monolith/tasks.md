@@ -40,11 +40,11 @@
 
 ## 6. Web UI parity features
 
-- [ ] 6.1 Submit acquisition flow (form action → downloader facade; validation errors surfaced per error taxonomy)
-- [ ] 6.2 Acquisition progress/list view (facade read models; phase, candidate, failure detail)
-- [ ] 6.3 Cancel acquisition flow
-- [ ] 6.4 Import review queue + resolution flow (importer facade; resolve semantics unchanged from MCP tool)
-- [ ] 6.5 Playwright e2e covering the parity flows against a dev instance
+- [x] 6.1 Submit acquisition flow (form action → downloader facade; validation errors surfaced per error taxonomy) — /acquisitions/new; facade errors mapped by $lib/server/facade-errors
+- [x] 6.2 Acquisition progress/list view (facade read models; phase, candidate, failure detail) — /acquisitions + /acquisitions/[id]; additive `target` field added to the status DTO for the spec's target description
+- [x] 6.3 Cancel acquisition flow — ?/cancel action on the detail page, shown while non-terminal
+- [x] 6.4 Import review queue + resolution flow (importer facade; resolve semantics unchanged from MCP tool) — /reviews + /reviews/[id]; all 9 verbs incl. per-track manual tags; retry verb always offered, NoRetainedCandidate refusal rendered (parity with the MCP tool's behavior)
+- [x] 6.5 Playwright e2e covering the parity flows against a dev instance — tests/serve.sh boots the REAL adapter-node build (real beets validation, scratch roots, closed-port third parties, ORIGIN set); 5 specs green
 - [ ] 6.6 Remove MCP interfaces + SDK dependency and the Fastify HTTP layer from both modules; delete Fastify dependency; parity demonstrated first
 - [ ] 6.7 Consolidate env config (webhook/peer-URL vars gone, single process config); update `.env.example`
 

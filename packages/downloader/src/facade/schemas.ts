@@ -132,9 +132,15 @@ export const historyEntrySchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+export const acquisitionTargetSchema = z.object({
+  artist: z.string(),
+  title: z.string(),
+});
+
 export const acquisitionStatusResponseSchema = z.object({
   acquisitionId: z.string(),
   status: acquisitionStatusSchema,
+  target: acquisitionTargetSchema.optional(),
   currentCandidate: candidateIdentitySchema.optional(),
   attempts: z.number(),
   rejectedCount: z.number(),

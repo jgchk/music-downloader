@@ -8,9 +8,10 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   webServer: {
-    command: 'pnpm build && pnpm preview --port 4173',
+    command: 'bash tests/serve.sh',
     port: 4173,
     reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
   },
   use: {
     baseURL: 'http://localhost:4173',
