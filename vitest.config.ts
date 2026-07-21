@@ -8,7 +8,17 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
-    projects: ['packages/*'],
+    projects: [
+      'packages/*',
+      // Root-level boundary pins: prove the lint-enforced module boundaries stay configured.
+      {
+        test: {
+          name: 'boundaries',
+          environment: 'node',
+          include: ['test/boundaries/**/*.test.ts'],
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],

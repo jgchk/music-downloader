@@ -11,22 +11,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import {
-  getImport,
-  listImports,
-  listPendingReviews,
-  resolveReview,
-  submitImport,
-} from '../../application/import/use-cases.js';
-import type { UseCaseDeps } from '../../application/import/use-cases.js';
 import type { Logger } from '../../application/logging/logger.js';
-import {
-  hintsToDomain,
-  pendingReviewToDto,
-  resolutionToDomain,
-  statusViewToDto,
-  submitImportRequestSchema,
-} from '../contracts/index.js';
+import type { ImporterFacade } from '../../facade/index.js';
+import { submitImportRequestSchema } from '../contracts/index.js';
 import {
   describeResolveReviewError,
   resolveReviewDescription,
@@ -73,7 +60,7 @@ function resource(
   return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(payload) }] };
 }
 
-export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: string): Server {
+export function buildMcpServer(facade: ImporterFacade, logger: Logger, version: string): Server {
   const server = new Server(
     { name: 'music-importer', version },
     { capabilities: { tools: {}, resources: {} } },
@@ -100,36 +87,25 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
     if (name === 'submit_import') {
       const parsed = submitImportRequestSchema.safeParse(args);
       if (!parsed.success) return toolError('invalid arguments');
-      const result = await submitImport(deps, {
-        directory: parsed.data.path,
-        hints: hintsToDomain(parsed.data),
-      });
-      return result.match(
-        ({ importId }) => {
-          logger.info({ importId }, 'mcp import submitted');
-          return text({ importId });
-        },
-        (error) => toolError(error.kind),
-      );
+      const result = await facade.submitImport(parsed.data);
+      if (!result.ok) return toolError(result.error.kind);
+      const { importId } = result.value;
+      logger.info({ importId }, 'mcp import submitted');
+      return text({ importId });
     }
     if (name === 'resolve_review') {
       const parsed = resolveReviewToolSchema.safeParse(args);
       if (!parsed.success) return toolError(describeResolveReviewError(parsed.error));
-      const result = await resolveReview(
-        deps,
-        parsed.data.id,
-        resolutionToDomain(toResolveReviewRequest(parsed.data.resolution)),
+      const result = await facade.resolveReview({
+        id: parsed.data.id,
+        resolution: toResolveReviewRequest(parsed.data.resolution),
+      });
+      if (!result.ok) return toolError(result.error.kind);
+      logger.info(
+        { importId: parsed.data.id, verb: parsed.data.resolution.verb },
+        'mcp review resolved',
       );
-      return result.match(
-        () => {
-          logger.info(
-            { importId: parsed.data.id, verb: parsed.data.resolution.verb },
-            'mcp review resolved',
-          );
-          return text({ importId: parsed.data.id });
-        },
-        (error) => toolError(error.kind),
-      );
+      return text({ importId: parsed.data.id });
     }
     return toolError(`unknown tool: ${name}`);
   });
@@ -138,7 +114,7 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
     resources: [
       { uri: COLLECTION_URI, name: 'imports', mimeType: 'application/json' },
       { uri: REVIEWS_URI, name: 'pending reviews', mimeType: 'application/json' },
-      ...listImports(deps).map((view) => ({
+      ...facade.listImports().imports.map((view) => ({
         uri: `${COLLECTION_URI}/${view.importId}`,
         name: `import ${view.importId}`,
         mimeType: 'application/json',
@@ -149,16 +125,16 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
   server.setRequestHandler(ReadResourceRequestSchema, (request) => {
     const { uri } = request.params;
     if (uri === COLLECTION_URI) {
-      return resource(uri, { imports: listImports(deps).map(statusViewToDto) });
+      return resource(uri, facade.listImports());
     }
     if (uri === REVIEWS_URI) {
-      return resource(uri, { reviews: listPendingReviews(deps).map(pendingReviewToDto) });
+      return resource(uri, facade.listPendingReviews());
     }
     const statusMatch = STATUS_URI.exec(uri);
     if (statusMatch) {
-      const view = getImport(deps, statusMatch[1]!);
-      if (view === undefined) throw new McpError(ErrorCode.InvalidParams, 'unknown import');
-      return resource(uri, statusViewToDto(view));
+      const view = facade.getImport({ id: statusMatch[1]! });
+      if (!view.ok) throw new McpError(ErrorCode.InvalidParams, 'unknown import');
+      return resource(uri, view.value);
     }
     throw new McpError(ErrorCode.InvalidParams, `unknown resource: ${uri}`);
   });
@@ -176,7 +152,7 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
  */
 export function registerMcpEndpoint(
   app: FastifyInstance,
-  deps: UseCaseDeps,
+  facade: ImporterFacade,
   logger: Logger,
   version: string,
 ): void {
@@ -191,7 +167,7 @@ export function registerMcpEndpoint(
       request: { raw: IncomingMessage; body?: unknown },
       reply: { hijack: () => void; raw: ServerResponse },
     ): Promise<void> => {
-      const server = buildMcpServer(deps, logger, version);
+      const server = buildMcpServer(facade, logger, version);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       reply.raw.on('close', () => {
         void transport.close();

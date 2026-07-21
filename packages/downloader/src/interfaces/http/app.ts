@@ -8,16 +8,8 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import type { CommandError } from '../../application/acquisition/command-handler.js';
-import {
-  cancelAcquisition,
-  getAcquisition,
-  getAcquisitionProgress,
-  listAcquisitions,
-  submitAcquisition,
-} from '../../application/acquisition/use-cases.js';
-import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
 import type { Logger } from '../../application/logging/logger.js';
+import type { DownloaderFacade, DownloaderFacadeError } from '../../facade/index.js';
 import {
   acquisitionIdParamsSchema,
   acquisitionListResponseSchema,
@@ -25,13 +17,9 @@ import {
   cancelAcquisitionResponseSchema,
   errorResponseSchema,
   progressResponseSchema,
-  requestToDomain,
-  resolvePolicies,
-  statusViewToDto,
   submitAcquisitionRequestSchema,
   submitAcquisitionResponseSchema,
 } from '../contracts/index.js';
-import { progressToDto } from '../contracts/mapping.js';
 import { registerMcpEndpoint } from '../mcp/server.js';
 
 /**
@@ -45,13 +33,26 @@ import { registerMcpEndpoint } from '../mcp/server.js';
 
 const BASE_PATH = '/api/v1/acquisitions';
 
-/** Map a use-case command failure to an HTTP status: infra faults are 5xx, the rest are conflicts. */
-export function statusForCommandError(error: CommandError): 500 | 409 {
-  return error.kind === 'InfraError' ? 500 : 409;
+/**
+ * Map a facade failure to an HTTP status: infra faults are 5xx, an unknown resource is 404,
+ * invalid input is 400, and the rest are conflicts with the stream's current state.
+ */
+export function statusForFacadeError(error: DownloaderFacadeError): 400 | 404 | 409 | 500 {
+  switch (error.kind) {
+    case 'InfraError':
+      return 500;
+    case 'NotFound':
+      return 404;
+    case 'ValidationFailed':
+    case 'InvalidPolicy':
+      return 400;
+    default:
+      return 409;
+  }
 }
 
 export async function buildHttpApp(
-  deps: UseCaseDeps,
+  facade: DownloaderFacade,
   logger: Logger,
   version: string,
 ): Promise<FastifyInstance> {
@@ -79,14 +80,14 @@ export async function buildHttpApp(
   });
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
-  registerAcquisitionRoutes(app, deps);
-  registerMcpEndpoint(app, deps, logger, version);
+  registerAcquisitionRoutes(app, facade);
+  registerMcpEndpoint(app, facade, logger, version);
 
   await app.ready();
   return app;
 }
 
-function registerAcquisitionRoutes(app: FastifyInstance, deps: UseCaseDeps): void {
+function registerAcquisitionRoutes(app: FastifyInstance, facade: DownloaderFacade): void {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.post(
@@ -103,29 +104,22 @@ function registerAcquisitionRoutes(app: FastifyInstance, deps: UseCaseDeps): voi
       },
     },
     async (request, reply) => {
-      const policies = resolvePolicies(request.body);
-      if (policies.isErr()) {
-        return reply.code(400).send({ error: 'InvalidPolicy' });
+      const result = await facade.submitAcquisition(request.body);
+      if (!result.ok) {
+        // Submit can only fail with 400/409/500 kinds: the body was schema-validated by Fastify
+        // and NotFound has no meaning here.
+        const status = statusForFacadeError(result.error) as 400 | 409 | 500;
+        return reply.code(status).send({ error: result.error.kind });
       }
-      const result = await submitAcquisition(deps, {
-        request: requestToDomain(request.body.request),
-        policies: policies.value,
-      });
-      return result.match(
-        ({ acquisitionId }) => {
-          request.log.info({ acquisitionId }, 'acquisition submitted');
-          return reply
-            .code(202)
-            .send({ acquisitionId, statusUrl: `${BASE_PATH}/${acquisitionId}` });
-        },
-        (error) => reply.code(statusForCommandError(error)).send({ error: error.kind }),
-      );
+      const { acquisitionId } = result.value;
+      request.log.info({ acquisitionId }, 'acquisition submitted');
+      return reply.code(202).send({ acquisitionId, statusUrl: `${BASE_PATH}/${acquisitionId}` });
     },
   );
 
-  typed.get(BASE_PATH, { schema: { response: { 200: acquisitionListResponseSchema } } }, () => ({
-    acquisitions: listAcquisitions(deps).map(statusViewToDto),
-  }));
+  typed.get(BASE_PATH, { schema: { response: { 200: acquisitionListResponseSchema } } }, () =>
+    facade.listAcquisitions(),
+  );
 
   typed.get(
     `${BASE_PATH}/:id`,
@@ -136,11 +130,12 @@ function registerAcquisitionRoutes(app: FastifyInstance, deps: UseCaseDeps): voi
       },
     },
     async (request, reply) => {
-      const view = getAcquisition(deps, request.params.id);
-      if (view === undefined) {
+      const result = facade.getAcquisition({ id: request.params.id });
+      if (!result.ok) {
+        // The only reachable failure is NotFound: params are Fastify-validated non-empty.
         return reply.code(404).send({ error: 'NotFound' });
       }
-      return statusViewToDto(view);
+      return result.value;
     },
   );
 
@@ -153,11 +148,12 @@ function registerAcquisitionRoutes(app: FastifyInstance, deps: UseCaseDeps): voi
       },
     },
     async (request, reply) => {
-      const progress = getAcquisitionProgress(deps, request.params.id);
-      if (progress === undefined) {
+      const result = facade.getAcquisitionProgress({ id: request.params.id });
+      if (!result.ok) {
+        // The only reachable failure is NotFound: params are Fastify-validated non-empty.
         return reply.code(404).send({ error: 'NotFound' });
       }
-      return progressToDto(progress);
+      return result.value;
     },
   );
 
@@ -176,17 +172,17 @@ function registerAcquisitionRoutes(app: FastifyInstance, deps: UseCaseDeps): voi
     },
     async (request, reply) => {
       const { id } = request.params;
-      if (getAcquisition(deps, id) === undefined) {
+      if (!facade.getAcquisition({ id }).ok) {
         return reply.code(404).send({ error: 'NotFound' });
       }
-      const result = await cancelAcquisition(deps, id);
-      return result.match(
-        () => {
-          request.log.info({ acquisitionId: id }, 'acquisition cancelled');
-          return reply.code(202).send({ acquisitionId: id });
-        },
-        (error) => reply.code(statusForCommandError(error)).send({ error: error.kind }),
-      );
+      const result = await facade.cancelAcquisition({ id });
+      if (!result.ok) {
+        // Cancel pre-checks existence, and its input mirrors the Fastify-validated params.
+        const status = statusForFacadeError(result.error) as 409 | 500;
+        return reply.code(status).send({ error: result.error.kind });
+      }
+      request.log.info({ acquisitionId: id }, 'acquisition cancelled');
+      return reply.code(202).send({ acquisitionId: id });
     },
   );
 }

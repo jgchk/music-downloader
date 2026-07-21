@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
-import { testWiring } from '../__fixtures__/wiring.js';
-import type { TestWiring } from '../__fixtures__/wiring.js';
+import { testWiring } from '../../facade/__fixtures__/wiring.js';
+import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { intakeEventConsumer } from './intake-consumer.js';
 import type { IntakeConsumerOptions } from './intake-consumer.js';
 

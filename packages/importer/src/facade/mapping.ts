@@ -1,9 +1,9 @@
-import type { ImportHints, ProposedCandidate, Resolution } from '../../domain/import/events.js';
-import type { OpenReview } from '../../domain/import/import.js';
+import type { ImportHints, ProposedCandidate, Resolution } from '../domain/import/events.js';
+import type { OpenReview } from '../domain/import/import.js';
 import type {
   ImportStatusView,
   PendingReviewView,
-} from '../../application/projections/read-models.js';
+} from '../application/projections/read-models.js';
 import type {
   ImportStatusResponseDto,
   PendingReviewDto,

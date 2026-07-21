@@ -3,6 +3,9 @@
   "private": true,
   "description": "The importer bounded context: proposes beets-powered metadata matches, auto-imports confident ones, and queues uncertain ones for review.",
   "type": "module",
+  "exports": {
+    ".": "./src/facade/index.ts"
+  },
   "dependencies": {
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^6.0.0",

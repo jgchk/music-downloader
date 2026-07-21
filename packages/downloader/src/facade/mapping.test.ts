@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MATCH_POLICY } from '../../domain/policy/policies.js';
-import type { AcquisitionStatusView } from '../../application/projections/read-models.js';
+import { DEFAULT_MATCH_POLICY } from '../domain/policy/policies.js';
+import type { AcquisitionStatusView } from '../application/projections/read-models.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 
 describe('requestToDomain', () => {

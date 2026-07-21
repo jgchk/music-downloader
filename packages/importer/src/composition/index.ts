@@ -13,6 +13,7 @@ import type { UseCaseDeps } from '../application/import/use-cases.js';
 import { createLogger } from '../application/logging/logger.js';
 import type { Clock } from '../application/ports/system-ports.js';
 import { ImportStatusProjection } from '../application/projections/read-models.js';
+import { createImporterFacade } from '../facade/index.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { loadConfig } from './config.js';
 import { readAppVersion } from './version.js';
@@ -93,7 +94,7 @@ async function main(): Promise<void> {
     status,
     policy: { autoApplyThreshold: config.autoApplyThreshold },
   };
-  const httpApp = await buildHttpApp(deps, logger, readAppVersion(), {
+  const httpApp = await buildHttpApp(createImporterFacade(deps), logger, readAppVersion(), {
     beetsConfig: beetsConfig.value,
   });
   await httpApp.listen({ port: config.httpPort, host: config.host });

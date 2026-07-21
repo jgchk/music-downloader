@@ -26,9 +26,9 @@
 
 ## 4. Facades and boundary enforcement
 
-- [ ] 4.1 Extract each module's wire-shaped facade (commands/queries over serializable DTOs, zod at boundary, errors as values) as its package's sole export
-- [ ] 4.2 Add lint enforcement: interface packages import facades only; no cross-module internal imports; no shared kernel; violation = build break
-- [ ] 4.3 Re-point existing HTTP/MCP interfaces at the facades (temporary — they stay alive until web UI parity, tasks 6.x)
+- [x] 4.1 Extract each module's wire-shaped facade (commands/queries over serializable DTOs, zod at boundary, errors as values) as its package's sole export
+- [x] 4.2 Add lint enforcement: interface packages import facades only; no cross-module internal imports; no shared kernel; violation = build break
+- [x] 4.3 Re-point existing HTTP/MCP interfaces at the facades (temporary — they stay alive until web UI parity, tasks 6.x)
 
 ## 5. Web UI foundation
 

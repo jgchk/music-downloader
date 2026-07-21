@@ -4,8 +4,8 @@ import {
   FAILURE,
   INCUMBENT,
   candidate,
-} from '../../domain/import/__fixtures__/import-fixtures.js';
-import type { ImportStatusView } from '../../application/projections/read-models.js';
+} from '../domain/import/__fixtures__/import-fixtures.js';
+import type { ImportStatusView } from '../application/projections/read-models.js';
 import {
   hintsToDomain,
   pendingReviewToDto,

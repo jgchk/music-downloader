@@ -33,6 +33,7 @@ import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import type { AcquisitionFulfilledEvent } from '../interfaces/contracts/events/schemas.js';
 import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
+import { createDownloaderFacade } from '../facade/index.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { buildMcpServer } from '../interfaces/mcp/server.js';
 
@@ -141,7 +142,7 @@ afterEach(async () => {
 async function startHttp(opts: E2eOptions) {
   const w = wire(opts);
   await w.reactor.start();
-  const app = await buildHttpApp(w.deps, silentLogger(), '0.0.0-test');
+  const app = await buildHttpApp(createDownloaderFacade(w.deps), silentLogger(), '0.0.0-test');
   cleanups.push(
     () => app.close(),
     () => w.reactor.stop(),
@@ -419,7 +420,9 @@ describe('acquisition E2E', () => {
     const w = wire(happyOptions);
     await w.reactor.start();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await buildMcpServer(w.deps, silentLogger(), '0.0.0-test').connect(serverTransport);
+    await buildMcpServer(createDownloaderFacade(w.deps), silentLogger(), '0.0.0-test').connect(
+      serverTransport,
+    );
     const client = new Client({ name: 'e2e', version: '0' });
     await client.connect(clientTransport);
     cleanups.push(

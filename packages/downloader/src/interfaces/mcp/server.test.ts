@@ -6,8 +6,8 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import { buildHttpApp } from '../http/app.js';
-import { testWiring } from '../__fixtures__/wiring.js';
-import type { TestWiring } from '../__fixtures__/wiring.js';
+import { testWiring } from '../../facade/__fixtures__/wiring.js';
+import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { buildMcpServer } from './server.js';
 
 const descriptorArgs = {
@@ -45,7 +45,7 @@ describe('MCP server', () => {
   beforeEach(async () => {
     wiring = testWiring();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await buildMcpServer(wiring.deps, silentLogger(), '9.9.9').connect(serverTransport);
+    await buildMcpServer(wiring.facade, silentLogger(), '9.9.9').connect(serverTransport);
     client = new Client({ name: 'test', version: '0' });
     await client.connect(clientTransport);
   });
@@ -276,7 +276,7 @@ describe('MCP over streamable HTTP', () => {
 
   beforeEach(async () => {
     wiring = testWiring();
-    app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test');
+    app = await buildHttpApp(wiring.facade, silentLogger(), '0.0.0-test');
     await app.listen({ port: 0, host: '127.0.0.1' });
     const { port } = app.server.address() as AddressInfo;
     baseUrl = `http://127.0.0.1:${port}`;

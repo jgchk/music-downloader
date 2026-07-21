@@ -4,6 +4,8 @@ import { FakeEventStore, fixedClock, silentLogger } from '../../application/__fi
 import type { EffectPorts } from '../../application/import/interpreter.js';
 import { interpretEffect } from '../../application/import/interpreter.js';
 import type { UseCaseDeps } from '../../application/import/use-cases.js';
+import { createImporterFacade } from '../index.js';
+import type { ImporterFacade } from '../index.js';
 import { ImportStatusProjection } from '../../application/projections/read-models.js';
 import type { ProposeOutcome } from '../../application/ports/outbound-ports.js';
 import type { Effect } from '../../domain/import/import.js';
@@ -16,6 +18,7 @@ import type { Effect } from '../../domain/import/import.js';
  */
 export interface TestWiring {
   readonly deps: UseCaseDeps;
+  readonly facade: ImporterFacade;
   readonly store: FakeEventStore;
   readonly status: ImportStatusProjection;
   readonly sync: () => void;
@@ -52,6 +55,7 @@ export function testWiring(): TestWiring {
   };
   return {
     deps,
+    facade: createImporterFacade(deps),
     store,
     status,
     ports,

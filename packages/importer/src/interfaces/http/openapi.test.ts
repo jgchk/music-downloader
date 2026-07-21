@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { silentLogger, testWiring } from '../__fixtures__/wiring.js';
+import { silentLogger, testWiring } from '../../facade/__fixtures__/wiring.js';
 import { buildHttpApp } from './app.js';
 
 /**
@@ -26,7 +26,7 @@ describe('OpenAPI contract', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    app = await buildHttpApp(testWiring().deps, silentLogger(), '0.0.0-test');
+    app = await buildHttpApp(testWiring().facade, silentLogger(), '0.0.0-test');
   });
 
   afterEach(async () => {
@@ -54,7 +54,7 @@ describe('OpenAPI contract', () => {
   });
 
   it('a release version bump alone does not change the contract', async () => {
-    const bumped = await buildHttpApp(testWiring().deps, silentLogger(), '99.99.99');
+    const bumped = await buildHttpApp(testWiring().facade, silentLogger(), '99.99.99');
     try {
       expect(normalizeVersion(bumped.swagger() as OpenApiDoc)).toEqual(
         normalizeVersion(app.swagger() as OpenApiDoc),

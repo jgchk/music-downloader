@@ -1,6 +1,6 @@
 import { Result } from 'neverthrow';
-import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
-import type { AcquisitionPolicies } from '../../domain/policy/policies.js';
+import type { AcquisitionRequest } from '../domain/acquisition/events.js';
+import type { AcquisitionPolicies } from '../domain/policy/policies.js';
 import {
   DEFAULT_DOWNLOAD_POLICY,
   DEFAULT_MATCH_POLICY,
@@ -8,13 +8,13 @@ import {
   createDownloadPolicy,
   createMatchPolicy,
   createRetryPolicy,
-} from '../../domain/policy/policies.js';
-import { DEFAULT_QUALITY_POLICY, createQualityPolicy } from '../../domain/policy/quality-policy.js';
-import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
+} from '../domain/policy/policies.js';
+import { DEFAULT_QUALITY_POLICY, createQualityPolicy } from '../domain/policy/quality-policy.js';
+import type { DownloadProgress } from '../application/ports/outbound-ports.js';
 import type {
   AcquisitionStatusView,
   StatusHistoryEntry,
-} from '../../application/projections/read-models.js';
+} from '../application/projections/read-models.js';
 import type {
   AcquisitionRequestDto,
   AcquisitionStatusResponseDto,

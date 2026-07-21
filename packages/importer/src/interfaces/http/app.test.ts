@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SOURCE, candidate } from '../../domain/import/__fixtures__/import-fixtures.js';
 import { importIdFor, submitImport } from '../../application/import/use-cases.js';
 import { infraError } from '../../application/ports/errors.js';
-import { silentLogger, testWiring } from '../__fixtures__/wiring.js';
-import type { TestWiring } from '../__fixtures__/wiring.js';
-import { buildHttpApp, statusForCommandError } from './app.js';
+import { silentLogger, testWiring } from '../../facade/__fixtures__/wiring.js';
+import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
+import { buildHttpApp, statusForFacadeError } from './app.js';
 
 const INTAKE = '/intake/Artist - Album';
 
@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 async function build(wiring: TestWiring = testWiring()): Promise<TestWiring> {
-  app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test');
+  app = await buildHttpApp(wiring.facade, silentLogger(), '0.0.0-test');
   return wiring;
 }
 
@@ -261,7 +261,7 @@ describe('GET /debug/beets-config', () => {
       plugins: ['musicbrainz'],
       overlay: { threaded: false },
     };
-    app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test', { beetsConfig });
+    app = await buildHttpApp(wiring.facade, silentLogger(), '0.0.0-test', { beetsConfig });
     const res = await app.inject({ method: 'GET', url: '/debug/beets-config' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual(beetsConfig);
@@ -288,14 +288,16 @@ describe('request identity', () => {
   });
 });
 
-describe('statusForCommandError', () => {
+describe('statusForFacadeError', () => {
   it('maps each failure family to its status', () => {
-    expect(statusForCommandError(infraError('x', 'boom'))).toBe(500);
-    expect(statusForCommandError({ kind: 'UnknownImport' })).toBe(404);
-    expect(statusForCommandError({ kind: 'NoOpenReview' })).toBe(409);
-    expect(statusForCommandError({ kind: 'NoRetainedCandidate' })).toBe(409);
+    expect(statusForFacadeError(infraError('x', 'boom'))).toBe(500);
+    expect(statusForFacadeError({ kind: 'UnknownImport' })).toBe(404);
+    expect(statusForFacadeError({ kind: 'NotFound' })).toBe(404);
+    expect(statusForFacadeError({ kind: 'ValidationFailed', message: 'bad' })).toBe(400);
+    expect(statusForFacadeError({ kind: 'NoOpenReview' })).toBe(409);
+    expect(statusForFacadeError({ kind: 'NoRetainedCandidate' })).toBe(409);
     expect(
-      statusForCommandError({ kind: 'ConcurrencyConflict', streamId: 's', expectedVersion: 0 }),
+      statusForFacadeError({ kind: 'ConcurrencyConflict', streamId: 's', expectedVersion: 0 }),
     ).toBe(409);
   });
 });

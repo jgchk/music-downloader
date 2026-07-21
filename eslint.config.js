@@ -28,8 +28,42 @@ const layerBoundaryZones = modulePackages.flatMap((pkg) => {
     // interfaces depend on application + domain, never on adapters or composition.
     { target: `${src}/interfaces`, from: `${src}/adapters` },
     { target: `${src}/interfaces`, from: `${src}/composition` },
+    // the facade sits above application + domain only; inner layers never reach outward to it,
+    // and the facade never reaches adapters, interfaces, or composition.
+    { target: `${src}/domain`, from: `${src}/facade` },
+    { target: `${src}/application`, from: `${src}/facade` },
+    { target: `${src}/adapters`, from: `${src}/facade` },
+    { target: `${src}/facade`, from: `${src}/adapters` },
+    { target: `${src}/facade`, from: `${src}/interfaces` },
+    { target: `${src}/facade`, from: `${src}/composition` },
   ];
 });
+
+/**
+ * Module boundaries (module-architecture): the two bounded contexts never import each other, and
+ * interface packages (web) reach a module only through its facade entry point. A violation fails
+ * lint and therefore CI.
+ */
+const moduleBoundaryZones = [
+  {
+    target: './packages/downloader',
+    from: './packages/importer',
+    message: 'Modules are isolated: downloader must not import importer.',
+  },
+  {
+    target: './packages/importer',
+    from: './packages/downloader',
+    message: 'Modules are isolated: importer must not import downloader.',
+  },
+  ...modulePackages.flatMap((pkg) => [
+    {
+      target: './packages/web',
+      from: `./packages/${pkg}/src`,
+      except: ['./facade'],
+      message: `Interface packages import a module only via its facade (@music/${pkg}).`,
+    },
+  ]),
+];
 
 /**
  * Each aggregate's decider internals — the folded state, `decide`, and `react` — are private to
@@ -83,6 +117,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '.e2e-tmp/**',
       'test/e2e/**',
+      'test/boundaries/**',
       'packages/*/test/contract/**',
       'scripts/**',
       'packages/*/scripts/**',
@@ -112,7 +147,7 @@ export default tseslint.config(
     rules: {
       'import/no-restricted-paths': [
         'error',
-        { zones: [...layerBoundaryZones, ...aggregateEncapsulationZones] },
+        { zones: [...layerBoundaryZones, ...moduleBoundaryZones, ...aggregateEncapsulationZones] },
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': [

@@ -4,8 +4,8 @@ import {
   fulfilledHistory,
   matchingCandidate,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
-import { testWiring } from '../__fixtures__/wiring.js';
-import type { TestWiring } from '../__fixtures__/wiring.js';
+import { testWiring } from '../../facade/__fixtures__/wiring.js';
+import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { verdictEventConsumer } from './verdict-consumer.js';
 
 const a = matchingCandidate('a');

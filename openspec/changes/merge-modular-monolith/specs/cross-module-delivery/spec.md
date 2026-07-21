@@ -18,14 +18,14 @@ A consuming module SHALL receive the producing module's integration events by re
 - **WHEN** the consumer reads an event whose type it does not handle, or whose payload carries unknown fields
 - **THEN** the consumer advances past it without failing, reading only the fields its consumer-owned schema declares
 
-### Requirement: Checkpoint is consumer-owned, atomic with effects, named, and resettable
+### Requirement: Checkpoint is consumer-owned, ordered after effects, named, and resettable
 
-Each subscription SHALL persist its checkpoint as a named row in the consuming module's own SQLite store, and the checkpoint advance MUST commit in the same transaction as the consumer's effects for the processed batch. Distinct subscriptions SHALL have independent checkpoints, and a checkpoint MUST be resettable to an earlier position for replay.
+Each subscription SHALL persist its checkpoint as a named row in the consuming module's own SQLite store, and the checkpoint SHALL advance only after the batch's effects have durably committed in that store — the checkpoint MUST never lead the effects. Distinct subscriptions SHALL have independent checkpoints, and a checkpoint MUST be resettable to an earlier position for replay.
 
-#### Scenario: Effects and checkpoint commit together
+#### Scenario: A crash between effects and checkpoint converges via redelivery
 
 - **WHEN** the consumer processes a batch and the process is killed at any single point during processing
-- **THEN** after restart either both the batch's effects and the checkpoint advance are present, or neither is
+- **THEN** after restart the checkpoint is never ahead of the committed effects, and any events redelivered from the held checkpoint converge idempotently to the same end state
 
 #### Scenario: Checkpoint reset replays the feed
 

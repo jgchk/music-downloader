@@ -8,29 +8,17 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import type { CommandError } from '../../application/import/command-handler.js';
-import {
-  getImport,
-  listImports,
-  listPendingReviews,
-  resolveReview,
-  submitImport,
-} from '../../application/import/use-cases.js';
-import type { UseCaseDeps } from '../../application/import/use-cases.js';
 import type { Logger } from '../../application/logging/logger.js';
 import type { TaggerConfiguration } from '../../application/ports/outbound-ports.js';
+import type { ImporterFacade, ImporterFacadeError } from '../../facade/index.js';
 import {
   errorResponseSchema,
-  hintsToDomain,
   importIdParamsSchema,
   importListResponseSchema,
   importStatusResponseSchema,
-  pendingReviewToDto,
-  resolutionToDomain,
   resolveReviewRequestSchema,
   resolveReviewResponseSchema,
   reviewListResponseSchema,
-  statusViewToDto,
   submitImportRequestSchema,
   submitImportResponseSchema,
 } from '../contracts/index.js';
@@ -48,13 +36,21 @@ import { registerMcpEndpoint } from '../mcp/server.js';
 const BASE_PATH = '/api/v1/imports';
 
 /**
- * Map a use-case command failure to an HTTP status: infra faults are 5xx, an unknown import is
- * 404, and the rest are conflicts with the stream's current state.
+ * Map a facade failure to an HTTP status: infra faults are 5xx, an unknown import is 404,
+ * invalid input is 400, and the rest are conflicts with the stream's current state.
  */
-export function statusForCommandError(error: CommandError): 500 | 404 | 409 {
-  if (error.kind === 'InfraError') return 500;
-  if (error.kind === 'UnknownImport') return 404;
-  return 409;
+export function statusForFacadeError(error: ImporterFacadeError): 400 | 404 | 409 | 500 {
+  switch (error.kind) {
+    case 'InfraError':
+      return 500;
+    case 'UnknownImport':
+    case 'NotFound':
+      return 404;
+    case 'ValidationFailed':
+      return 400;
+    default:
+      return 409;
+  }
 }
 
 export interface HttpAppOptions {
@@ -63,7 +59,7 @@ export interface HttpAppOptions {
 }
 
 export async function buildHttpApp(
-  deps: UseCaseDeps,
+  facade: ImporterFacade,
   logger: Logger,
   version: string,
   options: HttpAppOptions = {},
@@ -90,15 +86,15 @@ export async function buildHttpApp(
   });
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
-  registerImportRoutes(app, deps);
+  registerImportRoutes(app, facade);
   registerDebugRoutes(app, options);
-  registerMcpEndpoint(app, deps, logger, version);
+  registerMcpEndpoint(app, facade, logger, version);
 
   await app.ready();
   return app;
 }
 
-function registerImportRoutes(app: FastifyInstance, deps: UseCaseDeps): void {
+function registerImportRoutes(app: FastifyInstance, facade: ImporterFacade): void {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.post(
@@ -115,31 +111,30 @@ function registerImportRoutes(app: FastifyInstance, deps: UseCaseDeps): void {
       },
     },
     async (request, reply) => {
-      const result = await submitImport(deps, {
-        directory: request.body.path,
-        hints: hintsToDomain(request.body),
-      });
-      return result.match(
-        ({ importId }) => {
-          request.log.info({ importId }, 'import submitted');
-          return reply.code(202).send({ importId, statusUrl: `${BASE_PATH}/${importId}` });
-        },
+      const result = await facade.submitImport(request.body);
+      if (!result.ok) {
         // Submission is keyed by directory and idempotent, so `decide` never refuses it with a
-        // domain error: the sad paths here are infra faults and append races.
-        (error) => reply.code(error.kind === 'InfraError' ? 500 : 409).send({ error: error.kind }),
-      );
+        // domain error: the sad paths here are infra faults and append races (the body was
+        // already schema-validated by Fastify).
+        return reply
+          .code(result.error.kind === 'InfraError' ? 500 : 409)
+          .send({ error: result.error.kind });
+      }
+      const { importId } = result.value;
+      request.log.info({ importId }, 'import submitted');
+      return reply.code(202).send({ importId, statusUrl: `${BASE_PATH}/${importId}` });
     },
   );
 
-  typed.get(BASE_PATH, { schema: { response: { 200: importListResponseSchema } } }, () => ({
-    imports: listImports(deps).map(statusViewToDto),
-  }));
+  typed.get(BASE_PATH, { schema: { response: { 200: importListResponseSchema } } }, () =>
+    facade.listImports(),
+  );
 
   // A static segment: Fastify routes it ahead of the `/:id` parameter route.
   typed.get(
     `${BASE_PATH}/reviews`,
     { schema: { response: { 200: reviewListResponseSchema } } },
-    () => ({ reviews: listPendingReviews(deps).map(pendingReviewToDto) }),
+    () => facade.listPendingReviews(),
   );
 
   typed.get(
@@ -151,11 +146,12 @@ function registerImportRoutes(app: FastifyInstance, deps: UseCaseDeps): void {
       },
     },
     async (request, reply) => {
-      const view = getImport(deps, request.params.id);
-      if (view === undefined) {
+      const result = facade.getImport({ id: request.params.id });
+      if (!result.ok) {
+        // The only reachable failure is NotFound: params are Fastify-validated non-empty.
         return reply.code(404).send({ error: 'NotFound' });
       }
-      return statusViewToDto(view);
+      return result.value;
     },
   );
 
@@ -176,14 +172,14 @@ function registerImportRoutes(app: FastifyInstance, deps: UseCaseDeps): void {
     },
     async (request, reply) => {
       const { id } = request.params;
-      const result = await resolveReview(deps, id, resolutionToDomain(request.body));
-      return result.match(
-        () => {
-          request.log.info({ importId: id, verb: request.body.verb }, 'review resolved');
-          return reply.code(202).send({ importId: id });
-        },
-        (error) => reply.code(statusForCommandError(error)).send({ error: error.kind }),
-      );
+      const result = await facade.resolveReview({ id, resolution: request.body });
+      if (!result.ok) {
+        // Params and body are Fastify-validated, so ValidationFailed (400) is unreachable here.
+        const status = statusForFacadeError(result.error) as 404 | 409 | 500;
+        return reply.code(status).send({ error: result.error.kind });
+      }
+      request.log.info({ importId: id, verb: request.body.verb }, 'review resolved');
+      return reply.code(202).send({ importId: id });
     },
   );
 }

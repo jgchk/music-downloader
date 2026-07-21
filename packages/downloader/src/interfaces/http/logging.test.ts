@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createLogger } from '../../application/logging/logger.js';
-import { testWiring } from '../__fixtures__/wiring.js';
+import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import { buildHttpApp } from './app.js';
 
 /**
@@ -40,7 +40,7 @@ describe('HTTP request correlation', () => {
 
   beforeEach(async () => {
     capture = capturingLogger();
-    app = await buildHttpApp(testWiring().deps, capture.logger, '0.0.0-test');
+    app = await buildHttpApp(testWiring().facade, capture.logger, '0.0.0-test');
   });
 
   afterEach(async () => {

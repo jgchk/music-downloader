@@ -1,21 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
-import { infraError } from '../../application/ports/errors.js';
-import { testWiring } from '../__fixtures__/wiring.js';
-import type { TestWiring } from '../__fixtures__/wiring.js';
-import { buildHttpApp, statusForCommandError } from './app.js';
+import { testWiring } from '../../facade/__fixtures__/wiring.js';
+import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
+import { buildHttpApp, statusForFacadeError } from './app.js';
 
 const descriptorBody = {
   request: { kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T' },
 };
 
-describe('statusForCommandError', () => {
-  it('maps infra faults to 500 and everything else to 409', () => {
-    expect(statusForCommandError(infraError('append', 'boom'))).toBe(500);
-    expect(statusForCommandError({ kind: 'AlreadyExists' })).toBe(409);
+describe('statusForFacadeError', () => {
+  it('maps infra faults to 500, missing resources to 404, bad input to 400, the rest to 409', () => {
+    expect(statusForFacadeError({ kind: 'InfraError', operation: 'append', message: 'boom' })).toBe(
+      500,
+    );
+    expect(statusForFacadeError({ kind: 'NotFound' })).toBe(404);
+    expect(statusForFacadeError({ kind: 'ValidationFailed', message: 'bad' })).toBe(400);
+    expect(statusForFacadeError({ kind: 'InvalidPolicy' })).toBe(400);
+    expect(statusForFacadeError({ kind: 'AlreadyExists' })).toBe(409);
     expect(
-      statusForCommandError({ kind: 'ConcurrencyConflict', streamId: 'a', expectedVersion: 0 }),
+      statusForFacadeError({ kind: 'ConcurrencyConflict', streamId: 'a', expectedVersion: 0 }),
     ).toBe(409);
   });
 });
@@ -26,7 +30,7 @@ describe('HTTP API v1', () => {
 
   beforeEach(async () => {
     wiring = testWiring();
-    app = await buildHttpApp(wiring.deps, silentLogger(), '0.0.0-test');
+    app = await buildHttpApp(wiring.facade, silentLogger(), '0.0.0-test');
   });
 
   afterEach(async () => {

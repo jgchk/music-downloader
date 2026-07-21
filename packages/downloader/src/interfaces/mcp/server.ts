@@ -11,22 +11,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import {
-  cancelAcquisition,
-  getAcquisition,
-  getAcquisitionProgress,
-  listAcquisitions,
-  submitAcquisition,
-} from '../../application/acquisition/use-cases.js';
-import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
 import type { Logger } from '../../application/logging/logger.js';
-import {
-  cancelAcquisitionArgsSchema,
-  progressToDto,
-  requestToDomain,
-  resolvePolicies,
-  statusViewToDto,
-} from '../contracts/index.js';
+import type { DownloaderFacade } from '../../facade/index.js';
+import { cancelAcquisitionArgsSchema } from '../contracts/index.js';
 import {
   submitAcquisitionToolDescription,
   submitAcquisitionToolSchema,
@@ -72,7 +59,7 @@ function resource(
   return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(payload) }] };
 }
 
-export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: string): Server {
+export function buildMcpServer(facade: DownloaderFacade, logger: Logger, version: string): Server {
   const server = new Server(
     { name: 'music-downloader', version },
     { capabilities: { tools: {}, resources: {} } },
@@ -99,32 +86,19 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
       const parsed = submitAcquisitionToolSchema.safeParse(args);
       if (!parsed.success)
         return toolError(parsed.error.issues.map((issue) => issue.message).join('; '));
-      const dto = toSubmitAcquisitionDto(parsed.data);
-      const policies = resolvePolicies(dto);
-      if (policies.isErr()) return toolError('InvalidPolicy');
-      const result = await submitAcquisition(deps, {
-        request: requestToDomain(dto.request),
-        policies: policies.value,
-      });
-      return result.match(
-        ({ acquisitionId }) => {
-          logger.info({ acquisitionId }, 'mcp acquisition submitted');
-          return text({ acquisitionId });
-        },
-        (error) => toolError(error.kind),
-      );
+      const result = await facade.submitAcquisition(toSubmitAcquisitionDto(parsed.data));
+      if (!result.ok) return toolError(result.error.kind);
+      const { acquisitionId } = result.value;
+      logger.info({ acquisitionId }, 'mcp acquisition submitted');
+      return text({ acquisitionId });
     }
     if (name === 'cancel_acquisition') {
       const parsed = cancelAcquisitionArgsSchema.safeParse(args);
       if (!parsed.success) return toolError('invalid arguments');
-      const result = await cancelAcquisition(deps, parsed.data.id);
-      return result.match(
-        () => {
-          logger.info({ acquisitionId: parsed.data.id }, 'mcp acquisition cancelled');
-          return text({ acquisitionId: parsed.data.id });
-        },
-        (error) => toolError(error.kind),
-      );
+      const result = await facade.cancelAcquisition({ id: parsed.data.id });
+      if (!result.ok) return toolError(result.error.kind);
+      logger.info({ acquisitionId: parsed.data.id }, 'mcp acquisition cancelled');
+      return text({ acquisitionId: parsed.data.id });
     }
     return toolError(`unknown tool: ${name}`);
   });
@@ -132,7 +106,7 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
   server.setRequestHandler(ListResourcesRequestSchema, () => ({
     resources: [
       { uri: COLLECTION_URI, name: 'acquisitions', mimeType: 'application/json' },
-      ...listAcquisitions(deps).map((view) => ({
+      ...facade.listAcquisitions().acquisitions.map((view) => ({
         uri: `${COLLECTION_URI}/${view.acquisitionId}`,
         name: `acquisition ${view.acquisitionId}`,
         mimeType: 'application/json',
@@ -143,20 +117,19 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
   server.setRequestHandler(ReadResourceRequestSchema, (request) => {
     const { uri } = request.params;
     if (uri === COLLECTION_URI) {
-      return resource(uri, { acquisitions: listAcquisitions(deps).map(statusViewToDto) });
+      return resource(uri, facade.listAcquisitions());
     }
     const progressMatch = PROGRESS_URI.exec(uri);
     if (progressMatch) {
-      const progress = getAcquisitionProgress(deps, progressMatch[1]!);
-      if (progress === undefined)
-        throw new McpError(ErrorCode.InvalidParams, 'unknown acquisition');
-      return resource(uri, progressToDto(progress));
+      const progress = facade.getAcquisitionProgress({ id: progressMatch[1]! });
+      if (!progress.ok) throw new McpError(ErrorCode.InvalidParams, 'unknown acquisition');
+      return resource(uri, progress.value);
     }
     const statusMatch = STATUS_URI.exec(uri);
     if (statusMatch) {
-      const view = getAcquisition(deps, statusMatch[1]!);
-      if (view === undefined) throw new McpError(ErrorCode.InvalidParams, 'unknown acquisition');
-      return resource(uri, statusViewToDto(view));
+      const view = facade.getAcquisition({ id: statusMatch[1]! });
+      if (!view.ok) throw new McpError(ErrorCode.InvalidParams, 'unknown acquisition');
+      return resource(uri, view.value);
     }
     throw new McpError(ErrorCode.InvalidParams, `unknown resource: ${uri}`);
   });
@@ -174,7 +147,7 @@ export function buildMcpServer(deps: UseCaseDeps, logger: Logger, version: strin
  */
 export function registerMcpEndpoint(
   app: FastifyInstance,
-  deps: UseCaseDeps,
+  facade: DownloaderFacade,
   logger: Logger,
   version: string,
 ): void {
@@ -189,7 +162,7 @@ export function registerMcpEndpoint(
       request: { raw: IncomingMessage; body?: unknown },
       reply: { hijack: () => void; raw: ServerResponse },
     ): Promise<void> => {
-      const server = buildMcpServer(deps, logger, version);
+      const server = buildMcpServer(facade, logger, version);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       reply.raw.on('close', () => {
         void transport.close();

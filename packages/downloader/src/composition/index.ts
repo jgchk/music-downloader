@@ -27,6 +27,7 @@ import {
   LibraryViewProjection,
   ProgressReadModel,
 } from '../application/projections/read-models.js';
+import { createDownloaderFacade } from '../facade/index.js';
 import { buildHttpApp } from '../interfaces/http/app.js';
 import { loadConfig } from './config.js';
 import { readAppVersion } from './version.js';
@@ -127,7 +128,8 @@ async function main(): Promise<void> {
   // observed or cancelled over MCP; the retired stdio transport forced a client-spawned second
   // process that raced this one's reactor and read stale projections.
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
-  const httpApp = await buildHttpApp(deps, logger, readAppVersion());
+  const facade = createDownloaderFacade(deps);
+  const httpApp = await buildHttpApp(facade, logger, readAppVersion());
   await httpApp.listen({ port: config.httpPort, host: config.host });
 
   logger.info({ port: config.httpPort, host: config.host }, 'music-downloader started');

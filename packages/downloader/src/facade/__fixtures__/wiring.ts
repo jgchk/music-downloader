@@ -4,6 +4,8 @@ import {
   ProgressReadModel,
 } from '../../application/projections/read-models.js';
 import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
+import { createDownloaderFacade } from '../index.js';
+import type { DownloaderFacade } from '../index.js';
 
 /**
  * A minimal in-memory wiring of the use-case dependencies for interface tests. `sync()` pumps the
@@ -12,6 +14,7 @@ import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
  */
 export interface TestWiring {
   readonly deps: UseCaseDeps;
+  readonly facade: DownloaderFacade;
   readonly store: FakeEventStore;
   readonly status: AcquisitionStatusProjection;
   readonly progress: ProgressReadModel;
@@ -29,5 +32,12 @@ export function testWiring(): TestWiring {
     status,
     progress,
   };
-  return { deps, store, status, progress, sync: () => status.rebuild(store.all()) };
+  return {
+    deps,
+    facade: createDownloaderFacade(deps),
+    store,
+    status,
+    progress,
+    sync: () => status.rebuild(store.all()),
+  };
 }
