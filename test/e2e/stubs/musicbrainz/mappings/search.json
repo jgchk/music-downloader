@@ -1,0 +1,34 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/release",
+    "queryParameters": {
+      "query": { "contains": "Test Album" },
+      "fmt": { "equalTo": "json" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "releases": [
+        {
+          "id": "release-1-remaster",
+          "score": 100,
+          "title": "Test Album (Remaster)",
+          "status": "Official",
+          "date": "2021-01-01",
+          "release-group": { "id": "rg-1" }
+        },
+        {
+          "id": "release-1",
+          "score": 100,
+          "title": "Test Album",
+          "status": "Official",
+          "date": "2020-05-01",
+          "release-group": { "id": "rg-1" }
+        }
+      ]
+    }
+  }
+}

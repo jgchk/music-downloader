@@ -1,0 +1,390 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-07-05",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release",
+    "query": {
+      "query": "release:\"The Dark Side of the Moon\" AND artist:\"Pink Floyd\"",
+      "fmt": "json",
+      "limit": "100"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "created": "2026-07-05T15:52:23.036Z",
+      "count": 150,
+      "offset": 0,
+      "releases": [
+        {
+          "id": "be701edc-c9c7-484a-9ed2-aeef051c19be",
+          "score": 100,
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "artist-credit-id": "0b81ed37-abef-3a61-95a1-96078197007b",
+          "count": 1,
+          "title": "The Dark Side of the Moon",
+          "status": "Official",
+          "packaging": "Gatefold Cover",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "artist-credit": [
+            {
+              "name": "Pink Floyd",
+              "artist": {
+                "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                "name": "Pink Floyd",
+                "sort-name": "Pink Floyd"
+              }
+            }
+          ],
+          "release-group": {
+            "id": "f5093c06-23e3-404f-aeaa-40f72885ee3a",
+            "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "The Dark Side of the Moon",
+            "primary-type": "Album"
+          },
+          "date": "2016",
+          "country": "US",
+          "release-events": [
+            {
+              "date": "2016",
+              "area": {
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "name": "United States",
+                "sort-name": "United States",
+                "iso-3166-1-codes": [
+                  "US"
+                ]
+              }
+            }
+          ],
+          "barcode": "888751709126",
+          "label-info": [
+            {
+              "catalog-number": "PFR8",
+              "label": {
+                "id": "96772f8e-b725-4f74-a053-921a573fa0e8",
+                "name": "Pink Floyd Records"
+              }
+            },
+            {
+              "catalog-number": "88875170912",
+              "label": {
+                "id": "96772f8e-b725-4f74-a053-921a573fa0e8",
+                "name": "Pink Floyd Records"
+              }
+            }
+          ],
+          "track-count": 10,
+          "media": [
+            {
+              "id": "a61a7def-1caa-3baa-8a73-d8817ef02e7c",
+              "format": "CD",
+              "disc-count": 1,
+              "track-count": 10
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "classic rock"
+            },
+            {
+              "count": 1,
+              "name": "space rock"
+            }
+          ]
+        },
+        {
+          "id": "bec5e145-5edb-4920-b356-104df3124932",
+          "score": 100,
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "packaging-id": "f7101ce3-0384-39ce-9fde-fbbd0044d35f",
+          "artist-credit-id": "0b81ed37-abef-3a61-95a1-96078197007b",
+          "count": 1,
+          "title": "The Dark Side of the Moon",
+          "status": "Official",
+          "packaging": "Cardboard/Paper Sleeve",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "artist-credit": [
+            {
+              "name": "Pink Floyd",
+              "artist": {
+                "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                "name": "Pink Floyd",
+                "sort-name": "Pink Floyd"
+              }
+            }
+          ],
+          "release-group": {
+            "id": "f5093c06-23e3-404f-aeaa-40f72885ee3a",
+            "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "The Dark Side of the Moon",
+            "primary-type": "Album"
+          },
+          "date": "2017-11-01",
+          "country": "JP",
+          "release-events": [
+            {
+              "date": "2017-11-01",
+              "area": {
+                "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+                "name": "Japan",
+                "sort-name": "Japan",
+                "iso-3166-1-codes": [
+                  "JP"
+                ]
+              }
+            }
+          ],
+          "barcode": "4547366312669",
+          "asin": "B0759SQPX5",
+          "label-info": [
+            {
+              "catalog-number": "SICP 5409",
+              "label": {
+                "id": "c9a4ea86-7611-4fff-9f4f-41f18be7e14b",
+                "name": "Sony Records International"
+              }
+            }
+          ],
+          "track-count": 10,
+          "media": [
+            {
+              "id": "b9a8192e-03dc-3241-b663-45b3e1f60f1e",
+              "format": "CD",
+              "disc-count": 0,
+              "track-count": 10
+            }
+          ]
+        },
+        {
+          "id": "586ff28d-c0fc-4a50-ba18-d7152680417d",
+          "score": 100,
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "artist-credit-id": "0b81ed37-abef-3a61-95a1-96078197007b",
+          "count": 1,
+          "title": "The Dark Side of the Moon",
+          "status": "Official",
+          "packaging": "Gatefold Cover",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "artist-credit": [
+            {
+              "name": "Pink Floyd",
+              "artist": {
+                "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                "name": "Pink Floyd",
+                "sort-name": "Pink Floyd"
+              }
+            }
+          ],
+          "release-group": {
+            "id": "f5093c06-23e3-404f-aeaa-40f72885ee3a",
+            "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "The Dark Side of the Moon",
+            "primary-type": "Album"
+          },
+          "date": "2013",
+          "country": "XE",
+          "release-events": [
+            {
+              "date": "2013",
+              "area": {
+                "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+                "name": "Europe",
+                "sort-name": "Europe",
+                "iso-3166-1-codes": [
+                  "XE"
+                ]
+              }
+            }
+          ],
+          "barcode": "5099902895529",
+          "label-info": [
+            {
+              "catalog-number": "50999 028955 2 9",
+              "label": {
+                "id": "df7d1c7f-ef95-425f-8eef-445b3d7bcbd9",
+                "name": "Parlophone"
+              }
+            }
+          ],
+          "track-count": 10,
+          "media": [
+            {
+              "id": "132384eb-b9de-3b3c-ae57-96c7df44474e",
+              "format": "CD",
+              "disc-count": 1,
+              "track-count": 10
+            }
+          ]
+        },
+        {
+          "id": "3df425d2-b33e-424c-acd3-d949ea09e2c8",
+          "score": 100,
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "artist-credit-id": "0b81ed37-abef-3a61-95a1-96078197007b",
+          "count": 1,
+          "title": "The Dark Side of the Moon",
+          "status": "Official",
+          "disambiguation": "European remaster",
+          "packaging": "Gatefold Cover",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "artist-credit": [
+            {
+              "name": "Pink Floyd",
+              "artist": {
+                "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                "name": "Pink Floyd",
+                "sort-name": "Pink Floyd"
+              }
+            }
+          ],
+          "release-group": {
+            "id": "f5093c06-23e3-404f-aeaa-40f72885ee3a",
+            "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "The Dark Side of the Moon",
+            "primary-type": "Album"
+          },
+          "date": "2016-11-04",
+          "country": "GB",
+          "release-events": [
+            {
+              "date": "2016-11-04",
+              "area": {
+                "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+                "name": "United Kingdom",
+                "sort-name": "United Kingdom",
+                "iso-3166-1-codes": [
+                  "GB"
+                ]
+              }
+            },
+            {
+              "date": "2016-11-04",
+              "area": {
+                "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+                "name": "Europe",
+                "sort-name": "Europe",
+                "iso-3166-1-codes": [
+                  "XE"
+                ]
+              }
+            }
+          ],
+          "barcode": "5099902987613",
+          "label-info": [
+            {
+              "catalog-number": "PFRLP8",
+              "label": {
+                "id": "96772f8e-b725-4f74-a053-921a573fa0e8",
+                "name": "Pink Floyd Records"
+              }
+            }
+          ],
+          "track-count": 10,
+          "media": [
+            {
+              "id": "14881887-7c35-33e6-9d16-f3c02a04245a",
+              "format": "12\" Vinyl",
+              "disc-count": 0,
+              "track-count": 10
+            }
+          ]
+        },
+        {
+          "id": "37dba27d-895a-4d74-9679-d39f7c816f4b",
+          "score": 100,
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "artist-credit-id": "0b81ed37-abef-3a61-95a1-96078197007b",
+          "count": 1,
+          "title": "The Dark Side of the Moon",
+          "status": "Official",
+          "packaging": "Gatefold Cover",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "artist-credit": [
+            {
+              "name": "Pink Floyd",
+              "artist": {
+                "id": "83d91898-7763-47d7-b03b-b92132375c47",
+                "name": "Pink Floyd",
+                "sort-name": "Pink Floyd"
+              }
+            }
+          ],
+          "release-group": {
+            "id": "f5093c06-23e3-404f-aeaa-40f72885ee3a",
+            "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "The Dark Side of the Moon",
+            "primary-type": "Album"
+          },
+          "date": "2016-11-04",
+          "country": "US",
+          "release-events": [
+            {
+              "date": "2016-11-04",
+              "area": {
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "name": "United States",
+                "sort-name": "United States",
+                "iso-3166-1-codes": [
+                  "US"
+                ]
+              }
+            }
+          ],
+          "barcode": "888751842519",
+          "label-info": [
+            {
+              "catalog-number": "PFRLP8",
+              "label": {
+                "id": "96772f8e-b725-4f74-a053-921a573fa0e8",
+                "name": "Pink Floyd Records"
+              }
+            }
+          ],
+          "track-count": 10,
+          "media": [
+            {
+              "id": "fb28c574-0aee-3661-9a05-1453f2112d3f",
+              "format": "12\" Vinyl",
+              "disc-count": 0,
+              "track-count": 10
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

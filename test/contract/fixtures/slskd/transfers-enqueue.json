@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "download enqueue"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/v0/transfers/downloads/peer3"
+  },
+  "response": {
+    "status": 201
+  }
+}

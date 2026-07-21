@@ -1,0 +1,28 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "completed search"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/searches/ff434390-e757-4099-8802-7a33365766f2"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "endedAt": "2026-07-05T15:44:51.1228752Z",
+      "fileCount": 5934,
+      "id": "ff434390-e757-4099-8802-7a33365766f2",
+      "isComplete": true,
+      "lockedFileCount": 400,
+      "responseCount": 250,
+      "responses": [],
+      "searchText": "Pink Floyd Dark Side of the Moon",
+      "startedAt": "2026-07-05T15:44:49.8784941Z",
+      "state": "Completed, ResponseLimitReached",
+      "token": 850
+    }
+  }
+}

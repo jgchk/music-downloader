@@ -1,0 +1,155 @@
+import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
+import { Acquisition } from '../../domain/acquisition/acquisition.js';
+import type { AcquisitionPhase } from '../../domain/acquisition/acquisition.js';
+import type { AcquisitionEvent, DownloadFailureReason } from '../../domain/acquisition/events.js';
+import type { ValidationReason } from '../../domain/validation/verdict.js';
+import type { DownloadProgress } from '../ports/outbound-ports.js';
+import type { StoredEvent } from '../ports/event-store-port.js';
+
+/**
+ * Read-model projections (D7): each is a fold over the log and therefore rebuildable from it.
+ * Progress is the exception — it is ephemeral telemetry (D1) fed by the download adapter, never
+ * from events, so it is not replayable.
+ */
+
+// --- Acquisition status ------------------------------------------------------------------------
+
+export type StatusHistoryEntry =
+  | { readonly kind: 'selected'; readonly candidate: CandidateIdentity }
+  | {
+      readonly kind: 'download-failed';
+      readonly candidate: CandidateIdentity;
+      readonly reason: DownloadFailureReason;
+    }
+  | {
+      readonly kind: 'validation-failed';
+      readonly candidate: CandidateIdentity;
+      readonly reasons: readonly ValidationReason[];
+    }
+  | { readonly kind: 'imported'; readonly candidate: CandidateIdentity; readonly location: string }
+  | {
+      // A delivered candidate judged unacceptable by validation outside the system: the fulfilment
+      // was rejected and the acquisition revived into the retry ladder.
+      readonly kind: 'fulfillment-rejected';
+      readonly candidate: CandidateIdentity;
+      readonly reasons: readonly string[];
+    };
+
+export interface AcquisitionStatusView {
+  readonly acquisitionId: string;
+  readonly status: AcquisitionPhase;
+  readonly currentCandidate?: CandidateIdentity;
+  readonly attempts: number;
+  readonly rejectedCount: number;
+  readonly location?: string;
+  readonly history: readonly StatusHistoryEntry[];
+}
+
+export function projectStatus(
+  acquisitionId: string,
+  events: readonly AcquisitionEvent[],
+): AcquisitionStatusView {
+  const snapshot = Acquisition.fromHistory(events).snapshot;
+  const history: StatusHistoryEntry[] = [];
+  for (const event of events) {
+    if (event.type === 'CandidateSelected') {
+      history.push({ kind: 'selected', candidate: event.candidate.identity });
+    } else if (event.type === 'DownloadFailed') {
+      history.push({ kind: 'download-failed', candidate: event.candidate, reason: event.reason });
+    } else if (event.type === 'ValidationFailed') {
+      history.push({
+        kind: 'validation-failed',
+        candidate: event.candidate,
+        reasons: event.verdict.reasons,
+      });
+    } else if (event.type === 'Imported') {
+      history.push({ kind: 'imported', candidate: event.candidate, location: event.location });
+    } else if (event.type === 'FulfillmentRejected') {
+      history.push({
+        kind: 'fulfillment-rejected',
+        candidate: event.candidate,
+        reasons: event.reasons,
+      });
+    }
+  }
+  return {
+    acquisitionId,
+    status: snapshot.phase,
+    currentCandidate: snapshot.currentCandidate,
+    attempts: snapshot.attempts,
+    rejectedCount: snapshot.rejectedCount,
+    location: snapshot.location,
+    history,
+  };
+}
+
+export class AcquisitionStatusProjection {
+  private readonly streams = new Map<string, AcquisitionEvent[]>();
+
+  apply(stored: StoredEvent): void {
+    const list = this.streams.get(stored.streamId) ?? [];
+    list.push(stored.event);
+    this.streams.set(stored.streamId, list);
+  }
+
+  get(acquisitionId: string): AcquisitionStatusView | undefined {
+    const events = this.streams.get(acquisitionId);
+    return events === undefined ? undefined : projectStatus(acquisitionId, events);
+  }
+
+  list(): readonly AcquisitionStatusView[] {
+    return [...this.streams.entries()].map(([id, events]) => projectStatus(id, events));
+  }
+
+  rebuild(stored: readonly StoredEvent[]): void {
+    this.streams.clear();
+    for (const entry of stored) this.apply(entry);
+  }
+}
+
+// --- Download progress (ephemeral read model, D1) ----------------------------------------------
+
+export class ProgressReadModel {
+  private readonly progress = new Map<string, DownloadProgress>();
+
+  update(acquisitionId: string, progress: DownloadProgress): void {
+    this.progress.set(acquisitionId, progress);
+  }
+
+  get(acquisitionId: string): DownloadProgress | undefined {
+    return this.progress.get(acquisitionId);
+  }
+}
+
+// --- Library view ------------------------------------------------------------------------------
+
+export interface LibraryEntry {
+  readonly acquisitionId: string;
+  readonly artist: string;
+  readonly title: string;
+  readonly location: string;
+}
+
+export class LibraryViewProjection {
+  private readonly entries: LibraryEntry[] = [];
+  private readonly targets = new Map<string, { artist: string; title: string }>();
+
+  apply(stored: StoredEvent): void {
+    const event = stored.event;
+    if (event.type === 'TargetResolved') {
+      this.targets.set(stored.streamId, { artist: event.target.artist, title: event.target.title });
+    } else if (event.type === 'Imported') {
+      const target = this.targets.get(stored.streamId)!;
+      this.entries.push({
+        acquisitionId: stored.streamId,
+        artist: target.artist,
+        title: target.title,
+        location: event.location,
+      });
+    }
+  }
+
+  list(): readonly LibraryEntry[] {
+    return [...this.entries];
+  }
+}

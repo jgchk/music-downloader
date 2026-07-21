@@ -1,0 +1,45 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "per-user download transfers (nested directories[].files[])"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/transfers/downloads/peer3"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "username": "peer3",
+      "directories": [
+        {
+          "directory": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)",
+          "fileCount": 1,
+          "files": [
+            {
+              "id": "3b886835-658f-4c68-afd8-d619b9dc03f5",
+              "username": "peer3",
+              "direction": "Download",
+              "filename": "@@share\\_CD Collection_\\Pink Floyd  {Discography} (1968-2003)\\{1973}  Dark Side of the Moon (MFSL)\\01 - Speak To Me.flac",
+              "size": 3755129,
+              "startOffset": 0,
+              "state": "Completed, Succeeded",
+              "requestedAt": "2026-07-05T15:44:52.7546616",
+              "enqueuedAt": "2026-07-05T15:44:53.196074",
+              "startedAt": "2026-07-05T15:44:53.6804177Z",
+              "endedAt": "2026-07-05T15:44:54.4869297Z",
+              "bytesTransferred": 3755129,
+              "averageSpeed": 4656011.317872519,
+              "bytesRemaining": 0,
+              "elapsedTime": "00:00:00.8065120",
+              "percentComplete": 100,
+              "remainingTime": "00:00:00"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

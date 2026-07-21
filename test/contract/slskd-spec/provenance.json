@@ -1,0 +1,10 @@
+{
+  "service": "slskd",
+  "pinnedVersion": "0.22.5",
+  "specPath": "swagger-0.22.5.json",
+  "openapi": "3.0.1",
+  "capturedAt": "2026-07-05",
+  "source": "docker slskd/slskd:0.22.5 with SLSKD_SWAGGER=true, GET /swagger/v0/swagger.json",
+  "imageDigest": "sha256:f5150c39758353c31788e8e3d6aa9f9c2910f2a46591d810fc2f4d0bac81a96a",
+  "note": "The maintainer's live instance runs 0.22.5.0 but serves no swagger; this snapshot is the pinned contract surface. Refresh by re-running the capture (see test/contract/README.md) when the instance is upgraded."
+}

@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest';
+import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import type { SourceResource } from '../../application/ports/resource-ledger-port.js';
+import type { HttpClient, HttpResponse } from '../support/http.js';
+import { SlskdClient } from './client.js';
+import { SlskdResourceRemover } from './resource-remover.js';
+import type { Timer } from './timer.js';
+
+const ok: HttpResponse = { status: 204, body: '' };
+const search: SourceResource = {
+  source: 'slskd',
+  kind: 'search',
+  resourceKey: 's1',
+  resourceId: 's1',
+  acquisitionId: 'acq-1',
+};
+const transfer = (resourceId?: string): SourceResource => ({
+  source: 'slskd',
+  kind: 'transfer',
+  resourceKey: 'u1|@@a\\Album\\01.flac',
+  resourceId,
+  acquisitionId: 'acq-1',
+});
+
+function payload(files: readonly unknown[]): HttpResponse {
+  return { status: 200, body: JSON.stringify({ username: 'u1', directories: [{ files }] }) };
+}
+const gone = payload([]);
+const present = (state: string, id = 'live-id'): HttpResponse =>
+  payload([{ id, filename: '@@a\\Album\\01.flac', state }]);
+
+function fakeTimer(): Timer {
+  let current = 0;
+  return {
+    now: () => current,
+    sleep: (ms) => {
+      current += ms;
+      return Promise.resolve();
+    },
+  };
+}
+
+/** A remover whose GET (transfer-poll) responses are drained in order (last one repeats). */
+function remover(
+  gets: HttpResponse[],
+  deleteStatus = 204,
+): {
+  remover: SlskdResourceRemover;
+  deletes: string[];
+  getCount: () => number;
+} {
+  const deletes: string[] = [];
+  const queue = [...gets];
+  let getCount = 0;
+  const http: HttpClient = {
+    send: ({ method, url }) => {
+      if (method === 'DELETE') {
+        deletes.push(url);
+        return Promise.resolve({ status: deleteStatus, body: '' });
+      }
+      getCount += 1;
+      const next = queue.length > 1 ? queue.shift()! : (queue[0] ?? gone);
+      return Promise.resolve(next);
+    },
+  };
+  return {
+    remover: new SlskdResourceRemover(silentLogger(), new SlskdClient(http), fakeTimer(), 10),
+    deletes,
+    getCount: () => getCount,
+  };
+}
+
+describe('SlskdResourceRemover', () => {
+  it('deletes a search by its id and reports it confirmed gone', async () => {
+    const { remover: r, deletes } = remover([ok]);
+
+    expect((await r.remove(search))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual(['http://localhost:5030/api/v0/searches/s1']);
+  });
+
+  it('removes an already-terminal transfer on the first pass and confirms it gone', async () => {
+    const { remover: r, deletes } = remover([present('Completed, Succeeded'), gone]);
+
+    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
+    ]);
+  });
+
+  it('cancels an in-flight transfer, then removes it once it turns terminal', async () => {
+    const { remover: r, deletes } = remover([
+      present('InProgress'), // cancel-only (remove=false)
+      present('Completed, Cancelled'), // now terminal — remove it
+      gone, // confirmed gone
+    ]);
+
+    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
+    ]);
+  });
+
+  it('looks a transfer up by filename when its id was never captured', async () => {
+    const { remover: r, deletes } = remover([present('Completed, Succeeded'), gone]);
+
+    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
+    ]);
+  });
+
+  it('falls back to the captured GUID when the polled record omits its id', async () => {
+    // The transfer is found by filename but the payload carries no id; remove by the captured GUID.
+    const noId = payload([{ filename: '@@a\\Album\\01.flac', state: 'Completed, Succeeded' }]);
+    const { remover: r, deletes } = remover([noId, gone]);
+
+    expect((await r.remove(transfer('guid-9')))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/guid-9?remove=true',
+    ]);
+  });
+
+  it('removes an idless transfer at the bare path when no GUID was ever captured', async () => {
+    const noId = payload([{ filename: '@@a\\Album\\01.flac', state: 'Completed, Succeeded' }]);
+    const { remover: r, deletes } = remover([noId, gone]);
+
+    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual(['http://localhost:5030/api/v0/transfers/downloads/u1/?remove=true']);
+  });
+
+  it('locates a transfer by its captured GUID when the polled filename differs', async () => {
+    // slskd renamed the file on disk, so match on the captured id rather than the filename.
+    const renamed = payload([
+      { id: 'guid-9', filename: '@@a\\Album\\renamed.flac', state: 'Completed, Succeeded' },
+    ]);
+    const { remover: r, deletes } = remover([renamed, gone]);
+
+    expect((await r.remove(transfer('guid-9')))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/guid-9?remove=true',
+    ]);
+  });
+
+  it('no-ops when only another tenant’s transfer is present', async () => {
+    // A foreign transfer (different filename, no captured id to match) is left untouched.
+    const foreign = payload([{ id: 'x', filename: '@@a\\Other\\9.flac', state: 'InProgress' }]);
+    const { remover: r, deletes, getCount } = remover([foreign]);
+
+    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([]); // nothing of ours to remove
+    expect(getCount()).toBe(1);
+  });
+
+  it('reports a lingering transfer unconfirmed after the retry bound', async () => {
+    const { remover: r, deletes } = remover([present('InProgress')]); // never transitions
+
+    // Cancelled each round but never terminal, so it is left for the next boot's sweep.
+    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(false);
+    expect(deletes).toEqual([
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
+      'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
+    ]);
+  });
+
+  it('surfaces a transport fault as an InfraError', async () => {
+    const { remover: r } = remover([ok], 500);
+
+    const result = await r.remove(search);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.resource-remove',
+    });
+  });
+});

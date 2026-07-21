@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v0/options",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "directories": { "incomplete": "/downloads/incomplete", "downloads": "/downloads" }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.e2e-tmp/
+.playwright-mcp/
+*.log
+*.sqlite
+*.sqlite-*
+.DS_Store
+.env
+.env.*
+!.env.example

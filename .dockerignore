@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.git
+.github
+docs
+openspec
+**/*.test.ts
+**/__fixtures__
+**/__snapshots__
+.env
+.env.*
+*.log

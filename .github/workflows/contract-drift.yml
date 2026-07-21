@@ -1,0 +1,98 @@
+name: Contract drift
+
+# Tier 2 of the external-API contract tests (change: external-api-contract-tests). Verifies the
+# frozen contract against the live world on a schedule — never on a commit or PR. slskd is checked
+# by diffing its latest OpenAPI surface against our consumed-surface manifest; MusicBrainz by
+# replaying the recorded requests and validating live responses against the shared schemas. On
+# drift it opens — or refreshes — a single tracking issue.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    services:
+      slskd:
+        image: slskd/slskd:latest
+        env:
+          SLSKD_SWAGGER: 'true'
+        ports:
+          - 5030:5030
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: MusicBrainz drift (live replay vs schemas)
+        id: mb
+        continue-on-error: true
+        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
+        run: |
+          set -o pipefail
+          pnpm tsx test/contract/drift/musicbrainz.ts 2>&1 | tee mb.log
+
+      - name: Wait for slskd swagger
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5030/swagger/v0/swagger.json || true)
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "slskd swagger did not become available" && exit 1
+
+      - name: slskd drift (latest OpenAPI vs consumed-surface manifest)
+        id: slskd
+        continue-on-error: true
+        env:
+          SLSKD_SPEC_URL: http://localhost:5030/swagger/v0/swagger.json
+          SLSKD_LATEST_LABEL: latest
+        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
+        run: |
+          set -o pipefail
+          pnpm tsx test/contract/drift/slskd.ts 2>&1 | tee slskd.log
+
+      - name: Open or refresh drift issue
+        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const read = (f) => { try { return fs.readFileSync(f, 'utf8').trim(); } catch { return '(no output)'; } };
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = [
+              `Automated contract drift check failed on ${new Date().toISOString()}.`,
+              '',
+              `- MusicBrainz: **${{ steps.mb.outcome }}**`,
+              `- slskd: **${{ steps.slskd.outcome }}**`,
+              '',
+              '### MusicBrainz', '```', read('mb.log'), '```',
+              '### slskd', '```', read('slskd.log'), '```',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'Triage: if a consumed field or operation genuinely changed, update the schemas, re-record the fixtures, and refresh the pinned slskd snapshot; then this issue can be closed.',
+            ].join('\n');
+            const label = 'contract-drift';
+            const title = 'External API contract drift detected';
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label });
+            if (open.data.length > 0) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            }
+
+      - name: Fail the run on drift
+        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure'
+        run: echo "contract drift detected — see the drift issue" && exit 1

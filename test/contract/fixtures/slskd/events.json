@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "source": "live slskd instance",
+    "capturedAt": "2026-07-05",
+    "serviceVersion": "0.22.5.0",
+    "note": "GET /api/v0/events — newest-first log; each record's data is a JSON-encoded string. The DownloadFileComplete for transfer 3b886835 (see transfers-poll.json) carries the authoritative localFilename."
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/events"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "timestamp": "2026-07-05T15:44:54.4869297Z",
+        "type": "DownloadFileComplete",
+        "id": "evt-3b886835",
+        "data": "{\"localFilename\":\"/app/downloads/{1973}  Dark Side of the Moon (MFSL)/01 - Speak To Me.flac\",\"transfer\":{\"id\":\"3b886835-658f-4c68-afd8-d619b9dc03f5\"}}"
+      }
+    ]
+  }
+}

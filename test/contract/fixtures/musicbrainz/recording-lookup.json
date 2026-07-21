@@ -1,0 +1,40 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-07-05",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/recording/6fd45825-5e07-48b7-801c-433c48d3262e",
+    "query": {
+      "inc": "artist-credits",
+      "fmt": "json"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "title": "Smells Like Teen Spirit",
+      "id": "6fd45825-5e07-48b7-801c-433c48d3262e",
+      "length": 280800,
+      "video": false,
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "1980s–1990s US grunge band",
+            "type": "Group",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Nirvana",
+            "country": "US",
+            "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+            "name": "Nirvana"
+          },
+          "joinphrase": "",
+          "name": "Nirvana"
+        }
+      ],
+      "disambiguation": "live, 1991-11-19: Il Castello, Rome, Italy"
+    }
+  }
+}
