@@ -1,68 +1,79 @@
 # Out-of-process E2E tier
 
-A deterministic, gating end-to-end tier that drives the **real built Docker image** over a real
-HTTP socket, with the reactor and on-disk SQLite live, and only the two outermost third parties
-(slskd + MusicBrainz) replaced by HTTP stubs. It is the first coverage of the whole outer shell —
-the composition root, config load, real socket, the real slskd/MusicBrainz/ffmpeg/filesystem
-adapters, and the on-disk store — which the in-process subcutaneous tier (`src/composition/e2e.test.ts`)
-fakes at the port level.
+A deterministic, gating end-to-end tier that drives the **real built Docker image** — both module
+runtimes and the web interface in one process — over a real HTTP socket, with the reactors, the
+cross-module subscription seam, and both on-disk SQLite event stores live. Only the two outermost
+third parties (slskd + MusicBrainz) are replaced by WireMock stubs; **real beets** runs inside the
+image, pinned to the MusicBrainz stub (`musicbrainz.host` in the harness beets config), so nothing
+here ever touches the internet.
 
 ## What it exercises
 
-One happy-path acquisition, submitted over HTTP, driven by the reactor through the full cascade:
+Two phases, each against a fresh environment (`test/e2e/run.sh` orchestrates):
+
+**Phase 1 — the full product loop** (`full-loop.e2e.test.ts`):
 
 ```
-POST /api/v1/acquisitions  ──▶  resolve (MusicBrainz stub) ──▶ search + rank (slskd stub)
+POST /acquisitions/new  ──▶ resolve (MB stub) ──▶ search + rank (slskd stub)
     ──▶ download (slskd stub, stateful poll: in-progress → completed)
-    ──▶ validate (REAL ffmpeg decode + ffprobe of a REAL .flac)
-    ──▶ import (REAL filesystem move)  ──▶  status = Fulfilled
+    ──▶ validate (REAL ffmpeg decode of a REAL tagged FLAC) ──▶ deposit (REAL filesystem)
+    ──▶ status = Fulfilled (web UI)
+    ──▶ SEAM: catch-up subscription hands off to the importer (durable checkpoint)
+    ──▶ REAL beets propose (hint-pinned via the stub's ws/2 JSON) ──▶ auto-apply
+    ──▶ ImportApplied in the importer's store; review queue provably empty (web UI)
 ```
 
-Real bytes flow end to end: the download adapter reports the file at its computed staging path, so
-the harness seeds a real 10s FLAC (`fixtures/track.flac`) there — which means the real ffmpeg probe
-and the real library import both run on real audio. Three adapters get their first end-to-end
-coverage in one test (slskd, ffmpeg, filesystem).
+The slskd stub _reports_ the completed download's location (`events.json` → `localFilename` under
+the `options.json` downloads root); the harness seeds the fixture at exactly that reported
+location — never at a path recomputed from the app's own logic — so a regression in the adapter's
+event-based resolution fails the tier. Source-resource stewardship (search + transfer cleanup,
+nothing else touched) is asserted from the stub's request journal.
+
+**Phase 2 — restart resilience** (`restart.e2e.test.ts`): the container is killed after the
+downloader commits fulfilment but before the importer can finish (`BRIDGE_PYTHON` points at a
+wrapper that blocks propose/apply while a flag file exists — startup's `validate` verb passes
+through), then restarted on the same volumes with the gate lifted. The import completes to
+`ImportApplied` **exactly once**, driven purely by the durable stores and the subscription/reactor
+checkpoints — no re-submission. This phase found (and now guards) a real bug: the reactors'
+one-shot startup drain raced events appended mid-drain and had no fallback poll, so a
+crash-resumed import stalled forever.
 
 ## How it works
 
-- `docker-compose.test.yml` — `app` (the real `music-downloader:e2e` image), `mb-stub`, `slskd-stub`
-  (WireMock). The app's `SLSKD_BASE_URL` / `MUSICBRAINZ_BASE_URL` point at the stubs; `./.e2e-tmp`
-  is bind-mounted as `/data` (staging, library, and the SQLite file), shared with the host runner.
-- `stubs/{musicbrainz,slskd}/mappings/*.json` — WireMock mappings. The slskd transfer-poll endpoint
-  is a **scenario state machine** (`Started → Completed`): the first poll returns "in progress", the
-  next returns "completed", exercising the adapter's real polling loop deterministically.
-- `acquisition.e2e.test.ts` — runs on the **host**, drives `app` over `localhost:3000`, and seeds the
-  fixture using the app's own `candidateStagingDir` so the path can't drift from production.
+- `run.sh` — builds (or reuses via `E2E_SKIP_BUILD=1`) `music-downloader:e2e`, runs it plus two
+  WireMock containers **on the host network** (no docker network creation → no NAT kernel-module
+  dependency; localhost is the same everywhere), and documents the full mount/path topology in
+  its header comment. Notably `LIBRARY_ROOT` (the downloader's deposit root) and `INTAKE_ROOT`
+  are the same directory, exercising `INTAKE_SOURCE_ROOT`'s default (= `LIBRARY_ROOT`) as an
+  identity re-root.
+- `helpers.ts` — a browserless HTTP client over the same web routes the UI serves (form-encoded
+  actions, HTML parsed via the components' `data-testid` markers) plus read-only host-side peeks
+  into the two mounted SQLite stores.
+- `stubs/{musicbrainz,slskd}/mappings/*.json` — WireMock mappings. The slskd transfer poll is a
+  scenario state machine (in-progress → completed) exercising the real polling loop;
+  `beets-release-ws2.json` serves the MusicBrainz **ws/2 JSON** release that beets' matcher
+  fetches for the hint-pinned candidate (distance 0.0 against the tagged fixture).
+- `fixtures/track.flac` — a real 10s FLAC tagged to match the stubbed release exactly.
 
 ## Running it
 
 ```sh
-pnpm test:e2e        # builds the image, brings the stack up, runs the suite, tears down
+pnpm test:e2e        # builds the image, runs both phases, tears everything down
 ```
 
-Point the suite at any already-running instance instead:
+In CI (`.github/workflows/pipeline.yml` release job) it runs after the image build and before
+publish, gating the push: the image is built and loaded as `music-downloader:e2e`, and the tier
+runs with `E2E_SKIP_BUILD=1`.
 
-```sh
-TARGET_BASE_URL=http://host:3000 E2E_DATA_DIR=/shared/data \
-  pnpm exec vitest run --config test/e2e/vitest.config.ts
-```
+This tier is deliberately **separate from the unit run** and its 100% coverage gate (own vitest
+config; verified by execution). The stub payloads for the downloader-facing endpoints are
+contract-validated against the adapter schemas by `packages/downloader/test/contract`; the
+beets-facing ws/2 mapping is validated by beets itself (an unparsable payload yields zero
+candidates and fails the tier).
 
-In CI (`.github/workflows/cd.yml`) it runs **after the image build and before publish**, gating the
-push: the image is built and loaded as `music-downloader:e2e`, the suite runs with
-`E2E_SKIP_BUILD=1`, and publish only happens if it passes.
+## Caveats
 
-This tier is intentionally **separate from the unit run** (`test/e2e/vitest.config.ts`, and excluded
-from eslint/tsconfig): it is verified by execution, not by the 100% unit-coverage gate.
-
-## Caveats — what this tier does NOT cover
-
-- **Stub fidelity.** The stubs are only as faithful as we make them; drift from the real slskd /
-  MusicBrainz wire format would yield false green. This is now guarded on two sides by the contract
-  tier (`test/contract/`, see its README): the contract test suite validates every stub `jsonBody`
-  here against the same schemas the adapters enforce, so a stub can't drift from the contract; and a
-  weekly drift workflow validates the contract against the live services. This tier still verifies
-  _our_ composition end to end against a fixed contract, not the third parties' live behaviour —
-  that live check lives in the contract tier's tier 2.
-- **MCP.** The MCP interface is stdio-only and is covered by the in-process subcutaneous tier, not
-  here. Out-of-process MCP would require a self-contained spawned instance and a logger-to-stderr
-  change; it is out of scope for this tier.
+- Stub fidelity for the beets-facing ws/2 payload is guarded only by this tier (see above), and
+  live third-party drift is the weekly contract-drift workflow's job, not this tier's.
+- `AUTO_APPLY_THRESHOLD=0.15` (vs the 0.04 default) derisks flakiness; the pinned candidate's
+  distance is 0.0, so the margin is safety, not leniency.

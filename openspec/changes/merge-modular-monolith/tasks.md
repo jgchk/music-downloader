@@ -56,8 +56,8 @@
 
 ## 8. Out-of-process E2E
 
-- [ ] 8.1 Rework `test/e2e/run.sh` to the single service: drive intent → download (stubbed slskd) → cross-module handoff → import (real beets) → terminal imported outcome via the web interface endpoints
-- [ ] 8.2 E2E asserts both store files advance and the subscription checkpoint survives a mid-flow process restart
+- [x] 8.1 Rework `test/e2e/run.sh` to the single service: drive intent → download (stubbed slskd) → cross-module handoff → import (real beets) → terminal imported outcome via the web interface endpoints — host-network docker-run orchestration (compose file retired); beets pinned to the MB stub's ws/2 JSON (no live third party); fixture seeded at the slskd-REPORTED location; full loop green in ~7s. Found+fixed a real config bug: INTAKE_SOURCE_ROOT defaulted to STAGING_ROOT but deliveries are deposits under LIBRARY_ROOT
+- [x] 8.2 E2E asserts both store files advance and the subscription checkpoint survives a mid-flow process restart — kill forced between fulfilment and import via a BRIDGE_PYTHON gate wrapper; import completes exactly once after restart. Found+fixed a real product bug: both reactors' one-shot startup drain dropped events appended mid-drain (no fallback poll) → crash-resumed imports stalled; reactors now subscribe-before-drain with coalesced drains + a 5s fallback poll (regression-tested in both packages)
 
 ## 9. Cutover
 

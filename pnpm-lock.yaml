@@ -17,6 +17,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.0.0
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
+      better-sqlite3:
+        specifier: ^12.0.0
+        version: 12.11.1
       commit-and-tag-version:
         specifier: ^12.7.3
         version: 12.7.3
