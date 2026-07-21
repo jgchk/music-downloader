@@ -2,10 +2,9 @@
 
 ## Purpose
 
-Define how the project turns merged work into releases: a semantic version bump carried as an ordinary pre-merge change, a CI check that verifies the bump without pushing, and an idempotent post-merge pipeline that tags, releases, and publishes images only after every gate passes — never mutating the repository. Trunk is protected to a PR-only, rebase-merge flow.
+Define how the project turns merged work into releases: a semantic version bump carried as an ordinary pre-merge change, a CI check that verifies the bump without pushing, and an idempotent post-merge pipeline that gates the entire workspace as one product — one merged coverage measurement, one published container image — tagging and releasing only after every gate passes, never mutating the repository. Trunk is protected to a PR-only, rebase-merge flow.
 
 ## Requirements
-
 ### Requirement: The version bump is an ordinary pre-merge change
 The system SHALL compute the next semantic version and the corresponding CHANGELOG.md section from the conventional commits between the last release tag and the branch head, and SHALL carry that bump (package.json + CHANGELOG.md) as reviewable commits inside the pull request. No automation SHALL commit to `main` after merge.
 
@@ -100,3 +99,19 @@ The `main` branch SHALL accept changes only via pull requests that are up to dat
 - **GIVEN** a PR whose base has advanced (e.g., another PR claimed the same next version)
 - **WHEN** a merge is attempted
 - **THEN** GitHub requires the branch to be brought up to date first, after which version prep recomputes against the new baseline
+
+### Requirement: The pipeline gates the entire workspace as one product
+The pre-merge pipeline SHALL run the full gate — format, lint, typecheck, build, and tests — across every workspace package (both modules and the web interface) in one pipeline, with test coverage measured as a single merged report spanning node-environment and browser-mode suites against one 100% threshold. The post-merge pipeline SHALL build and publish exactly one container image containing both modules and the web interface.
+
+#### Scenario: A failure anywhere blocks the merge
+- **GIVEN** a pull request in which any workspace package fails format, lint, typecheck, build, or a test
+- **WHEN** the pre-merge pipeline runs
+- **THEN** the required check fails and the pull request cannot merge
+
+#### Scenario: Coverage is one merged measurement
+- **WHEN** the test gate runs
+- **THEN** coverage from node-environment and browser-mode suites lands in one report evaluated against the single 100% threshold
+
+#### Scenario: One image ships the product
+- **WHEN** a release-worthy merge passes all gates
+- **THEN** exactly one container image is published, containing the downloader module, the importer module, and the web interface

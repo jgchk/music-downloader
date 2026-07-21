@@ -2,74 +2,54 @@
 
 ## Purpose
 
-Publish the tool's relevant facts — starting with fulfilled acquisitions — to configured webhook subscribers, durably and without knowing any consumer: the event store acts as the outbox, deliveries follow the Standard Webhooks conventions, and the outbound contract is producer-owned, additive-only, and published as versioned artifacts (generated JSON Schema + frozen fixtures) that consumer repos can contract-test against.
+Publish the downloader module's relevant facts — starting with fulfilled acquisitions — on a durable outbound feed without knowing any consumer: the event store acts as the outbox, consuming modules tail it in-process through checkpointed catch-up subscriptions, and the outbound contract is producer-owned, additive-only, and published as versioned artifacts (generated JSON Schema + frozen fixtures) that consumers contract-test against in the same repository.
 
 ## Requirements
-
-### Requirement: Fulfilled acquisitions are published to configured webhook subscribers
-
-The system SHALL publish an `acquisition.fulfilled` event to every configured subscriber URL when an acquisition reaches fulfilment, carrying a self-contained payload — the acquisition id, the resolved target including its MusicBrainz release id, the fulfilled candidate's identity, and the deposited library location with its files — so a consumer can act without calling back. With no subscribers configured, the system SHALL behave exactly as it does today.
-
-#### Scenario: A deposit is announced
-
-- **WHEN** an acquisition is fulfilled and a subscriber is configured
-- **THEN** the subscriber receives an `acquisition.fulfilled` payload naming the deposited location, the target's MusicBrainz release id, and the files
-
-#### Scenario: Standalone mode is unchanged
-
-- **GIVEN** no subscriber URLs configured
-- **WHEN** acquisitions run to fulfilment
-- **THEN** no delivery is attempted and no behavior differs from before this capability existed
-
 ### Requirement: Delivery is durable, ordered, and at-least-once
 
-The system SHALL deliver published events through a durable checkpointed consumer of the event store: a delivery is retried with bounded backoff, a subscriber's checkpoint advances only on acknowledged delivery, undelivered events survive restarts and redeliver, and each subscriber receives events in stream order. Subscribers SHALL be isolated: one unreachable subscriber does not affect delivery to another. Each delivery SHALL carry a stable idempotency id so redeliveries are detectable by the receiver.
+The system SHALL deliver published events through a durable checkpointed catch-up subscription over the producer's event store: the consumer tails events by global position, each subscription owns a named checkpoint persisted in the consumer's own store, the checkpoint advances only in the same transaction as the consumer's effects, undelivered events survive restarts and redeliver from the checkpoint, and each subscription receives events in global-position order (per-stream order preserved). Subscriptions SHALL be isolated: one halted or lagging subscription does not affect delivery to another. Each delivered event SHALL carry a stable identity (its global position and event id) so redeliveries are detectable by the receiver.
 
-#### Scenario: A crash between append and delivery loses nothing
-
+#### Scenario: A crash between append and consumption loses nothing
 - **GIVEN** an acquisition fulfilled moments before a process crash
 - **WHEN** the system restarts
-- **THEN** the event is delivered from the checkpoint as if the crash had not happened
+- **THEN** the subscription resumes from its checkpoint and the event is consumed as if the crash had not happened
 
 #### Scenario: A redelivered event is identifiable
+- **GIVEN** a batch whose effects-and-checkpoint transaction did not commit
+- **WHEN** the events are delivered again after restart
+- **THEN** they carry the same global positions and event ids as the first attempt, and the consumer converges idempotently
 
-- **GIVEN** a delivery whose acknowledgement was lost
-- **WHEN** the event is delivered again
-- **THEN** it carries the same idempotency id as the first attempt
-
-#### Scenario: One dead subscriber does not starve another
-
-- **GIVEN** two configured subscribers, one unreachable
+#### Scenario: One halted subscription does not starve another
+- **GIVEN** two registered subscriptions, one halted by its poison-event policy
 - **WHEN** events are published
-- **THEN** the reachable subscriber keeps receiving them while the unreachable one's checkpoint holds for retry
-
-### Requirement: Published events follow the Standard Webhooks envelope and are signed
-
-Deliveries SHALL use the Standard Webhooks conventions: a `{type, timestamp, data}` body and `webhook-id`, `webhook-timestamp`, and `webhook-signature` (HMAC) headers, signed with a configured secret. The system SHALL refuse to start with subscribers configured but no signing secret.
-
-#### Scenario: A receiver can verify authenticity
-
-- **WHEN** a delivery arrives at a subscriber
-- **THEN** its signature verifies against the shared secret and the id/timestamp headers it carries
-
-#### Scenario: Unsigned publishing is impossible
-
-- **GIVEN** subscriber URLs configured without a signing secret
-- **WHEN** the system starts
-- **THEN** startup fails with a precise configuration error
+- **THEN** the healthy subscription keeps advancing its own checkpoint while the halted one's checkpoint holds
 
 ### Requirement: The outbound contract is producer-owned, additive-only, and published as artifacts
 
-The outbound event schemas SHALL live in this repository as the single contract source, validate every outgoing payload, and be published as generated JSON Schema plus frozen payload fixtures. Evolution SHALL be additive-only within an event type — verified in CI by diffing the generated schema against the last published version — and a breaking payload change SHALL be expressed as a new event type. Committed fixtures SHALL be kept permanently so compatibility is verifiable against every historical version.
+The outbound event schemas SHALL live with the producing module as the single contract source, validate every outgoing payload, and be published as generated JSON Schema plus frozen payload fixtures. Evolution SHALL be additive-only within an event type — verified in CI by diffing the generated schema against the last published version — and a breaking payload change SHALL be expressed as a new event type. Committed fixtures SHALL be kept permanently so compatibility is verifiable against every historical version. Consuming modules SHALL contract-test their tolerant readers against the producer's frozen fixtures in the same repository's test suite, replacing cross-repo drift detection.
 
 #### Scenario: A non-additive schema change fails CI
-
 - **GIVEN** an edit that removes or retypes a published payload field
 - **WHEN** the contract gate runs
 - **THEN** the build fails identifying the incompatible change
 
-#### Scenario: An outbound payload violating its schema never leaves the process
-
+#### Scenario: An outbound payload violating its schema never reaches a consumer
 - **GIVEN** a payload-rendering defect
 - **WHEN** the payload fails outbound validation
-- **THEN** the delivery is not attempted and the defect surfaces as an error
+- **THEN** the event is not exposed to subscriptions and the defect surfaces as an error
+
+#### Scenario: A consumer's reader is verified against producer fixtures in-repo
+- **WHEN** the test suite runs
+- **THEN** the importer's tolerant reader parses the downloader's frozen `acquisition.fulfilled` fixtures successfully, in the same gate that blocks the merge
+
+### Requirement: Fulfilled acquisitions are published on the module's outbound event feed
+The system SHALL expose an `acquisition.fulfilled` event on the downloader module's outbound feed when an acquisition reaches fulfilment, carrying a self-contained payload — the acquisition id, the resolved target including its MusicBrainz release id, the fulfilled candidate's identity, and the deposited location with its files — so a consuming module can act without calling back into the producer. The feed SHALL be consumed in-process by tolerant readers behind each consumer's anti-corruption layer; the producer SHALL NOT know its consumers.
+
+#### Scenario: A fulfilment is available to the importer
+- **WHEN** an acquisition is fulfilled
+- **THEN** the outbound feed carries an `acquisition.fulfilled` payload naming the deposited location, the target's MusicBrainz release id, and the files, and the importer's subscription observes it
+
+#### Scenario: No consumers changes nothing
+- **GIVEN** no subscription is registered against the feed
+- **WHEN** acquisitions run to fulfilment
+- **THEN** the producer's behavior is unchanged and events remain durably stored for any future subscriber
