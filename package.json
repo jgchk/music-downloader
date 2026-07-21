@@ -1,8 +1,8 @@
 {
   "name": "music-downloader",
-  "version": "2.5.1",
+  "version": "3.0.0",
   "private": true,
-  "description": "An extensible, event-sourced music downloader and importer \u2014 a modular monolith.",
+  "description": "An extensible, event-sourced music downloader and importer — a modular monolith.",
   "type": "module",
   "packageManager": "pnpm@11.13.1",
   "engines": {
