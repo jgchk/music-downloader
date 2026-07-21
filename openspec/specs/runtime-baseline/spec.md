@@ -2,10 +2,9 @@
 
 ## Purpose
 
-Define the project's Node.js runtime baseline: a single, exact source of truth for the target version, kept on a supported LTS, held in parity across development, CI, and production, honestly reflected in the declared support range, run on supported CI actions, and kept current by automated dependency updates.
+Define the project's runtime baseline: a single, exact source of truth for the Node.js target version kept in parity across development, CI, and production, and the composed single-process shape of the application — one entry point booting both module runtimes before the web interface accepts work, one event store file per module, and one validated environment configuration surface.
 
 ## Requirements
-
 ### Requirement: The runtime version has a single source of truth
 
 The project SHALL declare its target Node.js runtime version in exactly one authoritative place — `.nvmrc` — pinned to an exact `major.minor.patch` version. Every other runtime surface (CI/CD jobs, local development tooling) SHALL derive the version from that source rather than restating it, so the version cannot drift between surfaces.
@@ -69,3 +68,38 @@ Because the runtime version and base image are pinned exactly, the repository SH
 
 - **WHEN** a newer patch of the pinned Node major, base image, or an action is released
 - **THEN** the update automation opens a change proposal (pull request) to bump the pin, which CI validates before merge
+
+### Requirement: The application runs as a single composed process
+The system SHALL run as one Node process whose entry point first wires both module runtimes — each module's event store, subscriptions, reactors, pollers, and timers — through the composition root, and then mounts the web interface handler (SvelteKit `adapter-node`), so the process is a daemon that also serves pages. The system SHALL NOT depend on a standalone HTTP framework server, on webhook peers, or on any second service process for its core loop.
+
+#### Scenario: One process serves the whole loop
+- **WHEN** the application starts
+- **THEN** both module runtimes are active and the web interface answers on the same process and port, with no other application process required
+
+#### Scenario: Module runtimes start before the interface accepts work
+- **WHEN** the entry point boots
+- **THEN** the composition root has wired both modules' stores and subscriptions before the web handler begins accepting requests
+
+### Requirement: Each module's event store is a separate database file
+The process SHALL open one SQLite event store file per module, at independently configured paths, and SHALL NOT attach both files to one connection or span a transaction across them. Cross-module coordination SHALL happen only through the subscription seam, whose checkpoint may lag but never lead the producer's store.
+
+#### Scenario: Stores are independent files
+- **WHEN** the application runs
+- **THEN** the downloader's and importer's events persist in two distinct database files, each written only by its owning module
+
+#### Scenario: No cross-file transaction exists
+- **WHEN** any module commits a transaction
+- **THEN** that transaction touches exactly one of the two database files
+
+### Requirement: Configuration is consolidated in one environment
+The system SHALL read one environment configuration surface covering both modules and the web interface, validated at startup with precise errors, sourced from the environment per twelve-factor. Webhook-era settings (peer URLs, signing and receiver secrets) SHALL NOT be read.
+
+#### Scenario: Invalid configuration fails startup precisely
+- **GIVEN** a missing or malformed required setting for either module
+- **WHEN** the process starts
+- **THEN** startup fails with an error naming the offending setting
+
+#### Scenario: Webhook-era settings are inert
+- **GIVEN** an environment still carrying webhook peer URLs or secrets
+- **WHEN** the process starts
+- **THEN** those settings are ignored and no webhook publisher or receiver is constructed
