@@ -49,15 +49,47 @@ All configuration comes from the environment (12-factor); invalid config fails s
 
 ## Running
 
-### Locally
+The product runs as **one composed process** (modular monolith): the SvelteKit server boots both
+module runtimes — event stores, reactors, source pollers, and the two cross-module seam
+subscriptions — in its `init` hook, _before_ it accepts any request, then serves the web
+interface. Background processing never depends on page traffic.
+
+### Development (Vite)
 
 ```bash
 corepack enable
 pnpm install
-pnpm run build
-cp .env.example .env    # then edit LIBRARY_ROOT / STAGING_ROOT (and slskd/MusicBrainz)
-env $(grep -v '^#' .env | xargs) node dist/composition/index.js
+cp .env.example packages/web/.env                 # then edit the roots + slskd/beets settings
+pnpm dev                                          # Vite dev server, real daemon booted in-process
 ```
+
+Dev and prod run the SAME composition: Vite's dev server loads `src/hooks.server.ts`, whose
+`init` boots the real module runtimes with the facades wired into SSR — there is no mock daemon
+and no sidecar process.
+
+### Production (adapter-node build)
+
+```bash
+pnpm run build
+env $(grep -v '^#' packages/web/.env | xargs) node packages/web/build
+```
+
+The daemon composition lives in `packages/web/src/lib/server/` (the only code allowed to touch
+the modules' `./runtime` entries — lint-enforced); routes and components see the module facades
+only, via `event.locals.facades`. Server-only code stays under `$lib/server`, which SvelteKit
+refuses to bundle into the client — a client-side import of the daemon is a build error, not a
+code-review catch.
+
+### Web e2e smoke (Playwright)
+
+```bash
+pnpm test:e2e:web
+```
+
+Self-contained: `packages/web/tests/serve.sh` builds and serves the **real adapter-node entry**
+against scratch filesystem roots and a minimal real beets config (validated by the real bridge at
+boot); slskd and MusicBrainz point at a closed port, so the smoke drives the true server routes
+without any network. Threshold-free by design — the 100% coverage gate lives in the vitest tiers.
 
 ### Container (ffmpeg included)
 

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { hasReleasableCommits } from './bump.ts';
+import { latestReleaseVersion } from './tags.ts';
 import { extractChangelogSection } from './changelog.ts';
 
 /**
@@ -40,8 +41,12 @@ function versionOf(packageJson: string): string {
 }
 
 async function computeExpected(base: string): Promise<{ version: string; bumped: boolean }> {
-  const lastTag = git(['describe', '--tags', '--abbrev=0', '--match', 'v*']);
-  const lastVersion = lastTag.replace(/^v/, '');
+  // Anchor on the released mainline's tags, not `git describe` from HEAD: the merged importer
+  // lineage carries its own v0.1.x tags at a competitive commit distance, and describe would pick
+  // by distance. Released state is whatever main has shipped (tags.ts picks the highest semver).
+  const mainlineTags = git(['tag', '-l', 'v*', '--merged', 'origin/main']).split('\n');
+  const lastVersion = latestReleaseVersion(mainlineTags);
+  const lastTag = `v${lastVersion}`;
 
   // Deterministic recompute. Anchor package.json's version to the last released *tag* — the true
   // source of released state — rather than the merge-base file, whose version can lag (on the

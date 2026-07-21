@@ -4,7 +4,7 @@ This file orients anyone — human or AI — working in this repository. Read th
 
 ## Project
 
-An extensible, event-sourced music downloader. Given a musical intent and a quality policy, it finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release across pluggable sources, exposed over HTTP and MCP.
+An extensible, event-sourced music downloader and importer — one product, built as a modular monolith. Given a musical intent and a quality policy, the **downloader** module finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release across pluggable sources; the **importer** module proposes beets-powered metadata matches for the staged files, auto-imports confident ones into the library, and queues uncertain ones for human review. The two bounded contexts each own their SQLite event store and integrate only through durable in-process catch-up subscriptions over each other's events (producer-owned schemas, tolerant readers behind an anti-corruption layer). Beets remains the library's system of record.
 
 Design, capability specs, and task breakdowns live under `openspec/changes/` (active) and `openspec/changes/archive/` (shipped) — the source of truth for _what_ we build. The docs below are the source of truth for _how_ we build.
 
@@ -46,12 +46,13 @@ Runtime: Node ≥24, pnpm 11. After switching Node versions locally, run `pnpm r
 
 ## Stack
 
-Node · TypeScript (strict) · pnpm · neverthrow · zod · Fastify · pino · vitest · SQLite · ffmpeg. VCS: jujutsu (`jj`), git-backed — see Non-negotiables.
+Node · TypeScript (strict) · pnpm workspace · neverthrow · zod · pino · vitest · SQLite · ffmpeg (downloader) · beets via a stateless Python bridge CLI behind an outbound port (importer, the one non-TS component, pinned in the Docker image). VCS: jujutsu (`jj`), git-backed — see Non-negotiables.
 
 ## Where things live
 
-- `openspec/` — change design, capability specs, and tasks (_what_ we're building).
+- `openspec/` — change design, capability specs, and tasks (_what_ we're building). Adopted importer capabilities note their provenance.
 - `docs/development/` — the constitution (_how_ we build).
-- `src/{domain,application,adapters,interfaces,composition}` — the layers.
+- `packages/downloader`, `packages/importer` — the bounded-context packages, each with `src/{domain,application,adapters,interfaces,composition}` layers, its own event store file, and its own contract tier (`test/contract`).
+- `test/e2e`, `scripts/release` — product-level tiers and tooling at the workspace root.
 
 **Keep the two at their right altitude.** `docs/development/*.md` is constitutional: durable, largely project-agnostic principles for _how_ we build. Write them without domain specifics — no aggregate names, no source names, no schemas. Code-level, project-specific design (the actual aggregate, ports, event schema, policies, endpoints) belongs in OpenSpec under `openspec/changes/<change>/`, which already carries that detail. If a development doc starts needing concrete design specifics, that's the signal it belongs in OpenSpec instead.

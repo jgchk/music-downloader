@@ -1,73 +1,136 @@
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
+
+const modulePackages = ['downloader', 'importer'];
 
 /**
  * The dependency rule (D9): domain <- application <- {adapters, interfaces} <- composition.
- * A layer may import from itself and inner layers only. Encoded as forbidden (target, from)
- * pairs for `import/no-restricted-paths`; a violation fails lint and therefore CI.
+ * A layer may import from itself and inner layers only, within each bounded-context package.
+ * Encoded as forbidden (target, from) pairs for `import/no-restricted-paths`; a violation fails
+ * lint and therefore CI.
  */
-const layerBoundaryZones = [
-  // domain imports nothing outward — the pure core depends on no other layer.
-  { target: './src/domain', from: './src/application' },
-  { target: './src/domain', from: './src/adapters' },
-  { target: './src/domain', from: './src/interfaces' },
-  { target: './src/domain', from: './src/composition' },
-  // application depends only on domain.
-  { target: './src/application', from: './src/adapters' },
-  { target: './src/application', from: './src/interfaces' },
-  { target: './src/application', from: './src/composition' },
-  // adapters depend on application + domain, never on interfaces or composition.
-  { target: './src/adapters', from: './src/interfaces' },
-  { target: './src/adapters', from: './src/composition' },
-  // interfaces depend on application + domain, never on adapters or composition.
-  { target: './src/interfaces', from: './src/adapters' },
-  { target: './src/interfaces', from: './src/composition' },
+const layerBoundaryZones = modulePackages.flatMap((pkg) => {
+  const src = `./packages/${pkg}/src`;
+  return [
+    // domain imports nothing outward — the pure core depends on no other layer.
+    { target: `${src}/domain`, from: `${src}/application` },
+    { target: `${src}/domain`, from: `${src}/adapters` },
+    { target: `${src}/domain`, from: `${src}/interfaces` },
+    { target: `${src}/domain`, from: `${src}/composition` },
+    // application depends only on domain.
+    { target: `${src}/application`, from: `${src}/adapters` },
+    { target: `${src}/application`, from: `${src}/interfaces` },
+    { target: `${src}/application`, from: `${src}/composition` },
+    // adapters depend on application + domain, never on interfaces or composition.
+    { target: `${src}/adapters`, from: `${src}/interfaces` },
+    { target: `${src}/adapters`, from: `${src}/composition` },
+    // interfaces depend on application + domain, never on adapters or composition.
+    { target: `${src}/interfaces`, from: `${src}/adapters` },
+    { target: `${src}/interfaces`, from: `${src}/composition` },
+    // the facade sits above application + domain only; inner layers never reach outward to it,
+    // and the facade never reaches adapters, interfaces, or composition.
+    { target: `${src}/domain`, from: `${src}/facade` },
+    { target: `${src}/application`, from: `${src}/facade` },
+    { target: `${src}/adapters`, from: `${src}/facade` },
+    { target: `${src}/facade`, from: `${src}/adapters` },
+    { target: `${src}/facade`, from: `${src}/interfaces` },
+    { target: `${src}/facade`, from: `${src}/composition` },
+  ];
+});
+
+/**
+ * Module boundaries (module-architecture): the two bounded contexts never import each other, and
+ * interface packages (web) reach a module only through its facade entry point. A violation fails
+ * lint and therefore CI.
+ */
+const moduleBoundaryZones = [
+  {
+    target: './packages/downloader',
+    from: './packages/importer',
+    message: 'Modules are isolated: downloader must not import importer.',
+  },
+  {
+    target: './packages/importer',
+    from: './packages/downloader',
+    message: 'Modules are isolated: importer must not import downloader.',
+  },
+  ...modulePackages.flatMap((pkg) => [
+    {
+      // The web package sees a module only through its facade — plus the designated runtime
+      // entry, which a files-scoped no-restricted-imports below confines to $lib/server (the
+      // composed process's composition seam, design D8).
+      target: './packages/web',
+      from: `./packages/${pkg}/src`,
+      except: ['./facade', './composition/runtime.ts'],
+      message: `Interface packages import a module only via its facade (@music/${pkg}).`,
+    },
+  ]),
 ];
 
 /**
- * The acquisition decider internals — the folded state, `decide`, and `react` — are private to the
- * aggregate. Only `src/domain/acquisition/*` may import them; every other layer goes through the
- * `Acquisition` facade (`acquisition.js`), which re-exports the public types. A violation fails
- * lint and therefore CI.
+ * Each aggregate's decider internals — the folded state, `decide`, and `react` — are private to
+ * the aggregate. Only the aggregate's own domain directory may import them; every other layer
+ * goes through the aggregate facade, which re-exports the public types. A violation fails lint
+ * and therefore CI.
  */
-const acquisitionInternals = [
-  './src/domain/acquisition/state.ts',
-  './src/domain/acquisition/decide.ts',
-  './src/domain/acquisition/react.ts',
-];
-const aggregateExternalConsumers = [
-  './src/application',
-  './src/adapters',
-  './src/interfaces',
-  './src/composition',
-];
-const aggregateEncapsulationZones = aggregateExternalConsumers.flatMap((target) =>
-  acquisitionInternals.map((from) => ({
-    target,
-    from,
+const aggregates = [
+  {
+    pkg: 'downloader',
+    dir: 'acquisition',
     message:
       'Acquisition decider internals are private to the aggregate — import the Acquisition facade from domain/acquisition/acquisition.js instead.',
-  })),
-);
+  },
+  {
+    pkg: 'importer',
+    dir: 'import',
+    message:
+      'Import decider internals are private to the aggregate — import the Import facade from domain/import/import.js instead.',
+  },
+];
+const aggregateEncapsulationZones = aggregates.flatMap(({ pkg, dir, message }) => {
+  const src = `./packages/${pkg}/src`;
+  const internals = [
+    `${src}/domain/${dir}/state.ts`,
+    `${src}/domain/${dir}/decide.ts`,
+    `${src}/domain/${dir}/react.ts`,
+  ];
+  const externalConsumers = [
+    `${src}/application`,
+    `${src}/adapters`,
+    `${src}/interfaces`,
+    `${src}/composition`,
+  ];
+  return externalConsumers.flatMap((target) =>
+    internals.map((from) => ({ target, from, message })),
+  );
+});
 
 export default tseslint.config(
   {
-    // test/e2e, test/contract, and scripts/ (release tooling) are out-of-src suites verified by
-    // execution (Docker-driven e2e; frozen-fixture contract tests; version:prep unit tests), not
-    // part of the src-scoped TypeScript project (tsconfig `include: ["src"]`); keep them out of the
-    // type-checked lint to avoid projectService "file not in project" errors. Their production
-    // dependency — the schema modules — lives in src and is fully linted and typechecked there.
+    // test/e2e, packages/*/test/contract, and scripts (release + contract generators) are
+    // out-of-src suites verified by execution (Docker-driven e2e; frozen-fixture contract tests;
+    // version:prep unit tests), not part of the src-scoped TypeScript projects (tsconfig
+    // `include: ["src"]`); keep them out of the type-checked lint to avoid projectService
+    // "file not in project" errors. Their production dependency — the schema modules — lives in
+    // src and is fully linted and typechecked there.
     ignores: [
-      'dist/**',
-      'coverage/**',
-      'node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/.svelte-kit/**',
+      'packages/web/build/**',
+      'packages/web/tests/**',
+      'packages/web/playwright.config.ts',
       '.e2e-tmp/**',
       'test/e2e/**',
-      'test/contract/**',
+      'test/boundaries/**',
+      'packages/*/test/contract/**',
       'scripts/**',
-      '*.config.ts',
-      '*.config.js',
+      'packages/*/scripts/**',
+      '**/*.config.ts',
+      '**/*.config.js',
     ],
   },
   {
@@ -85,14 +148,14 @@ export default tseslint.config(
     settings: {
       'import/resolver': {
         typescript: {
-          project: './tsconfig.json',
+          project: ['packages/*/tsconfig.json'],
         },
       },
     },
     rules: {
       'import/no-restricted-paths': [
         'error',
-        { zones: [...layerBoundaryZones, ...aggregateEncapsulationZones] },
+        { zones: [...layerBoundaryZones, ...moduleBoundaryZones, ...aggregateEncapsulationZones] },
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': [
@@ -103,7 +166,7 @@ export default tseslint.config(
   },
   {
     // The pure domain performs no logging (D15): it must not import any logger.
-    files: ['src/domain/**/*.ts'],
+    files: ['packages/*/src/domain/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -123,6 +186,44 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // Outside $lib/server, web code must not touch the module runtime entries — routes and
+    // components consume facades via locals only (design D8/D9). $lib/server is the one
+    // composition seam allowed to boot the daemon.
+    files: ['packages/web/src/**/*.ts', 'packages/web/src/**/*.svelte'],
+    ignores: ['packages/web/src/lib/server/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@music/*/runtime'],
+              message:
+                'Only $lib/server may boot module runtimes; interface code consumes facades via locals (design D8).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Svelte components: the plugin's recommended set with TypeScript script blocks. Not
+    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step.
+    files: ['**/*.svelte'],
+    extends: [...svelte.configs['flat/recommended']],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
+    },
+    rules: {
+      // The app serves at the root (no configured base path), and $lib components stay free of
+      // kit-runtime imports so the three-tier component tests can compile them without a kit
+      // context; plain string hrefs are correct here.
+      'svelte/no-navigation-without-resolve': 'off',
     },
   },
   {

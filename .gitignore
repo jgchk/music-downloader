@@ -10,3 +10,15 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Hermetic venv for recording/re-recording bridge contract fixtures
+packages/importer/test/contract/.venv/
+
+# SvelteKit generated output
+.svelte-kit/
+
+# Web build + Playwright artifacts
+packages/web/build/
+packages/web/test-results/
+packages/web/playwright-report/
+/packages/web/.e2e-scratch/

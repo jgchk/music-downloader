@@ -1,0 +1,120 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/ws/2/release/6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "id": "6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1",
+      "title": "Test Album",
+      "status": "Official",
+      "quality": "normal",
+      "date": "2020-05-01",
+      "country": "XW",
+      "barcode": "",
+      "asin": "",
+      "packaging": null,
+      "disambiguation": "",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "name": "Test Artist",
+          "joinphrase": "",
+          "artist": {
+            "id": "aa95172f-e086-4dcc-8a17-3b0f9d1c1ff3",
+            "name": "Test Artist",
+            "sort-name": "Test Artist",
+            "aliases": [],
+            "type": "Person",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "release-group": {
+        "id": "9c7ad3a2-8f2f-4f4a-9c2b-1f4b6a5f2c11",
+        "title": "Test Album",
+        "primary-type": "Album",
+        "secondary-types": [],
+        "first-release-date": "2020-05-01",
+        "disambiguation": "",
+        "aliases": []
+      },
+      "release-events": [
+        {
+          "date": "2020-05-01",
+          "area": null
+        }
+      ],
+      "label-info": [],
+      "media": [
+        {
+          "position": 1,
+          "format": "Digital Media",
+          "title": "",
+          "track-count": 1,
+          "track-offset": 0,
+          "tracks": [
+            {
+              "id": "d6bd7f8e-3a44-4b95-92a5-6a17e3c1b0aa",
+              "position": 1,
+              "number": "1",
+              "title": "Track One",
+              "length": 10000,
+              "artist-credit": [
+                {
+                  "name": "Test Artist",
+                  "joinphrase": "",
+                  "artist": {
+                    "id": "aa95172f-e086-4dcc-8a17-3b0f9d1c1ff3",
+                    "name": "Test Artist",
+                    "sort-name": "Test Artist",
+                    "aliases": [],
+                    "type": "Person",
+                    "disambiguation": ""
+                  }
+                }
+              ],
+              "recording": {
+                "id": "e7c1a9b0-4b55-4ca6-a3b6-7b28f4d2c1bb",
+                "title": "Track One",
+                "length": 10000,
+                "disambiguation": "",
+                "first-release-date": "2020-05-01",
+                "artist-credit": [
+                  {
+                    "name": "Test Artist",
+                    "joinphrase": "",
+                    "artist": {
+                      "id": "aa95172f-e086-4dcc-8a17-3b0f9d1c1ff3",
+                      "name": "Test Artist",
+                      "sort-name": "Test Artist",
+                      "aliases": [],
+                      "type": "Person",
+                      "disambiguation": ""
+                    }
+                  }
+                ],
+                "video": false,
+                "aliases": []
+              }
+            }
+          ]
+        }
+      ],
+      "cover-art-archive": {
+        "artwork": false,
+        "count": 0,
+        "front": false,
+        "back": false
+      },
+      "aliases": []
+    }
+  }
+}

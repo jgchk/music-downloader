@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.0.0](https://github.com/jgchk/music-downloader/compare/v2.5.1...v3.0.0) (2026-07-21)
+
+One product: [music-importer](https://github.com/jgchk/music-importer)'s history and capabilities are merged into this repository as a modular monolith — two bounded-context packages (`packages/downloader`, `packages/importer`) integrating through durable in-process catch-up subscriptions, one SvelteKit web interface, one process, one image. Implements `openspec/changes/merge-modular-monolith`.
+
+### ⚠ BREAKING CHANGES
+
+* **interfaces:** the standalone HTTP API and MCP endpoints are retired on both modules; the web UI over wire-shaped module facades is the product's interface ([c29efae](https://github.com/jgchk/music-downloader/commit/c29efaeed888826fff37c6f50abc67fb592c7f54))
+* **seam:** the intake and verdict webhook endpoints no longer exist; cross-module delivery is in-process over each module's event store, and webhook-era configuration is inert ([91edb3e](https://github.com/jgchk/music-downloader/commit/91edb3e43d0e538615229b3266585cdeb4e32b2a))
+* the repository is a pnpm workspace; the deployable is a single image running `node packages/web/build` ([c96a692](https://github.com/jgchk/music-downloader/commit/c96a692e84992d126423ef9db69bca975961562c))
+
+### Features
+
+* **facade:** wire-shaped module facades; interfaces become facade consumers ([4ffc213](https://github.com/jgchk/music-downloader/commit/4ffc213b34baaa98618c2884e944ec3b40ae2206))
+* **web:** SvelteKit web foundation — composed daemon, three-tier UI testing at 100% ([939174d](https://github.com/jgchk/music-downloader/commit/939174d09ccd1caf41436e1459c7e6aa5bcfcc07))
+* **web:** parity UI — acquisitions and review resolution over the facades ([62b9d61](https://github.com/jgchk/music-downloader/commit/62b9d61bbce7db52648082e9298406d0cc072a59))
+
+### Bug Fixes
+
+* **runtime:** close the reactor startup-drain gap; intake source-root defaults to the deposit root ([220b536](https://github.com/jgchk/music-downloader/commit/220b53632ec55dda06aba478a20b3f9eddf9e054))
+
 ## [2.5.1](https://github.com/jgchk/music-downloader/compare/v2.5.0...v2.5.1) (2026-07-21)
 
 

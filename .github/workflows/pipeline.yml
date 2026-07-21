@@ -59,9 +59,10 @@ jobs:
       - name: Build
         run: pnpm run build
 
-  # Test pyramid — unit » integration » e2e-in-process in one coverage run; the OpenAPI snapshot is
-  # the breaking-change contract test. Plus the frozen-fixture contract tier and the release-tooling
-  # unit tests. ffmpeg is a real dependency of the audio-probe adapter tests.
+  # Test pyramid — every workspace package in one merged 100% coverage run (node + SSR + Chromium
+  # browser-mode projects), plus the frozen-fixture contract tiers (incl. the cross-module seam
+  # fixtures) and the release-tooling unit tests. ffmpeg is a real dependency of the audio-probe
+  # adapter tests; Chromium is the browser-mode runner for the web client project.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -74,12 +75,38 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium (browser-mode client tests)
+        run: pnpm --dir packages/web exec playwright install --with-deps chromium
       - name: Test @ 100% coverage
         run: pnpm run test:cov
       - name: Contract tests (frozen fixtures; no network)
         run: pnpm run test:contract
       - name: Release-tooling tests
         run: pnpm run test:release
+
+  # The web-interface E2E tier (Playwright over the real adapter-node build, threshold-free).
+  # Deliberately NOT a required check: browser flake must not block a merge; the merged-coverage
+  # gate above is the constitutional gate.
+  web-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --dir packages/web exec playwright install --with-deps chromium
+      - name: Beets venv (the real bridge validates the beets config at boot)
+        run: |
+          python3 -m venv /tmp/beets-venv
+          /tmp/beets-venv/bin/pip install --quiet --requirement packages/importer/src/adapters/beets/bridge/requirements.txt
+      - name: Web E2E (Playwright)
+        env:
+          BRIDGE_PYTHON: /tmp/beets-venv/bin/python3
+        run: pnpm test:e2e:web
 
   # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
   # tier, then — only if package.json's version is not already tagged — tag, release, and publish.

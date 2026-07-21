@@ -1,0 +1,34 @@
+{
+  "name": "@music/web",
+  "private": true,
+  "description": "The product's web interface: a SvelteKit BFF whose server routes call the module facades in-process.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "sync": "svelte-kit sync",
+    "check:svelte": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "prepare": "svelte-kit sync || true"
+  },
+  "dependencies": {
+    "@music/downloader": "workspace:*",
+    "@music/importer": "workspace:*",
+    "better-sqlite3": "^12.0.0",
+    "neverthrow": "^8.2.0",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@sveltejs/adapter-node": "^5.3.3",
+    "@sveltejs/kit": "^2.46.5",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@vitest/browser-playwright": "^4.0.0",
+    "playwright": "^1.56.0",
+    "svelte": "^5.42.2",
+    "svelte-check": "^4.3.3",
+    "vite": "^7.0.0",
+    "vitest-browser-svelte": "^1.1.0"
+  }
+}

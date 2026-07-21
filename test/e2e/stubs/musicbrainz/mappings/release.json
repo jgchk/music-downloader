@@ -1,18 +1,38 @@
 {
   "request": {
     "method": "GET",
-    "urlPath": "/release/release-1",
-    "queryParameters": { "fmt": { "equalTo": "json" } }
+    "urlPath": "/release/6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1",
+    "queryParameters": {
+      "fmt": {
+        "equalTo": "json"
+      }
+    }
   },
   "response": {
     "status": 200,
-    "headers": { "Content-Type": "application/json" },
+    "headers": {
+      "Content-Type": "application/json"
+    },
     "jsonBody": {
-      "id": "release-1",
+      "id": "6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1",
       "title": "Test Album",
       "date": "2020-05-01",
-      "artist-credit": [{ "name": "Test Artist" }],
-      "media": [{ "tracks": [{ "position": 1, "title": "Track One", "length": 10000 }] }]
+      "artist-credit": [
+        {
+          "name": "Test Artist"
+        }
+      ],
+      "media": [
+        {
+          "tracks": [
+            {
+              "position": 1,
+              "title": "Track One",
+              "length": 10000
+            }
+          ]
+        }
+      ]
     }
   }
 }

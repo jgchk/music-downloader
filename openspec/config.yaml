@@ -1,20 +1,16 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+context: |
+  An extensible, event-sourced music downloader and importer — a modular monolith. Two bounded-
+  context packages (packages/downloader, packages/importer), each with its own pure domain
+  (decide/evolve/react decider), layered + hexagonal internals, and its own SQLite event store
+  file; they integrate only through durable in-process catch-up subscriptions over each other's
+  event stores (producer-owned schemas, tolerant readers behind an anti-corruption layer).
+  Interfaces are cross-functional packages over wire-shaped module facades.
+  Tech stack: Node >=24, TypeScript strict, pnpm workspace, neverthrow (errors as values), zod,
+  pino, vitest (100% merged coverage enforced), SQLite (better-sqlite3), ffmpeg (downloader),
+  beets driven via a stateless Python bridge CLI behind an outbound port (importer).
+  Architecture: dependency rule and module boundaries lint-enforced; vanilla DI in each package's
+  src/composition. Conventions: conventional commits, jj (jujutsu) for VCS, trunk-based with PR
+  gate, release on merge to main (one Docker image to GHCR, tag, GitHub Release).
+  Capability specs live in openspec/specs; adopted importer capabilities note their provenance.

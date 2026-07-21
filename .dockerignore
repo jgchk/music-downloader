@@ -1,13 +1,33 @@
-node_modules
-dist
-coverage
+# VCS + tooling metadata
 .git
+.jj
 .github
+.claude
 docs
 openspec
+
+# Installed/generated trees (the builder installs and builds from source)
+node_modules
+**/node_modules
+**/dist
+**/coverage
+packages/web/build
+packages/web/.svelte-kit
+packages/web/.e2e-scratch
+packages/web/test-results
+
+# Test tiers not needed to build the runtime image
+test
+packages/*/test
+packages/web/tests
 **/*.test.ts
 **/__fixtures__
 **/__snapshots__
+
+# Local environment + logs
 .env
 .env.*
+!.env.example
 *.log
+.e2e-tmp
+.playwright-mcp
