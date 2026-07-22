@@ -46,7 +46,7 @@ The app version is read once at composition/boot from the root/web `package.json
 ```json
 {
   "status": "ok",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "modules": {
     "downloader": { "status": "up" },
     "importer": { "status": "up" }
@@ -68,7 +68,7 @@ Reading the snapshot and version returns values, not exceptions. The route compo
 
 ## Migration Plan
 
-Purely additive; no migration. Ship in v3.1.0. Once live, homelab/Komodo verification and uptime checks re-point at `GET /health`; the runbook note about `docker inspect`-only verification can be retired.
+Purely additive; no migration. Ship in v3.2.0. Once live, homelab/Komodo verification and uptime checks re-point at `GET /health`; the runbook note about `docker inspect`-only verification can be retired.
 
 ## Open Questions
 

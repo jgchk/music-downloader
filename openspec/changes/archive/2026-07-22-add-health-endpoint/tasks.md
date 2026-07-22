@@ -35,4 +35,4 @@ Test-first throughout: every item writes a failing test (red) before the product
 
 ## 5. Release note
 
-- [ ] 5.1 Note the additive, non-breaking minor bump (v3.1.0) in the changelog at release time; call out the re-added `GET /health` probe for deploy/uptime verification — DEFERRED to release: the changelog + version bump are produced by `version:prep`/`commit-and-tag-version` at release time, not hand-edited now.
+- [ ] 5.1 Note the additive, non-breaking minor bump (v3.2.0) in the changelog at release time; call out the re-added `GET /health` probe for deploy/uptime verification — DEFERRED to release: the changelog + version bump are produced by `version:prep`/`commit-and-tag-version` at release time, not hand-edited now.
