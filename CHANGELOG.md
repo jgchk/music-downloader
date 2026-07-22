@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.0.1](https://github.com/jgchk/music-downloader/compare/v3.0.0...v3.0.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **web:** load root .env in dev via kit.env.dir + $env/dynamic/private ([4fb0ec9](https://github.com/jgchk/music-downloader/commit/4fb0ec9e4ab5124a9b5e838a876d3bb2bcece8d7))
+
 ## [3.0.0](https://github.com/jgchk/music-downloader/compare/v2.5.1...v3.0.0) (2026-07-21)
 
 One product: [music-importer](https://github.com/jgchk/music-importer)'s history and capabilities are merged into this repository as a modular monolith — two bounded-context packages (`packages/downloader`, `packages/importer`) integrating through durable in-process catch-up subscriptions, one SvelteKit web interface, one process, one image. Implements `openspec/changes/merge-modular-monolith`.

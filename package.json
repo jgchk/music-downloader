@@ -1,6 +1,6 @@
 {
   "name": "music-downloader",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "An extensible, event-sourced music downloader and importer — a modular monolith.",
   "type": "module",
