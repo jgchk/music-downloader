@@ -40,7 +40,11 @@ This is level-triggered reconciliation (the Kubernetes controller model) applied
 
 After the catch-up drain, a re-drive pass folds every non-terminal stream and asks `react(lastEvent, state)` for the effect its current state is waiting on, then dispatches it through the normal idempotent path. The pass is **rate-limited/jittered** (reconciling every non-terminal stream at boot must not stampede MusicBrainz or slskd) and **serialized per stream with normal dispatch** (the boot pass and the live drain must not race a check-then-act re-attach on the same acquisition). Consequences per phase: `Pending` re-fires resolution; `Searching`/`Selecting` re-fire search/selection continuation; `Downloading` re-fires the download effect, whose adapter must **reconcile before enqueueing** — via the source-resource ledger and slskd's transfer listing, it re-attaches to an existing live transfer (resuming polling and restarting stall/queue budgets from re-attach time) or re-enqueues if the source lost it; `AwaitingManualSelection` derives no effect (the pause is the state, not a lost effect); terminal phases are skipped. Idempotency and decide's stale-outcome rejection make double-drive safe by the existing contract.
 
-### D4 — Observability is part of the contract
+### D4 — Boot must not wait behind the backlog
+
+Today the composed process awaits the downloader runtime's startup catch-up drain inside `init`, and the drain executes effects inline — a backlog containing real work (an album download) keeps the web server unbound for its duration (observed 2026-07-22: ~2h UI outage). The fix: `createDownloaderRuntime` returns once stores and timers are wired; the catch-up drain and the D3 re-drive pass run in the background on the reactor's own scheduling. Ordering guarantees are unaffected (the drain is serial per stream regardless of who awaits it); the interface's runtime-baseline guarantee weakens deliberately from "all pending work done before serving" to "the module is wired and draining before serving" — which is what a level-triggered reactor wants anyway.
+
+### D5 — Observability is part of the contract
 
 Parked/dead-lettered state is queryable (count + per-acquisition) through the status read model, and every park, retry, degrade, and dead-letter transition logs structured entries with the acquisition id, effect type, attempt, and next retry. The two incidents were prolonged by silence; the fix treats visibility as a requirement, not a nicety.
 

@@ -64,3 +64,14 @@ The system SHALL isolate effect-dispatch failures per acquisition: an infrastruc
 - **GIVEN** an effect failing because its upstream is briefly unavailable
 - **WHEN** the upstream recovers within the retry budget
 - **THEN** a backed-off retry succeeds and the acquisition proceeds normally
+
+### Requirement: Startup catch-up work does not block readiness
+
+The system SHALL report the acquisition runtime ready once its stores, subscriptions, and schedulers are wired; the startup catch-up drain and the re-derivation pass SHALL execute in the background after readiness. A backlog of pending effect work SHALL NOT delay the runtime's readiness, and the work SHALL still be driven to completion with the same ordering guarantees as live processing.
+
+#### Scenario: A heavy backlog does not delay readiness
+
+- **GIVEN** a restart with pending effect work in the backlog (for example an in-flight download)
+- **WHEN** the runtime boots
+- **THEN** the runtime reports ready without waiting for the backlog's effects to execute
+- **AND** the backlog is subsequently driven to completion in the background

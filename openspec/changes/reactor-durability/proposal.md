@@ -8,6 +8,7 @@ Two production stalls (2026-07-22) exposed durability gaps the current spec not 
 - **A retry budget with a modeled landing.** Parked effects retry with backoff up to a bounded budget; a budget exhausted degrades to the effect's modeled business failure where one exists (resolution → metadata failure) or to a dead-letter with the acquisition visibly marked stalled — never a silent infinite loop, never a silent drop.
 - **Restart re-drive.** On startup, after the catch-up drain, the reactor re-derives the pending effect for every non-terminal acquisition from its folded state and re-dispatches it idempotently — a mid-flight download re-attaches to (or re-requests) its transfer and its stall/queue budgets restart; a pending resolution re-fires. `AwaitingManualSelection` correctly re-derives *no* effect (the pause is the state's meaning).
 - **The `acquisition-lifecycle` restart/fault requirements are rewritten** to demand isolation, bounded retry, and resumption — replacing the wording that mandated infinite same-event retry and only forbade duplication.
+- **Boot readiness.** Startup catch-up work (the drain and the re-drive) runs in the background after the runtime reports ready: the interface binds and serves requests immediately instead of waiting behind the backlog's effect execution (the 2026-07-22 incident put the UI down for the duration of an album download that ran inside boot).
 
 ## Capabilities
 
