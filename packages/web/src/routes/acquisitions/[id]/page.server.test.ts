@@ -18,6 +18,16 @@ function eventFor(facade: Record<string, unknown>) {
   } as never;
 }
 
+function selectEventFor(facade: Record<string, unknown>, releaseMbid: string) {
+  const data = new FormData();
+  data.set('releaseMbid', releaseMbid);
+  return {
+    params: { id: 'acq-1' },
+    locals: { facades: { downloader: facade as unknown as DownloaderFacade } },
+    request: { formData: () => Promise.resolve(data) },
+  } as never;
+}
+
 describe('acquisition detail load', () => {
   it('returns the status without progress while not downloading', () => {
     const facade = {
@@ -77,5 +87,45 @@ describe('cancel action', () => {
     };
     expect(result.status).toBe(500);
     expect(result.data.message).toContain('store');
+  });
+});
+
+describe('select action', () => {
+  it('dispatches the chosen edition and redirects back to the detail', async () => {
+    const selectEdition = vi
+      .fn()
+      .mockResolvedValue({ ok: true, value: { acquisitionId: 'acq-1' } });
+    await expect(actions.select!(selectEventFor({ selectEdition }, 'boot-1'))).rejects.toSatisfy(
+      (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-1',
+    );
+    expect(selectEdition).toHaveBeenCalledWith({ id: 'acq-1', releaseMbid: 'boot-1' });
+  });
+
+  it('passes a malformed post (no releaseMbid) through as an empty selection for the facade to refuse', async () => {
+    const selectEdition = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { kind: 'ValidationFailed', message: 'releaseMbid required' },
+    });
+    const event = {
+      params: { id: 'acq-1' },
+      locals: { facades: { downloader: { selectEdition } as unknown as DownloaderFacade } },
+      request: { formData: () => Promise.resolve(new FormData()) },
+    } as never;
+    const result = (await actions.select!(event)) as { status: number };
+    expect(result.status).toBe(400);
+    expect(selectEdition).toHaveBeenCalledWith({ id: 'acq-1', releaseMbid: '' });
+  });
+
+  it('surfaces the modeled rejection for a stale or off-menu selection', async () => {
+    const selectEdition = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { kind: 'UnknownEdition', releaseMbid: 'off-menu' },
+    });
+    const result = (await actions.select!(selectEventFor({ selectEdition }, 'off-menu'))) as {
+      status: number;
+      data: { message: string };
+    };
+    expect(result.status).toBe(400);
+    expect(result.data.message).toContain('off-menu');
   });
 });

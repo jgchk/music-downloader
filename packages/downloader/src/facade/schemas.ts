@@ -143,6 +143,16 @@ export const acquisitionTargetSchema = z.object({
   title: z.string(),
 });
 
+/** One edition on offer while an acquisition awaits manual selection (wire copy of the domain value). */
+export const editionCandidateSchema = z.object({
+  releaseMbid: z.string(),
+  title: z.string().optional(),
+  date: z.string().optional(),
+  country: z.string().optional(),
+  format: z.string().optional(),
+  trackCount: z.number(),
+});
+
 export const acquisitionStatusResponseSchema = z.object({
   acquisitionId: z.string(),
   status: acquisitionStatusSchema,
@@ -152,6 +162,8 @@ export const acquisitionStatusResponseSchema = z.object({
   rejectedCount: z.number(),
   location: z.string().optional(),
   history: z.array(historyEntrySchema),
+  // Present only while status is AwaitingManualSelection (additive).
+  candidates: z.array(editionCandidateSchema).optional(),
 });
 
 export const acquisitionListResponseSchema = z.object({
@@ -195,6 +207,7 @@ export type SubmitAcquisitionRequestDto = z.infer<typeof submitAcquisitionReques
 export type SubmitAcquisitionResponseDto = z.infer<typeof submitAcquisitionResponseSchema>;
 export type AcquisitionStatusResponseDto = z.infer<typeof acquisitionStatusResponseSchema>;
 export type AcquisitionListResponseDto = z.infer<typeof acquisitionListResponseSchema>;
+export type EditionCandidateDto = z.infer<typeof editionCandidateSchema>;
 export type ProgressResponseDto = z.infer<typeof progressResponseSchema>;
 export type CancelAcquisitionResponseDto = z.infer<typeof cancelAcquisitionResponseSchema>;
 export type ErrorResponseDto = z.infer<typeof errorResponseSchema>;

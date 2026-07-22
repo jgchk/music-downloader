@@ -1,7 +1,11 @@
 import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionPhase } from '../../domain/acquisition/acquisition.js';
-import type { AcquisitionEvent, DownloadFailureReason } from '../../domain/acquisition/events.js';
+import type {
+  AcquisitionEvent,
+  DownloadFailureReason,
+  EditionCandidate,
+} from '../../domain/acquisition/events.js';
 import type { ValidationReason } from '../../domain/validation/verdict.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
@@ -45,6 +49,8 @@ export interface AcquisitionStatusView {
   readonly rejectedCount: number;
   readonly location?: string;
   readonly history: readonly StatusHistoryEntry[];
+  /** The candidate editions on offer, present only while awaiting manual selection. */
+  readonly candidates?: readonly EditionCandidate[];
 }
 
 export function projectStatus(
@@ -91,6 +97,7 @@ export function projectStatus(
     rejectedCount: snapshot.rejectedCount,
     location: snapshot.location,
     history,
+    candidates: snapshot.candidates,
   };
 }
 

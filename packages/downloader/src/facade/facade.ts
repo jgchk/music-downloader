@@ -5,6 +5,7 @@ import {
   getAcquisition as getAcquisitionUseCase,
   getAcquisitionProgress as getProgressUseCase,
   listAcquisitions as listAcquisitionsUseCase,
+  selectEdition as selectEditionUseCase,
   submitAcquisition as submitAcquisitionUseCase,
 } from '../application/acquisition/use-cases.js';
 import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
@@ -75,21 +76,29 @@ function toFacadeError(error: CommandError): DownloaderFacadeError {
 // --- Input/output schemas ----------------------------------------------------------------------
 
 export const acquisitionIdInputSchema = z.object({ id: z.string().min(1) });
+export const selectEditionInputSchema = z.object({
+  id: z.string().min(1),
+  releaseMbid: z.string().min(1),
+});
 
 export const submitAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
 export const cancelAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
+export const selectEditionResultSchema = z.object({ acquisitionId: z.string() });
 export const acquisitionStatusResultSchema = acquisitionStatusResponseSchema;
 export const acquisitionListResultSchema = acquisitionListResponseSchema;
 export const progressResultSchema = progressResponseSchema;
 
 export type SubmitAcquisitionResult = z.infer<typeof submitAcquisitionResultSchema>;
 export type CancelAcquisitionResult = z.infer<typeof cancelAcquisitionResultSchema>;
+export type SelectEditionResult = z.infer<typeof selectEditionResultSchema>;
 
 // --- The facade --------------------------------------------------------------------------------
 
 export interface DownloaderFacade {
   submitAcquisition(input: unknown): Promise<FacadeResult<SubmitAcquisitionResult>>;
   cancelAcquisition(input: unknown): Promise<FacadeResult<CancelAcquisitionResult>>;
+  /** Resume an awaiting-selection acquisition with the chosen edition (manual-edition-selection). */
+  selectEdition(input: unknown): Promise<FacadeResult<SelectEditionResult>>;
   getAcquisition(input: unknown): FacadeResult<AcquisitionStatusResponseDto>;
   /** Infallible collection read: returns the DTO directly, no result envelope. */
   listAcquisitions(): AcquisitionListResponseDto;
@@ -117,6 +126,16 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const result = await cancelAcquisitionUseCase(deps, parsed.data.id);
+      return result.match(
+        () => ok({ acquisitionId: parsed.data.id }),
+        (error) => fail(toFacadeError(error)),
+      );
+    },
+
+    async selectEdition(input) {
+      const parsed = selectEditionInputSchema.safeParse(input);
+      if (!parsed.success) return validationFailed(parsed.error);
+      const result = await selectEditionUseCase(deps, parsed.data.id, parsed.data.releaseMbid);
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),

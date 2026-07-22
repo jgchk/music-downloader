@@ -45,6 +45,43 @@
   </p>
 {/if}
 
+{#if acquisition.status === 'AwaitingManualSelection' && acquisition.candidates !== undefined}
+  <h2>Choose an edition</h2>
+  <p>
+    This release group has no official edition, so nothing was picked automatically. Choose the
+    edition to acquire.
+  </p>
+  <table data-testid="edition-candidates">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Date</th>
+        <th>Country</th>
+        <th>Format</th>
+        <th>Tracks</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each acquisition.candidates as candidate (candidate.releaseMbid)}
+        <tr>
+          <td>{candidate.title ?? '(untitled)'}</td>
+          <td>{candidate.date ?? '—'}</td>
+          <td>{candidate.country ?? '—'}</td>
+          <td>{candidate.format ?? '—'}</td>
+          <td>{candidate.trackCount}</td>
+          <td>
+            <form method="POST" action="?/select">
+              <input type="hidden" name="releaseMbid" value={candidate.releaseMbid} />
+              <button type="submit" data-testid="select-edition">Choose</button>
+            </form>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+{/if}
+
 {#if isCancellable(acquisition.status)}
   <form method="POST" action="?/cancel">
     <button type="submit" data-testid="cancel">Cancel</button>

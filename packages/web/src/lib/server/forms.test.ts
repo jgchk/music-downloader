@@ -19,6 +19,16 @@ describe('submitAcquisitionForm', () => {
     });
   });
 
+  it('shapes a release-group request, forcing the album target type', () => {
+    const data = new FormData();
+    data.set('kind', 'release-group');
+    data.set('targetType', 'track'); // a stale UI value must not survive: a group is album-only
+    data.set('mbid', 'rg-1');
+    expect(submitAcquisitionForm(data)).toEqual({
+      request: { kind: 'release-group', targetType: 'album', mbid: 'rg-1' },
+    });
+  });
+
   it('shapes a descriptor request with optional album omitted when blank', () => {
     const dto = submitAcquisitionForm(
       form({ kind: 'descriptor', targetType: 'track', artist: 'A', title: 'T', album: ' ' }),

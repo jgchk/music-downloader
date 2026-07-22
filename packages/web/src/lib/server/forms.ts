@@ -34,7 +34,11 @@ export function submitAcquisitionForm(data: FormData): unknown {
           title: text(data, 'title'),
           album: text(data, 'album'),
         }
-      : { kind, targetType: text(data, 'targetType'), mbid: text(data, 'mbid') };
+      : kind === 'release-group'
+        ? // A release group is album-only: the target type is fixed here, not read from the form,
+          // so a stale UI value cannot smuggle in an invalid track request.
+          { kind, targetType: 'album', mbid: text(data, 'mbid') }
+        : { kind, targetType: text(data, 'targetType'), mbid: text(data, 'mbid') };
 
   const order = text(data, 'qualityOrder')
     ?.split(',')

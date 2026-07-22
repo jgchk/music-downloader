@@ -24,6 +24,16 @@ describe('AcquisitionForm (SSR)', () => {
     expect(body).toContain('value="T"');
   });
 
+  it('renders the release-group kind with an id field and no target-type choice', () => {
+    const { body } = render(AcquisitionForm, {
+      props: { values: { kind: 'release-group', mbid: 'rg-1' } },
+    });
+    expect(body).toContain('name="mbid"');
+    expect(body).toContain('value="rg-1"');
+    expect(body).not.toContain('name="targetType"');
+    expect(body).not.toContain('name="artist"');
+  });
+
   it('renders every optional policy field', () => {
     const { body } = render(AcquisitionForm, {
       props: {
