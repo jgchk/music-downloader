@@ -295,6 +295,29 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
+  it('tolerates a null-status edition among the browsed releases (prod: Red Headed Stranger)', async () => {
+    const result = (
+      await resolver([
+        [
+          '/release?release-group=rg-null',
+          browse([
+            { id: 'official', status: 'Official', date: '2000', media: [{ 'track-count': 10 }] },
+            {
+              id: 'mystery',
+              title: null,
+              status: null,
+              date: null,
+              media: [{ 'track-count': 10 }],
+            },
+          ]),
+        ],
+        ['/release/official', releaseFixture('official')],
+      ]).resolve(byReleaseGroup('rg-null'))
+    )._unsafeUnwrap();
+
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'official' } });
+  });
+
   it('reports unresolved when the release group is empty', async () => {
     const result = (
       await resolver([['/release?release-group=rg-3', browse([])]]).resolve(byReleaseGroup('rg-3'))

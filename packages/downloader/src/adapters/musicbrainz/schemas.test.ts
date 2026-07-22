@@ -181,6 +181,45 @@ describe('MusicBrainz contract schemas', () => {
     expect(parsed.releases?.[0]?.media?.[0]?.format).toBeNull();
   });
 
+  it('accepts a null browse title, status, and date (the Red Headed Stranger wedge: null is a value, not drift)', () => {
+    const parsed = mbReleaseGroupBrowseSchema.parse({
+      releases: [{ id: 'rel-1', title: null, status: null, date: null }],
+    });
+
+    expect(parsed.releases?.[0]?.status).toBeNull();
+  });
+
+  it('accepts null title, status, and date on a scored search hit', () => {
+    const parsed = mbReleaseSearchSchema.parse({
+      releases: [
+        {
+          id: 'rel-1',
+          score: 100,
+          title: null,
+          status: null,
+          date: null,
+          'release-group': { id: 'rg-1', title: null },
+        },
+      ],
+    });
+
+    expect(parsed.releases?.[0]?.status).toBeNull();
+  });
+
+  it('accepts null titles and artist-credit names on lookups', () => {
+    const release = mbReleaseSchema.parse({
+      id: 'rel-1',
+      title: null,
+      date: null,
+      'artist-credit': [{ name: null, joinphrase: null }],
+      media: [{ tracks: [{ position: 1, title: null, length: 1000 }] }],
+    });
+    const recording = mbRecordingSchema.parse({ id: 'rec-1', title: null, length: null });
+
+    expect(release.title).toBeNull();
+    expect(recording.title).toBeNull();
+  });
+
   it('rejects a browse edition whose media format is not a string', () => {
     const result = mbReleaseGroupBrowseSchema.safeParse({
       releases: [{ id: 'x', media: [{ format: 7 }] }],
