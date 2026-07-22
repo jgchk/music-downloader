@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.3.0](https://github.com/jgchk/music-downloader/compare/v3.2.1...v3.3.0) (2026-07-22)
+
+
+### Features
+
+* **downloader:** pause in AwaitingManualSelection and resume via SelectEdition ([be50d01](https://github.com/jgchk/music-downloader/commit/be50d01714bbeb753e1b6547c27a8aafd8af0715))
+* **downloader:** wire needsSelection through the interpreter and add the selectEdition use-case ([3320f62](https://github.com/jgchk/music-downloader/commit/3320f62cfa4ffa3b9001736924494595654fa54f))
+* **downloader:** yield needsSelection with candidate editions when a release group has no official edition ([ba4320a](https://github.com/jgchk/music-downloader/commit/ba4320affb3ed960dbf496250e3cb78369212d16))
+* **web:** surface awaiting-selection acquisitions and the choose-edition action ([d091371](https://github.com/jgchk/music-downloader/commit/d09137190355e8f1e087a63cdc9c3e022d6ae00b))
+
+
+### Bug Fixes
+
+* **downloader:** harden manual selection per review — empty-menu guard, drift registry, diagnostics ([79a49e7](https://github.com/jgchk/music-downloader/commit/79a49e7cc8f627b1cc81720c6b4488358ff4b8d7))
+
 ## [3.2.1](https://github.com/jgchk/music-downloader/compare/v3.2.0...v3.2.1) (2026-07-22)
 
 
