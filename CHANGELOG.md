@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.3.4](https://github.com/jgchk/music-downloader/compare/v3.3.3...v3.3.4) (2026-07-22)
+
+
+### Bug Fixes
+
+* **web:** map facade errors to HTTP status exhaustively ([41265da](https://github.com/jgchk/music-downloader/commit/41265da29a3b9858849544cf2d460724e9912415))
+
 ## [3.3.3](https://github.com/jgchk/music-downloader/compare/v3.3.2...v3.3.3) (2026-07-22)
 
 
