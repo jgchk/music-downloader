@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.1.0](https://github.com/jgchk/music-downloader/compare/v3.0.1...v3.1.0) (2026-07-22)
+
+
+### Features
+
+* **downloader:** resolve acquisitions by MusicBrainz release-group id ([ed78b7f](https://github.com/jgchk/music-downloader/commit/ed78b7fb17bae016ad01e09250b9094b151c0d3e))
+
 ## [3.0.1](https://github.com/jgchk/music-downloader/compare/v3.0.0...v3.0.1) (2026-07-22)
 
 
