@@ -17,13 +17,14 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
 
   constructor(db: EventDatabase) {
     this.insertStmt = db.prepare(
-      `INSERT INTO dead_letters (subscription, global_seq, error, occurred_at)
-       VALUES (@subscription, @globalSeq, @error, @occurredAt)
+      `INSERT INTO dead_letters (subscription, global_seq, error, occurred_at, stream_id)
+       VALUES (@subscription, @globalSeq, @error, @occurredAt, @streamId)
        ON CONFLICT (subscription, global_seq) DO UPDATE
-         SET error = excluded.error, occurred_at = excluded.occurred_at`,
+         SET error = excluded.error, occurred_at = excluded.occurred_at,
+             stream_id = excluded.stream_id`,
     );
     this.listStmt = db.prepare(
-      `SELECT subscription, global_seq, error, occurred_at
+      `SELECT subscription, global_seq, error, occurred_at, stream_id
        FROM dead_letters WHERE subscription = ? ORDER BY global_seq ASC`,
     );
   }
@@ -35,6 +36,7 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
         globalSeq: letter.globalSeq,
         error: letter.error,
         occurredAt: letter.occurredAt,
+        streamId: letter.streamId ?? null,
       });
       return okAsync(undefined);
     } catch (err) {
@@ -49,6 +51,7 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
         global_seq: number;
         error: string;
         occurred_at: string;
+        stream_id: string | null;
       }[];
       return okAsync<readonly DeadLetter[], InfraError>(
         rows.map((row) => ({
@@ -56,6 +59,7 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
           globalSeq: row.global_seq,
           error: row.error,
           occurredAt: row.occurred_at,
+          ...(row.stream_id === null ? {} : { streamId: row.stream_id }),
         })),
       );
     } catch (err) {
