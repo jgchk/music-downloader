@@ -14,9 +14,14 @@ Ship a drafted OpenSpec change end to end. This command assumes the change's art
 
 ## Phase 0 — Preflight
 
-1. Verify this is the jj-driven product repo (`jj root` succeeds). All VCS mutations here use `jj`, never `git` (read-only `git`/`gh` inspection is fine; the repo is colocated, so `gh` and `pnpm version:prep` work).
+1. Verify this is the jj-driven product repo (`jj root` succeeds). All VCS mutations here use `jj`, never `git` (read-only `git`/`gh` inspection is fine).
 2. Resolve the change name and confirm it is ready to apply: `openspec status --change <name> --json` — artifacts complete, tasks pending (or partially done, which means "continue"). If artifacts are missing, stop and point at `/opsx:propose` or `/opsx:explore`.
-3. Confirm a sane starting state: working copy based on `trunk()`, no unrelated in-flight work (`jj st`, `jj log -r 'trunk()..@'`). If unrelated changes are present, stop and ask.
+3. **Work in the change's own jj workspace — never implement in the default workspace** (concurrent sessions may be using it):
+   - `jj git fetch` first so the workspace starts from latest trunk.
+   - `jj workspace list`: if a workspace named `<change>` already exists, resume in it. Otherwise `jj workspace add --name <change> -r main ../music-downloader-2--<change>`.
+   - `cd` into the workspace and `pnpm install` (fresh workspaces have no `node_modules`).
+   - Every subsequent phase — implementation, review fixes, archive, version prep, push — runs inside this workspace. `git`/`gh`/`pnpm version:prep` work in bare workspaces here; if one of them unexpectedly fails on missing-`.git` grounds, stop and report rather than improvising around it.
+4. Confirm a sane starting state in the workspace: `jj st` clean apart from the new working-copy commit, based on `trunk()`.
 
 ## Phase 1 — Implement
 
@@ -50,7 +55,8 @@ CI's required `version-check` re-runs `version:prep --check`, so this commit mus
 2. `gh pr create --head <change-name>` with a concise body: what the change does, link to the archived OpenSpec change, review outcome (cycles run, anything consciously skipped). End the body with the standard Claude Code attribution line.
 3. Watch required checks (`version-check`, `quality`, `test`): `gh pr checks <PR#> --watch`. `web-e2e` is advisory — note a failure but it does not block. If a required check fails, fix, commit, `jj git push --bookmark <change-name>`, and re-watch.
 4. **CHECKPOINT — stop and ask the user to confirm the merge**, presenting: PR URL, version, one-paragraph summary, review-cycle summary, check status.
-5. On confirmation: `gh pr merge <PR#> --rebase` (always pass the PR number explicitly — detached-HEAD breaks gh's branch inference; do not pass `--delete-branch`). Then `jj git fetch` and rebase/abandon local leftovers so trunk is clean.
+5. On confirmation: `gh pr merge <PR#> --rebase` (always pass the PR number explicitly — detached-HEAD breaks gh's branch inference; do not pass `--delete-branch`). Then `jj git fetch` to confirm the commit landed on `main`.
+6. Retire the workspace now that its work is on trunk: `cd` back to the main repo, `jj workspace forget <change>`, and remove the workspace directory. Only do this after verifying the merge via `gh pr view <PR#> --json state` and the fetch.
 
 ## Phase 6 — Wait for the image publish
 
@@ -87,6 +93,7 @@ End with a summary: change name → version shipped, PR link, release link, revi
 **Guardrails**
 
 - `jj` for all VCS mutations in both repos; `git` only read-only. `gh` for PR/run/release operations, always with explicit PR numbers / `--head`.
+- All product-repo work happens in the change's own jj workspace; the default workspace's working copy is never touched, and the workspace is forgotten only after its commits are confirmed on `main`.
 - Rebase-merge only; never merge with failing required checks; never bypass the pre-merge checkpoint.
 - Never publish an image or tag manually — only the pipeline's gated release path does that.
 - One lifecycle per invocation: one change, one version, one deploy.
