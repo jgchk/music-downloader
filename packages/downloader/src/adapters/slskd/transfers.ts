@@ -55,6 +55,20 @@ export function reasonFromTransfer(transfer: SlskdTransfer): DownloadFailureReas
   return 'TransferError';
 }
 
+/**
+ * Translate an slskd enqueue *rejection* into the candidate-level failure reason (D10). An HTTP
+ * rejection from slskd means slskd itself is up and answered — the candidate, not the
+ * infrastructure, failed; a connection-flavored body names the peer. Transport-level failures
+ * (slskd unreachable) never come here — they stay infrastructure faults and are retried.
+ */
+export function enqueueRejectionReason(body: string): DownloadFailureReason {
+  const text = body.toLowerCase();
+  if (text.includes('connect') || text.includes('offline') || text.includes('unavailable')) {
+    return 'PeerUnavailable';
+  }
+  return 'TransferError';
+}
+
 export interface TransferAggregate {
   readonly progress: DownloadProgress;
   /** Every transfer has reached a terminal state (there is at least one transfer). */

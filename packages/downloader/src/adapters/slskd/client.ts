@@ -49,6 +49,15 @@ export class SlskdClient {
     return this.request('POST', path, body);
   }
 
+  /**
+   * POST returning the raw status and body without throwing on non-2xx — for callers that own the
+   * rejection taxonomy (an enqueue refused by a live slskd is a candidate failure to model, not an
+   * infrastructure fault to retry).
+   */
+  postRaw(path: string, body: unknown): Promise<{ status: number; body: string }> {
+    return this.dispatch('POST', path, body);
+  }
+
   del(path: string): Promise<unknown> {
     return this.request('DELETE', path);
   }

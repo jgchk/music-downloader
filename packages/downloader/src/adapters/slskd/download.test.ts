@@ -97,6 +97,7 @@ const bothCompleted = eventsPage([
 
 interface Opts {
   enqueue?: HttpResponse;
+  enqueueThrows?: boolean; // transport-level failure: slskd itself unreachable
   polls: HttpResponse[];
   events?: HttpResponse[];
   options?: HttpResponse;
@@ -124,7 +125,10 @@ function downloader(opts: Opts): Harness {
   const events = [...(opts.events ?? [bothCompleted])];
   const http: HttpClient = {
     send: ({ method, url }) => {
-      if (method === 'POST') return Promise.resolve(opts.enqueue ?? { status: 200, body: '' });
+      if (method === 'POST') {
+        if (opts.enqueueThrows) return Promise.reject(new Error('socket hang up'));
+        return Promise.resolve(opts.enqueue ?? { status: 200, body: '' });
+      }
       if (method === 'DELETE') {
         deletes.push(url);
         return Promise.resolve({ status: opts.deleteStatus ?? 204, body: '' });
@@ -403,8 +407,34 @@ describe('SlskdDownload', () => {
     expect(result._unsafeUnwrap().kind).toBe('completed');
   });
 
-  it('surfaces an enqueue failure as an InfraError', async () => {
+  it('fails the candidate when a live slskd rejects the enqueue for an unreachable peer', async () => {
+    const { adapter, ledger } = downloader({
+      enqueue: {
+        status: 500,
+        body: 'Failed to establish a direct or indirect message connection to user',
+      },
+      polls: [],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    // slskd answered, so the infrastructure is up: the candidate failed, and the retry ladder
+    // advances to the next peer instead of retrying this one forever (prod 2026-07-22).
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'PeerUnavailable' });
+    // the write-ahead rows are released: nothing was created at the source
+    expect(ledger.removed).toHaveLength(candidate.files.length);
+  });
+
+  it('fails the candidate as a generic transfer error for other enqueue rejections', async () => {
     const { adapter } = downloader({ enqueue: { status: 500, body: 'boom' }, polls: [] });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
+  });
+
+  it('surfaces a transport fault during enqueue as an InfraError (slskd itself unreachable)', async () => {
+    const { adapter } = downloader({ enqueueThrows: true, polls: [] });
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
