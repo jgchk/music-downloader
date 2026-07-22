@@ -370,4 +370,28 @@ describe('MusicBrainzMetadata', () => {
       operation: 'musicbrainz.resolve',
     });
   });
+
+  // MusicBrainz answers an invalid identifier with `400 {"error":"Invalid mbid."}` — a *permanent*
+  // condition that never succeeds on retry. It must be the business outcome `unresolved`, not an
+  // InfraError, or the reactor retries it forever and wedges (regression: an invalid mbid stalled
+  // resolution in production).
+  it('treats a 400 (invalid mbid) on a lookup as unresolved, not a retryable fault', async () => {
+    const result = (
+      await resolver([
+        ['/release/rel-1', { status: 400, body: '{"error":"Invalid mbid."}' }],
+      ]).resolve(albumById)
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('treats a 400 (invalid mbid) on the release-group browse as unresolved', async () => {
+    const result = (
+      await resolver([
+        ['/release?release-group=bad', { status: 400, body: '{"error":"Invalid mbid."}' }],
+      ]).resolve(byReleaseGroup('bad'))
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
 });

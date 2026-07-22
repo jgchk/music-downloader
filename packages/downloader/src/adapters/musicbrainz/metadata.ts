@@ -150,9 +150,13 @@ export class MusicBrainzMetadata implements MetadataPort {
 
   /**
    * GET and validate the body against the endpoint's contract schema; `undefined` for 404 (not
-   * found → unresolved), throw for other non-2xx. A body that violates the contract makes
-   * `schema.parse` throw, which the `resolve` wrapper maps to an `InfraError` — provider drift
-   * surfaces as an attributable boundary fault, never as malformed data reaching the mapping (D2).
+   * found) and 400 (invalid identifier), both of which map to the business outcome *unresolved*;
+   * throw for other non-2xx. MusicBrainz answers a malformed/invalid mbid with `400 {"error":
+   * "Invalid mbid."}` — a *permanent* condition that never succeeds on retry, so it must NOT become
+   * an `InfraError` (which the reactor retries forever, wedging resolution); it is logged and
+   * treated as unresolved. A body that violates the contract makes `schema.parse` throw, which the
+   * `resolve` wrapper maps to an `InfraError` — provider drift surfaces as an attributable boundary
+   * fault, never as malformed data reaching the mapping (D2).
    */
   private async getJson<T>(url: string, schema: ZodType<T>): Promise<T | undefined> {
     const response = await this.http.send({
@@ -160,6 +164,10 @@ export class MusicBrainzMetadata implements MetadataPort {
       headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
     });
     if (response.status === 404) return undefined;
+    if (response.status === 400) {
+      this.logger.warn({ url }, 'musicbrainz rejected the request (400); treating as unresolved');
+      return undefined;
+    }
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`MusicBrainz responded ${response.status}`);
     }
