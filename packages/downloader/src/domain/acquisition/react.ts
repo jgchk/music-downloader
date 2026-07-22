@@ -25,7 +25,7 @@ export type Effect =
 
 /**
  * `state` is the state *as of* `event`: the fold of the stream prefix up to and including it (the
- * reactor slices the stream before reacting — see `Reactor.process`). So `event`'s post-state is
+ * reactor slices the stream before reacting — see the reactor's prefix-fold dispatch). So `event`'s post-state is
  * exactly what a reaction reads, both for co-emitted batches (reacting to a non-final event sees its
  * own phase, not a batch successor's) and under at-least-once redelivery (a re-reacted event sees
  * the same state it saw at first delivery, regardless of how far the stream has since advanced).

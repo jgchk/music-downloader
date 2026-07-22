@@ -634,7 +634,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
       streamId: 'acq-1',
     });
     expect(deadLetters.letters[0]!.error).toContain('Cleanup');
-    expect(lines.join('')).toContain('effect dead-lettered and acquisition stalled');
+    expect(lines.join('')).toContain('dead-lettered and acquisition stalled');
     r.stop();
   });
 
@@ -991,7 +991,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     });
     expect(parkedEntry).toHaveProperty('nextRetryAt');
     expect(
-      entries.find((entry) => entry.msg === 'retry budget exhausted; degrading to modeled failure'),
+      entries.find((entry) => entry.msg === 'effect landed; degrading to modeled failure'),
     ).toMatchObject({ acquisitionId: 'acq-1', effect: 'ResolveMetadata' });
   });
 });
@@ -1113,6 +1113,24 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
     store.throwOnReadAll = false;
     await r.drain(); // the mutex still runs passes
     expect(resolve).toHaveBeenCalledOnce();
+    r.stop();
+  });
+
+  it('defers to the next restart when a re-driven failure cannot even be parked', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    await seed(requestedHistory());
+    await checkpointToHead();
+    parked.failPark = true;
+    const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
+    await r.start();
+
+    expect(parked.count()).toBe(0); // nothing durable survived — the log is the only trail
+    expect(lines.join('')).toContain('deferred to the next restart');
     r.stop();
   });
 

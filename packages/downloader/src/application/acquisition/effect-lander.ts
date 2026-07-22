@@ -71,7 +71,7 @@ export class EffectLander {
       if (applied.isOk()) {
         this.deps.logger.error(
           { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
-          'retry budget exhausted; degrading to modeled failure',
+          'effect landed; degrading to modeled failure',
         );
         return true;
       }
@@ -111,7 +111,7 @@ export class EffectLander {
     this.deps.stalled.mark(stored.streamId);
     this.deps.logger.error(
       { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
-      'retry budget exhausted; effect dead-lettered and acquisition stalled',
+      'effect landed; dead-lettered and acquisition stalled',
     );
     return true;
   }

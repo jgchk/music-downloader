@@ -237,7 +237,14 @@ export class Reactor {
     );
     const outcome = await this.dispatchEvent(last, events);
     if (outcome.kind === 'retry') {
-      await this.parkStream(last, outcome.effect, outcome.error);
+      const parkedOk = await this.parkStream(last, outcome.effect, outcome.error);
+      if (!parkedOk) {
+        // No checkpoint to hold here: an unparked re-drive failure waits for the next restart.
+        this.deps.logger.error(
+          { acquisitionId: streamId },
+          're-driven effect failed and could not be parked; deferred to the next restart',
+        );
+      }
     }
   }
 
