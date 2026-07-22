@@ -184,5 +184,13 @@ fresh_env
 touch .e2e-tmp/bin/bridge-blocked
 start_app -e BRIDGE_PYTHON=/e2e-bin/bridge-python
 run_phase test/e2e/restart.e2e.test.ts
+docker rm -f "$APP" >/dev/null
+
+echo "── phase 3: restart resumption mid-download"
+curl -fsS -X POST "http://localhost:$SLSKD_PORT/__admin/scenarios/reset" >/dev/null
+curl -fsS -X DELETE "http://localhost:$SLSKD_PORT/__admin/requests" >/dev/null
+fresh_env
+start_app
+run_phase test/e2e/restart-mid-download.e2e.test.ts
 
 echo "── e2e green"

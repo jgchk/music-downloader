@@ -21,12 +21,12 @@
 - [x] 4.1 Write failing tests for the re-drive pass: after the catch-up drain, every non-terminal stream's current effect is re-derived from folded state and dispatched; terminal and awaiting-selection streams derive none; implement.
 - [x] 4.2 Write failing tests for the download adapter's reconcile-before-enqueue: an acquisition with a live ledgered transfer re-attaches (polling resumes, budgets restart); a lost transfer re-enqueues; implement against the slskd fakes.
 - [x] 4.3 Write failing tests that the re-drive pass is jittered/rate-limited and serialized per stream against live dispatch (no check-then-act race on the same acquisition); implement.
-- [ ] 4.4 Extend the out-of-process restart e2e: kill mid-download, restart, assert the transfer is driven to an outcome (completed or timed out) rather than orphaned.
+- [x] 4.4 Extend the out-of-process restart e2e: kill mid-download, restart, assert the transfer is driven to an outcome (completed or timed out) rather than orphaned.
 - [x] 4.5 Write failing tests that runtime boot reports ready without awaiting the catch-up drain or re-drive (a slow/pending effect in the backlog does not delay readiness; the backlog still completes in the background); implement by backgrounding the startup drain.
 
 ## 5. Contract, spec coverage & the gate
 
-- [ ] 5.1 Contract additivity: the `stalled` view field and any facade changes covered by existing additivity guards; no wire breaks.
-- [ ] 5.2 Ensure every scenario in the `acquisition-lifecycle` delta maps to a test (isolation, degrade, dead-letter, outage ride-out, resume-mid-download, resume-mid-resolution, paused-stays-paused, crash-window convergence).
-- [ ] 5.3 Run `pnpm check` and `openspec validate reactor-durability --strict`; fix gaps.
-- [ ] 5.4 Manually verify: submit a poisoned resolution (unroutable base URL in a dev config) alongside a healthy acquisition — the healthy one completes; restart mid-download in the e2e harness — the download resumes.
+- [x] 5.1 Contract additivity: the `stalled` view field and any facade changes covered by existing additivity guards; no wire breaks.
+- [x] 5.2 Ensure every scenario in the `acquisition-lifecycle` delta maps to a test (isolation, degrade, dead-letter, outage ride-out, resume-mid-download, resume-mid-resolution, paused-stays-paused, crash-window convergence).
+- [x] 5.3 Run `pnpm check` and `openspec validate reactor-durability --strict`; fix gaps.
+- [x] 5.4 Manually verify: submit a poisoned resolution (unroutable base URL in a dev config) alongside a healthy acquisition — the healthy one completes; restart mid-download in the e2e harness — the download resumes.
