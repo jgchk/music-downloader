@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.2.0](https://github.com/jgchk/music-downloader/compare/v3.1.0...v3.2.0) (2026-07-22)
+
+
+### Features
+
+* **web:** add GET /health readiness+version endpoint (add-health-endpoint) ([17d3553](https://github.com/jgchk/music-downloader/commit/17d3553f6078776a8be653b917565ed4b7d62916))
+
 ## [3.1.0](https://github.com/jgchk/music-downloader/compare/v3.0.1...v3.1.0) (2026-07-22)
 
 
