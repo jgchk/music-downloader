@@ -1,9 +1,9 @@
 ## 1. Resolution outcome & candidate mapping
 
-- [ ] 1.1 Write failing tests for the `EditionCandidate` value and the additive `{ kind: 'needsSelection'; candidates }` variant of `MetadataResolution`; ensure existing `resolved`/`unresolved` consumers still typecheck.
-- [ ] 1.2 Add `EditionCandidate` (domain value carried on events) and the `needsSelection` variant to the ports/domain.
-- [ ] 1.3 Write a failing adapter test: a release group with no official edition returns `needsSelection` with the candidate editions (id, title, date, country, format, track count); implement the mapping from picker output to `EditionCandidate[]` (replacing the prerequisite change's unresolved behavior).
-- [ ] 1.4 Extend the release-search/browse schema additively with `country` and `media[].format` for candidate presentation; failing schema tests first.
+- [x] 1.1 Write failing tests for the `EditionCandidate` value and the additive `{ kind: 'needsSelection'; candidates }` variant of `MetadataResolution`; ensure existing `resolved`/`unresolved` consumers still typecheck.
+- [x] 1.2 Add `EditionCandidate` (domain value carried on events) and the `needsSelection` variant to the ports/domain.
+- [x] 1.3 Write a failing adapter test: a release group with no official edition returns `needsSelection` with the candidate editions (id, title, date, country, format, track count); implement the mapping from picker output to `EditionCandidate[]` (replacing the prerequisite change's unresolved behavior).
+- [x] 1.4 Extend the release-search/browse schema additively with `country` and `media[].format` for candidate presentation; failing schema tests first.
 
 ## 2. Aggregate state & commands
 

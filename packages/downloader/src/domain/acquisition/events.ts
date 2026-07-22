@@ -40,6 +40,22 @@ export interface DownloadedFile {
   readonly name: string; // file name within the candidate
 }
 
+/**
+ * One edition of a release group offered for manual selection — a lightweight presentation value,
+ * not a {@link Target}, since presenting an edition needs no track manifest. Carried on the
+ * `ManualSelectionRequested` event so the retained candidates are part of the acquisition's
+ * history. Fields beyond the id are optional: MusicBrainz data is sparse, and a missing field
+ * degrades presentation, never the pause itself.
+ */
+export interface EditionCandidate {
+  readonly releaseMbid: string;
+  readonly title?: string;
+  readonly date?: string;
+  readonly country?: string;
+  readonly format?: string;
+  readonly trackCount: number;
+}
+
 export type AcquisitionEvent =
   | {
       readonly type: 'AcquisitionRequested';

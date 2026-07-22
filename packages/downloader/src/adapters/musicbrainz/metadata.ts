@@ -12,6 +12,7 @@ import {
   recordingToTarget,
   releaseCandidateIds,
   releaseGroupCandidateIds,
+  releaseGroupEditionCandidates,
   releaseToTarget,
 } from './mapping.js';
 import {
@@ -28,9 +29,11 @@ import {
  * descriptor searches, resolves the album's identity to a confident, unambiguous release group and
  * selects an edition within it ({@link releaseCandidateIds}), then fetches releases in order until
  * one yields a target; a release-group request browses the group's editions and selects a
- * representative official one ({@link releaseGroupCandidateIds}); a track descriptor uses the flat
- * {@link bestMatchId} guard. Not-found / no-confident-match is the *business* outcome `unresolved`;
- * only transport faults or unexpected HTTP statuses become an `InfraError`.
+ * representative official one ({@link releaseGroupCandidateIds}), or — when the group has editions
+ * but none official — yields `needsSelection` with the candidates for a human to choose
+ * ({@link releaseGroupEditionCandidates}); a track descriptor uses the flat {@link bestMatchId}
+ * guard. Not-found / no-confident-match is the *business* outcome `unresolved`; only transport
+ * faults or unexpected HTTP statuses become an `InfraError`.
  */
 
 const UNRESOLVED: MetadataResolution = { kind: 'unresolved' };
@@ -112,9 +115,17 @@ export class MusicBrainzMetadata implements MetadataPort {
   private async resolveReleaseByReleaseGroup(mbid: string): Promise<MetadataResolution> {
     const url = `${this.baseUrl}/release?release-group=${encodeURIComponent(mbid)}&inc=media&fmt=json&limit=${RELEASE_SEARCH_LIMIT}`;
     const json = await this.getJson(url, mbReleaseGroupBrowseSchema);
-    for (const id of releaseGroupCandidateIds(json?.releases)) {
+    const officialIds = releaseGroupCandidateIds(json?.releases);
+    for (const id of officialIds) {
       const resolution = await this.resolveReleaseById(id);
       if (resolution.kind === 'resolved') return resolution;
+    }
+    // No official edition to pick — offer the group's editions for a human to choose. When an
+    // official edition existed but yielded no usable target, that stays unresolved: the picker did
+    // its job and the data was bad, which manual selection cannot fix.
+    if (officialIds.length === 0) {
+      const candidates = releaseGroupEditionCandidates(json?.releases);
+      if (candidates.length > 0) return { kind: 'needsSelection', candidates };
     }
     return UNRESOLVED;
   }

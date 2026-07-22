@@ -243,14 +243,53 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
-  it('reports unresolved when the release group has no official edition', async () => {
+  it('surfaces the candidate editions for manual selection when the group has no official edition', async () => {
     const result = (
       await resolver([
         [
           '/release?release-group=rg-2',
-          browse([{ id: 'boot', status: 'Bootleg', date: '2001', media: [{ 'track-count': 12 }] }]),
+          browse([
+            {
+              id: 'boot',
+              title: 'Live Bootleg',
+              status: 'Bootleg',
+              date: '2001',
+              country: 'JP',
+              media: [{ 'track-count': 12, format: 'CD' }],
+            },
+          ]),
         ],
       ]).resolve(byReleaseGroup('rg-2'))
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({
+      kind: 'needsSelection',
+      candidates: [
+        {
+          releaseMbid: 'boot',
+          title: 'Live Bootleg',
+          date: '2001',
+          country: 'JP',
+          format: 'CD',
+          trackCount: 12,
+        },
+      ],
+    });
+  });
+
+  it('reports unresolved (not manual selection) when an official edition exists but yields no target', async () => {
+    const sparse = ok({ id: 'off', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
+    const result = (
+      await resolver([
+        [
+          '/release?release-group=rg-5',
+          browse([
+            { id: 'off', status: 'Official', date: '2010', media: [{ 'track-count': 10 }] },
+            { id: 'boot', status: 'Bootleg', date: '2011', media: [{ 'track-count': 10 }] },
+          ]),
+        ],
+        ['/release/off', sparse], // official edition resolves to no valid target
+      ]).resolve(byReleaseGroup('rg-5'))
     )._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });

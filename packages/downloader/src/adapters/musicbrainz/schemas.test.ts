@@ -153,4 +153,40 @@ describe('MusicBrainz contract schemas', () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'media', 0, 'track-count']);
   });
+
+  it('consumes the browse edition country and media format for candidate presentation', () => {
+    const parsed = mbReleaseGroupBrowseSchema.parse({
+      releases: [
+        {
+          id: 'rel-1',
+          title: 'Album',
+          status: 'Bootleg',
+          date: '1995-05-01',
+          country: 'GB',
+          media: [{ 'track-count': 12, format: 'CD' }],
+        },
+      ],
+    });
+
+    expect(parsed.releases?.[0]?.country).toBe('GB');
+    expect(parsed.releases?.[0]?.media?.[0]?.format).toBe('CD');
+  });
+
+  it('accepts a null browse country and media format (MusicBrainz reports unknowns as null)', () => {
+    const parsed = mbReleaseGroupBrowseSchema.parse({
+      releases: [{ id: 'rel-1', country: null, media: [{ 'track-count': 12, format: null }] }],
+    });
+
+    expect(parsed.releases?.[0]?.country).toBeNull();
+    expect(parsed.releases?.[0]?.media?.[0]?.format).toBeNull();
+  });
+
+  it('rejects a browse edition whose media format is not a string', () => {
+    const result = mbReleaseGroupBrowseSchema.safeParse({
+      releases: [{ id: 'x', media: [{ format: 7 }] }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'media', 0, 'format']);
+  });
 });

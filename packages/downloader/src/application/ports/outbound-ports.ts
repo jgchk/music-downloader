@@ -7,6 +7,7 @@ import type {
   AcquisitionRequest,
   DownloadFailureReason,
   DownloadedFile,
+  EditionCandidate,
 } from '../../domain/acquisition/events.js';
 import type { InfraError } from './errors.js';
 
@@ -20,7 +21,10 @@ import type { InfraError } from './errors.js';
 // --- MetadataPort (first adapter: MusicBrainz) -------------------------------------------------
 
 export type MetadataResolution =
-  { readonly kind: 'resolved'; readonly target: Target } | { readonly kind: 'unresolved' }; // no confident match — a business fact, not an infra fault
+  | { readonly kind: 'resolved'; readonly target: Target }
+  | { readonly kind: 'unresolved' } // no confident match — a business fact, not an infra fault
+  // a release group with editions but no official one: a human must choose (manual-edition-selection)
+  | { readonly kind: 'needsSelection'; readonly candidates: readonly EditionCandidate[] };
 
 export interface MetadataPort {
   resolve(request: AcquisitionRequest): ResultAsync<MetadataResolution, InfraError>;
