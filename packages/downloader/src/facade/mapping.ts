@@ -85,6 +85,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     location: view.location,
     history: view.history.map(historyEntryToDto),
     candidates: view.candidates?.map((candidate) => ({ ...candidate })),
+    stalled: view.stalled,
   };
 }
 

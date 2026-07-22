@@ -10,7 +10,11 @@ import {
 } from './use-cases.js';
 import type { UseCaseDeps } from './use-cases.js';
 import { FakeEventStore, fixedClock, sequentialIds } from '../__fixtures__/fakes.js';
-import { AcquisitionStatusProjection, ProgressReadModel } from '../projections/read-models.js';
+import {
+  AcquisitionStatusProjection,
+  ProgressReadModel,
+  StalledReadModel,
+} from '../projections/read-models.js';
 import {
   awaitingSelectionHistory,
   defaultPolicies,
@@ -26,6 +30,7 @@ function deps(): UseCaseDeps {
     ids: sequentialIds(),
     status: new AcquisitionStatusProjection(),
     progress: new ProgressReadModel(),
+    stalled: new StalledReadModel(),
   };
 }
 
@@ -149,5 +154,24 @@ describe('queries', () => {
     expect(getAcquisition(d, 'missing')).toBeUndefined();
     expect(listAcquisitions(d)).toHaveLength(1);
     expect(getAcquisitionProgress(d, 'acq-1')?.percent).toBe(10);
+  });
+
+  it('exposes a dead-lettered acquisition as stalled, additively (reactor-durability D2)', () => {
+    const d = deps();
+    d.status.apply({
+      globalSeq: 1,
+      streamId: 'acq-1',
+      version: 0,
+      type: 'AcquisitionRequested',
+      event: { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+      metadata: { acquisitionId: 'acq-1', occurredAt: 't' },
+    });
+
+    expect(getAcquisition(d, 'acq-1')?.stalled).toBeUndefined();
+    expect(listAcquisitions(d)[0]?.stalled).toBeUndefined();
+
+    d.stalled.mark('acq-1');
+    expect(getAcquisition(d, 'acq-1')?.stalled).toBe(true);
+    expect(listAcquisitions(d)[0]?.stalled).toBe(true);
   });
 });

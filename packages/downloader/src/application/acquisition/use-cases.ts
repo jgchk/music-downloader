@@ -8,6 +8,7 @@ import type {
   AcquisitionStatusProjection,
   AcquisitionStatusView,
   ProgressReadModel,
+  StalledReadModel,
 } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDeps, CommandError } from './command-handler.js';
@@ -20,6 +21,7 @@ export interface UseCaseDeps extends CommandDeps {
   readonly ids: IdGenerator;
   readonly status: AcquisitionStatusProjection;
   readonly progress: ProgressReadModel;
+  readonly stalled: StalledReadModel;
 }
 
 export interface SubmitAcquisitionInput {
@@ -84,15 +86,21 @@ export function recordExternalValidationFailure(
   }).map(() => undefined);
 }
 
+/** Join the stalled exposure onto a projected view — additive, absent unless dead-lettered. */
+function withStalled(deps: UseCaseDeps, view: AcquisitionStatusView): AcquisitionStatusView {
+  return deps.stalled.isStalled(view.acquisitionId) ? { ...view, stalled: true } : view;
+}
+
 export function getAcquisition(
   deps: UseCaseDeps,
   acquisitionId: string,
 ): AcquisitionStatusView | undefined {
-  return deps.status.get(acquisitionId);
+  const view = deps.status.get(acquisitionId);
+  return view === undefined ? undefined : withStalled(deps, view);
 }
 
 export function listAcquisitions(deps: UseCaseDeps): readonly AcquisitionStatusView[] {
-  return deps.status.list();
+  return deps.status.list().map((view) => withStalled(deps, view));
 }
 
 export function getAcquisitionProgress(

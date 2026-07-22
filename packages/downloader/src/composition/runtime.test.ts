@@ -3,13 +3,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { okAsync, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { openEventDatabase } from '../adapters/index.js';
+import {
+  SqliteCheckpointStore,
+  SqliteEventStore,
+  UpcasterRegistry,
+  openEventDatabase,
+} from '../adapters/index.js';
+import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import type { EffectPorts } from '../application/acquisition/interpreter.js';
-import { silentLogger } from '../application/__fixtures__/fakes.js';
+import { FakeDeadLetterStore, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import type { DownloadResult } from '../application/ports/outbound-ports.js';
 import {
   matchingCandidate,
+  requestedHistory,
   sampleTarget,
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
@@ -245,5 +252,95 @@ describe('createDownloaderRuntime', () => {
     );
     cleanups.push(() => runtime.stop());
     expect(errors.join('')).toContain('projection rebuild failed');
+  });
+});
+
+describe('stalled exposure at boot (reactor-durability D2)', () => {
+  async function seededRuntime(occurredAt: string): Promise<DownloaderRuntime> {
+    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const file = join(dir, 'events.db');
+    const db = openEventDatabase(file);
+    const store = new SqliteEventStore(db, new UpcasterRegistry());
+    (
+      await store.append('acq-stalled', 0, requestedHistory(), {
+        acquisitionId: 'acq-stalled',
+        occurredAt: 't',
+      })
+    )._unsafeUnwrap();
+    // The reactor already processed the event and dead-lettered its effect before the restart.
+    await new SqliteCheckpointStore(db).save('acquisition-reactor', 1);
+    const seedLetters = new SqliteDeadLetterStore(db);
+    await seedLetters.record({
+      subscription: 'acquisition-reactor',
+      globalSeq: 1,
+      streamId: 'acq-stalled',
+      error: '{"effect":"Cleanup"}',
+      occurredAt,
+    });
+    // A legacy letter with no stream attribution seeds nothing (tolerated, not fatal).
+    await seedLetters.record({
+      subscription: 'acquisition-reactor',
+      globalSeq: 2,
+      error: 'legacy',
+      occurredAt,
+    });
+    db.close();
+
+    const runtime = await createDownloaderRuntime(
+      {
+        databaseFile: file,
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+        reactor: { retry: { budgetMs: 21_600_000 }, stalledRetentionMs: 30 * 24 * 3_600_000 },
+      },
+      silentLogger(),
+      { ports: fakePorts() },
+    );
+    cleanups.push(() => runtime.stop());
+    return runtime;
+  }
+
+  it('seeds the stalled read model from dead letters recorded before the restart', async () => {
+    const runtime = await seededRuntime(new Date().toISOString());
+
+    const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
+    expect(status).toMatchObject({ ok: true, value: { stalled: true } });
+  });
+
+  it('logs and continues when the dead-letter store cannot be read at boot', async () => {
+    const deadLetters = new FakeDeadLetterStore();
+    deadLetters.failList = true;
+    deadLetters.failPrune = true;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const runtime = await createDownloaderRuntime(
+      {
+        databaseFile: ':memory:',
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      logger,
+      { ports: fakePorts(), deadLetters },
+    );
+    cleanups.push(() => runtime.stop());
+
+    expect(lines.join('')).toContain('stalled retention prune failed');
+    expect(lines.join('')).toContain('stalled read-model seed failed');
+  });
+
+  it('prunes dead letters older than the retention horizon at boot', async () => {
+    const runtime = await seededRuntime('2020-01-01T00:00:00.000Z'); // far beyond 30 days
+
+    const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
+    expect(status.ok).toBe(true);
+    expect(status.ok && status.value.stalled).toBeFalsy();
   });
 });

@@ -51,6 +51,12 @@ export interface AcquisitionStatusView {
   readonly history: readonly StatusHistoryEntry[];
   /** The candidate editions on offer, present only while awaiting manual selection. */
   readonly candidates?: readonly EditionCandidate[];
+  /**
+   * Present (true) when the acquisition's current effect exhausted its retry budget with no
+   * modeled failure to degrade to — dead-lettered, awaiting an operator (reactor-durability D2).
+   * Additive: absent for every acquisition that is progressing normally.
+   */
+  readonly stalled?: boolean;
 }
 
 export function projectStatus(
@@ -122,6 +128,30 @@ export class AcquisitionStatusProjection {
   rebuild(stored: readonly StoredEvent[]): void {
     this.streams.clear();
     for (const entry of stored) this.apply(entry);
+  }
+}
+
+// --- Stalled acquisitions (reactor-durability D2/D4) -------------------------------------------
+
+/**
+ * The in-memory face of the reactor's dead-lettered effects: seeded from the dead-letter store at
+ * boot, marked/cleared by the reactor as effects dead-letter or their streams resume. In-memory
+ * (like {@link ProgressReadModel}) because the facade's queries are synchronous; the durable truth
+ * stays in the dead-letter store.
+ */
+export class StalledReadModel {
+  private readonly stalled = new Set<string>();
+
+  mark(acquisitionId: string): void {
+    this.stalled.add(acquisitionId);
+  }
+
+  clear(acquisitionId: string): void {
+    this.stalled.delete(acquisitionId);
+  }
+
+  isStalled(acquisitionId: string): boolean {
+    return this.stalled.has(acquisitionId);
   }
 }
 

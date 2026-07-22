@@ -100,6 +100,19 @@ describe('statusViewToDto', () => {
 
     expect(statusViewToDto(view).currentCandidate).toBeUndefined();
   });
+
+  it('passes the stalled exposure through to the wire', () => {
+    const view: AcquisitionStatusView = {
+      acquisitionId: 'acq-1',
+      status: 'Downloading',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+      stalled: true,
+    };
+
+    expect(statusViewToDto(view).stalled).toBe(true);
+  });
 });
 
 describe('progressToDto', () => {

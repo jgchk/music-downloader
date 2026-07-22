@@ -17,6 +17,7 @@ import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
+  StalledReadModel,
 } from '../application/projections/read-models.js';
 import type { AcquisitionPhase } from '../domain/acquisition/acquisition.js';
 import {
@@ -80,6 +81,7 @@ function wire(opts: E2eOptions) {
   const discardStaging = vi.fn((_files) => okAsync<void>(undefined));
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
+  const stalledModel = new StalledReadModel();
   const libraryView = new LibraryViewProjection();
   bus.subscribe((stored) => {
     status.apply(stored);
@@ -114,6 +116,7 @@ function wire(opts: E2eOptions) {
     bus,
     parked: new SqliteParkedEffectStore(db),
     deadLetters: new SqliteDeadLetterStore(db),
+    stalled: stalledModel,
     logger: silentLogger(),
     interpreter,
   });
@@ -123,6 +126,7 @@ function wire(opts: E2eOptions) {
     ids: sequentialIds(),
     status,
     progress: progressModel,
+    stalled: stalledModel,
   };
   return {
     db,

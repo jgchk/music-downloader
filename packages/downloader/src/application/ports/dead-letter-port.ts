@@ -21,4 +21,8 @@ export interface DeadLetter {
 export interface DeadLetterStore {
   record(letter: DeadLetter): ResultAsync<void, InfraError>;
   list(subscription: string): ResultAsync<readonly DeadLetter[], InfraError>;
+  /** Drop a resolved stream's letters (idempotent) — the acquisition is no longer stalled. */
+  clearStream(subscription: string, streamId: string): ResultAsync<void, InfraError>;
+  /** Retention (reactor-durability D2): drop letters older than the horizon (ISO-8601). */
+  prune(subscription: string, olderThanIso: string): ResultAsync<void, InfraError>;
 }
