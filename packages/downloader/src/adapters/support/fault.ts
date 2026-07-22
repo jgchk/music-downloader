@@ -9,10 +9,10 @@ import type { InfraError } from '../../application/ports/errors.js';
  * drift — the v3.3.1 incident class — and retrying it forever is the wedge this change removes;
  * everything else stays transient and earns backoff.
  *
- * Deliberately NOT applied to long polling loops (the slskd download/abort paths): there a single
- * proxy-mangled payload would be classified permanent and terminate a possibly near-complete
- * candidate on the spot. Those paths stay transient — genuine drift then rides the bounded retry
- * budget and lands visibly, which is exactly what the budget is for.
+ * Deliberately NOT applied to the slskd adapters (the search, download, and abort paths, all of
+ * which poll): there a single proxy-mangled payload would be classified permanent and terminate a
+ * possibly near-complete candidate on the spot. Those paths stay transient — genuine drift then
+ * rides the bounded retry budget and lands visibly, which is exactly what the budget is for.
  */
 export function classifiedFault(operation: string, cause: unknown): InfraError {
   return cause instanceof ZodError

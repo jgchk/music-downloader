@@ -159,9 +159,9 @@ export class StalledReadModel {
 
 /**
  * Boot-time retention + seeding (reactor-durability D2): prune dead letters older than the
- * horizon, then load the survivors' stream ids into the in-memory exposure. Both store faults
- * degrade to a served-but-unmarked boot — logged, never fatal: the truth stays in the store and
- * the next boot retries.
+ * horizon, then load the survivors' stream ids into the in-memory exposure. Either store fault is
+ * logged, never fatal: a failed prune over-retains (aged letters stay marked), a failed list
+ * serves the boot unmarked — the truth stays in the store and the next boot retries.
  */
 export async function seedStalledReadModel(
   deadLetters: DeadLetterStore,
