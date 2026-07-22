@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { aggregate, flattenDownloads, reasonFromTransfer } from './transfers.js';
+import {
+  aggregate,
+  enqueueRejectionReason,
+  flattenDownloads,
+  reasonFromTransfer,
+} from './transfers.js';
 
 describe('flattenDownloads', () => {
   it('returns nothing when the payload omits directories', () => {
@@ -109,5 +114,20 @@ describe('aggregate', () => {
 
     expect(status).toMatchObject({ settled: false, allQueued: false });
     expect(status.progress.percent).toBe(25);
+  });
+});
+
+describe('enqueueRejectionReason', () => {
+  it('names the peer when the rejection body is connection-flavored', () => {
+    expect(
+      enqueueRejectionReason('Failed to establish a direct or indirect message connection to u'),
+    ).toBe('PeerUnavailable');
+    expect(enqueueRejectionReason('User u appears to be offline')).toBe('PeerUnavailable');
+    expect(enqueueRejectionReason('peer unavailable')).toBe('PeerUnavailable');
+  });
+
+  it('falls back to a generic transfer failure for other rejection bodies', () => {
+    expect(enqueueRejectionReason('boom')).toBe('TransferError');
+    expect(enqueueRejectionReason('')).toBe('TransferError');
   });
 });

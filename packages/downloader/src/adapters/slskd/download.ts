@@ -23,6 +23,7 @@ import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
 import {
   aggregate,
+  enqueueRejectionReason,
   flattenDownloads,
   isTransferComplete,
   isTransferSucceeded,
@@ -138,7 +139,23 @@ export class SlskdDownload implements DownloadPort {
     for (const key of ownedKeys)
       await this.record(this.ledger.recordCreated({ ...key }), 'record transfer');
     this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
-    await this.client.post(this.downloadsPath(username), requests);
+    const enqueue = await this.client.postRaw(this.downloadsPath(username), requests);
+    if (enqueue.status < 200 || enqueue.status >= 300) {
+      // slskd answered, so the infrastructure is up: it refused THIS candidate's enqueue
+      // (typically an unreachable peer). That is a business failure for the retry ladder — reject
+      // the candidate and advance to the next-best — never an InfraError, which would retry the
+      // same dead peer forever (prod 2026-07-22). The write-ahead rows are released: nothing was
+      // created at the source, so the sweep must not chase them.
+      const reason = enqueueRejectionReason(enqueue.body);
+      this.logger.warn(
+        { username, status: enqueue.status, reason },
+        'slskd rejected the enqueue; failing the candidate',
+      );
+      for (const key of ownedKeys) {
+        await this.record(this.ledger.markRemoved(key), 'release rejected transfer');
+      }
+      return { kind: 'failed', reason };
+    }
 
     const start = this.timer.now();
     let lastBytes = 0;
