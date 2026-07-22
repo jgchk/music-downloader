@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.3.3](https://github.com/jgchk/music-downloader/compare/v3.3.2...v3.3.3) (2026-07-22)
+
+
+### Bug Fixes
+
+* **downloader:** treat a 404 transfer listing as an empty collection, not a retryable fault ([e695f6c](https://github.com/jgchk/music-downloader/commit/e695f6ccf80aa52e7f82d364745e80fdb33f68c3))
+
 ## [3.3.2](https://github.com/jgchk/music-downloader/compare/v3.3.1...v3.3.2) (2026-07-22)
 
 
