@@ -84,38 +84,13 @@ jobs:
       - name: Release-tooling tests
         run: pnpm run test:release
 
-  # The web-interface E2E tier (Playwright over the real adapter-node build, threshold-free).
-  # Post-merge only, like the out-of-process tier: no slow/E2E tests run pre-merge. It gates the
-  # release (via the release job's `needs`), never a merge — browser flake can hold a release
-  # until re-run, but the merged-coverage gate above remains the constitutional pre-merge gate.
-  web-e2e:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm --dir packages/web exec playwright install --with-deps chromium
-      - name: Beets venv (the real bridge validates the beets config at boot)
-        run: |
-          python3 -m venv /tmp/beets-venv
-          /tmp/beets-venv/bin/pip install --quiet --requirement packages/importer/src/adapters/beets/bridge/requirements.txt
-      - name: Web E2E (Playwright)
-        env:
-          BRIDGE_PYTHON: /tmp/beets-venv/bin/python3
-        run: pnpm test:e2e:web
-
   # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
-  # tier, then — only if package.json's version is not already tagged — tag, release, and publish.
-  # The version is read from package.json (bumped pre-merge), never recomputed here.
+  # tier — browser parity phase included, so Playwright drives the same image that publishes — then,
+  # only if package.json's version is not already tagged, tag, release, and publish. The version is
+  # read from package.json (bumped pre-merge), never recomputed here.
   release:
     if: github.event_name == 'push'
-    needs: [quality, test, web-e2e]
+    needs: [quality, test]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release tag + GitHub Release
@@ -175,13 +150,25 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium (browser parity phase)
+        run: pnpm --dir packages/web exec playwright install --with-deps chromium
 
       # THE GATE: stand up the freshly built image + WireMock stubs, drive it end to end over a real
-      # socket, tear down. A failure here fails the job and blocks the publish + release steps below.
+      # socket — a real browser first (parity phase), then the two loop phases — tear down. A failure
+      # here fails the job and blocks the publish + release steps below.
       - name: Out-of-process E2E gate
         env:
           E2E_SKIP_BUILD: '1'
         run: pnpm test:e2e
+      - name: Upload Playwright traces (parity-phase failures)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: packages/web/test-results/
+          # warn (not ignore): loop-phase failures legitimately have no traces, but if the
+          # Playwright output path ever drifts, the annotation is the only signal we'd get.
+          if-no-files-found: warn
 
       # Everything below is the release, guarded on the version not already being tagged. Order:
       # publish the image, then tag + GitHub Release — so `latest`/semver only move on a green E2E.
