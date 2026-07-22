@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Out-of-process E2E orchestration (merge-modular-monolith): run the ONE real image — both module
 # runtimes + the web interface in a single process — against WireMock stubs for the two outermost
-# third parties, and drive it over the web routes on a real socket. Two isolated phases:
+# third parties (loop phases; phase 0 runs stub-free), and drive it over the web routes on a real
+# socket. Three isolated phases:
 #
+#   phase 0  parity.spec.ts          Playwright: a real browser drives the image's web interface
+#                                    with third-party URLs the app CANNOT reach (not the stubs) —
+#                                    the cancel test needs acquisitions to stay retrying, and the
+#                                    image is proven to boot and serve while third parties are down
 #   phase 1  full-loop.e2e.test.ts   intent → download → deposit → seam → real beets → applied
 #   phase 2  restart.e2e.test.ts     kill between fulfilment and import; durable resume, exactly once
 #
@@ -71,7 +76,7 @@ wait_ready() {
   echo "ready: $name"
 }
 
-# ── stubs (shared by both phases; scenario state reset between them) ────────────────────────────
+# ── stubs (loop phases 1–2 share them, state reset between; phase 0 bypasses them) ──────────────
 docker run -d --name "$MB_STUB" --network host \
   -v "$(pwd)/test/e2e/stubs/musicbrainz:/home/wiremock" \
   "$WIREMOCK_IMAGE" --port "$MB_PORT" --disable-banner >/dev/null
@@ -150,6 +155,21 @@ run_phase() { # run_phase <spec-file>
     exit 1
   fi
 }
+
+# Fail fast on browser-level breakage before the slower loop phases. Third parties point at
+# 127.0.0.1:9 (serve.sh's convention) rather than the stubs: port 9 is on the WHATWG fetch
+# bad-ports list, so undici refuses it deterministically at the client — a guaranteed fetch
+# failure with zero network dependence — keeping acquisitions retrying (the cancel test's
+# window) without coupling the smoke to WireMock's unmatched-request 404s, whose classification
+# is deliberate adapter behavior.
+echo "── phase 0: web parity (real browser; third parties unreachable)"
+fresh_env
+start_app -e SLSKD_BASE_URL=http://127.0.0.1:9 -e MUSICBRAINZ_BASE_URL=http://127.0.0.1:9
+if ! pnpm --dir packages/web exec playwright test; then
+  dump_logs
+  exit 1
+fi
+docker rm -f "$APP" >/dev/null
 
 echo "── phase 1: full loop"
 fresh_env

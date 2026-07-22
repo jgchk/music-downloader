@@ -1,19 +1,33 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * The Playwright e2e tier (design D10): a separate, threshold-free job — NOT part of `pnpm check`
- * or the coverage gate. It builds and previews the real app and drives it as a user would;
- * cross-browser confidence lives here, the 100% coverage gate lives in the vitest tiers.
+ * The Playwright parity smoke — threshold-free in both modes (the coverage gate lives in the
+ * vitest tiers). Two ways to run it:
+ *
+ * - CI (E2E_BASE_URL set, non-empty): a phase of the out-of-process e2e tier. `test/e2e/run.sh`
+ *   owns the app — the real built Docker image on a real socket — and points this suite at it;
+ *   no webServer here.
+ * - Local (E2E_BASE_URL unset or empty): a dockerless developer convenience that builds and
+ *   boots the adapter-node app via tests/serve.sh. Not a CI gate.
  */
+const harnessUrl = process.env.E2E_BASE_URL;
+
 export default defineConfig({
   testDir: './tests',
-  webServer: {
-    command: 'bash tests/serve.sh',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  // This suite gates image publish in CI: a stray `.only` must fail loudly, not shrink the gate.
+  forbidOnly: !!process.env.CI,
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: harnessUrl || 'http://localhost:4173',
+    trace: 'retain-on-failure',
   },
+  ...(harnessUrl
+    ? {}
+    : {
+        webServer: {
+          command: 'bash tests/serve.sh',
+          port: 4173,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+        },
+      }),
 });
