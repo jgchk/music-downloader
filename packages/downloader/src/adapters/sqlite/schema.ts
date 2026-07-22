@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS dead_letters (
   global_seq   INTEGER NOT NULL,
   error        TEXT    NOT NULL,
   occurred_at  TEXT    NOT NULL,
+  stream_id    TEXT,
   PRIMARY KEY (subscription, global_seq)
 );
 
@@ -60,5 +61,14 @@ export function openEventDatabase(filename: string): EventDatabase {
   const db = new Database(filename);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/** Additive in-place migrations for databases created before a column existed. */
+function migrate(db: EventDatabase): void {
+  const deadLetterColumns = db.pragma('table_info(dead_letters)') as { name: string }[];
+  if (!deadLetterColumns.some((column) => column.name === 'stream_id')) {
+    db.exec('ALTER TABLE dead_letters ADD COLUMN stream_id TEXT');
+  }
 }

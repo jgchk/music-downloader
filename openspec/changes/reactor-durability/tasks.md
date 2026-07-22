@@ -6,10 +6,10 @@
 
 ## 2. Reactor: park, advance, retry
 
-- [ ] 2.1 Write failing reactor tests: a retryable effect failure parks the stream and ADVANCES the global checkpoint; a subsequent unrelated stream's event is processed immediately (the isolation scenario); implement.
-- [ ] 2.2 Write failing tests for per-stream ordering under park: later events of a parked stream queue behind it and dispatch in order after the parked effect succeeds; pin the no-leapfrog invariant (event N+1 of a parked stream can never dispatch while N is parked); implement.
-- [ ] 2.3 Write failing tests for the retry scheduler: due parked entries re-dispatch with incremented attempt; success clears the entry; implement (reuse the existing fallback-poll timer seam).
-- [ ] 2.4 Write failing tests for budget exhaustion: `ResolveMetadata` degrades to `RecordMetadataFailed` through the command path; an effect with no modeled failure moves to the dead-letter store; both log structured transitions; implement.
+- [x] 2.1 Write failing reactor tests: a retryable effect failure parks the stream and ADVANCES the global checkpoint; a subsequent unrelated stream's event is processed immediately (the isolation scenario); implement.
+- [x] 2.2 Write failing tests for per-stream ordering under park: later events of a parked stream queue behind it and dispatch in order after the parked effect succeeds; pin the no-leapfrog invariant (event N+1 of a parked stream can never dispatch while N is parked); implement.
+- [x] 2.3 Write failing tests for the retry scheduler: due parked entries re-dispatch with incremented attempt; success clears the entry; implement (reuse the existing fallback-poll timer seam).
+- [x] 2.4 Write failing tests for budget exhaustion: `ResolveMetadata` degrades to `RecordMetadataFailed` through the command path; an effect with no modeled failure moves to the dead-letter store; both log structured transitions; implement.
 
 ## 3. Stalled visibility
 

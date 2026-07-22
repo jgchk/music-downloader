@@ -12,6 +12,7 @@ import {
   SlskdSearch,
   SqliteCheckpointStore,
   SqliteEventStore,
+  SqliteParkedEffectStore,
   SqliteResourceLedger,
   UpcasterRegistry,
   fetchHttpClient,
@@ -20,6 +21,8 @@ import {
 } from '../adapters/index.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import { Reactor } from '../application/acquisition/reactor.js';
+import { DEFAULT_RETRY_POLICY } from '../application/acquisition/retry-policy.js';
+import type { RetryPolicy } from '../application/acquisition/retry-policy.js';
 import { SourceResourceSweep } from '../application/acquisition/sweep.js';
 import type { EffectPorts, InterpreterDeps } from '../application/acquisition/interpreter.js';
 import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
@@ -53,6 +56,8 @@ export interface DownloaderRuntimeConfig {
   readonly stagingRoot: string;
   readonly musicbrainz: { readonly baseUrl?: string; readonly userAgent?: string };
   readonly slskd: { readonly baseUrl?: string; readonly apiKey?: string };
+  /** Parked-effect retry tuning (reactor-durability D2); defaults are production-sane. */
+  readonly reactor?: { readonly retry?: Partial<RetryPolicy> };
 }
 
 export interface DownloaderRuntimeOverrides {
@@ -100,6 +105,7 @@ export async function createDownloaderRuntime(
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
   const deadLetters = new SqliteDeadLetterStore(db);
+  const parkedEffects = new SqliteParkedEffectStore(db);
   const ledger = new SqliteResourceLedger(db, clock);
 
   const status = new AcquisitionStatusProjection();
@@ -157,7 +163,16 @@ export async function createDownloaderRuntime(
       progressModel.update(acquisitionId, progress);
     },
   };
-  const reactor = new Reactor({ store, checkpoints, bus, logger, interpreter });
+  const reactor = new Reactor({
+    store,
+    checkpoints,
+    bus,
+    parked: parkedEffects,
+    deadLetters,
+    logger,
+    interpreter,
+    retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
+  });
   await reactor.start();
 
   const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };

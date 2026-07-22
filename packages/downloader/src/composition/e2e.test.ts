@@ -4,6 +4,7 @@ import {
   InProcessEventBus,
   SqliteCheckpointStore,
   SqliteEventStore,
+  SqliteParkedEffectStore,
   UpcasterRegistry,
   openEventDatabase,
 } from '../adapters/index.js';
@@ -107,7 +108,15 @@ function wire(opts: E2eOptions) {
     ports,
     onProgress: (id, _candidate, progress) => progressModel.update(id, progress),
   };
-  const reactor = new Reactor({ store, checkpoints, bus, logger: silentLogger(), interpreter });
+  const reactor = new Reactor({
+    store,
+    checkpoints,
+    bus,
+    parked: new SqliteParkedEffectStore(db),
+    deadLetters: new SqliteDeadLetterStore(db),
+    logger: silentLogger(),
+    interpreter,
+  });
   const deps: UseCaseDeps = {
     store,
     clock: fixedClock(),
