@@ -13,7 +13,7 @@ The composition is also well-suited to a *readiness* probe, not just liveness: S
 - Add a SvelteKit server route (`+server.ts`) at `GET /health` that returns `200` and a JSON body on success. The payload reports an overall `status`, the app `version` (from the workspace `package.json`), and per-module runtime readiness for `downloader` and `importer`.
 - Define **readiness semantics**: the endpoint is a readiness probe. It reports `ok` (200) when both module runtimes are booted and healthy, and `degraded` (503) when a booted runtime reports itself unhealthy. Because the boot gate refuses to serve a half-booted process, a reachable `/health` already implies "booted"; the endpoint's added value over raw reachability is version reporting and post-boot per-module health.
 - Add a cheap **readiness snapshot** to each module runtime surface (`runtime-baseline`): a synchronous, side-effect-free query the web BFF can read to answer `/health` without scanning event stores or performing domain I/O. The route is an interface-layer concern that reads this snapshot; the domain stays pure and dependencies point inward.
-- This is **purely additive**: a new endpoint plus a new read-only runtime query. No existing route, facade, or contract changes. Per api-compatibility this is a **minor, non-breaking** change (targets **v3.1.0**).
+- This is **purely additive**: a new endpoint plus a new read-only runtime query. No existing route, facade, or contract changes. Per api-compatibility this is a **minor, non-breaking** change (targets **v3.2.0**).
 
 ## Capabilities
 
@@ -25,7 +25,7 @@ The composition is also well-suited to a *readiness* probe, not just liveness: S
 ## Impact
 
 - **Code**: one new `packages/web/src/routes/health/+server.ts`; a readiness accessor threaded from the module runtimes through `$lib/server` (runtime/facades). No changes to domain or application layers.
-- **Contracts/compat**: additive only; new `/health` endpoint and new runtime query. No breaking change; minor version bump to v3.1.0.
+- **Contracts/compat**: additive only; new `/health` endpoint and new runtime query. No breaking change; minor version bump to v3.2.0.
 - **Ops**: Komodo redeploy verification, uptime checks, and "which version is live?" get a stable HTTP probe again. Monitoring can alert on `503`/`degraded`.
 - **Testing**: new route and readiness snapshot land test-first under the web package's merged 100% coverage gate (server + ssr projects); no threshold carve-out required.
 - **Deferred explicitly**: re-exposing an OpenAPI document (`/docs/json`) and a standalone `/version` endpoint — `/health` carries the version, so a separate version route is unnecessary for now; the web UI auth story is unchanged (the endpoint is unauthenticated, consistent with the rest of the UI today).
