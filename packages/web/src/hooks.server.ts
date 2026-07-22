@@ -1,4 +1,5 @@
 import type { Handle, ServerInit } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { bootRuntimes, facadesOf } from '$lib/server/runtime.js';
 
 /**
@@ -9,7 +10,10 @@ import { bootRuntimes, facadesOf } from '$lib/server/runtime.js';
  * the daemon lives behind $lib/server.
  */
 export const init: ServerInit = async () => {
-  await bootRuntimes();
+  // Boot from SvelteKit's runtime env, not process.env: in dev, vite/SvelteKit loads `.env`
+  // into `$env/dynamic/private` (and NOT into process.env), so the composed config surface is
+  // only visible here. Under adapter-node in production this reflects the real process env.
+  await bootRuntimes(env);
 };
 
 export const handle: Handle = ({ event, resolve }) => {
