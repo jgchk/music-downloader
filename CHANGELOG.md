@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.3.2](https://github.com/jgchk/music-downloader/compare/v3.3.1...v3.3.2) (2026-07-22)
+
+
+### Bug Fixes
+
+* **downloader:** treat an slskd enqueue rejection as a candidate failure, not an infra fault ([913455f](https://github.com/jgchk/music-downloader/commit/913455f8105996602c9bbef8cbbe254a3bf1312e))
+
 ## [3.3.1](https://github.com/jgchk/music-downloader/compare/v3.3.0...v3.3.1) (2026-07-22)
 
 
