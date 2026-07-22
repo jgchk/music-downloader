@@ -1,0 +1,267 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-07-22",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release",
+    "query": {
+      "release-group": "03cf7496-f565-3b02-8ffb-1eaaf4aafcf4",
+      "inc": "media",
+      "fmt": "json",
+      "limit": "100"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "release-count": 5,
+      "release-offset": 0,
+      "releases": [
+        {
+          "packaging-id": null,
+          "barcode": null,
+          "packaging": null,
+          "quality": "normal",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "title": "Great White Wonder",
+          "cover-art-archive": {
+            "count": 0,
+            "artwork": false,
+            "front": false,
+            "darkened": false,
+            "back": false
+          },
+          "asin": null,
+          "media": [
+            {
+              "title": "",
+              "position": 1,
+              "id": "55c7306d-d9f3-38a6-86a6-802075c195de",
+              "track-count": 12,
+              "format": null,
+              "format-id": null
+            }
+          ],
+          "id": "2def8cff-a8c3-4a9f-a4bb-6549e8666d17",
+          "disambiguation": "",
+          "status": "Bootleg",
+          "text-representation": {
+            "script": "Latn",
+            "language": "eng"
+          }
+        },
+        {
+          "barcode": null,
+          "packaging-id": "f7101ce3-0384-39ce-9fde-fbbd0044d35f",
+          "packaging": "Cardboard/Paper Sleeve",
+          "quality": "normal",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "country": null,
+          "release-events": [
+            {
+              "date": "1970",
+              "area": null
+            }
+          ],
+          "asin": null,
+          "date": "1970",
+          "title": "1/2 of Great White Wonder",
+          "cover-art-archive": {
+            "back": false,
+            "artwork": true,
+            "count": 1,
+            "front": true,
+            "darkened": false
+          },
+          "media": [
+            {
+              "id": "3dce1846-1ce0-3703-8e96-004046ac4a67",
+              "position": 1,
+              "title": "",
+              "format": "12\" Vinyl",
+              "track-count": 12,
+              "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64"
+            },
+            {
+              "position": 2,
+              "title": "",
+              "id": "0181a970-c9c7-3d45-abcb-ef021f494b8b",
+              "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+              "track-count": 12,
+              "format": "12\" Vinyl"
+            }
+          ],
+          "disambiguation": "",
+          "id": "3034055d-0310-4224-8df7-cc053685ef7e",
+          "status": "Bootleg",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          }
+        },
+        {
+          "status": "Bootleg",
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "media": [
+            {
+              "title": "",
+              "position": 1,
+              "id": "f8cee7d5-3519-37fd-814e-e4046b139a39",
+              "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+              "track-count": 12,
+              "format": "12\" Vinyl"
+            },
+            {
+              "format-id": "3e9080b0-5e6c-34ab-bd15-f526b6306a64",
+              "format": "12\" Vinyl",
+              "track-count": 12,
+              "id": "57a55c75-8f9b-30d6-90a2-274347092d26",
+              "title": "",
+              "position": 2
+            }
+          ],
+          "id": "7629ca5c-d6af-4ea4-a541-dc08751df750",
+          "disambiguation": "Berkeley release",
+          "country": "US",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "release-events": [
+            {
+              "date": "1971",
+              "area": {
+                "type": null,
+                "sort-name": "United States",
+                "type-id": null,
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "disambiguation": "",
+                "iso-3166-1-codes": [
+                  "US"
+                ],
+                "name": "United States"
+              }
+            }
+          ],
+          "asin": null,
+          "title": "Great White Wonder",
+          "cover-art-archive": {
+            "count": 3,
+            "artwork": true,
+            "darkened": false,
+            "front": true,
+            "back": true
+          },
+          "date": "1971",
+          "barcode": null,
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "packaging": "Gatefold Cover",
+          "quality": "normal"
+        },
+        {
+          "title": "Great White Wonder",
+          "cover-art-archive": {
+            "back": false,
+            "darkened": false,
+            "front": false,
+            "artwork": false,
+            "count": 0
+          },
+          "date": "2018",
+          "asin": null,
+          "release-events": [
+            {
+              "area": null,
+              "date": "2018"
+            }
+          ],
+          "country": null,
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "packaging": null,
+          "quality": "normal",
+          "packaging-id": null,
+          "barcode": null,
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "status": "Bootleg",
+          "id": "7d2c7f16-b8c6-4ffa-89db-4026e6ccc7c5",
+          "disambiguation": "50th Anniversary",
+          "media": [
+            {
+              "format-id": "907a28d9-b3b2-3ef6-89a8-7b18d91d4794",
+              "track-count": 23,
+              "format": "Digital Media",
+              "position": 1,
+              "title": "",
+              "id": "28ca3569-b94c-35a2-8d20-fe28fbfc849f"
+            }
+          ]
+        },
+        {
+          "disambiguation": "",
+          "id": "df92850f-2a3e-44ba-bdb2-d3d96beea3ae",
+          "media": [
+            {
+              "track-count": 12,
+              "format": "Vinyl",
+              "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+              "position": 1,
+              "title": "",
+              "id": "82cd06a2-8a73-3b20-a097-fb65b8dbfe42"
+            },
+            {
+              "id": "1e78ade0-224e-39f3-b59f-9f7e1de29ec0",
+              "position": 2,
+              "title": "",
+              "format-id": "10e17707-9751-3aaf-95b2-2432acd5374c",
+              "format": "Vinyl",
+              "track-count": 12
+            }
+          ],
+          "text-representation": {
+            "script": "Latn",
+            "language": "eng"
+          },
+          "status": "Bootleg",
+          "packaging": "Gatefold Cover",
+          "quality": "normal",
+          "barcode": null,
+          "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+          "asin": null,
+          "date": "1969",
+          "title": "Great White Wonder",
+          "cover-art-archive": {
+            "front": true,
+            "darkened": false,
+            "count": 3,
+            "artwork": true,
+            "back": false
+          },
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "country": "US",
+          "release-events": [
+            {
+              "date": "1969",
+              "area": {
+                "name": "United States",
+                "iso-3166-1-codes": [
+                  "US"
+                ],
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "disambiguation": "",
+                "type-id": null,
+                "sort-name": "United States",
+                "type": null
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
