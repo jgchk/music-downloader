@@ -21,6 +21,7 @@ export const qualityBucketSchema = z.enum([
 export const acquisitionStatusSchema = z.enum([
   'Empty',
   'Pending',
+  'AwaitingManualSelection',
   'Searching',
   'Selecting',
   'Downloading',

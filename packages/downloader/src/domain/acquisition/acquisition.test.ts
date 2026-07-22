@@ -4,12 +4,14 @@ import type { Effect } from './acquisition.js';
 import type { AcquisitionCommand } from './commands.js';
 import type { AcquisitionEvent, AcquisitionRequest } from './events.js';
 import {
+  awaitingSelectionHistory,
   defaultPolicies,
   fulfilledHistory,
   importingHistory,
   matchingCandidate,
   requestedHistory,
   resolvedHistory,
+  sampleEditionCandidates,
   sampleFiles,
   sampleRequest,
   sampleTarget,
@@ -803,5 +805,127 @@ describe('Acquisition — immutability', () => {
     expect(types(second._unsafeUnwrap())).toEqual(types(first._unsafeUnwrap()));
     expect(acq.phase).toBe('Downloading');
     expect(acq.isTerminal).toBe(false);
+  });
+});
+
+describe('Acquisition.execute — manual edition selection', () => {
+  it('pauses for a human choice when resolution reports the candidates', () => {
+    const events = Acquisition.fromHistory(requestedHistory())
+      .execute({ type: 'RecordManualSelectionRequested', candidates: sampleEditionCandidates })
+      ._unsafeUnwrap();
+    expect(events).toEqual([
+      { type: 'ManualSelectionRequested', candidates: sampleEditionCandidates },
+    ]);
+  });
+
+  it('absorbs a manual-selection report arriving on a terminal acquisition', () => {
+    const cancelled = [...requestedHistory(), { type: 'AcquisitionCancelled' } as const];
+    const result = Acquisition.fromHistory(cancelled).execute({
+      type: 'RecordManualSelectionRequested',
+      candidates: sampleEditionCandidates,
+    });
+    expect(result._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('rejects a manual-selection report outside the Pending phase', () => {
+    const result = Acquisition.fromHistory(resolvedHistory()).execute({
+      type: 'RecordManualSelectionRequested',
+      candidates: sampleEditionCandidates,
+    });
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'IllegalTransition',
+      command: 'RecordManualSelectionRequested',
+      phase: 'Searching',
+    });
+  });
+
+  it('folds the pause as a non-terminal awaiting state', () => {
+    const acq = Acquisition.fromHistory(awaitingSelectionHistory());
+    expect(acq.phase).toBe('AwaitingManualSelection');
+    expect(acq.isTerminal).toBe(false);
+  });
+
+  it('selecting a retained candidate records the choice', () => {
+    const events = Acquisition.fromHistory(awaitingSelectionHistory())
+      .execute({ type: 'SelectEdition', releaseMbid: 'boot-1' })
+      ._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'EditionSelected', releaseMbid: 'boot-1' }]);
+  });
+
+  it('rejects selecting an edition that is not among the retained candidates', () => {
+    const acq = Acquisition.fromHistory(awaitingSelectionHistory());
+    const result = acq.execute({ type: 'SelectEdition', releaseMbid: 'not-a-candidate' });
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'UnknownEdition',
+      releaseMbid: 'not-a-candidate',
+    });
+    expect(acq.phase).toBe('AwaitingManualSelection'); // no state change
+  });
+
+  it('rejects a selection on an acquisition that is not awaiting one', () => {
+    const result = Acquisition.fromHistory(resolvedHistory()).execute({
+      type: 'SelectEdition',
+      releaseMbid: 'boot-1',
+    });
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'IllegalTransition',
+      command: 'SelectEdition',
+      phase: 'Searching',
+    });
+  });
+
+  it('rejects a selection on a terminal acquisition', () => {
+    const cancelled = [...awaitingSelectionHistory(), { type: 'AcquisitionCancelled' } as const];
+    const result = Acquisition.fromHistory(cancelled).execute({
+      type: 'SelectEdition',
+      releaseMbid: 'boot-1',
+    });
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'IllegalTransition',
+      command: 'SelectEdition',
+      phase: 'Cancelled',
+    });
+  });
+
+  it('a resolved target after the selection resumes the normal flow', () => {
+    const resumed = [
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: 'boot-1' } as const,
+    ];
+    const events = Acquisition.fromHistory(resumed)
+      .execute({ type: 'RecordTarget', target: sampleTarget })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['TargetResolved']);
+  });
+
+  it('cancelling while awaiting selection follows the existing cancel path', () => {
+    const acq = Acquisition.fromHistory(awaitingSelectionHistory());
+    const events = acq.execute({ type: 'CancelAcquisition' })._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'AcquisitionCancelled', files: [] }]);
+  });
+
+  it('emits no effects while awaiting selection: the acquisition pauses', () => {
+    const effects = Acquisition.fromHistory(awaitingSelectionHistory()).reactTo({
+      type: 'ManualSelectionRequested',
+      candidates: sampleEditionCandidates,
+    });
+    expect(effects).toEqual([]);
+  });
+
+  it('a recorded selection resolves the chosen release directly (the resume effect)', () => {
+    const resumed = [
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: 'boot-1' } as const,
+    ];
+    const effects = Acquisition.fromHistory(resumed).reactTo({
+      type: 'EditionSelected',
+      releaseMbid: 'boot-1',
+    });
+    expect(effects).toEqual([
+      {
+        type: 'ResolveMetadata',
+        request: { kind: 'musicbrainz', mbid: 'boot-1', targetType: 'album' },
+      },
+    ]);
   });
 });

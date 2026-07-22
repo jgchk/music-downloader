@@ -3,6 +3,7 @@ import type { AcquisitionEvent } from './events.js';
 import { evolve, foldEvents } from './state.js';
 import type { AcquisitionPhase, AcquisitionState } from './state.js';
 import {
+  awaitingSelectionHistory,
   defaultPolicies,
   fulfilledHistory,
   importingHistory,
@@ -10,6 +11,8 @@ import {
   rankedOf,
   requestedHistory,
   resolvedHistory,
+  sampleEditionCandidates,
+  sampleGroupRequest,
   sampleRequest,
   sampleTarget,
   selectedHistory,
@@ -30,6 +33,7 @@ const selectingHistory: AcquisitionEvent[] = [
 const stateByPhase: Record<AcquisitionPhase, AcquisitionState> = {
   Empty: foldEvents([]),
   Pending: foldEvents(requestedHistory()),
+  AwaitingManualSelection: foldEvents(awaitingSelectionHistory()),
   Searching: foldEvents(resolvedHistory()),
   Selecting: foldEvents(selectingHistory),
   Downloading: foldEvents(selectedHistory([a])),
@@ -47,6 +51,8 @@ const allEvents: AcquisitionEvent[] = [
   { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
   { type: 'TargetResolved', target: sampleTarget },
   { type: 'MetadataResolutionFailed' },
+  { type: 'ManualSelectionRequested', candidates: sampleEditionCandidates },
+  { type: 'EditionSelected', releaseMbid: 'boot-1' },
   { type: 'SearchRequested', round: 2 },
   { type: 'SearchCompleted', round: 1, candidates: [] },
   { type: 'CandidatesRanked', ranked: [] },
@@ -69,6 +75,7 @@ const allEvents: AcquisitionEvent[] = [
 const NON_TERMINAL: readonly AcquisitionPhase[] = [
   'Empty',
   'Pending',
+  'AwaitingManualSelection',
   'Searching',
   'Selecting',
   'Downloading',
@@ -79,6 +86,8 @@ const legalSources: Record<AcquisitionEvent['type'], readonly AcquisitionPhase[]
   AcquisitionRequested: ['Empty'],
   TargetResolved: ['Pending'],
   MetadataResolutionFailed: ['Pending'],
+  ManualSelectionRequested: ['Pending'],
+  EditionSelected: ['AwaitingManualSelection'],
   SearchRequested: ['Selecting'],
   SearchCompleted: ['Searching'],
   CandidatesRanked: ['Searching'],
@@ -238,5 +247,41 @@ describe('evolve — cancellation retains and settles the mid-download candidate
   it('ignores a further rejection once `pending` is already cleared', () => {
     const cleared = evolve(cancelledInFlight, { type: 'CandidateRejected', candidate: a.identity });
     expect(evolve(cleared, { type: 'CandidateRejected', candidate: a.identity })).toBe(cleared);
+  });
+});
+
+describe('evolve — manual edition selection pauses and resumes', () => {
+  it('folds a manual-selection request into AwaitingManualSelection, retaining the candidates', () => {
+    const state = foldEvents(awaitingSelectionHistory());
+    expect(state).toMatchObject({
+      phase: 'AwaitingManualSelection',
+      request: sampleGroupRequest,
+      candidates: sampleEditionCandidates,
+    });
+  });
+
+  it('folds an edition selection back to Pending, keeping the original request', () => {
+    const state = foldEvents([
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+    ]);
+    expect(state).toMatchObject({ phase: 'Pending', request: sampleGroupRequest });
+    expect('candidates' in state).toBe(false);
+  });
+
+  it('resolves to Searching once the selected edition yields a target (the normal flow)', () => {
+    const state = foldEvents([
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+      { type: 'TargetResolved', target: sampleTarget },
+    ]);
+    expect(state).toMatchObject({ phase: 'Searching', target: sampleTarget });
+  });
+
+  it('cancelling while awaiting selection folds through the existing cancel path', () => {
+    const state = foldEvents([...awaitingSelectionHistory(), { type: 'AcquisitionCancelled' }]);
+    expect(state).toMatchObject({ phase: 'Cancelled' });
+    expect('current' in state).toBe(false);
+    expect('pending' in state).toBe(false);
   });
 });

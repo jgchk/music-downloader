@@ -38,6 +38,8 @@ export const downloaderFacadeErrorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('NotFound') }),
   z.object({ kind: z.literal('AlreadyExists') }),
   z.object({ kind: z.literal('IllegalTransition'), command: z.string(), phase: z.string() }),
+  // A SelectEdition naming a release outside the retained candidates (manual-edition-selection).
+  z.object({ kind: z.literal('UnknownEdition'), releaseMbid: z.string() }),
   z.object({
     kind: z.literal('ConcurrencyConflict'),
     streamId: z.string(),

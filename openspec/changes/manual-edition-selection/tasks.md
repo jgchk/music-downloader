@@ -7,11 +7,11 @@
 
 ## 2. Aggregate state & commands
 
-- [ ] 2.1 Write failing decide/evolve tests: a `needsSelection` resolution produces `ManualSelectionRequested { candidates }`; state folds to `AwaitingManualSelection` retaining candidates; no search/download effects while awaiting.
-- [ ] 2.2 Add the `ManualSelectionRequested` event, the record command, and the `AwaitingManualSelection` phase in decide/evolve.
-- [ ] 2.3 Write failing tests for `SelectEdition { releaseMbid }`: valid only in `AwaitingManualSelection`; a known candidate resolves that release (reusing the direct path) → `TargetResolved` and normal flow; unknown candidate or wrong-state is a modeled error with no state change.
-- [ ] 2.4 Implement `SelectEdition`, its validation, and the resume effect; wire `react` to continue to search.
-- [ ] 2.5 Write failing tests that cancelling while awaiting selection follows the existing cancel path; adjust decide/evolve.
+- [x] 2.1 Write failing decide/evolve tests: a `needsSelection` resolution produces `ManualSelectionRequested { candidates }`; state folds to `AwaitingManualSelection` retaining candidates; no search/download effects while awaiting.
+- [x] 2.2 Add the `ManualSelectionRequested` event, the record command, and the `AwaitingManualSelection` phase in decide/evolve.
+- [x] 2.3 Write failing tests for `SelectEdition { releaseMbid }`: valid only in `AwaitingManualSelection`; a known candidate resolves that release (reusing the direct path) → `TargetResolved` and normal flow; unknown candidate or wrong-state is a modeled error with no state change.
+- [x] 2.4 Implement `SelectEdition`, its validation, and the resume effect; wire `react` to continue to search.
+- [x] 2.5 Write failing tests that cancelling while awaiting selection follows the existing cancel path; adjust decide/evolve.
 
 ## 3. Application wiring
 

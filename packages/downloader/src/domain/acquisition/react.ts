@@ -44,6 +44,15 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
       return [{ type: 'ResolveMetadata', request: event.request }];
     case 'TargetResolved':
       return [{ type: 'Search', target: event.target, round: 1 }];
+    case 'EditionSelected':
+      // The resume: resolve exactly the chosen release, reusing the direct-by-release-id path — no
+      // new "release id → target" logic exists for manual selection (manual-edition-selection D2).
+      return [
+        {
+          type: 'ResolveMetadata',
+          request: { kind: 'musicbrainz', mbid: event.releaseMbid, targetType: 'album' },
+        },
+      ];
     case 'SearchRequested':
       return state.phase === 'Searching'
         ? [{ type: 'Search', target: state.target, round: event.round }]
@@ -90,6 +99,9 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
       if (state.pending !== undefined) return [{ type: 'AbortDownload', candidate: state.pending }];
       return [];
     case 'MetadataResolutionFailed':
+    // The pause itself: an acquisition awaiting a human's edition choice does nothing — no search,
+    // no download, no import — until a SelectEdition or a cancellation moves it on.
+    case 'ManualSelectionRequested':
     case 'SearchCompleted':
     case 'CandidatesRanked':
     case 'DownloadFailed':
