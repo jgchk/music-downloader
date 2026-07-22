@@ -1,10 +1,24 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
- * The parity smoke (web-ui 6.5): the real composed app — daemon booted by the init hook, real
- * facades, real stores on a scratch filesystem — driven as a user would. Third parties (slskd,
- * MusicBrainz) point at a closed port, so acquisitions retry/park rather than fulfil; the full
- * download→import loop is the out-of-process e2e tier's job (group 8), not this smoke's.
+ * Switch the request kind to `descriptor` and wait for its reactive fields. A selectOption that
+ * fires before hydration changes only the DOM: Svelte then reasserts its own state (`bind:value`),
+ * the select snaps back, and the descriptor fields never render. Re-select until they appear.
+ */
+async function chooseDescriptorKind(page: Page): Promise<void> {
+  await expect(async () => {
+    await page.getByTestId('kind').selectOption('descriptor');
+    await expect(page.getByTestId('artist')).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+}
+
+/**
+ * The parity smoke (out-of-process-e2e browser phase): the real composed app — daemon booted by
+ * the init hook, real facades, real stores — driven as a user would, in either of the two modes
+ * playwright.config.ts describes (the built image under test/e2e/run.sh in CI; a serve.sh boot
+ * locally). Third parties (slskd, MusicBrainz) point at a port fetch refuses deterministically,
+ * so acquisitions retry/park rather than fulfil; the full download→import loop belongs to the
+ * tier's loop phases (1–2), not this smoke.
  */
 
 test('the landing page offers the product navigation', async ({ page }) => {
@@ -15,7 +29,7 @@ test('the landing page offers the product navigation', async ({ page }) => {
 
 test('submitting an acquisition lands on its detail and appears in the list', async ({ page }) => {
   await page.goto('/acquisitions/new');
-  await page.getByTestId('kind').selectOption('descriptor');
+  await chooseDescriptorKind(page);
   await page.getByTestId('artist').fill('E2E Artist');
   await page.locator('input[name="title"]').fill('E2E Album');
   await page.getByRole('button', { name: 'Request download' }).click();
@@ -37,7 +51,7 @@ test('a rejected submission re-renders the form with the failure message', async
 
 test('a cancellable acquisition can be cancelled from its detail page', async ({ page }) => {
   await page.goto('/acquisitions/new');
-  await page.getByTestId('kind').selectOption('descriptor');
+  await chooseDescriptorKind(page);
   await page.getByTestId('artist').fill('Cancel Me');
   await page.locator('input[name="title"]').fill('Now');
   await page.getByRole('button', { name: 'Request download' }).click();

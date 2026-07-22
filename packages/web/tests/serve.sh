@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Serve the real composed app for the Playwright tier: scratch filesystem roots, a minimal but
-# real beets config (validated by the real bridge at boot), and unreachable third-party base URLs
-# (closed port) so the smoke never touches the network. This is the production boot path —
-# adapter-node build, init-hook daemon, facades over locals — not a mock server.
+# Serve the composed app for LOCAL Playwright iteration — a dockerless developer convenience,
+# not any CI job's boot path (CI runs the parity smoke inside test/e2e/run.sh against the real
+# built image). Scratch filesystem roots, a minimal but real beets config (validated by the real
+# bridge at boot), and third-party base URLs at a fetch bad-port (127.0.0.1:9 — undici refuses
+# it at the client) so the smoke never touches the network. Adapter-node build, init-hook daemon, facades over locals — not a mock server.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 scratch="$root/.e2e-scratch"

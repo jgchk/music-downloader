@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 /**
  * The web package's `client` project (design D10): component tests in a real headless Chromium via
  * Browser Mode + vitest-browser-svelte locators. Chromium only — v8 coverage requires a V8
- * runtime; cross-browser confidence belongs to the Playwright e2e tier, not the coverage gate.
+ * runtime; the Playwright parity phase of the out-of-process e2e tier is threshold-free.
  */
 
 // Match the build's `__APP_VERSION__` define (design D5) so client tests see the shipped version.

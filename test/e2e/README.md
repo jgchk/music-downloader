@@ -3,13 +3,26 @@
 A deterministic, gating end-to-end tier that drives the **real built Docker image** — both module
 runtimes and the web interface in one process — over a real HTTP socket, with the reactors, the
 cross-module subscription seam, and both on-disk SQLite event stores live. Only the two outermost
-third parties (slskd + MusicBrainz) are replaced by WireMock stubs; **real beets** runs inside the
+third parties (slskd + MusicBrainz) are replaced by WireMock stubs in the loop phases (the browser
+phase runs stub-free); **real beets** runs inside the
 image, pinned to the MusicBrainz stub (`musicbrainz.host` in the harness beets config), so nothing
 here ever touches the internet.
 
 ## What it exercises
 
-Two phases, each against a fresh environment (`test/e2e/run.sh` orchestrates):
+Three phases, each against a fresh environment (`test/e2e/run.sh` orchestrates):
+
+**Phase 0 — browser parity smoke** (`packages/web/tests/parity.spec.ts`, Playwright): a real
+browser drives the image's web interface — navigation, submit, modeled rejection, user-shaped
+cancel, empty review queue. This app run points the third-party base URLs at **`127.0.0.1:9`
+instead of the stubs** — port 9 is on the WHATWG fetch bad-ports list, so undici refuses it
+deterministically at the client, a guaranteed fetch failure with zero network dependence. That
+keeps acquisitions retrying (the cancel test's window stays open) without coupling the smoke to
+WireMock's unmatched-request 404s, whose classification is deliberate adapter behavior — and it
+proves the image boots and serves while both third parties are unreachable. It runs first to fail fast: browser-level breakage surfaces before
+the slower loop phases. The same suite runs dockerless for local iteration via
+`pnpm test:e2e:web` (`packages/web/tests/serve.sh` boots the adapter-node build); that path is a
+developer convenience, not a CI gate.
 
 **Phase 1 — the full product loop** (`full-loop.e2e.test.ts`):
 
@@ -58,7 +71,7 @@ crash-resumed import stalled forever.
 ## Running it
 
 ```sh
-pnpm test:e2e        # builds the image, runs both phases, tears everything down
+pnpm test:e2e        # builds the image, runs all three phases, tears everything down
 ```
 
 In CI (`.github/workflows/pipeline.yml` release job) it runs after the image build and before
