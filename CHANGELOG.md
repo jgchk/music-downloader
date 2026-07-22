@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.5.0](https://github.com/jgchk/music-downloader/compare/v3.4.0...v3.5.0) (2026-07-22)
+
+
+### Features
+
+* **web:** unify human-attention work into one cross-module attention queue ([444279c](https://github.com/jgchk/music-downloader/commit/444279c08299a7f4d7e6cb1096255c8d3cb38c50))
+
 ## [3.4.0](https://github.com/jgchk/music-downloader/compare/v3.3.4...v3.4.0) (2026-07-22)
 
 
