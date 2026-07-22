@@ -78,12 +78,13 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     stalled,
     logger: overrides.logger ?? silentLogger(),
     interpreter: interpreter(ports),
-    // Tests drive drains explicitly; the default real interval is covered by its own test below.
+    clock,
+    // Tests drive drains explicitly; the timer wiring itself is pinned by its own test below.
     interval: overrides.interval ?? (() => () => {}),
     retryPolicy: overrides.retryPolicy,
     // Deterministic full-step jitter: the delay equals the exponential step exactly.
     random: overrides.random ?? (() => 1),
-    // Instant re-drive jitter by default; the jitter itself is pinned by its own test below.
+    // Instant re-drive jitter by default; the jitter values are pinned by their own test below.
     sleep: overrides.sleep ?? (() => Promise.resolve()),
     redriveGapMs: overrides.redriveGapMs,
   };
@@ -154,11 +155,43 @@ describe('Reactor.start', () => {
     expect(ports.download.download).toHaveBeenCalledOnce();
   });
 
-  it('subscribes even when catch-up fails, and tolerates a checkpoint load failure', async () => {
+  it('subscribes even when the catch-up read fails', async () => {
     store.failReadAll = true;
-    checkpoints.failLoad = true;
     await reactor(stubPorts()).start();
     expect(bus.subscriberCount()).toBe(1);
+  });
+
+  it('logs a failed checkpoint load and replays from the log start', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    await seed(requestedHistory());
+    checkpoints.failLoad = true;
+    const ports = stubPorts({
+      metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
+    });
+    await reactor(ports, { logger }).start();
+
+    expect(lines.join('')).toContain('checkpoint load failed; replaying from the log start');
+    expect(ports.metadata.resolve).toHaveBeenCalledOnce(); // replayed from seq 0
+  });
+
+  it('logs a failed checkpoint save and keeps draining on the in-memory cursor', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    await seed(requestedHistory(), 'acq-1');
+    await seed(requestedHistory(), 'acq-2');
+    checkpoints.failSaves = true;
+    const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
+    await reactor(stubPorts({ metadata: { resolve } }), { logger }).start();
+
+    expect(resolve).toHaveBeenCalledTimes(2); // the drain does not wedge on the save fault
+    expect(lines.join('')).toContain('checkpoint save failed');
   });
 
   it('processes live events delivered on the bus after start', async () => {
@@ -262,19 +295,18 @@ describe('Reactor.process', () => {
     r.stop();
   });
 
-  it('polls on a real timer by default, and stop() clears it', async () => {
+  it('polls on the supplied interval timer, and stop() clears it', async () => {
     vi.useFakeTimers();
     try {
       const ports = stubPorts();
-      const r = new Reactor({
-        store,
-        checkpoints,
-        bus,
-        parked,
-        deadLetters,
-        stalled,
-        logger: silentLogger(),
-        interpreter: interpreter(ports),
+      const r = reactor(ports, {
+        // The same wiring composition supplies in production: a real setInterval.
+        interval: (fn, ms) => {
+          const handle = setInterval(fn, ms);
+          return () => {
+            clearInterval(handle);
+          };
+        },
       });
       await r.start();
 
@@ -459,6 +491,54 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     r.stop();
   });
 
+  it('logs a failed park clear and converges once the clear succeeds', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    await seed(requestedHistory());
+    const resolve = vi
+      .fn()
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down')))
+      .mockReturnValue(okAsync({ kind: 'unresolved' as const }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
+    await r.start();
+
+    clock.advance(5_000);
+    parked.failClear = true;
+    await r.drain(); // the retry succeeds but the park cannot be cleared
+    expect(parked.peek('acq-1')).toBeDefined();
+    expect(lines.join('')).toContain('failed to clear the resolved park');
+
+    parked.failClear = false;
+    await r.drain(); // the past-due entry re-fires idempotently, then clears
+    expect(parked.count()).toBe(0);
+    r.stop();
+  });
+
+  it('retries every due stream in one tick — one failure does not starve a sibling', async () => {
+    await seed(requestedHistory(), 'acq-sick');
+    await seed(requestedHistory(), 'acq-healthy');
+    const resolve = vi
+      .fn()
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down'))) // drain: acq-sick parks
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down'))) // drain: acq-healthy parks
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down'))) // retry tick: acq-sick still down
+      .mockReturnValue(okAsync({ kind: 'unresolved' as const })); // retry tick: acq-healthy recovered
+    const r = reactor(stubPorts({ metadata: { resolve } }));
+    await r.start();
+    expect(parked.count()).toBe(2);
+
+    clock.advance(5_000);
+    await r.drain();
+
+    expect(parked.peek('acq-sick')).toMatchObject({ attempt: 2 }); // rescheduled
+    expect(parked.peek('acq-healthy')).toBeUndefined(); // resumed in the same tick
+    expect(streamEventTypes('acq-healthy')).toContain('MetadataResolutionFailed');
+    r.stop();
+  });
+
   it('clears a park whose event no longer exists and lets the re-drive reconcile', async () => {
     await parked.park({
       streamId: 'acq-ghost',
@@ -523,6 +603,11 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
 
   it('dead-letters an effect with no modeled failure and records the owning stream', async () => {
     // A CandidateRejected cleanup (no modeled failure path) that fails for the whole budget.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
     const a = matchingCandidate('a');
     await seed([
       ...selectedHistory([a]),
@@ -533,6 +618,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     const discardStaging = vi.fn(() => errAsync(infraError('fs', 'denied')));
     const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }), {
       retryPolicy: TIGHT_BUDGET,
+      logger,
     });
     await r.start();
     expect(parked.peek('acq-1')).toMatchObject({ globalSeq: 7 });
@@ -548,6 +634,62 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
       streamId: 'acq-1',
     });
     expect(deadLetters.letters[0]!.error).toContain('Cleanup');
+    expect(lines.join('')).toContain('effect dead-lettered and acquisition stalled');
+    r.stop();
+  });
+
+  it('dead-letters an exhausted Search — an empty result would be a fabricated fact', async () => {
+    await seed(resolvedHistory()); // ends TargetResolved -> Search effect
+    await checkpoints.save(REACTOR_CONSUMER, 1); // only the search dispatch is pending
+    const search = vi.fn(() => errAsync(infraError('slskd.search', 'down')));
+    const r = reactor(stubPorts({ search: { search } }), { retryPolicy: TIGHT_BUDGET });
+    await r.start();
+
+    clock.advance(61_000);
+    await r.drain();
+
+    expect(parked.count()).toBe(0);
+    expect(deadLetters.letters[0]?.error).toContain('Search');
+    expect(stalled.isStalled('acq-1')).toBe(true);
+    r.stop();
+  });
+
+  it('dead-letters an exhausted Validate — a verdict cannot be fabricated', async () => {
+    const a = matchingCandidate('a');
+    await seed(validatingHistory([a])); // ends DownloadCompleted -> Validate effect
+    await checkpoints.save(REACTOR_CONSUMER, 5);
+    const probe = vi.fn(() => errAsync(infraError('ffmpeg.probe', 'no binary')));
+    const r = reactor(stubPorts({ probe: { probe } }), { retryPolicy: TIGHT_BUDGET });
+    await r.start();
+
+    clock.advance(61_000);
+    await r.drain();
+
+    expect(parked.count()).toBe(0);
+    expect(deadLetters.letters[0]?.error).toContain('Validate');
+    expect(stalled.isStalled('acq-1')).toBe(true);
+    r.stop();
+  });
+
+  it('dead-letters an exhausted Import — a library location cannot be fabricated', async () => {
+    const a = matchingCandidate('a');
+    await seed(importingHistory([a])); // ends ValidationPassed -> Import effect
+    await checkpoints.save(REACTOR_CONSUMER, 6);
+    const libraryImport = vi.fn(() => errAsync(infraError('library.import', 'disk full')));
+    const r = reactor(
+      stubPorts({
+        library: { import: libraryImport, discardStaging: vi.fn(() => okAsync(undefined)) },
+      }),
+      { retryPolicy: TIGHT_BUDGET },
+    );
+    await r.start();
+
+    clock.advance(61_000);
+    await r.drain();
+
+    expect(parked.count()).toBe(0);
+    expect(deadLetters.letters[0]?.error).toContain('Import');
+    expect(stalled.isStalled('acq-1')).toBe(true);
     r.stop();
   });
 
@@ -713,13 +855,11 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     await r.start();
 
     clock.advance(61_000);
-    const append = vi
-      .spyOn(store, 'append')
-      .mockReturnValue(errAsync(infraError('event-store.append', 'disk full')));
+    store.failAppends = true;
     await r.drain();
     expect(parked.peek('acq-1')).toBeDefined(); // the modeled landing must not be lost
 
-    append.mockRestore();
+    store.failAppends = false;
     await r.drain();
     expect(parked.count()).toBe(0);
     expect(streamEventTypes('acq-1')).toContain('MetadataResolutionFailed');
@@ -728,39 +868,13 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
 
   it('parks on a concurrency conflict, recording the conflict as the last error', async () => {
     await seed(requestedHistory());
-    const append = vi
-      .spyOn(store, 'append')
-      .mockReturnValue(
-        errAsync({ kind: 'ConcurrencyConflict' as const, streamId: 'acq-1', expectedVersion: 1 }),
-      );
+    store.conflictAppends = true;
     const r = reactor(
       stubPorts({ metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) } }),
     );
     await r.start();
 
     expect(parked.peek('acq-1')?.lastError).toContain('ConcurrencyConflict');
-    append.mockRestore();
-    r.stop();
-  });
-
-  it('rolls real jitter by default when parking', async () => {
-    await seed(requestedHistory());
-    const ports = stubPorts({
-      metadata: { resolve: vi.fn(() => errAsync(infraError('mb', 'down'))) },
-    });
-    const r = new Reactor({
-      store,
-      checkpoints,
-      bus,
-      parked,
-      deadLetters,
-      stalled,
-      logger: silentLogger(),
-      interpreter: interpreter(ports),
-      interval: () => () => {},
-    });
-    await r.start();
-    expect(parked.peek('acq-1')).toBeDefined();
     r.stop();
   });
 
@@ -851,7 +965,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     r.stop();
   });
 
-  it('logs structured park, degrade, and dead-letter transitions', async () => {
+  it('logs structured park and degrade transitions', async () => {
     const lines: string[] = [];
     const logger = createLogger({
       level: 'debug',
@@ -989,44 +1103,14 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
     r.stop();
   });
 
-  it('sleeps on a real timeout by default between re-driven streams', async () => {
-    vi.useFakeTimers();
-    try {
-      await seed(requestedHistory());
-      await checkpointToHead();
-      const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
-      const r = new Reactor({
-        store,
-        checkpoints,
-        bus,
-        parked,
-        deadLetters,
-        stalled,
-        logger: silentLogger(),
-        interpreter: interpreter(stubPorts({ metadata: { resolve } })),
-        interval: () => () => {},
-        random: () => 1,
-      });
-      const started = r.start();
-      await vi.advanceTimersByTimeAsync(1_000); // the default jitter gap elapses
-      await started;
-      expect(resolve).toHaveBeenCalledOnce();
-      r.stop();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('survives an unexpected throw inside a pass without poisoning the mutex', async () => {
     await seed(requestedHistory());
     const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
     const r = reactor(stubPorts({ metadata: { resolve } }));
-    const readAll = vi.spyOn(store, 'readAll').mockImplementation(() => {
-      throw new Error('boom'); // a bug, not a modeled failure — must not silence the reactor
-    });
+    store.throwOnReadAll = true; // a bug, not a modeled failure — must not silence the reactor
     await r.drain(); // resolves; the throw is caught and logged
 
-    readAll.mockRestore();
+    store.throwOnReadAll = false;
     await r.drain(); // the mutex still runs passes
     expect(resolve).toHaveBeenCalledOnce();
     r.stop();
@@ -1075,11 +1159,33 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
   });
 
   it('logs and skips the pass when the log cannot be read', async () => {
-    // Covered indirectly by the catch-up-failure start test; pinned here against the re-drive.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
     store.failReadAll = true;
-    const r = reactor(stubPorts());
+    const r = reactor(stubPorts(), { logger });
     await r.start();
-    expect(parked.count()).toBe(0);
+    expect(lines.join('')).toContain('startup re-drive could not read the log');
+    r.stop();
+  });
+
+  it('logs and skips a stream whose park state cannot be read at re-drive', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    await seed(requestedHistory());
+    await checkpointToHead();
+    parked.failFind = true;
+    const ports = stubPorts();
+    const r = reactor(ports, { logger });
+    await r.start();
+
+    expect(ports.metadata.resolve).not.toHaveBeenCalled(); // skipped, not blindly re-driven
+    expect(lines.join('')).toContain('startup re-drive park lookup failed');
     r.stop();
   });
 });
@@ -1090,6 +1196,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     // Fulfilled. Reacting against the prefix (Importing) re-fires Import; reacting against the latest
     // fold (Fulfilled) would silently swallow it. Redelivery must reproduce first-delivery effects.
     await seed(importedThenFulfilled([matchingCandidate('a')]));
+    const before = streamEventTypes('acq-1');
     const validationPassed = storedOfType('ValidationPassed');
     const ports = stubPorts({
       library: {
@@ -1101,6 +1208,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     expect(ports.library.import).toHaveBeenCalledOnce();
     // The re-import's RecordImported hits the already-terminal stream → decide no-ops → checkpoint advances.
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(validationPassed.globalSeq);
+    expect(streamEventTypes('acq-1')).toEqual(before); // the recorded history gains no duplicate
   });
 
   it('reacts to a co-emitted non-final event against its own post-state, not the batch successor', async () => {
@@ -1124,6 +1232,12 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     // Validating). Download re-fires; the stale RecordDownloadCompleted is an IllegalTransition that
     // D5 records and advances past — download happened, but the consumer does not wedge.
     await seed(validatingHistory([matchingCandidate('a')]));
+    const before = streamEventTypes('acq-1');
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
     const selected = storedOfType('CandidateSelected');
     const ports = stubPorts({
       download: {
@@ -1131,8 +1245,10 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
         abort: vi.fn(() => okAsync([])),
       },
     });
-    await reactor(ports).process(selected);
+    await reactor(ports, { logger }).process(selected);
     expect(ports.download.download).toHaveBeenCalledOnce();
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(selected.globalSeq);
+    expect(streamEventTypes('acq-1')).toEqual(before); // the stale completion appended nothing
+    expect(lines.join('')).toContain('effect follow-on rejected as stale'); // recorded, not silent
   });
 });

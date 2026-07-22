@@ -34,6 +34,7 @@ import {
   LibraryViewProjection,
   ProgressReadModel,
   StalledReadModel,
+  seedStalledReadModel,
 } from '../application/projections/read-models.js';
 import { REACTOR_CONSUMER } from '../application/acquisition/reactor.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
@@ -124,21 +125,10 @@ export async function createDownloaderRuntime(
   const progressModel = new ProgressReadModel();
   const libraryView = new LibraryViewProjection();
 
-  // Stalled retention + seeding (reactor-durability D2): prune aged dead letters, then load the
-  // survivors into the in-memory exposure the facade's synchronous queries read.
   const stalledModel = new StalledReadModel();
   const retentionMs = config.reactor?.stalledRetentionMs ?? DEFAULT_STALLED_RETENTION_MS;
   const horizon = new Date(clock.now().getTime() - retentionMs).toISOString();
-  const pruned = await deadLetters.prune(REACTOR_CONSUMER, horizon);
-  if (pruned.isErr()) logger.warn({ err: pruned.error }, 'stalled retention prune failed');
-  const letters = await deadLetters.list(REACTOR_CONSUMER);
-  if (letters.isOk()) {
-    for (const letter of letters.value) {
-      if (letter.streamId !== undefined) stalledModel.mark(letter.streamId);
-    }
-  } else {
-    logger.error({ err: letters.error }, 'stalled read-model seed failed');
-  }
+  await seedStalledReadModel(deadLetters, stalledModel, REACTOR_CONSUMER, horizon, logger);
 
   const backlog = await store.readAll(0);
   if (backlog.isOk()) {
@@ -200,12 +190,23 @@ export async function createDownloaderRuntime(
     stalled: stalledModel,
     logger,
     interpreter,
+    clock,
+    // The ambient effects the reactor runs on are chosen here, not in the application layer.
+    interval: (fn, ms) => {
+      const handle = setInterval(fn, ms);
+      return () => {
+        clearInterval(handle);
+      };
+    },
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    random: Math.random,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
   });
-  // Boot readiness (reactor-durability): the runtime is ready once wired; the catch-up drain and
-  // the startup re-drive execute in the background on the reactor's own scheduling. Awaiting them
-  // here kept the web interface unbound for the backlog's whole execution (2026-07-22: an album
-  // download ran inside boot — a ~2h UI outage).
+  // Boot readiness (reactor-durability D4): the runtime is ready once wired; the catch-up drain
+  // and the startup re-drive execute in the background on the reactor's own scheduling. Awaiting
+  // them here kept the web interface unbound for the backlog's whole execution (2026-07-22: an
+  // album download ran inside boot — a ~2h UI outage). start() cannot reject by construction:
+  // its awaited reads are Results and both passes run under the reactor's catching mutex.
   void reactor.start();
 
   const deps: UseCaseDeps = {

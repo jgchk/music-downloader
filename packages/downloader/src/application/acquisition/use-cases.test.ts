@@ -156,7 +156,7 @@ describe('queries', () => {
     expect(getAcquisitionProgress(d, 'acq-1')?.percent).toBe(10);
   });
 
-  it('exposes a dead-lettered acquisition as stalled, additively (reactor-durability D2)', () => {
+  it('joins the stalled exposure onto get and list, absent by default (reactor-durability D2)', () => {
     const d = deps();
     d.status.apply({
       globalSeq: 1,

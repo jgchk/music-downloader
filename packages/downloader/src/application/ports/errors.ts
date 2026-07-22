@@ -1,7 +1,8 @@
 /**
  * Infrastructure faults (D3): the neverthrow `Err` channel of the outbound ports. Distinct from
  * business sadness (a stalled download, no candidates), which flows as domain events. The shell
- * treats an `InfraError` as a retryable operational concern (backoff / dead-letter), never a fact.
+ * treats an `InfraError` as retryable (backoff / dead-letter) unless the adapter marked it
+ * permanent — never as a fact.
  */
 export interface InfraError {
   readonly kind: 'InfraError';
