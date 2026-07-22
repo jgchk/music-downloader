@@ -2,7 +2,12 @@ import type { Candidate, CandidateRef } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { Target } from '../target/target.js';
 import type { ValidationVerdict } from '../validation/verdict.js';
-import type { AcquisitionRequest, DownloadFailureReason, DownloadedFile } from './events.js';
+import type {
+  AcquisitionRequest,
+  DownloadFailureReason,
+  DownloadedFile,
+  EditionCandidate,
+} from './events.js';
 
 /**
  * Commands drive `decide`. External effect *results* re-enter as `Record*` commands so `decide`
@@ -16,6 +21,16 @@ export type AcquisitionCommand =
     }
   | { readonly type: 'RecordTarget'; readonly target: Target }
   | { readonly type: 'RecordMetadataFailed' }
+  | {
+      // Resolution's needs-selection outcome re-entering: the group's candidate editions.
+      readonly type: 'RecordManualSelectionRequested';
+      readonly candidates: readonly EditionCandidate[];
+    }
+  | {
+      // The user's choice among the retained candidates (valid only while awaiting selection).
+      readonly type: 'SelectEdition';
+      readonly releaseMbid: string;
+    }
   | { readonly type: 'RecordSearchResults'; readonly candidates: readonly Candidate[] }
   | { readonly type: 'RecordDownloadCompleted'; readonly files: readonly DownloadedFile[] }
   | {

@@ -16,6 +16,7 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 {
     case 'InvalidPolicy':
     case 'InvalidResolution':
     case 'UnknownCandidate':
+    case 'UnknownEdition':
       return 400;
     case 'NotFound':
     case 'UnknownImport':
@@ -47,6 +48,8 @@ export function messageOf(error: FacadeError): string {
       return `Invalid resolution: ${error.detail}`;
     case 'UnknownCandidate':
       return `Unknown candidate: ${error.candidate}.`;
+    case 'UnknownEdition':
+      return `Unknown edition: ${error.releaseMbid}. Reload — the available editions may have changed.`;
     case 'NoRetainedCandidate':
       return 'This import did not arrive from the downloader with a retained candidate, so a download retry cannot be requested. Plain reject is still available.';
     case 'ConcurrencyConflict':

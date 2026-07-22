@@ -64,6 +64,17 @@ export type AcquisitionEvent =
     }
   | { readonly type: 'TargetResolved'; readonly target: Target }
   | { readonly type: 'MetadataResolutionFailed' }
+  | {
+      // A release-group request found editions but none official: resolution cannot pick, so the
+      // acquisition pauses with the candidates for a human to choose (manual-edition-selection).
+      readonly type: 'ManualSelectionRequested';
+      readonly candidates: readonly EditionCandidate[];
+    }
+  | {
+      // The human chose: resolve exactly this release, identical to a direct-by-release-id request.
+      readonly type: 'EditionSelected';
+      readonly releaseMbid: string;
+    }
   | { readonly type: 'SearchRequested'; readonly round: number }
   | {
       readonly type: 'SearchCompleted';

@@ -3,7 +3,12 @@ import type { Candidate } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { RankedCandidate } from '../ranking/ranking.js';
 import type { Target } from '../target/target.js';
-import type { AcquisitionEvent, AcquisitionRequest, DownloadedFile } from './events.js';
+import type {
+  AcquisitionEvent,
+  AcquisitionRequest,
+  DownloadedFile,
+  EditionCandidate,
+} from './events.js';
 
 /**
  * The folded state of one acquisition (the sole aggregate, D1), modelled as a discriminated union
@@ -16,6 +21,7 @@ import type { AcquisitionEvent, AcquisitionRequest, DownloadedFile } from './eve
 export type AcquisitionPhase =
   | 'Empty' // no acquisition yet
   | 'Pending' // requested, resolving metadata
+  | 'AwaitingManualSelection' // paused: a human must choose among the retained candidate editions
   | 'Searching' // awaiting search results
   | 'Selecting' // ranked working set in hand, none in flight
   | 'Downloading' // one candidate in flight
@@ -52,6 +58,15 @@ export interface EmptyState {
 }
 export interface PendingState extends Requested {
   readonly phase: 'Pending';
+}
+/**
+ * Paused for a human's edition choice (manual-edition-selection D2): resolution found editions but
+ * no official one, so the candidates are retained and nothing searches, downloads, or imports
+ * until a `SelectEdition` or a cancellation.
+ */
+export interface AwaitingManualSelectionState extends Requested {
+  readonly phase: 'AwaitingManualSelection';
+  readonly candidates: readonly EditionCandidate[];
 }
 export interface SearchingState extends Targeted {
   readonly phase: 'Searching';
@@ -122,6 +137,7 @@ export interface CancelledState extends Progress {
 export type AcquisitionState =
   | EmptyState
   | PendingState
+  | AwaitingManualSelectionState
   | SearchingState
   | SelectingState
   | DownloadingState
@@ -173,6 +189,16 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
     case 'MetadataResolutionFailed':
       if (state.phase !== 'Pending') return state;
       return { ...state, phase: 'MetadataFailed' };
+    case 'ManualSelectionRequested':
+      if (state.phase !== 'Pending') return state;
+      return { ...state, phase: 'AwaitingManualSelection', candidates: event.candidates };
+    case 'EditionSelected': {
+      // Back to Pending: the chosen release id is being resolved, exactly like a fresh resolution.
+      // The candidates are dropped — they were only ever the menu for this choice.
+      if (state.phase !== 'AwaitingManualSelection') return state;
+      const { candidates: _candidates, ...requested } = state;
+      return { ...requested, phase: 'Pending' };
+    }
     case 'SearchRequested':
       if (state.phase !== 'Selecting') return state;
       return {

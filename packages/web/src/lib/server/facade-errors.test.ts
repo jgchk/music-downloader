@@ -9,6 +9,7 @@ const downloaderErrors: DownloaderFacadeError[] = [
   { kind: 'NotFound' },
   { kind: 'AlreadyExists' },
   { kind: 'IllegalTransition', command: 'Cancel', phase: 'Fulfilled' },
+  { kind: 'UnknownEdition', releaseMbid: 'mbid-x' },
   { kind: 'ConcurrencyConflict', streamId: 'acq-1', expectedVersion: 3 },
   { kind: 'InfraError', operation: 'store.append', message: 'disk full' },
 ];
@@ -32,6 +33,7 @@ describe('statusOf', () => {
     ['NotFound', 404],
     ['AlreadyExists', 409],
     ['IllegalTransition', 409],
+    ['UnknownEdition', 400],
     ['ConcurrencyConflict', 409],
     ['InfraError', 500],
   ] as const)('%s -> %d (downloader)', (kind, status) => {
@@ -72,6 +74,7 @@ describe('messageOf', () => {
       messageOf({ kind: 'IllegalTransition', command: 'Cancel', phase: 'Fulfilled' }),
     ).toContain('Fulfilled');
     expect(messageOf({ kind: 'UnknownCandidate', candidate: 'mb/x' })).toContain('mb/x');
+    expect(messageOf({ kind: 'UnknownEdition', releaseMbid: 'mb/ed' })).toContain('mb/ed');
     expect(messageOf({ kind: 'InvalidResolution', detail: 'no candidates' })).toContain(
       'no candidates',
     );

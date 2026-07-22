@@ -30,7 +30,10 @@ export type DomainError =
       readonly kind: 'IllegalTransition';
       readonly command: AcquisitionCommandType;
       readonly phase: AcquisitionPhase;
-    };
+    }
+  // A SelectEdition naming a release that is not among the retained candidates: the menu is the
+  // contract, so an off-menu choice is a protocol violation, not a resolvable request.
+  | { readonly kind: 'UnknownEdition'; readonly releaseMbid: string };
 
 type Decision = Result<readonly AcquisitionEvent[], DomainError>;
 
@@ -141,6 +144,20 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
       return ok([{ type: 'MetadataResolutionFailed' }]);
+
+    case 'RecordManualSelectionRequested':
+      if (isTerminal(state)) return ok([]);
+      if (state.phase !== 'Pending') return err(illegal(command.type, state));
+      return ok([{ type: 'ManualSelectionRequested', candidates: command.candidates }]);
+
+    case 'SelectEdition':
+      // A user command, not an effect result: a stale or out-of-state selection is *rejected* (the
+      // caller must learn its choice did nothing), unlike Record* commands which absorb on terminal.
+      if (state.phase !== 'AwaitingManualSelection') return err(illegal(command.type, state));
+      if (!state.candidates.some((candidate) => candidate.releaseMbid === command.releaseMbid)) {
+        return err({ kind: 'UnknownEdition', releaseMbid: command.releaseMbid });
+      }
+      return ok([{ type: 'EditionSelected', releaseMbid: command.releaseMbid }]);
 
     case 'RecordSearchResults': {
       if (isTerminal(state)) return ok([]);

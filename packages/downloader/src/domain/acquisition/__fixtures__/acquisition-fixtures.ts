@@ -10,7 +10,12 @@ import { rankCandidates } from '../../ranking/ranking.js';
 import type { RankedCandidate } from '../../ranking/ranking.js';
 import { createTarget } from '../../target/target.js';
 import type { Target } from '../../target/target.js';
-import type { AcquisitionEvent, AcquisitionRequest, DownloadedFile } from '../events.js';
+import type {
+  AcquisitionEvent,
+  AcquisitionRequest,
+  DownloadedFile,
+  EditionCandidate,
+} from '../events.js';
 
 /** Shared BDD fixtures for the decider tests: a target, matching candidates, and history builders. */
 
@@ -74,6 +79,35 @@ export function requestedHistory(
   policies: AcquisitionPolicies = defaultPolicies(),
 ): AcquisitionEvent[] {
   return [{ type: 'AcquisitionRequested', request: sampleRequest, policies }];
+}
+
+export const sampleGroupRequest: AcquisitionRequest = {
+  kind: 'release-group',
+  mbid: 'rg-1',
+  targetType: 'album',
+};
+
+/** The candidate editions of a group with no official edition, as resolution would present them. */
+export const sampleEditionCandidates: readonly EditionCandidate[] = [
+  {
+    releaseMbid: 'boot-1',
+    title: 'Live at Budokan',
+    date: '1995-05-01',
+    country: 'JP',
+    format: 'CD',
+    trackCount: 12,
+  },
+  { releaseMbid: 'boot-2', title: 'Promo Sampler', trackCount: 12 },
+];
+
+/** History paused for a human's edition choice — an AwaitingManualSelection state. */
+export function awaitingSelectionHistory(
+  policies: AcquisitionPolicies = defaultPolicies(),
+): AcquisitionEvent[] {
+  return [
+    { type: 'AcquisitionRequested', request: sampleGroupRequest, policies },
+    { type: 'ManualSelectionRequested', candidates: sampleEditionCandidates },
+  ];
 }
 
 export function resolvedHistory(
