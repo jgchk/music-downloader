@@ -85,9 +85,11 @@ jobs:
         run: pnpm run test:release
 
   # The web-interface E2E tier (Playwright over the real adapter-node build, threshold-free).
-  # Deliberately NOT a required check: browser flake must not block a merge; the merged-coverage
-  # gate above is the constitutional gate.
+  # Post-merge only, like the out-of-process tier: no slow/E2E tests run pre-merge. It gates the
+  # release (via the release job's `needs`), never a merge — browser flake can hold a release
+  # until re-run, but the merged-coverage gate above remains the constitutional pre-merge gate.
   web-e2e:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -113,7 +115,7 @@ jobs:
   # The version is read from package.json (bumped pre-merge), never recomputed here.
   release:
     if: github.event_name == 'push'
-    needs: [quality, test]
+    needs: [quality, test, web-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release tag + GitHub Release
