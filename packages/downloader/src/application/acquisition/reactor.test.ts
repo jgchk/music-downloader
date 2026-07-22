@@ -190,7 +190,7 @@ describe('Reactor.process', () => {
     // wakeup must coalesce into another pass — a snapshot-then-subscribe drops the follow-ons
     // into the gap and a crash-resumed chain stalls (found by the out-of-process restart e2e).
     await seed(requestedHistory());
-    const resolution = { kind: 'album', artist: 'a', title: 't', mbid: 'm' };
+    const resolution = { kind: 'unresolved' as const };
     const resolve = vi.fn(() => {
       if (resolve.mock.calls.length === 1) {
         // First delivery (acq-1, from the backlog): a second stream lands and publishes while
@@ -222,7 +222,7 @@ describe('Reactor.process', () => {
     const resolve = vi
       .fn()
       .mockReturnValueOnce(errAsync(infraError('mb', 'down')))
-      .mockReturnValue(okAsync({ kind: 'album', artist: 'a', title: 't', mbid: 'm' }));
+      .mockReturnValue(okAsync({ kind: 'unresolved' as const }));
     const ports = stubPorts({ metadata: { resolve } });
     const r = reactor(ports, {
       interval: (fn) => {

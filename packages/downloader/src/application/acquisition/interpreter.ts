@@ -10,6 +10,8 @@ import type {
   MetadataPort,
   SearchPort,
 } from '../ports/outbound-ports.js';
+import type { MetadataResolution } from '../ports/outbound-ports.js';
+import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDeps, CommandError } from './command-handler.js';
 import { runValidation } from './validation-service.js';
@@ -37,6 +39,18 @@ export interface InterpreterDeps extends CommandDeps {
   ) => void;
 }
 
+/** Each resolution outcome re-enters `decide` as its own command (manual-edition-selection D2). */
+function resolutionCommand(resolution: MetadataResolution): AcquisitionCommand {
+  switch (resolution.kind) {
+    case 'resolved':
+      return { type: 'RecordTarget', target: resolution.target };
+    case 'needsSelection':
+      return { type: 'RecordManualSelectionRequested', candidates: resolution.candidates };
+    case 'unresolved':
+      return { type: 'RecordMetadataFailed' };
+  }
+}
+
 export function interpretEffect(
   deps: InterpreterDeps,
   acquisitionId: string,
@@ -47,15 +61,7 @@ export function interpretEffect(
     case 'ResolveMetadata':
       return ports.metadata
         .resolve(effect.request)
-        .andThen((resolution) =>
-          applyCommand(
-            deps,
-            acquisitionId,
-            resolution.kind === 'resolved'
-              ? { type: 'RecordTarget', target: resolution.target }
-              : { type: 'RecordMetadataFailed' },
-          ),
-        );
+        .andThen((resolution) => applyCommand(deps, acquisitionId, resolutionCommand(resolution)));
 
     case 'Search':
       return ports.search

@@ -46,6 +46,21 @@ export function cancelAcquisition(
   return applyCommand(deps, acquisitionId, { type: 'CancelAcquisition' }).map(() => undefined);
 }
 
+/**
+ * Resume an acquisition awaiting manual edition selection with the user's choice. `decide` is the
+ * single guard: an off-menu edition or an acquisition in any other state is a modeled rejection
+ * (`UnknownEdition` / `IllegalTransition`) with no state change (manual-edition-selection D2).
+ */
+export function selectEdition(
+  deps: CommandDeps,
+  acquisitionId: string,
+  releaseMbid: string,
+): ResultAsync<void, CommandError> {
+  return applyCommand(deps, acquisitionId, { type: 'SelectEdition', releaseMbid }).map(
+    () => undefined,
+  );
+}
+
 /** What an external adjudicator reported about a delivered candidate (fulfillment-external-verdict). */
 export interface ExternalValidationFailureInput {
   readonly candidate: CandidateRef;
