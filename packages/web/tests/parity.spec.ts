@@ -23,6 +23,7 @@ async function chooseDescriptorKind(page: Page): Promise<void> {
 
 test('the site navigation offers every surface from the landing page', async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Acquisitions' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Needs attention/ })).toBeVisible();
 });

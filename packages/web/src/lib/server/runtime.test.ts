@@ -5,7 +5,13 @@ import { err, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DownloaderRuntime } from '@music/downloader/runtime';
 import type { createImporterRuntime, ImporterRuntime } from '@music/importer/runtime';
-import { bootRuntimes, facadesOf, readinessOf, resetRuntimesForTesting } from './runtime.js';
+import {
+  bootRuntimes,
+  facadesOf,
+  loggerOf,
+  readinessOf,
+  resetRuntimesForTesting,
+} from './runtime.js';
 
 /** The shipped product version — read straight from the workspace root package.json (design D5). */
 const shippedVersion = (
@@ -109,6 +115,9 @@ describe('bootRuntimes', () => {
     expect(booted.facades.importer).toBe(fakes.importer.facade);
     expect(onShutdownSignal).toHaveBeenCalledOnce();
     expect(facadesOf()).toBe(booted.facades);
+    // The pino root is exposed to routes so degraded reads can leave a trace.
+    expect(loggerOf()).toBe(booted.logger);
+    expect(typeof loggerOf().warn).toBe('function');
   });
 
   it('shares one boot across repeated calls', async () => {
@@ -169,6 +178,10 @@ describe('bootRuntimes', () => {
 
   it('facadesOf refuses before boot', () => {
     expect(() => facadesOf()).toThrow(/init hook/);
+  });
+
+  it('loggerOf refuses before boot', () => {
+    expect(() => loggerOf()).toThrow(/init hook/);
   });
 
   it('registers the adapter-node shutdown signal by default', async () => {
