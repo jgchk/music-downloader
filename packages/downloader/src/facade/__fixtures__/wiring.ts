@@ -2,6 +2,7 @@ import { FakeEventStore, fixedClock, sequentialIds } from '../../application/__f
 import {
   AcquisitionStatusProjection,
   ProgressReadModel,
+  StalledReadModel,
 } from '../../application/projections/read-models.js';
 import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
 import { createDownloaderFacade } from '../index.js';
@@ -31,6 +32,7 @@ export function testWiring(): TestWiring {
     ids: sequentialIds(),
     status,
     progress,
+    stalled: new StalledReadModel(),
   };
   return {
     deps,

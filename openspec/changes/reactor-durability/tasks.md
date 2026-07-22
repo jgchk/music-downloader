@@ -13,8 +13,8 @@
 
 ## 3. Stalled visibility
 
-- [ ] 3.1 Write failing tests for the status read model exposing `stalled` (from dead-lettered park entries) additively on the view/DTO; implement (facade schema additive field + mapping).
-- [ ] 3.2 Write failing tests for parked/dead-letter retention: resolved entries clear; aged stalled entries prune per policy; implement.
+- [x] 3.1 Write failing tests for the status read model exposing `stalled` (from dead-lettered park entries) additively on the view/DTO; implement (facade schema additive field + mapping).
+- [x] 3.2 Write failing tests for parked/dead-letter retention: resolved entries clear; aged stalled entries prune per policy; implement.
 
 ## 4. Startup re-drive
 

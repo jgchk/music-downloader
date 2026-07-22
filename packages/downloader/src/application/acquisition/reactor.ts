@@ -10,6 +10,7 @@ import type {
   StoredEvent,
 } from '../ports/event-store-port.js';
 import type { ParkedEffect, ParkedEffectStore } from '../ports/parked-effect-port.js';
+import type { StalledReadModel } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandError } from './command-handler.js';
 import { interpretEffect } from './interpreter.js';
@@ -83,6 +84,8 @@ export interface ReactorDeps {
   readonly bus: EventBus;
   readonly parked: ParkedEffectStore;
   readonly deadLetters: DeadLetterStore;
+  /** The queryable face of dead-lettered effects (D4); the reactor marks and clears it. */
+  readonly stalled: StalledReadModel;
   readonly logger: Logger;
   readonly interpreter: InterpreterDeps;
   /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
@@ -217,10 +220,18 @@ export class Reactor {
       return;
     }
 
+    // Read before dispatch: a landing inside the dispatch may mark the stream stalled, and that
+    // fresh exposure must survive this very event — only a PREVIOUSLY stalled stream that now
+    // drives successfully is resolved.
+    const wasStalled = this.deps.stalled.isStalled(stored.streamId);
     const outcome = await this.dispatchEvent(stored, stream.value);
     if (outcome.kind === 'retry') {
       const parkedOk = await this.parkStream(stored, outcome.effect, outcome.error);
       if (!parkedOk) return; // fall back to holding the checkpoint — the poll retries in-line
+    } else if (wasStalled) {
+      // A stalled acquisition's stream was driven successfully again (a cancellation, an operator
+      // resubmission): its dead letters are resolved — clear them and the stalled exposure.
+      await this.clearStalled(stored.streamId);
     }
     await this.advanceTo(stored.globalSeq);
   }
@@ -459,11 +470,27 @@ export class Reactor {
       );
       return false;
     }
+    this.deps.stalled.mark(stored.streamId);
     this.deps.logger.error(
       { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
       'retry budget exhausted; effect dead-lettered and acquisition stalled',
     );
     return true;
+  }
+
+  /** Resolution clears retention (D2): the stream's letters and its stalled exposure go together. */
+  private async clearStalled(streamId: string): Promise<void> {
+    const cleared = await this.deps.deadLetters.clearStream(REACTOR_CONSUMER, streamId);
+    if (cleared.isErr()) {
+      // Stay marked stalled — the letters still exist; a later successful event retries the clear.
+      this.deps.logger.error(
+        { acquisitionId: streamId, err: cleared.error },
+        'failed to clear resolved dead letters',
+      );
+      return;
+    }
+    this.deps.stalled.clear(streamId);
+    this.deps.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
   }
 
   private async advanceTo(globalSeq: number): Promise<void> {

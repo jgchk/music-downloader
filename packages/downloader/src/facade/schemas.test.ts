@@ -72,6 +72,18 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(parsed.history).toHaveLength(5);
   });
 
+  it('accepts the additive stalled flag and its absence (reactor-durability D2)', () => {
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'Downloading',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    expect(acquisitionStatusResponseSchema.parse(base).stalled).toBeUndefined();
+    expect(acquisitionStatusResponseSchema.parse({ ...base, stalled: true }).stalled).toBe(true);
+  });
+
   it('rejects an unknown status', () => {
     expect(() =>
       acquisitionStatusResponseSchema.parse({

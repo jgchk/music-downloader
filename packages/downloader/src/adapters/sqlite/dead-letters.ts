@@ -14,6 +14,8 @@ import type { EventDatabase } from './schema.js';
 export class SqliteDeadLetterStore implements DeadLetterStore {
   private readonly insertStmt: Statement;
   private readonly listStmt: Statement;
+  private readonly clearStreamStmt: Statement;
+  private readonly pruneStmt: Statement;
 
   constructor(db: EventDatabase) {
     this.insertStmt = db.prepare(
@@ -27,6 +29,30 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
       `SELECT subscription, global_seq, error, occurred_at, stream_id
        FROM dead_letters WHERE subscription = ? ORDER BY global_seq ASC`,
     );
+    this.clearStreamStmt = db.prepare(
+      `DELETE FROM dead_letters WHERE subscription = ? AND stream_id = ?`,
+    );
+    this.pruneStmt = db.prepare(
+      `DELETE FROM dead_letters WHERE subscription = ? AND occurred_at < ?`,
+    );
+  }
+
+  clearStream(subscription: string, streamId: string): ResultAsync<void, InfraError> {
+    try {
+      this.clearStreamStmt.run(subscription, streamId);
+      return okAsync(undefined);
+    } catch (err) {
+      return errAsync(infraError('dead-letters.clearStream', String(err), err));
+    }
+  }
+
+  prune(subscription: string, olderThanIso: string): ResultAsync<void, InfraError> {
+    try {
+      this.pruneStmt.run(subscription, olderThanIso);
+      return okAsync(undefined);
+    } catch (err) {
+      return errAsync(infraError('dead-letters.prune', String(err), err));
+    }
   }
 
   record(letter: DeadLetter): ResultAsync<void, InfraError> {

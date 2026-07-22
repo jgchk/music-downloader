@@ -65,6 +65,33 @@ describe('SqliteDeadLetterStore', () => {
     expect(letters).toEqual([{ ...LETTER, streamId: 'acq-1' }]);
   });
 
+  it('clears the letters of one stream without touching its neighbours', async () => {
+    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    await store.record({ ...LETTER, subscription: 'acquisition-reactor', streamId: 'acq-1' });
+    await store.record({
+      ...LETTER,
+      subscription: 'acquisition-reactor',
+      globalSeq: 9,
+      streamId: 'acq-2',
+    });
+
+    await store.clearStream('acquisition-reactor', 'acq-1');
+
+    const letters = (await store.list('acquisition-reactor'))._unsafeUnwrap();
+    expect(letters.map((letter) => letter.streamId)).toEqual(['acq-2']);
+  });
+
+  it('prunes letters older than the retention horizon', async () => {
+    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    await store.record({ ...LETTER, occurredAt: '2026-06-01T00:00:00.000Z' }); // aged out
+    await store.record({ ...LETTER, globalSeq: 9, occurredAt: '2026-07-20T00:00:00.000Z' });
+
+    await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z');
+
+    const letters = (await store.list('seam:verdicts'))._unsafeUnwrap();
+    expect(letters.map((letter) => letter.globalSeq)).toEqual([9]);
+  });
+
   it('surfaces storage faults as infra errors', async () => {
     const db = openEventDatabase(':memory:');
     const store = new SqliteDeadLetterStore(db);
@@ -72,5 +99,7 @@ describe('SqliteDeadLetterStore', () => {
 
     expect((await store.record(LETTER)).isErr()).toBe(true);
     expect((await store.list('seam:verdicts')).isErr()).toBe(true);
+    expect((await store.clearStream('seam:verdicts', 'acq-1')).isErr()).toBe(true);
+    expect((await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z')).isErr()).toBe(true);
   });
 });

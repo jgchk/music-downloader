@@ -14,6 +14,7 @@ import {
 } from '../__fixtures__/fakes.js';
 import type { SettableClock } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
+import { StalledReadModel } from '../projections/read-models.js';
 import { infraError, permanentInfraError } from '../ports/errors.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
@@ -50,6 +51,7 @@ let checkpoints: FakeCheckpointStore;
 let bus: FakeEventBus;
 let parked: FakeParkedEffectStore;
 let deadLetters: FakeDeadLetterStore;
+let stalled: StalledReadModel;
 let clock: SettableClock;
 
 function interpreter(ports: EffectPorts): InterpreterDeps {
@@ -70,6 +72,7 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     bus,
     parked,
     deadLetters,
+    stalled,
     logger: overrides.logger ?? silentLogger(),
     interpreter: interpreter(ports),
     // Tests drive drains explicitly; the default real interval is covered by its own test below.
@@ -119,6 +122,7 @@ beforeEach(() => {
   bus = new FakeEventBus();
   parked = new FakeParkedEffectStore();
   deadLetters = new FakeDeadLetterStore();
+  stalled = new StalledReadModel();
   clock = settableClock('2026-07-22T12:00:00.000Z');
 });
 
@@ -258,6 +262,7 @@ describe('Reactor.process', () => {
         bus,
         parked,
         deadLetters,
+        stalled,
         logger: silentLogger(),
         interpreter: interpreter(ports),
       });
@@ -739,6 +744,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
       bus,
       parked,
       deadLetters,
+      stalled,
       logger: silentLogger(),
       interpreter: interpreter(ports),
       interval: () => () => {},
@@ -786,6 +792,52 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
 
     expect(parked.count()).toBe(0);
     expect(deadLetters.letters).toEqual([]);
+    r.stop();
+  });
+
+  it('marks the acquisition stalled on dead-letter and clears it when the stream resumes', async () => {
+    const a = matchingCandidate('a');
+    await seed([
+      ...selectedHistory([a]),
+      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: a.identity, files: sampleFiles },
+    ]);
+    await checkpoints.save(REACTOR_CONSUMER, 6);
+    const discardStaging = vi.fn(() => errAsync(permanentInfraError('fs', 'path outside root')));
+    const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }));
+    await r.start();
+    expect(stalled.isStalled('acq-1')).toBe(true);
+
+    // The operator resolves it (a cancellation): the stream drives successfully again, and the
+    // dead letters — with the stalled exposure — clear together (retention: resolved entries).
+    await seed([{ type: 'AcquisitionCancelled' }]);
+    await r.drain();
+    expect(stalled.isStalled('acq-1')).toBe(false);
+    expect(deadLetters.letters).toEqual([]);
+    r.stop();
+  });
+
+  it('stays stalled when clearing the resolved dead letters fails, and retries later', async () => {
+    const a = matchingCandidate('a');
+    await seed([
+      ...selectedHistory([a]),
+      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: a.identity, files: sampleFiles },
+    ]);
+    await checkpoints.save(REACTOR_CONSUMER, 6);
+    const discardStaging = vi.fn(() => errAsync(permanentInfraError('fs', 'path outside root')));
+    const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }));
+    await r.start();
+
+    deadLetters.failClearStream = true;
+    await seed([{ type: 'AcquisitionCancelled' }]);
+    await r.drain();
+    expect(stalled.isStalled('acq-1')).toBe(true); // letters survived; exposure must too
+
+    deadLetters.failClearStream = false;
+    await seed([{ type: 'AcquisitionCancelled' }]); // absorbed no-op event, drives successfully
+    await r.drain();
+    expect(stalled.isStalled('acq-1')).toBe(false);
     r.stop();
   });
 

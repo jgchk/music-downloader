@@ -3,6 +3,7 @@ import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
+  StalledReadModel,
   projectStatus,
 } from './read-models.js';
 import { FakeEventStore } from '../__fixtures__/fakes.js';
@@ -155,5 +156,26 @@ describe('LibraryViewProjection', () => {
     expect(projection.list()).toEqual([
       { acquisitionId: 'acq-1', artist: 'Radiohead', title: 'Kid A', location: '/lib/c' },
     ]);
+  });
+});
+
+describe('StalledReadModel', () => {
+  it('marks, reads, and clears stalled acquisitions', () => {
+    const model = new StalledReadModel();
+    expect(model.isStalled('acq-1')).toBe(false);
+
+    model.mark('acq-1');
+    expect(model.isStalled('acq-1')).toBe(true);
+    expect(model.isStalled('acq-2')).toBe(false);
+
+    model.clear('acq-1');
+    expect(model.isStalled('acq-1')).toBe(false);
+  });
+
+  it('clearing an unknown acquisition is a no-op', () => {
+    const model = new StalledReadModel();
+    expect(() => {
+      model.clear('never-marked');
+    }).not.toThrow();
   });
 });

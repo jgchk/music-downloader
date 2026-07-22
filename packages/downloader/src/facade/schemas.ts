@@ -164,6 +164,8 @@ export const acquisitionStatusResponseSchema = z.object({
   history: z.array(historyEntrySchema),
   // Present only while status is AwaitingManualSelection (additive).
   candidates: z.array(editionCandidateSchema).optional(),
+  // Present (true) only when the acquisition dead-lettered awaiting an operator (additive).
+  stalled: z.boolean().optional(),
 });
 
 export const acquisitionListResponseSchema = z.object({

@@ -20,6 +20,7 @@ import {
   realTimer,
 } from '../adapters/index.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
+import type { DeadLetterStore } from '../application/ports/dead-letter-port.js';
 import { Reactor } from '../application/acquisition/reactor.js';
 import { DEFAULT_RETRY_POLICY } from '../application/acquisition/retry-policy.js';
 import type { RetryPolicy } from '../application/acquisition/retry-policy.js';
@@ -32,7 +33,9 @@ import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
+  StalledReadModel,
 } from '../application/projections/read-models.js';
+import { REACTOR_CONSUMER } from '../application/acquisition/reactor.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
@@ -57,18 +60,27 @@ export interface DownloaderRuntimeConfig {
   readonly musicbrainz: { readonly baseUrl?: string; readonly userAgent?: string };
   readonly slskd: { readonly baseUrl?: string; readonly apiKey?: string };
   /** Parked-effect retry tuning (reactor-durability D2); defaults are production-sane. */
-  readonly reactor?: { readonly retry?: Partial<RetryPolicy> };
+  readonly reactor?: {
+    readonly retry?: Partial<RetryPolicy>;
+    /** How long dead-lettered (stalled) entries are retained before pruning at boot. */
+    readonly stalledRetentionMs?: number;
+  };
 }
 
 export interface DownloaderRuntimeOverrides {
   readonly ports?: EffectPorts;
   readonly clock?: Clock;
   readonly ids?: IdGenerator;
+  /** Test seam: swap the dead-letter store (e.g. to prove boot survives its faults). */
+  readonly deadLetters?: DeadLetterStore;
 }
 
 export interface SeamWakeups {
   subscribe(listener: () => void): () => void;
 }
+
+/** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
+const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 /**
  * This module's own readiness shape (design D4) — declared locally, no shared kernel: `up` unless
@@ -104,13 +116,29 @@ export async function createDownloaderRuntime(
   const bus = new InProcessEventBus();
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
-  const deadLetters = new SqliteDeadLetterStore(db);
+  const deadLetters = overrides.deadLetters ?? new SqliteDeadLetterStore(db);
   const parkedEffects = new SqliteParkedEffectStore(db);
   const ledger = new SqliteResourceLedger(db, clock);
 
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
   const libraryView = new LibraryViewProjection();
+
+  // Stalled retention + seeding (reactor-durability D2): prune aged dead letters, then load the
+  // survivors into the in-memory exposure the facade's synchronous queries read.
+  const stalledModel = new StalledReadModel();
+  const retentionMs = config.reactor?.stalledRetentionMs ?? DEFAULT_STALLED_RETENTION_MS;
+  const horizon = new Date(clock.now().getTime() - retentionMs).toISOString();
+  const pruned = await deadLetters.prune(REACTOR_CONSUMER, horizon);
+  if (pruned.isErr()) logger.warn({ err: pruned.error }, 'stalled retention prune failed');
+  const letters = await deadLetters.list(REACTOR_CONSUMER);
+  if (letters.isOk()) {
+    for (const letter of letters.value) {
+      if (letter.streamId !== undefined) stalledModel.mark(letter.streamId);
+    }
+  } else {
+    logger.error({ err: letters.error }, 'stalled read-model seed failed');
+  }
 
   const backlog = await store.readAll(0);
   if (backlog.isOk()) {
@@ -169,13 +197,21 @@ export async function createDownloaderRuntime(
     bus,
     parked: parkedEffects,
     deadLetters,
+    stalled: stalledModel,
     logger,
     interpreter,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
   });
   await reactor.start();
 
-  const deps: UseCaseDeps = { store, clock, ids, status, progress: progressModel };
+  const deps: UseCaseDeps = {
+    store,
+    clock,
+    ids,
+    status,
+    progress: progressModel,
+    stalled: stalledModel,
+  };
   const facade = createDownloaderFacade(deps);
   const feed = new OutboundFeed(store, publishedEventMapping);
   const wakeups: SeamWakeups = {
