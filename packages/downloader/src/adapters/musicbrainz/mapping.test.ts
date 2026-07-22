@@ -620,6 +620,35 @@ describe('releaseGroupCandidateIds', () => {
       ]),
     ).toEqual([]);
   });
+
+  it('treats a null-status edition as non-official and a null date as undated', () => {
+    const ids = releaseGroupCandidateIds([
+      { id: 'unknown', title: null, status: null, date: null, media: [{ 'track-count': 10 }] },
+      { id: 'official', status: 'Official', date: '2000', media: [{ 'track-count': 10 }] },
+    ]);
+
+    expect(ids).toEqual(['official']);
+  });
+});
+
+describe('releaseCandidateIds — null tolerance', () => {
+  it('tolerates search hits whose title, status, or date are null', () => {
+    const ids = releaseCandidateIds(
+      [
+        {
+          id: 'hit',
+          score: 100,
+          title: null,
+          status: null,
+          date: null,
+          'release-group': { id: 'rg', title: null },
+        },
+      ],
+      'Album',
+    );
+
+    expect(ids).toEqual(['hit']);
+  });
 });
 
 describe('releaseGroupEditionCandidates', () => {
@@ -680,6 +709,14 @@ describe('releaseGroupEditionCandidates', () => {
     ]);
 
     expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 3 }]);
+  });
+
+  it('treats a null title, status, and date as absent', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: 'nulled', title: null, status: null, date: null },
+    ]);
+
+    expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 0 }]);
   });
 
   it('orders candidates by the picker heuristic: modal track count first, then earliest date', () => {

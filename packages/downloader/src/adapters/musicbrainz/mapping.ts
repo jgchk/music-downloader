@@ -30,7 +30,7 @@ function artistCreditName(credits: readonly MbArtistCredit[] | undefined): strin
     .trim();
 }
 
-function parseYear(date: string | undefined): number | undefined {
+function parseYear(date: string | null | undefined): number | undefined {
   const year = Number(date?.slice(0, 4));
   return Number.isInteger(year) && year > 0 ? year : undefined;
 }
@@ -119,7 +119,7 @@ interface GroupedRelease {
 // any real component, so within a year a fully-specified date precedes a year-only one; an undated or
 // non-year-leading value maps to +Infinity and sorts after every dated release.
 const DATE_COMPONENT_SENTINEL = 99;
-function dateKey(date: string | undefined): number {
+function dateKey(date: string | null | undefined): number {
   const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/.exec(date ?? '');
   if (match === null) return Number.POSITIVE_INFINITY;
   const year = Number(match[1]);
@@ -129,7 +129,7 @@ function dateKey(date: string | undefined): number {
 }
 
 /** Chronological comparison of two MusicBrainz dates via {@link dateKey}; equal keys rank equal. */
-function compareDates(a: string | undefined, b: string | undefined): number {
+function compareDates(a: string | null | undefined, b: string | null | undefined): number {
   const aKey = dateKey(a);
   const bKey = dateKey(b);
   return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
@@ -186,8 +186,8 @@ export function releaseCandidateIds(
       id: release.id,
       score: release.score ?? 0,
       title,
-      status: release.status,
-      date: release.date,
+      status: release.status ?? undefined,
+      date: release.date ?? undefined,
       groupTitle: group?.id === undefined ? title : (group.title ?? ''),
     };
     const existing = groups.get(key);
@@ -286,8 +286,8 @@ export function releaseGroupCandidateIds(
     if (release.id === undefined) continue;
     editions.push({
       id: release.id,
-      status: release.status,
-      date: release.date,
+      status: release.status ?? undefined,
+      date: release.date ?? undefined,
       trackCount: totalTrackCount(release),
     });
   }
@@ -323,8 +323,8 @@ export function releaseGroupEditionCandidates(
     ];
     candidates.push({
       releaseMbid: release.id,
-      title: release.title,
-      date: release.date,
+      title: release.title ?? undefined,
+      date: release.date ?? undefined,
       country: release.country ?? undefined,
       format: formats.length > 0 ? formats.join(' + ') : undefined,
       trackCount: totalTrackCount(release),

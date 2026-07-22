@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fetchHttpClient } from './http.js';
+import { createFetchHttpClient, fetchHttpClient } from './http.js';
 
 // Drive the real fetch wrapper against a throwaway localhost server — deterministic, no network.
 let server: Server;
@@ -10,6 +10,7 @@ let base: string;
 
 beforeAll(async () => {
   server = createServer((req, res) => {
+    if (req.url === '/hang') return; // never respond — the timeout must fire
     let body = '';
     req.on('data', (chunk: Buffer) => (body += chunk.toString()));
     req.on('end', () => {
@@ -40,5 +41,13 @@ describe('fetchHttpClient', () => {
     });
 
     expect(response.body).toBe('POST /post payload');
+  });
+});
+
+describe('createFetchHttpClient — timeout', () => {
+  it('fails a hung request instead of waiting forever (a frozen fetch must not wedge the caller)', async () => {
+    const client = createFetchHttpClient(100);
+
+    await expect(client.send({ url: `${base}/hang` })).rejects.toThrowError(/timeout|abort/i);
   });
 });

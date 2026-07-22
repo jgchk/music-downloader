@@ -9,9 +9,13 @@ import { z } from 'zod';
  * the payloads; the hand-written interfaces they replace are gone so the two cannot diverge.
  */
 
+// Every optional metadata string below is also nullable: MusicBrainz reports "unknown" as null
+// (status, dates, titles, credits alike), and null is a value, not drift — a strict field here
+// turns one sparse release into a permanently-retried resolution fault (the Red Headed Stranger
+// wedge, prod 2026-07-22). Only entity ids stay non-nullable; a null id would be genuine drift.
 const artistCreditSchema = z.object({
-  name: z.string().optional(),
-  joinphrase: z.string().optional(),
+  name: z.string().nullable().optional(),
+  joinphrase: z.string().nullable().optional(),
 });
 
 // MusicBrainz returns `length: null` for a track/recording whose duration it does not know — a
@@ -19,18 +23,18 @@ const artistCreditSchema = z.object({
 // duration (the release then yields no valid target and the caller falls through to the next).
 const trackSchema = z.object({
   position: z.number().optional(),
-  title: z.string().optional(),
+  title: z.string().nullable().optional(),
   length: z.number().nullable().optional(),
   recording: z
-    .object({ title: z.string().optional(), length: z.number().nullable().optional() })
+    .object({ title: z.string().nullable().optional(), length: z.number().nullable().optional() })
     .optional(),
 });
 
 /** `GET /release/{mbid}?inc=recordings+artist-credits&fmt=json`. */
 export const mbReleaseSchema = z.object({
   id: z.string().optional(),
-  title: z.string().optional(),
-  date: z.string().optional(),
+  title: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
   'artist-credit': z.array(artistCreditSchema).optional(),
   media: z.array(z.object({ tracks: z.array(trackSchema).optional() })).optional(),
 });
@@ -38,7 +42,7 @@ export const mbReleaseSchema = z.object({
 /** `GET /recording/{mbid}?inc=artist-credits&fmt=json`. */
 export const mbRecordingSchema = z.object({
   id: z.string().optional(),
-  title: z.string().optional(),
+  title: z.string().nullable().optional(),
   length: z.number().nullable().optional(),
   'artist-credit': z.array(artistCreditSchema).optional(),
 });
@@ -56,10 +60,12 @@ const scoredEntrySchema = z.object({ id: z.string().optional(), score: z.number(
 const scoredReleaseSchema = z.object({
   id: z.string().optional(),
   score: z.number().optional(),
-  title: z.string().optional(),
-  status: z.string().optional(),
-  date: z.string().optional(),
-  'release-group': z.object({ id: z.string().optional(), title: z.string().optional() }).optional(),
+  title: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
+  'release-group': z
+    .object({ id: z.string().optional(), title: z.string().nullable().optional() })
+    .optional(),
 });
 
 /** `GET /release?query=…&fmt=json` — the scored hit list with each hit's identity/edition fields. */
@@ -79,9 +85,9 @@ export const mbReleaseSearchSchema = z.object({
  */
 const browseReleaseSchema = z.object({
   id: z.string().optional(),
-  title: z.string().optional(),
-  status: z.string().optional(),
-  date: z.string().optional(),
+  title: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
   country: z.string().nullable().optional(), // null = MusicBrainz doesn't know — a value, not drift
   media: z
     .array(
