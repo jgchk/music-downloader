@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.4.0](https://github.com/jgchk/music-downloader/compare/v3.3.4...v3.4.0) (2026-07-22)
+
+
+### Features
+
+* **downloader:** add parked-effect store, backoff policy, and permanent-fault classification ([8ca3bf6](https://github.com/jgchk/music-downloader/commit/8ca3bf69c091f586077f6242e4892ac04212cbd9))
+* **downloader:** expose dead-lettered acquisitions as stalled with retention ([c915bbb](https://github.com/jgchk/music-downloader/commit/c915bbbbca0aa1731a29cee6cabe5f74247b4274))
+* **downloader:** park failing effects per stream and advance the reactor checkpoint ([e746599](https://github.com/jgchk/music-downloader/commit/e746599defaa942b5d4f7b08982a40e18d7271cc))
+* **downloader:** re-drive pending effects at startup and re-attach live downloads ([ff68328](https://github.com/jgchk/music-downloader/commit/ff683281575bfbd8758c7940af859cdd5ffd9b6c))
+
 ## [3.3.4](https://github.com/jgchk/music-downloader/compare/v3.3.3...v3.3.4) (2026-07-22)
 
 
