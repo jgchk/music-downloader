@@ -13,6 +13,7 @@ import {
   resolvedHistory,
   sampleEditionCandidates,
   sampleFiles,
+  sampleGroupRequest,
   sampleRequest,
   sampleTarget,
   selectedHistory,
@@ -810,7 +811,10 @@ describe('Acquisition — immutability', () => {
 
 describe('Acquisition.execute — manual edition selection', () => {
   it('pauses for a human choice when resolution reports the candidates', () => {
-    const events = Acquisition.fromHistory(requestedHistory())
+    const groupRequested: AcquisitionEvent[] = [
+      { type: 'AcquisitionRequested', request: sampleGroupRequest, policies },
+    ];
+    const events = Acquisition.fromHistory(groupRequested)
       .execute({ type: 'RecordManualSelectionRequested', candidates: sampleEditionCandidates })
       ._unsafeUnwrap();
     expect(events).toEqual([
@@ -819,8 +823,20 @@ describe('Acquisition.execute — manual edition selection', () => {
   });
 
   it('degrades an empty candidate menu to a metadata failure instead of a dead-end pause', () => {
-    const events = Acquisition.fromHistory(requestedHistory())
+    const groupRequested: AcquisitionEvent[] = [
+      { type: 'AcquisitionRequested', request: sampleGroupRequest, policies },
+    ];
+    const events = Acquisition.fromHistory(groupRequested)
       .execute({ type: 'RecordManualSelectionRequested', candidates: [] })
+      ._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'MetadataResolutionFailed' }]);
+  });
+
+  it('degrades a manual-selection report for a non-release-group request to a metadata failure', () => {
+    // sampleRequest is a direct musicbrainz request: no resolver should pause it for selection,
+    // and the domain — not the adapter — enforces that the pause is release-group-only.
+    const events = Acquisition.fromHistory(requestedHistory())
+      .execute({ type: 'RecordManualSelectionRequested', candidates: sampleEditionCandidates })
       ._unsafeUnwrap();
     expect(events).toEqual([{ type: 'MetadataResolutionFailed' }]);
   });
