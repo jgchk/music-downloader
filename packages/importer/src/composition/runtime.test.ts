@@ -171,6 +171,41 @@ describe('createImporterRuntime', () => {
     expect(result._unsafeUnwrapErr().kind).toBe('BeetsConfigUnusable');
   });
 
+  it('reports readiness up on a freshly booted runtime (value, no throw)', async () => {
+    const runtime = await testRuntime();
+    expect(runtime.readiness()).toEqual({ status: 'up' });
+  });
+
+  it('reports readiness down once the acquisition subscription halts on a poison event', async () => {
+    const runtime = await testRuntime();
+    // A known-type event with a malformed payload is a producer contract defect the intake
+    // consumer poisons; the `halt` policy stops the subscription without advancing.
+    const poison: SeamEvent = {
+      globalSeq: 1,
+      type: 'acquisition.fulfilled',
+      timestamp: '2026-07-18T12:00:00.000Z',
+      data: { not: 'a valid fulfilment' },
+    };
+    const feed: SeamFeed = {
+      read: (from) =>
+        Promise.resolve(ok({ events: from < 1 ? [poison] : [], scannedTo: Math.max(from, 1) })),
+    };
+    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+    await subscription.start();
+    cleanups.push(() => subscription.stop());
+
+    expect(subscription.isHalted).toBe(true);
+    expect(runtime.readiness()).toEqual({ status: 'down' });
+  });
+
+  it('reads readiness with no side effects on repeated probes', async () => {
+    const runtime = await testRuntime();
+    expect(runtime.readiness()).toEqual({ status: 'up' });
+    expect(runtime.readiness()).toEqual({ status: 'up' });
+    // A pure read of runtime state advances no stream and creates no work.
+    expect(runtime.facade.listImports()).toEqual({ imports: [] });
+  });
+
   it('logs and continues when the projection rebuild cannot read the backlog', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'importer-runtime-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));

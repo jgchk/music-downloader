@@ -67,6 +67,15 @@ export interface AcquisitionFeedOptions {
   readonly sourceRoot: string;
 }
 
+/**
+ * This module's own readiness shape (design D4) — declared locally, no shared kernel: `up` unless
+ * the inbound acquisition subscription has halted on a poison event. A synchronous read of
+ * in-memory runtime state; never a value that throws, never an event-store scan.
+ */
+export interface ImporterReadiness {
+  readonly status: 'up' | 'down';
+}
+
 export interface ImporterRuntime {
   readonly facade: ImporterFacade;
   readonly beetsConfig: TaggerConfiguration;
@@ -79,6 +88,8 @@ export interface ImporterRuntime {
     options: AcquisitionFeedOptions,
     wakeups?: SeamWakeups,
   ): CatchUpSubscription;
+  /** Side-effect-free readiness snapshot from in-memory runtime state (design D4). */
+  readiness(): ImporterReadiness;
   stop(): Promise<void>;
 }
 
@@ -161,13 +172,17 @@ export async function createImporterRuntime(
     subscribe: (listener) => bus.subscribe(() => listener()),
   };
 
+  // The inbound seam subscription this runtime owns; the composition root connects it, and its
+  // halted-on-poison state is this module's one exposed "down" signal (design D4).
+  let acquisitions: CatchUpSubscription | undefined;
+
   return ok({
     facade,
     beetsConfig: beetsConfig.value,
     feed,
     wakeups,
     connectAcquisitionFeed(acquisitionFeed, options, acquisitionWakeups) {
-      return new CatchUpSubscription({
+      acquisitions = new CatchUpSubscription({
         name: 'seam:acquisitions',
         feed: acquisitionFeed,
         checkpoints,
@@ -186,6 +201,10 @@ export async function createImporterRuntime(
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         wakeups: acquisitionWakeups,
       });
+      return acquisitions;
+    },
+    readiness() {
+      return { status: acquisitions?.isHalted ? 'down' : 'up' };
     },
     stop() {
       reactor.stop();
