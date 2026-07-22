@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.2.1](https://github.com/jgchk/music-downloader/compare/v3.2.0...v3.2.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **downloader:** treat MusicBrainz 400 (invalid mbid) as unresolved, not a retryable fault ([4ae0133](https://github.com/jgchk/music-downloader/commit/4ae01333127383f4221b0f7b7e625c161fce9095))
+
 ## [3.2.0](https://github.com/jgchk/music-downloader/compare/v3.1.0...v3.2.0) (2026-07-22)
 
 
