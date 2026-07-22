@@ -14,8 +14,12 @@ const TERMINAL: Record<string, BadgePhase | undefined> = {
   Conflicted: 'failed',
 };
 
-/** The badge tone for a status — terminal states resolve to fulfilled/failed, the rest pend. */
+/**
+ * The badge tone for a status — terminal states resolve to fulfilled/failed, a pause on the user
+ * demands attention, and the rest pend (web-ui spec: awaiting-selection presents as action-needed).
+ */
 export function statusTone(status: AcquisitionStatusResponseDto['status']): BadgePhase {
+  if (status === 'AwaitingManualSelection') return 'attention';
   return TERMINAL[status] ?? 'pending';
 }
 
@@ -29,9 +33,16 @@ export function isCancellable(status: AcquisitionStatusResponseDto['status']): b
 }
 
 export function targetDescription(acquisition: AcquisitionStatusResponseDto): string {
-  return acquisition.target
-    ? `${acquisition.target.artist} — ${acquisition.target.title}`
-    : '(resolving…)';
+  if (acquisition.target) return `${acquisition.target.artist} — ${acquisition.target.title}`;
+  if (acquisition.status === 'AwaitingManualSelection') {
+    // The pause is the user's, so say what is awaited — never the in-progress placeholder. The
+    // offered editions share the group's identity; borrow the first titled one as the headline.
+    const title = acquisition.candidates?.find((candidate) => candidate.title !== undefined)?.title;
+    return title === undefined
+      ? 'Awaiting your edition choice'
+      : `${title} — awaiting your edition choice`;
+  }
+  return '(resolving…)';
 }
 
 /** The terminal outcome line: where it landed, or why it failed (web-ui spec). */

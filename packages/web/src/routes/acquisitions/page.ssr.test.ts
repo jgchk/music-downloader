@@ -5,7 +5,7 @@ import Page from './+page.svelte';
 describe('acquisitions page (SSR)', () => {
   it('renders the list view over its load data', () => {
     const { body } = render(Page, {
-      props: { data: { list: { acquisitions: [] } }, params: {}, form: null },
+      props: { data: { attentionCount: 0, list: { acquisitions: [] } }, params: {}, form: null },
     });
     expect(body).toContain('<h1>Acquisitions</h1>');
     expect(body).toContain('data-testid="empty"');

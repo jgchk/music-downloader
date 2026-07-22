@@ -21,10 +21,10 @@ async function chooseDescriptorKind(page: Page): Promise<void> {
  * tier's loop phases (1–2), not this smoke.
  */
 
-test('the landing page offers the product navigation', async ({ page }) => {
+test('the site navigation offers every surface from the landing page', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Acquisitions' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Reviews' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Needs attention/ })).toBeVisible();
 });
 
 test('submitting an acquisition lands on its detail and appears in the list', async ({ page }) => {

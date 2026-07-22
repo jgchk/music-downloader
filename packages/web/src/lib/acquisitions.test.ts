@@ -23,7 +23,7 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
 describe('statusTone / isTerminal / isCancellable', () => {
   it.each([
     ['Pending', 'pending', false],
-    ['AwaitingManualSelection', 'pending', false],
+    ['AwaitingManualSelection', 'attention', false],
     ['Searching', 'pending', false],
     ['Downloading', 'pending', false],
     ['Fulfilled', 'fulfilled', true],
@@ -45,6 +45,45 @@ describe('targetDescription', () => {
 
   it('renders a resolving placeholder before a target is known', () => {
     expect(targetDescription(acquisition({}))).toBe('(resolving…)');
+  });
+
+  it('names the awaited edition choice after the offered editions, never "(resolving…)"', () => {
+    expect(
+      targetDescription(
+        acquisition({
+          status: 'AwaitingManualSelection',
+          candidates: [
+            { releaseMbid: 'r1', trackCount: 10 },
+            { releaseMbid: 'r2', title: 'OK Computer', trackCount: 12 },
+          ],
+        }),
+      ),
+    ).toBe('OK Computer — awaiting your edition choice');
+  });
+
+  it('states the awaited choice even when no offered edition carries a title', () => {
+    expect(
+      targetDescription(
+        acquisition({
+          status: 'AwaitingManualSelection',
+          candidates: [{ releaseMbid: 'r1', trackCount: 10 }],
+        }),
+      ),
+    ).toBe('Awaiting your edition choice');
+  });
+
+  it('states the awaited choice when the projection carries no candidates at all', () => {
+    expect(targetDescription(acquisition({ status: 'AwaitingManualSelection' }))).toBe(
+      'Awaiting your edition choice',
+    );
+  });
+
+  it('prefers a resolved target over the awaiting description', () => {
+    expect(
+      targetDescription(
+        acquisition({ status: 'AwaitingManualSelection', target: { artist: 'A', title: 'T' } }),
+      ),
+    ).toBe('A — T');
   });
 });
 

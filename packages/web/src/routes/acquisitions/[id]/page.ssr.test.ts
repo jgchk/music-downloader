@@ -7,6 +7,7 @@ describe('acquisition detail page (SSR)', () => {
     const { body } = render(Page, {
       props: {
         data: {
+          attentionCount: 0,
           acquisition: {
             acquisitionId: 'acq-1',
             status: 'Searching',

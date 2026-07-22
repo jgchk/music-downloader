@@ -3,7 +3,7 @@
  * strings to human labels. Pure — shared by server loads and components, unit-tested in the node
  * project.
  */
-export type BadgePhase = 'pending' | 'fulfilled' | 'failed';
+export type BadgePhase = 'pending' | 'fulfilled' | 'failed' | 'attention';
 
 export function phaseLabel(phase: BadgePhase): string {
   switch (phase) {
@@ -13,5 +13,7 @@ export function phaseLabel(phase: BadgePhase): string {
       return 'Failed';
     case 'pending':
       return 'Working';
+    case 'attention':
+      return 'Action needed';
   }
 }
