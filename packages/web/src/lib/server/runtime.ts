@@ -4,8 +4,11 @@ import { createImporterRuntime } from '@music/importer/runtime';
 import type { ImporterRuntime } from '@music/importer/runtime';
 import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
+import type { DownloaderReadiness } from '@music/downloader/runtime';
+import type { ImporterReadiness } from '@music/importer/runtime';
 import { loadComposedConfig } from './config.js';
 import { createLogger } from './logger.js';
+import { version } from './version.js';
 
 /**
  * The composed process's composition root (design D8): boots both module runtimes — stores,
@@ -25,8 +28,29 @@ export interface Facades {
   readonly importer: ImporterFacade;
 }
 
+/**
+ * The composed process's readiness surface (design D4/D6): the server-layer projection routes read
+ * to answer `GET /health`. Overall `status` is `ok` only when both module runtimes report `up`,
+ * else `degraded`; `version` is the shipped artifact version; each module's live status is
+ * enumerated so a degraded response names the culprit. Routes read this — never module internals.
+ */
+export interface Readiness {
+  readonly status: 'ok' | 'degraded';
+  readonly version: string;
+  readonly modules: {
+    readonly downloader: { readonly status: 'up' | 'down' };
+    readonly importer: { readonly status: 'up' | 'down' };
+  };
+}
+
 interface Booted {
   readonly facades: Facades;
+  /** Live readiness accessors captured at boot; invoked per probe so a later halt is honest. */
+  readonly readiness: {
+    readonly downloader: () => DownloaderReadiness;
+    readonly importer: () => ImporterReadiness;
+  };
+  readonly version: string;
   readonly shutdown: () => Promise<void>;
 }
 
@@ -91,6 +115,11 @@ async function boot(
 
   return {
     facades: { downloader: downloader.facade, importer: importer.facade },
+    readiness: {
+      downloader: () => downloader.readiness(),
+      importer: () => importer.readiness(),
+    },
+    version,
     shutdown,
   };
 }
@@ -113,6 +142,28 @@ export function facadesOf(): Facades {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
   return booted.facades;
+}
+
+/**
+ * The readiness surface for `GET /health` (design D4/D6): reads each module runtime's live
+ * readiness accessor and the shipped version — no event-store scan, no module-internal reach.
+ * Overall `ok` only when both modules are `up`, else `degraded`. The daemon must have booted first.
+ */
+export function readinessOf(): Readiness {
+  if (booted === undefined) {
+    throw new Error('runtimes not booted — the init hook must run before requests are served');
+  }
+  const downloader = booted.readiness.downloader();
+  const importer = booted.readiness.importer();
+  const healthy = downloader.status === 'up' && importer.status === 'up';
+  return {
+    status: healthy ? 'ok' : 'degraded',
+    version: booted.version,
+    modules: {
+      downloader: { status: downloader.status },
+      importer: { status: importer.status },
+    },
+  };
 }
 
 /** Test seam: tear down the module-scope singleton between specs. */

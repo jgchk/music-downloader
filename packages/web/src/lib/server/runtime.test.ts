@@ -1,11 +1,18 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { err, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DownloaderRuntime } from '@music/downloader/runtime';
 import type { createImporterRuntime, ImporterRuntime } from '@music/importer/runtime';
-import { bootRuntimes, facadesOf, resetRuntimesForTesting } from './runtime.js';
+import { bootRuntimes, facadesOf, readinessOf, resetRuntimesForTesting } from './runtime.js';
+
+/** The shipped product version — read straight from the workspace root package.json (design D5). */
+const shippedVersion = (
+  JSON.parse(readFileSync(new URL('../../../../../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 /**
  * The composed boot path (design D8, runtime-baseline): module runtimes and both seam
@@ -31,12 +38,16 @@ function fakeSubscription(log: string[], name: string) {
   };
 }
 
-function fakeRuntimes(log: string[]) {
+function fakeRuntimes(
+  log: string[],
+  statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {},
+) {
   const downloader = {
     facade: { kind: 'downloader-facade' },
     feed: { read: vi.fn() },
     wakeups: { subscribe: () => () => undefined },
     connectVerdictFeed: () => fakeSubscription(log, 'verdicts'),
+    readiness: () => ({ status: statuses.downloader ?? 'up' }),
     stop: () => {
       log.push('downloader:stop');
       return Promise.resolve();
@@ -51,6 +62,7 @@ function fakeRuntimes(log: string[]) {
       log.push(`acquisitions:connect:${options.sourceRoot}`);
       return fakeSubscription(log, 'acquisitions');
     },
+    readiness: () => ({ status: statuses.importer ?? 'up' }),
     stop: () => {
       log.push('importer:stop');
       return Promise.resolve();
@@ -193,5 +205,56 @@ describe('bootRuntimes', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('readinessOf', () => {
+  async function boot(statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {}) {
+    const fakes = fakeRuntimes([], statuses);
+    await bootRuntimes(VALID_ENV, {
+      createDownloader: fakes.createDownloader,
+      createImporter: fakes.createImporter,
+      onShutdownSignal: vi.fn(),
+    });
+  }
+
+  it('composes both booted runtimes into ok with the shipped version when all up', async () => {
+    await boot();
+    expect(readinessOf()).toEqual({
+      status: 'ok',
+      version: shippedVersion,
+      modules: { downloader: { status: 'up' }, importer: { status: 'up' } },
+    });
+  });
+
+  it('reports the version from the shipped package, not the environment', async () => {
+    await boot();
+    // The value tracks the workspace root package.json version — no env var is consulted.
+    expect(readinessOf().version).toBe(shippedVersion);
+    expect(process.env.APP_VERSION).toBeUndefined();
+  });
+
+  it('reports degraded and names the downloader when it is down', async () => {
+    await boot({ downloader: 'down' });
+    const readiness = readinessOf();
+    expect(readiness.status).toBe('degraded');
+    expect(readiness.modules).toEqual({
+      downloader: { status: 'down' },
+      importer: { status: 'up' },
+    });
+  });
+
+  it('reports degraded and names the importer when it is down', async () => {
+    await boot({ importer: 'down' });
+    const readiness = readinessOf();
+    expect(readiness.status).toBe('degraded');
+    expect(readiness.modules).toEqual({
+      downloader: { status: 'up' },
+      importer: { status: 'down' },
+    });
+  });
+
+  it('refuses before boot (values only after the init hook has run)', () => {
+    expect(() => readinessOf()).toThrow(/not booted/);
   });
 });

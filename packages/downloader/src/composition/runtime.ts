@@ -65,6 +65,15 @@ export interface SeamWakeups {
   subscribe(listener: () => void): () => void;
 }
 
+/**
+ * This module's own readiness shape (design D4) — declared locally, no shared kernel: `up` unless
+ * the inbound verdict subscription has halted on a poison event. A synchronous read of in-memory
+ * runtime state; never a value that throws, never an event-store scan.
+ */
+export interface DownloaderReadiness {
+  readonly status: 'up' | 'down';
+}
+
 export interface DownloaderRuntime {
   readonly facade: DownloaderFacade;
   /** This module's outbound seam surface, consumed by the importer's subscription. */
@@ -72,6 +81,8 @@ export interface DownloaderRuntime {
   readonly wakeups: SeamWakeups;
   /** Build (unstarted) the subscription that consumes the importer's verdict feed. */
   connectVerdictFeed(feed: SeamFeed, wakeups?: SeamWakeups): CatchUpSubscription;
+  /** Side-effect-free readiness snapshot from in-memory runtime state (design D4). */
+  readiness(): DownloaderReadiness;
   stop(): Promise<void>;
 }
 
@@ -156,12 +167,16 @@ export async function createDownloaderRuntime(
     subscribe: (listener) => bus.subscribe(() => listener()),
   };
 
+  // The inbound seam subscription this runtime owns; the composition root connects it, and its
+  // halted-on-poison state is this module's one exposed "down" signal (design D4).
+  let verdicts: CatchUpSubscription | undefined;
+
   return {
     facade,
     feed,
     wakeups,
     connectVerdictFeed(verdictFeed, verdictWakeups) {
-      return new CatchUpSubscription({
+      verdicts = new CatchUpSubscription({
         name: 'seam:verdicts',
         feed: verdictFeed,
         checkpoints,
@@ -176,6 +191,10 @@ export async function createDownloaderRuntime(
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         wakeups: verdictWakeups,
       });
+      return verdicts;
+    },
+    readiness() {
+      return { status: verdicts?.isHalted ? 'down' : 'up' };
     },
     stop() {
       reactor.stop();
