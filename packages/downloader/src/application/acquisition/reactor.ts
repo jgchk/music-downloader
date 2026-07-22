@@ -94,9 +94,17 @@ export interface ReactorDeps {
   readonly retryPolicy?: RetryPolicy;
   /** Jitter roll ∈ [0, 1] (defaults to `Math.random`) — injectable for deterministic tests. */
   readonly random?: () => number;
+  /** Injectable sleep for the re-drive pass's jitter (defaults to a real timeout). */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Upper bound of the jittered gap between re-driven streams (rate limit, D3). */
+  readonly redriveGapMs?: number;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
+const DEFAULT_REDRIVE_GAP_MS = 1_000;
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 const defaultInterval = (fn: () => void, ms: number): (() => void) => {
   const handle = setInterval(fn, ms);
@@ -111,8 +119,23 @@ export class Reactor {
   private stopInterval: (() => void) | undefined;
   private running = false;
   private pending = false;
+  private stopped = false;
+  /** The dispatch mutex: drain passes and the startup re-drive serialize through this chain. */
+  private mutex: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: ReactorDeps) {}
+
+  /**
+   * Failures inside a pass are values (neverthrow) — an actual throw is a bug. It is caught and
+   * logged here so one buggy pass can never poison the chain and silence the reactor for good.
+   */
+  private withMutex(work: () => Promise<void>): Promise<void> {
+    const run = this.mutex.then(work).catch((err: unknown) => {
+      this.deps.logger.error({ err }, 'reactor pass failed unexpectedly');
+    });
+    this.mutex = run;
+    return run;
+  }
 
   private get policy(): RetryPolicy {
     return this.deps.retryPolicy ?? DEFAULT_RETRY_POLICY;
@@ -136,6 +159,7 @@ export class Reactor {
    */
   async start(): Promise<void> {
     const checkpoint = await this.deps.checkpoints.load(REACTOR_CONSUMER);
+    if (this.stopped) return; // stopped while loading (a backgrounded boot torn down early)
     this.lastProcessed = checkpoint.unwrapOr(0);
 
     this.unsubscribe = this.deps.bus.subscribe(() => {
@@ -146,9 +170,11 @@ export class Reactor {
     }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
 
     await this.drain();
+    await this.redrive();
   }
 
   stop(): void {
+    this.stopped = true;
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.stopInterval?.();
@@ -166,26 +192,78 @@ export class Reactor {
       return;
     }
     this.running = true;
-    try {
-      do {
-        this.pending = false;
-        await this.retryDueParked();
-        const backlog = await this.deps.store.readAll(this.lastProcessed);
-        if (backlog.isErr()) {
-          this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
-          return;
-        }
-        for (const stored of backlog.value) {
-          await this.process(stored);
-          if (this.lastProcessed < stored.globalSeq) {
-            // The event could not be processed or parked durably (a store fault): stop here and
-            // let the next wakeup or fallback poll retry, instead of hot-looping over it.
+    return this.withMutex(async () => {
+      try {
+        do {
+          this.pending = false;
+          await this.retryDueParked();
+          const backlog = await this.deps.store.readAll(this.lastProcessed);
+          if (backlog.isErr()) {
+            this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
             return;
           }
-        }
-      } while (this.pending);
-    } finally {
-      this.running = false;
+          for (const stored of backlog.value) {
+            await this.process(stored);
+            if (this.lastProcessed < stored.globalSeq) {
+              // The event could not be processed or parked durably (a store fault): stop here and
+              // let the next wakeup or fallback poll retry, instead of hot-looping over it.
+              return;
+            }
+          }
+        } while (this.pending);
+      } finally {
+        this.running = false;
+      }
+    });
+  }
+
+  /**
+   * The startup re-drive pass (D3) — level-triggered reconciliation: after the catch-up drain,
+   * fold every stream and re-dispatch the effect its current state is waiting on through the
+   * normal idempotent path. Terminal streams derive none; awaiting-selection pauses derive none
+   * (the pause is the state's meaning); parked streams belong to the retry scheduler and stalled
+   * ones to the operator. The pass is jittered between streams so a boot with many pending
+   * acquisitions does not stampede the upstreams, and it runs on the dispatch mutex so it can
+   * never race a live drain over the same acquisition (a check-then-act re-attach hazard).
+   */
+  private redrive(): Promise<void> {
+    return this.withMutex(async () => {
+      const all = await this.deps.store.readAll(0);
+      if (all.isErr()) {
+        this.deps.logger.error({ err: all.error }, 'startup re-drive could not read the log');
+        return;
+      }
+      const streams = new Map<string, StoredEvent[]>();
+      for (const stored of all.value) {
+        const list = streams.get(stored.streamId) ?? [];
+        list.push(stored);
+        streams.set(stored.streamId, list);
+      }
+      for (const [streamId, events] of streams) {
+        if (this.stopped) return;
+        await this.redriveStream(streamId, events);
+      }
+    });
+  }
+
+  private async redriveStream(streamId: string, events: readonly StoredEvent[]): Promise<void> {
+    if (this.deps.stalled.isStalled(streamId)) return; // landed; awaiting an operator
+    const park = await this.deps.parked.find(streamId);
+    if (park.isErr() || park.value !== undefined) return; // the retry scheduler owns it
+    const acquisition = Acquisition.fromHistory(events.map((entry) => entry.event));
+    if (acquisition.isTerminal) return;
+    const last = events[events.length - 1]!;
+    if (acquisition.reactTo(last.event).length === 0) return; // nothing pending (e.g. paused)
+
+    const gap = this.deps.redriveGapMs ?? DEFAULT_REDRIVE_GAP_MS;
+    await (this.deps.sleep ?? defaultSleep)(gap * this.roll());
+    this.deps.logger.info(
+      { acquisitionId: streamId, phase: acquisition.phase },
+      'startup re-drive dispatching the pending effect',
+    );
+    const outcome = await this.dispatchEvent(last, events);
+    if (outcome.kind === 'retry') {
+      await this.parkStream(last, outcome.effect, outcome.error);
     }
   }
 

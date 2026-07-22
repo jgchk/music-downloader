@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { okAsync, ok } from 'neverthrow';
+import { ResultAsync, okAsync, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SqliteCheckpointStore,
@@ -342,5 +342,55 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
     expect(status.ok).toBe(true);
     expect(status.ok && status.value.stalled).toBeFalsy();
+  });
+});
+
+describe('boot readiness (reactor-durability D4)', () => {
+  it('returns ready without awaiting the backlog drain — a hanging effect cannot block boot', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const file = join(dir, 'events.db');
+    const db = openEventDatabase(file);
+    const store = new SqliteEventStore(db, new UpcasterRegistry());
+    (
+      await store.append('acq-hung', 0, requestedHistory(), {
+        acquisitionId: 'acq-hung',
+        occurredAt: 't',
+      })
+    )._unsafeUnwrap();
+    db.close();
+
+    let releaseResolution!: () => void;
+    const gate = new Promise<{ kind: 'unresolved' }>((res) => {
+      releaseResolution = () => {
+        res({ kind: 'unresolved' });
+      };
+    });
+    const ports: EffectPorts = {
+      ...fakePorts(),
+      metadata: { resolve: () => ResultAsync.fromSafePromise(gate) },
+    };
+
+    // The pending resolution hangs indefinitely; boot must return anyway (backgrounded drain).
+    const runtime = await createDownloaderRuntime(
+      {
+        databaseFile: file,
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      silentLogger(),
+      { ports },
+    );
+    cleanups.push(() => runtime.stop());
+    expect(runtime.readiness()).toEqual({ status: 'up' });
+
+    // The backlog still completes in the background once the effect resolves.
+    releaseResolution();
+    await vi.waitFor(() => {
+      const status = runtime.facade.getAcquisition({ id: 'acq-hung' });
+      expect(status).toMatchObject({ ok: true, value: { status: 'MetadataFailed' } });
+    });
   });
 });

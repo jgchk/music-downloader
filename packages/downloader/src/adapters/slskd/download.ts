@@ -109,22 +109,33 @@ export class SlskdDownload implements DownloadPort {
       this.transferLedger.keyFor(acquisitionId, username, request.filename),
     );
 
+    // Reconcile before enqueue (reactor-durability D3): live ledgered rows are evidence of a
+    // prior attempt whose poller died with the process. If the source still holds those
+    // transfers, re-attach — resume polling with fresh stall/queue budgets — rather than
+    // download the candidate a second time; if the source lost them, fall through and re-enqueue.
+    const prior = await this.transferLedger.liveTransferFilenames(acquisitionId, username, wanted);
     await this.transferLedger.recordCreated(ownedKeys);
-    this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
-    const enqueue = await this.client.postRaw(downloadsPath(username), requests);
-    if (enqueue.status < 200 || enqueue.status >= 300) {
-      // slskd answered, so the infrastructure is up: it refused THIS candidate's enqueue
-      // (typically an unreachable peer). That is a business failure for the retry ladder — reject
-      // the candidate and advance to the next-best — never an InfraError, which would retry the
-      // same dead peer forever (prod 2026-07-22). The write-ahead rows are released: nothing was
-      // created at the source, so the sweep must not chase them.
-      const reason = enqueueRejectionReason(enqueue.body);
-      this.logger.warn(
-        { username, status: enqueue.status, reason },
-        'slskd rejected the enqueue; failing the candidate',
-      );
-      await this.transferLedger.release(ownedKeys);
-      return { kind: 'failed', reason };
+    let attached = false;
+    if (prior.size > 0) {
+      attached = await this.reattach(username, wanted);
+    }
+    if (!attached) {
+      this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
+      const enqueue = await this.client.postRaw(downloadsPath(username), requests);
+      if (enqueue.status < 200 || enqueue.status >= 300) {
+        // slskd answered, so the infrastructure is up: it refused THIS candidate's enqueue
+        // (typically an unreachable peer). That is a business failure for the retry ladder — reject
+        // the candidate and advance to the next-best — never an InfraError, which would retry the
+        // same dead peer forever (prod 2026-07-22). The write-ahead rows are released: nothing was
+        // created at the source, so the sweep must not chase them.
+        const reason = enqueueRejectionReason(enqueue.body);
+        this.logger.warn(
+          { username, status: enqueue.status, reason },
+          'slskd rejected the enqueue; failing the candidate',
+        );
+        await this.transferLedger.release(ownedKeys);
+        return { kind: 'failed', reason };
+      }
     }
 
     const start = this.timer.now();
@@ -166,6 +177,17 @@ export class SlskdDownload implements DownloadPort {
       }
       await this.timer.sleep(this.pollIntervalMs);
     }
+  }
+
+  /** True when the source still lists the prior attempt's transfers — polling resumes on them. */
+  private async reattach(username: string, wanted: ReadonlySet<string>): Promise<boolean> {
+    const present = await pollOwnedTransfers(this.client, username, wanted);
+    if (present.length === 0) {
+      this.logger.warn({ username }, 'ledgered transfers lost at the source; re-enqueueing');
+      return false;
+    }
+    this.logger.info({ username, count: present.length }, 're-attaching to live slskd transfers');
+    return true;
   }
 
   /**

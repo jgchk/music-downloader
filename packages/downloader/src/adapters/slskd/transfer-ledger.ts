@@ -38,6 +38,30 @@ export class TransferLedger {
     };
   }
 
+  /**
+   * The wanted filenames whose transfer rows are already live for this acquisition — evidence of
+   * a prior attempt whose poller died with the process (reactor-durability D3). Best-effort: a
+   * ledger fault reports none, degrading reconciliation to a plain enqueue.
+   */
+  async liveTransferFilenames(
+    acquisitionId: string,
+    username: string,
+    wanted: ReadonlySet<string>,
+  ): Promise<ReadonlySet<string>> {
+    const rows = await this.ledger.liveByAcquisition(acquisitionId);
+    if (rows.isErr()) {
+      this.logger.warn({ err: rows.error }, 'ledger: list live transfers failed');
+      return new Set();
+    }
+    return new Set(
+      rows.value
+        .filter((row) => row.source === SLSKD_SOURCE && row.kind === 'transfer')
+        .filter((row) => row.resourceKey.startsWith(`${username}|`))
+        .map((row) => filenameOfKey(row))
+        .filter((filename) => wanted.has(filename)),
+    );
+  }
+
   /** Must run before the enqueue (write-ahead), so a crash still leaves the sweep a trail. */
   async recordCreated(keys: readonly SourceResourceKey[]): Promise<void> {
     for (const key of keys) {
