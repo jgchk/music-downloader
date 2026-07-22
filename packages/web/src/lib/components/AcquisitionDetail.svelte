@@ -80,6 +80,13 @@
       {/each}
     </tbody>
   </table>
+{:else if acquisition.status === 'AwaitingManualSelection'}
+  <!-- Defensive: the projection always carries candidates in this phase; if a stale or drifted
+       reader ever sees none, say so instead of presenting a silent dead end. -->
+  <p data-testid="no-candidates">
+    This acquisition is waiting for an edition selection, but no candidate editions are available.
+    Cancel and resubmit the request.
+  </p>
 {/if}
 
 {#if isCancellable(acquisition.status)}

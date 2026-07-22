@@ -23,6 +23,7 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
 describe('statusTone / isTerminal / isCancellable', () => {
   it.each([
     ['Pending', 'pending', false],
+    ['AwaitingManualSelection', 'pending', false],
     ['Searching', 'pending', false],
     ['Downloading', 'pending', false],
     ['Fulfilled', 'fulfilled', true],

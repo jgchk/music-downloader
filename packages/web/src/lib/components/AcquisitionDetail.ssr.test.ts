@@ -82,11 +82,27 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('1995-05-01');
     expect(body).toContain('JP');
     expect(body).toContain('CD');
-    expect(body).toContain('12');
+    expect(body).toContain('<td>12</td>');
     expect(body).toContain('action="?/select"');
     expect(body).toContain('value="boot-1"');
     expect(body).toContain('value="boot-2"');
     // Awaiting selection is not terminal: cancelling remains available.
+    expect(body).toContain('data-testid="cancel"');
+  });
+
+  it('explains an awaiting-selection acquisition that carries no candidates instead of a dead end', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        acquisition: {
+          ...working,
+          status: 'AwaitingManualSelection' as const,
+          currentCandidate: undefined,
+          history: [],
+        },
+      },
+    });
+    expect(body).not.toContain('data-testid="edition-candidates"');
+    expect(body).toContain('data-testid="no-candidates"');
     expect(body).toContain('data-testid="cancel"');
   });
 

@@ -71,8 +71,9 @@ export const mbReleaseSearchSchema = z.object({
  * One edition of a known release group, as returned by the browse `GET /release?release-group={mbid}
  * &inc=media&fmt=json`. A browse carries no relevance `score` (identity is given); the picker reads
  * only `status` and `date` (edition selection) and the per-medium `track-count`s, whose sum is the
- * edition's total track count. `country` and the per-medium `format` are consumed solely to present
- * candidate editions for manual selection (manual-edition-selection). All fields are optional — a
+ * edition's total track count. `title`, `country`, and the per-medium `format` are consumed to
+ * present candidate editions for manual selection (`date` and the track count do double duty
+ * there). All fields are optional — a
  * sparse edition degrades selection or presentation (e.g. an unknown track count of 0 simply won't
  * be modal), never the resolution as a whole.
  */

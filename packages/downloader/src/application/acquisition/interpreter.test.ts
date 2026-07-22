@@ -108,19 +108,24 @@ describe('interpretEffect — metadata resolution', () => {
 
   it('resolves the chosen edition on the resume path and records the target', async () => {
     await seed([...awaitingSelectionHistory(), { type: 'EditionSelected', releaseMbid: 'boot-1' }]);
-    const resolve = vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget }));
-    const ports = stubPorts({ metadata: { resolve } });
+    const ports = stubPorts({
+      metadata: {
+        resolve: vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget })),
+      },
+    });
     // The effect `react` emits for EditionSelected: the direct-by-release-id request.
     await interpretEffect(deps(ports), 'acq-1', {
       type: 'ResolveMetadata',
       request: { kind: 'musicbrainz', mbid: 'boot-1', targetType: 'album' },
     });
-    expect(resolve).toHaveBeenCalledWith({
-      kind: 'musicbrainz',
-      mbid: 'boot-1',
-      targetType: 'album',
-    });
-    expect(appendedTypes()).toContain('TargetResolved');
+    const resolved = store
+      .all()
+      .map((entry) => entry.event)
+      .find(
+        (event): event is Extract<AcquisitionEvent, { type: 'TargetResolved' }> =>
+          event.type === 'TargetResolved',
+      );
+    expect(resolved?.target).toEqual(sampleTarget);
   });
 
   it('propagates an infrastructure fault without appending', async () => {

@@ -274,7 +274,9 @@ export function releaseGroupEditionIds(
  * Reduce a release-group browse (identity-typed editions) to the ordered release ids to try, via
  * {@link releaseGroupEditionIds}. An edition's total track count is the sum of its media's
  * `track-count`s (an unknown count contributes 0); editions without an id are dropped, since there
- * is nothing to fetch. Empty, all-non-official, or missing input yields no candidates → *unresolved*.
+ * is nothing to fetch. Empty, all-non-official, or missing input yields no candidates — the adapter
+ * then offers the editions for manual selection ({@link releaseGroupEditionCandidates}) or reports
+ * *unresolved* when there are none.
  */
 export function releaseGroupCandidateIds(
   releases: readonly MbBrowseRelease[] | undefined,
@@ -301,9 +303,10 @@ function totalTrackCount(release: MbBrowseRelease): number {
  * The candidate editions to offer for manual selection when a group has editions but no official
  * one (the `needsSelection` outcome). Every edition with an id is presented — none is silently
  * dropped, since the whole point is a human judging editions the picker won't. Ordered by the
- * picker's heuristic so the most standard-looking edition leads: modal track count first, then
- * earliest date, stable input order as the final tiebreak. Presentation fields pass through
- * sparsely; an edition's distinct media formats join into one display string (e.g. `CD + DVD`).
+ * picker's preference order so the most standard-looking edition leads: modal track count (over
+ * all editions, ranking rather than filtering) first, then earliest date, stable input order as
+ * the final tiebreak. Presentation fields pass through sparsely; an edition's distinct media
+ * formats join into one display string (e.g. `CD + DVD`).
  */
 export function releaseGroupEditionCandidates(
   releases: readonly MbBrowseRelease[] | undefined,
@@ -329,7 +332,7 @@ export function releaseGroupEditionCandidates(
   }
   if (candidates.length === 0) return candidates;
   const modal = modalTrackCount(candidates);
-  return [...candidates].sort((a, b) => {
+  return candidates.sort((a, b) => {
     const modalRank = Number(a.trackCount !== modal) - Number(b.trackCount !== modal);
     if (modalRank !== 0) return modalRank;
     return compareDates(a.date, b.date);

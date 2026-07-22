@@ -12,8 +12,8 @@ import type { ValidationVerdict } from '../validation/verdict.js';
 
 /**
  * What the caller asked for: a MusicBrainz release/recording id, a MusicBrainz release-*group* id
- * (an album identity, resolved to a representative official edition), or a structured descriptor to
- * resolve (D12).
+ * (an album identity, resolved to a representative official edition — or paused for manual edition
+ * selection when none is official), or a structured descriptor to resolve (D12).
  */
 export type AcquisitionRequest =
   | { readonly kind: 'musicbrainz'; readonly mbid: string; readonly targetType: TargetType }
@@ -44,8 +44,9 @@ export interface DownloadedFile {
  * One edition of a release group offered for manual selection — a lightweight presentation value,
  * not a {@link Target}, since presenting an edition needs no track manifest. Carried on the
  * `ManualSelectionRequested` event so the retained candidates are part of the acquisition's
- * history. Fields beyond the id are optional: MusicBrainz data is sparse, and a missing field
- * degrades presentation, never the pause itself.
+ * history. Fields beyond the id and track count are optional: MusicBrainz data is sparse, and a
+ * missing field degrades presentation, never the pause itself. An unknown track count arrives as
+ * 0 (the mapping sums per-medium counts, unknown contributing nothing).
  */
 export interface EditionCandidate {
   readonly releaseMbid: string;

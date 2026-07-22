@@ -148,6 +148,10 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
     case 'RecordManualSelectionRequested':
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
+      // An empty menu is not a choice — it is the unresolved outcome wearing a costume. Guarding
+      // here (not just in the adapter) keeps "AwaitingManualSelection has a non-empty menu" true
+      // for every history decide can produce, so the pause can never be a dead end.
+      if (command.candidates.length === 0) return ok([{ type: 'MetadataResolutionFailed' }]);
       return ok([{ type: 'ManualSelectionRequested', candidates: command.candidates }]);
 
     case 'SelectEdition':
