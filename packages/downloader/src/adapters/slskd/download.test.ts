@@ -108,7 +108,7 @@ interface Harness {
   adapter: SlskdDownload;
   deletes: string[];
   ledger: FakeResourceLedger;
-  counts: { options: number; events: number };
+  counts: { options: number; events: number; posts: number };
 }
 
 function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
@@ -118,7 +118,7 @@ function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
 function downloader(opts: Opts): Harness {
   const deletes: string[] = [];
   const ledger = new FakeResourceLedger();
-  const counts = { options: 0, events: 0 };
+  const counts = { options: 0, events: 0, posts: 0 };
   const polls = [...opts.polls];
   // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
   // its staged files without every test having to spell out the events stub.
@@ -126,6 +126,7 @@ function downloader(opts: Opts): Harness {
   const http: HttpClient = {
     send: ({ method, url }) => {
       if (method === 'POST') {
+        counts.posts += 1;
         if (opts.enqueueThrows) return Promise.reject(new Error('socket hang up'));
         return Promise.resolve(opts.enqueue ?? { status: 200, body: '' });
       }
@@ -335,6 +336,79 @@ describe('SlskdDownload', () => {
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
     expect(ledger.removed).toHaveLength(2); // both confirmed gone
+  });
+
+  describe('reconcile-before-enqueue (reactor-durability D3)', () => {
+    /** The prior attempt's write-ahead rows, as a crashed poller would have left them. */
+    function seedLedgeredTransfers(ledger: FakeResourceLedger): void {
+      for (const name of ['01.flac', '02.flac']) {
+        ledger.created.push({
+          source: 'slskd',
+          kind: 'transfer',
+          resourceKey: `u1|@@a\\Album\\${name}`,
+          acquisitionId: ACQ,
+        });
+      }
+    }
+
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+    ]);
+
+    it('re-attaches to live ledgered transfers instead of downloading a second time', async () => {
+      const harness = downloader({ polls: [inFlight, bothSucceeded], events: [bothCompleted] });
+      seedLedgeredTransfers(harness.ledger);
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+
+      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(harness.counts.posts).toBe(0); // never enqueued again — polling resumed
+    });
+
+    it('re-enqueues when the ledgered transfers were lost at the source', async () => {
+      const harness = downloader({ polls: [poll([]), bothSucceeded], events: [bothCompleted] });
+      seedLedgeredTransfers(harness.ledger);
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+
+      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(harness.counts.posts).toBe(1);
+    });
+
+    it('applies the queue-wait budget from re-attach — a resumed transfer can still time out', async () => {
+      const queued = poll([
+        transfer('01.flac', { state: 'Queued, Remotely', size: 100, placeInQueue: 4 }),
+        transfer('02.flac', { state: 'Queued, Remotely', size: 100 }),
+      ]);
+      const harness = downloader({ polls: [queued, queued, queued, poll([])] });
+      seedLedgeredTransfers(harness.ledger);
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(100000, 50), () => {});
+
+      expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
+      expect(harness.counts.posts).toBe(0);
+    });
+
+    it('a fresh download consults no listing before its enqueue (no prior ledger rows)', async () => {
+      const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+
+      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(harness.counts.posts).toBe(1);
+    });
+
+    it('degrades to a plain enqueue when the ledger cannot be read', async () => {
+      const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+      seedLedgeredTransfers(harness.ledger);
+      harness.ledger.fail = true;
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+
+      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(harness.counts.posts).toBe(1);
+    });
   });
 
   it('abandons a hopelessly-queued transfer once the queue wait elapses', async () => {

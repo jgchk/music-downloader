@@ -23,6 +23,12 @@ const envSchema = z.object({
   SLSKD_API_KEY: z.string().min(1).optional(),
   MUSICBRAINZ_BASE_URL: z.string().min(1).optional(),
   MUSICBRAINZ_USER_AGENT: z.string().min(1).optional(),
+  // Parked-effect retry tuning (reactor-durability D2); unset falls back to runtime defaults
+  // (5s initial, 15min cap, 6h wall-clock budget, 30d stalled retention).
+  REACTOR_RETRY_INITIAL_DELAY_MS: z.coerce.number().int().positive().optional(),
+  REACTOR_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().optional(),
+  REACTOR_RETRY_BUDGET_MS: z.coerce.number().int().nonnegative().optional(),
+  REACTOR_STALLED_RETENTION_MS: z.coerce.number().int().positive().optional(),
 
   // --- importer --------------------------------------------------------------------------------
   IMPORTER_DATABASE_FILE: z.string().min(1).default('data/importer/events.db'),
@@ -72,6 +78,20 @@ export function loadComposedConfig(
       stagingRoot: v.STAGING_ROOT,
       musicbrainz: { baseUrl: v.MUSICBRAINZ_BASE_URL, userAgent: v.MUSICBRAINZ_USER_AGENT },
       slskd: { baseUrl: v.SLSKD_BASE_URL, apiKey: v.SLSKD_API_KEY },
+      reactor: {
+        retry: {
+          ...(v.REACTOR_RETRY_INITIAL_DELAY_MS === undefined
+            ? {}
+            : { initialDelayMs: v.REACTOR_RETRY_INITIAL_DELAY_MS }),
+          ...(v.REACTOR_RETRY_MAX_DELAY_MS === undefined
+            ? {}
+            : { maxDelayMs: v.REACTOR_RETRY_MAX_DELAY_MS }),
+          ...(v.REACTOR_RETRY_BUDGET_MS === undefined
+            ? {}
+            : { budgetMs: v.REACTOR_RETRY_BUDGET_MS }),
+        },
+        stalledRetentionMs: v.REACTOR_STALLED_RETENTION_MS,
+      },
     },
     importer: {
       databaseFile: v.IMPORTER_DATABASE_FILE,

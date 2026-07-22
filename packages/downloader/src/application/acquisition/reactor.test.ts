@@ -1,4 +1,4 @@
-import { errAsync, okAsync } from 'neverthrow';
+import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { REACTOR_CONSUMER, Reactor } from './reactor.js';
 import type { ReactorDeps } from './reactor.js';
@@ -20,6 +20,7 @@ import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { RetryPolicy } from './retry-policy.js';
 import {
+  awaitingSelectionHistory,
   importingHistory,
   matchingCandidate,
   requestedHistory,
@@ -63,6 +64,8 @@ interface ReactorOverrides {
   readonly retryPolicy?: RetryPolicy;
   readonly random?: () => number;
   readonly logger?: ReactorDeps['logger'];
+  readonly sleep?: (ms: number) => Promise<void>;
+  readonly redriveGapMs?: number;
 }
 
 function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor {
@@ -80,6 +83,9 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     retryPolicy: overrides.retryPolicy,
     // Deterministic full-step jitter: the delay equals the exponential step exactly.
     random: overrides.random ?? (() => 1),
+    // Instant re-drive jitter by default; the jitter itself is pinned by its own test below.
+    sleep: overrides.sleep ?? (() => Promise.resolve()),
+    redriveGapMs: overrides.redriveGapMs,
   };
   return new Reactor(deps);
 }
@@ -136,12 +142,16 @@ describe('Reactor.start', () => {
     expect(bus.subscriberCount()).toBe(1);
   });
 
-  it('does not re-dispatch an already-checkpointed in-flight download after a restart', async () => {
+  it('re-drives an already-checkpointed in-flight download after a restart', async () => {
+    // The old contract ("not downloaded a second time") was satisfied by never driving the
+    // download again — the orphan bug this change removes. Resumption is now required: the
+    // effect re-fires idempotently and the ADAPTER reconciles against the source's live
+    // transfers instead of enqueueing twice (reactor-durability D3).
     await seed(selectedHistory([matchingCandidate('a')])); // ends at CandidateSelected (globalSeq 5)
     await checkpoints.save(REACTOR_CONSUMER, 5); // as if processed just before the crash
     const ports = stubPorts();
     await reactor(ports).start();
-    expect(ports.download.download).not.toHaveBeenCalled();
+    expect(ports.download.download).toHaveBeenCalledOnce();
   });
 
   it('subscribes even when catch-up fails, and tolerates a checkpoint load failure', async () => {
@@ -869,6 +879,208 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     expect(
       entries.find((entry) => entry.msg === 'retry budget exhausted; degrading to modeled failure'),
     ).toMatchObject({ acquisitionId: 'acq-1', effect: 'ResolveMetadata' });
+  });
+});
+
+describe('Reactor — startup re-drive (reactor-durability D3)', () => {
+  async function checkpointToHead(): Promise<void> {
+    const head = store.all().at(-1)?.globalSeq ?? 0;
+    await checkpoints.save(REACTOR_CONSUMER, head);
+  }
+
+  it('re-derives and dispatches the pending effect of every non-terminal stream', async () => {
+    await seed(requestedHistory(), 'acq-pending'); // Pending → ResolveMetadata
+    await seed(selectedHistory([matchingCandidate('a')]), 'acq-downloading'); // → Download
+    await seed(importedThenFulfilled([matchingCandidate('b')]), 'acq-done'); // terminal → nothing
+    await seed(awaitingSelectionHistory(), 'acq-paused'); // the pause IS the state → nothing
+    await checkpointToHead(); // the drain has nothing to do; only the re-drive acts
+    const ports = stubPorts({
+      metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
+    });
+    const r = reactor(ports);
+    await r.start();
+
+    expect(ports.metadata.resolve).toHaveBeenCalledOnce(); // acq-pending resumed
+    expect(ports.download.download).toHaveBeenCalledOnce(); // acq-downloading resumed
+    expect(ports.search.search).not.toHaveBeenCalled(); // terminal and paused derive nothing
+    r.stop();
+  });
+
+  it('skips parked and stalled streams — their owners are the scheduler and the operator', async () => {
+    await seed(requestedHistory(), 'acq-parked');
+    await seed(requestedHistory(), 'acq-stalled');
+    await checkpointToHead();
+    await parked.park({
+      streamId: 'acq-parked',
+      globalSeq: 1,
+      attempt: 1,
+      parkedAt: '2026-07-22T12:00:00.000Z',
+      nextRetryAt: '2026-07-22T13:00:00.000Z', // not due
+      lastError: 'mb: down',
+    });
+    stalled.mark('acq-stalled');
+    const ports = stubPorts();
+    const r = reactor(ports);
+    await r.start();
+
+    expect(ports.metadata.resolve).not.toHaveBeenCalled();
+    r.stop();
+  });
+
+  it('jitters and rate-limits between re-driven streams', async () => {
+    await seed(requestedHistory(), 'acq-one');
+    await seed(requestedHistory(), 'acq-two');
+    await checkpointToHead();
+    const sleeps: number[] = [];
+    const ports = stubPorts({
+      metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
+    });
+    const r = reactor(ports, {
+      sleep: (ms) => {
+        sleeps.push(ms);
+        return Promise.resolve();
+      },
+      random: () => 0.5,
+      redriveGapMs: 2_000,
+    });
+    await r.start();
+
+    expect(sleeps).toEqual([1_000, 1_000]); // one jittered gap per dispatching stream
+    r.stop();
+  });
+
+  it('serializes the re-drive with live dispatch — no interleaving on the mutex', async () => {
+    await seed(requestedHistory(), 'acq-redriven');
+    await checkpointToHead();
+    const order: string[] = [];
+    let releaseRedrive!: () => void;
+    const gate = new Promise<{ kind: 'unresolved' }>((res) => {
+      releaseRedrive = () => {
+        order.push('redrive:end');
+        res({ kind: 'unresolved' });
+      };
+    });
+    const resolve = vi.fn(() => {
+      if (resolve.mock.calls.length === 1) {
+        // The re-driven effect: hold it open while a live event lands on the bus.
+        order.push('redrive:start');
+        return ResultAsync.fromSafePromise(gate);
+      }
+      order.push('live:dispatch');
+      return okAsync({ kind: 'unresolved' as const });
+    });
+    const ports = stubPorts({ metadata: { resolve } });
+    const r = reactor(ports);
+    const started = r.start();
+
+    await vi.waitFor(() => {
+      expect(order).toContain('redrive:start');
+    });
+    // A live event lands mid-re-drive: its drain must queue behind the mutex.
+    await seed(requestedHistory(), 'acq-live');
+    bus.publish(store.all().filter((entry) => entry.streamId === 'acq-live'));
+    releaseRedrive();
+    await started;
+    await vi.waitFor(() => {
+      expect(order).toContain('live:dispatch');
+    });
+
+    expect(order).toEqual(['redrive:start', 'redrive:end', 'live:dispatch']);
+    r.stop();
+  });
+
+  it('sleeps on a real timeout by default between re-driven streams', async () => {
+    vi.useFakeTimers();
+    try {
+      await seed(requestedHistory());
+      await checkpointToHead();
+      const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
+      const r = new Reactor({
+        store,
+        checkpoints,
+        bus,
+        parked,
+        deadLetters,
+        stalled,
+        logger: silentLogger(),
+        interpreter: interpreter(stubPorts({ metadata: { resolve } })),
+        interval: () => () => {},
+        random: () => 1,
+      });
+      const started = r.start();
+      await vi.advanceTimersByTimeAsync(1_000); // the default jitter gap elapses
+      await started;
+      expect(resolve).toHaveBeenCalledOnce();
+      r.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('survives an unexpected throw inside a pass without poisoning the mutex', async () => {
+    await seed(requestedHistory());
+    const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
+    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const readAll = vi.spyOn(store, 'readAll').mockImplementation(() => {
+      throw new Error('boom'); // a bug, not a modeled failure — must not silence the reactor
+    });
+    await r.drain(); // resolves; the throw is caught and logged
+
+    readAll.mockRestore();
+    await r.drain(); // the mutex still runs passes
+    expect(resolve).toHaveBeenCalledOnce();
+    r.stop();
+  });
+
+  it('parks a stream whose re-driven effect fails retryably', async () => {
+    await seed(requestedHistory(), 'acq-1');
+    await checkpointToHead();
+    const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
+    const r = reactor(stubPorts({ metadata: { resolve } }));
+    await r.start();
+
+    expect(parked.peek('acq-1')).toMatchObject({ globalSeq: 1, attempt: 1 });
+    r.stop();
+  });
+
+  it('abandons startup when stopped while the checkpoint is still loading', async () => {
+    // A backgrounded boot torn down early: stop() lands before start() finishes loading. The
+    // reactor must not subscribe afterwards — that listener would leak past the shutdown.
+    await seed(requestedHistory());
+    const ports = stubPorts();
+    const r = reactor(ports);
+    const started = r.start();
+    r.stop();
+    await started;
+    expect(bus.subscriberCount()).toBe(0);
+    expect(ports.metadata.resolve).not.toHaveBeenCalled();
+  });
+
+  it('halts the re-drive pass between streams once stopped', async () => {
+    await seed(requestedHistory(), 'acq-one');
+    await seed(requestedHistory(), 'acq-two');
+    await checkpointToHead();
+    const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
+    const holder: { r?: Reactor } = {};
+    const r = reactor(stubPorts({ metadata: { resolve } }), {
+      sleep: () => {
+        holder.r?.stop(); // shutdown arrives while the first stream's jitter gap elapses
+        return Promise.resolve();
+      },
+    });
+    holder.r = r;
+    await r.start();
+
+    expect(resolve).toHaveBeenCalledOnce(); // the second stream is never re-driven
+  });
+
+  it('logs and skips the pass when the log cannot be read', async () => {
+    // Covered indirectly by the catch-up-failure start test; pinned here against the re-drive.
+    store.failReadAll = true;
+    const r = reactor(stubPorts());
+    await r.start();
+    expect(parked.count()).toBe(0);
+    r.stop();
   });
 });
 

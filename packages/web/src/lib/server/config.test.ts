@@ -68,6 +68,23 @@ describe('loadComposedConfig', () => {
     expect(config.logLevel).toBe('debug');
   });
 
+  it('maps the reactor retry/retention tuning, leaving unset values to runtime defaults', () => {
+    const defaults = loadComposedConfig(VALID)._unsafeUnwrap();
+    expect(defaults.downloader.reactor).toEqual({ retry: {}, stalledRetentionMs: undefined });
+
+    const tuned = loadComposedConfig({
+      ...VALID,
+      REACTOR_RETRY_INITIAL_DELAY_MS: '1000',
+      REACTOR_RETRY_MAX_DELAY_MS: '60000',
+      REACTOR_RETRY_BUDGET_MS: '3600000',
+      REACTOR_STALLED_RETENTION_MS: '86400000',
+    })._unsafeUnwrap();
+    expect(tuned.downloader.reactor).toEqual({
+      retry: { initialDelayMs: 1000, maxDelayMs: 60000, budgetMs: 3_600_000 },
+      stalledRetentionMs: 86_400_000,
+    });
+  });
+
   it('labels a root-level shape failure as such', () => {
     const error = loadComposedConfig(undefined as never)._unsafeUnwrapErr();
     expect(error).toContain('(root)');

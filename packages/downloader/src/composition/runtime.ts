@@ -202,7 +202,11 @@ export async function createDownloaderRuntime(
     interpreter,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
   });
-  await reactor.start();
+  // Boot readiness (reactor-durability): the runtime is ready once wired; the catch-up drain and
+  // the startup re-drive execute in the background on the reactor's own scheduling. Awaiting them
+  // here kept the web interface unbound for the backlog's whole execution (2026-07-22: an album
+  // download ran inside boot — a ~2h UI outage).
+  void reactor.start();
 
   const deps: UseCaseDeps = {
     store,
