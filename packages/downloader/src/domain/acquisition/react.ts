@@ -47,6 +47,10 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
     case 'EditionSelected':
       // The resume: resolve exactly the chosen release, reusing the direct-by-release-id path — no
       // new "release id → target" logic exists for manual selection (manual-edition-selection D2).
+      // `kind: 'musicbrainz'` is not a provider choice made here: `EditionSelected` carries a
+      // release MBID, so the direct-by-release-id request is the only kind that can express it. A
+      // second metadata provider would bring its own selection vocabulary (request kind + event),
+      // not reuse this arm.
       // `targetType: 'album'` is domain-guaranteed: `decide` only pauses release-group requests
       // (whose type pins album), so an awaiting acquisition can never hold anything else — and a
       // chosen edition is an album release by definition.
