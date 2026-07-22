@@ -6,25 +6,34 @@ import type { BadgePhase } from './phase-label.js';
  * Shared by server loads and components; unit-tested in the node project.
  */
 
-const TERMINAL: Record<string, BadgePhase | undefined> = {
+/**
+ * The badge tone for every status — exhaustive on purpose, so a status the downloader adds breaks
+ * this build instead of silently inheriting a fallback tone (that is exactly how awaiting-selection
+ * once hid as generic pending). Terminal states resolve to fulfilled/failed, a pause on the user
+ * demands attention (web-ui spec: awaiting-selection presents as action-needed), the rest pend.
+ */
+const TONE = {
+  Empty: 'pending',
+  Pending: 'pending',
+  AwaitingManualSelection: 'attention',
+  Searching: 'pending',
+  Selecting: 'pending',
+  Downloading: 'pending',
+  Validating: 'pending',
+  Importing: 'pending',
   Fulfilled: 'fulfilled',
   Exhausted: 'failed',
   Cancelled: 'failed',
   MetadataFailed: 'failed',
   Conflicted: 'failed',
-};
+} as const satisfies Record<AcquisitionStatusResponseDto['status'], BadgePhase>;
 
-/**
- * The badge tone for a status — terminal states resolve to fulfilled/failed, a pause on the user
- * demands attention, and the rest pend (web-ui spec: awaiting-selection presents as action-needed).
- */
 export function statusTone(status: AcquisitionStatusResponseDto['status']): BadgePhase {
-  if (status === 'AwaitingManualSelection') return 'attention';
-  return TERMINAL[status] ?? 'pending';
+  return TONE[status];
 }
 
 export function isTerminal(status: AcquisitionStatusResponseDto['status']): boolean {
-  return TERMINAL[status] !== undefined;
+  return TONE[status] === 'fulfilled' || TONE[status] === 'failed';
 }
 
 /** Anything not terminal can be asked to cancel; the decider converges if the ask is stale. */

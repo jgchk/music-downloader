@@ -6,6 +6,7 @@ import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
 import type { DownloaderReadiness } from '@music/downloader/runtime';
 import type { ImporterReadiness } from '@music/importer/runtime';
+import type { Logger } from 'pino';
 import { loadComposedConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { version } from './version.js';
@@ -45,6 +46,8 @@ export interface Readiness {
 
 interface Booted {
   readonly facades: Facades;
+  /** The pino root shared with the module runtimes, exposed so routes can leave a trace too. */
+  readonly logger: Logger;
   /** Live readiness accessors captured at boot; invoked per probe so a later halt is honest. */
   readonly readiness: {
     readonly downloader: () => DownloaderReadiness;
@@ -115,6 +118,7 @@ async function boot(
 
   return {
     facades: { downloader: downloader.facade, importer: importer.facade },
+    logger,
     readiness: {
       downloader: () => downloader.readiness(),
       importer: () => importer.readiness(),
@@ -142,6 +146,14 @@ export function facadesOf(): Facades {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
   return booted.facades;
+}
+
+/** The structured logger for request handling; the daemon must have booted first (init hook). */
+export function loggerOf(): Logger {
+  if (booted === undefined) {
+    throw new Error('runtimes not booted — the init hook must run before requests are served');
+  }
+  return booted.logger;
 }
 
 /**

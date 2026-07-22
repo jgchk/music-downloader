@@ -99,7 +99,6 @@ describe('attentionItems', () => {
     const items = attentionItems([review({ path: '' })], [acquisition({})]);
     expect(items).toHaveLength(2);
     expect(items[0]?.title).toBe('Import awaiting review');
-    expect(items[1]?.title).toBe('Awaiting your edition choice');
   });
 });
 

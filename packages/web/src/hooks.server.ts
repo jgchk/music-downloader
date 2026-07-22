@@ -1,6 +1,6 @@
 import type { Handle, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { bootRuntimes, facadesOf } from '$lib/server/runtime.js';
+import { bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
 
 /**
  * The composed process's server hooks (design D8): `init` boots both module runtimes and the
@@ -18,5 +18,6 @@ export const init: ServerInit = async () => {
 
 export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
+  event.locals.logger = loggerOf();
   return resolve(event);
 };

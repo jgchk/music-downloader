@@ -1,6 +1,6 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import type { PendingReviewDto } from '@music/importer';
-import { targetDescription } from './acquisitions.js';
+import { statusTone, targetDescription } from './acquisitions.js';
 
 /**
  * The attention queue's vocabulary (design D1): a web-owned view model composing everything that
@@ -18,19 +18,27 @@ export interface AttentionItem {
   readonly href: string;
 }
 
+/** Kind determines module — one queue arm per pause kind, each owned by exactly one module. */
+const MODULE_OF = {
+  'match-review': 'importer',
+  'edition-selection': 'downloader',
+} as const satisfies Record<AttentionItem['kind'], AttentionItem['module']>;
+
 export function attentionItems(
   reviews: readonly PendingReviewDto[],
   acquisitions: readonly AcquisitionStatusResponseDto[],
 ): AttentionItem[] {
   return orderByLongestWaiting([
     ...reviews.map(reviewItem),
-    ...acquisitions.filter((entry) => entry.status === 'AwaitingManualSelection').map(editionItem),
+    // Queue membership is the badge tone's rule, not a re-derivation: whatever the acquisitions
+    // list badges as action-needed is exactly what the queue lists.
+    ...acquisitions.filter((entry) => statusTone(entry.status) === 'attention').map(editionItem),
   ]);
 }
 
 function reviewItem(pending: PendingReviewDto): AttentionItem {
   return {
-    module: 'importer',
+    module: MODULE_OF['match-review'],
     kind: 'match-review',
     id: pending.importId,
     // Sparse presentation fields degrade the item, never drop it (web-ui spec).
@@ -42,7 +50,7 @@ function reviewItem(pending: PendingReviewDto): AttentionItem {
 
 function editionItem(acquisition: AcquisitionStatusResponseDto): AttentionItem {
   return {
-    module: 'downloader',
+    module: MODULE_OF['edition-selection'],
     kind: 'edition-selection',
     id: acquisition.acquisitionId,
     title: targetDescription(acquisition),
@@ -53,9 +61,10 @@ function editionItem(acquisition: AcquisitionStatusResponseDto): AttentionItem {
 
 /** Longest-waiting first; items without a date follow the dated ones in their given order. */
 export function orderByLongestWaiting(items: readonly AttentionItem[]): AttentionItem[] {
-  // ISO instants compare lexicographically; ￿ sorts undated items after any date. The sort
-  // is stable, so facade order (itself oldest-first per module) survives among equals.
-  const key = (entry: AttentionItem): string => entry.waitingSince ?? '￿';
+  // ISO instants in one uniform format (UTC `Z`, fixed precision) compare lexicographically —
+  // keep producers uniform. '\uffff' (U+FFFF, the max BMP code unit) sorts undated items after
+  // any date; the sort is stable, so the facades' given order survives among equals.
+  const key = (entry: AttentionItem): string => entry.waitingSince ?? '\uffff';
   return [...items].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 

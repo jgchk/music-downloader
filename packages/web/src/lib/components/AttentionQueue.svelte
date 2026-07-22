@@ -4,14 +4,12 @@
   interface Props {
     items: readonly AttentionItem[];
     /** Per-section modeled failures — a failed module hides its items, so no empty claim then. */
-    errors?: { importer?: string; downloader?: string };
+    errors?: Partial<Record<AttentionItem['module'], string>>;
   }
 
   let { items, errors = {} }: Props = $props();
 
-  const anySectionFailed = $derived(
-    errors.importer !== undefined || errors.downloader !== undefined,
-  );
+  const anySectionFailed = $derived(Object.values(errors).some((message) => message !== undefined));
 </script>
 
 {#if errors.importer !== undefined}
