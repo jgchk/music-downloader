@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   global_seq INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS parked_effects (
+  stream_id     TEXT    PRIMARY KEY,
+  global_seq    INTEGER NOT NULL,
+  attempt       INTEGER NOT NULL,
+  parked_at     TEXT    NOT NULL,
+  next_retry_at TEXT    NOT NULL,
+  last_error    TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS dead_letters (
   subscription TEXT    NOT NULL,
   global_seq   INTEGER NOT NULL,

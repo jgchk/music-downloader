@@ -1,8 +1,8 @@
 ## 1. Parked-effect store & backoff
 
-- [ ] 1.1 Write failing tests for a durable parked-effects store (sibling to the checkpoint store): record `{ streamId, globalSeq, attempt, nextRetryAt }`, list due entries, clear on success; implement (SQLite, same file/discipline as checkpoints).
-- [ ] 1.2 Write failing tests for the backoff policy (exponential with jitter, capped interval, wall-clock budget exhaustion signal; env-configurable); implement as a pure function.
-- [ ] 1.3 Write failing tests for non-retryable classification: an error the adapter marks permanent short-circuits the budget and lands immediately (modeled failure or dead-letter); implement the classification seam.
+- [x] 1.1 Write failing tests for a durable parked-effects store (sibling to the checkpoint store): record `{ streamId, globalSeq, attempt, nextRetryAt }`, list due entries, clear on success; implement (SQLite, same file/discipline as checkpoints).
+- [x] 1.2 Write failing tests for the backoff policy (exponential with jitter, capped interval, wall-clock budget exhaustion signal; env-configurable); implement as a pure function.
+- [x] 1.3 Write failing tests for non-retryable classification: an error the adapter marks permanent short-circuits the budget and lands immediately (modeled failure or dead-letter); implement the classification seam.
 
 ## 2. Reactor: park, advance, retry
 

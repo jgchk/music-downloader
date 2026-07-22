@@ -2,7 +2,7 @@ import { ResultAsync } from 'neverthrow';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadFailureReason, DownloadedFile } from '../../domain/acquisition/events.js';
-import { infraError } from '../../application/ports/errors.js';
+import { classifiedFault } from '../support/fault.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   DownloadPort,
@@ -89,7 +89,7 @@ export class SlskdDownload implements DownloadPort {
   ): ResultAsync<DownloadResult, InfraError> {
     return ResultAsync.fromPromise(
       this.doDownload(acquisitionId, candidate, policy, onProgress),
-      (cause) => infraError('slskd.download', String(cause), cause),
+      (cause) => classifiedFault('slskd.download', cause),
     );
   }
 
@@ -178,7 +178,7 @@ export class SlskdDownload implements DownloadPort {
     candidate: Candidate,
   ): ResultAsync<readonly DownloadedFile[], InfraError> {
     return ResultAsync.fromPromise(this.doAbort(acquisitionId, candidate), (cause) =>
-      infraError('slskd.abort', String(cause), cause),
+      classifiedFault('slskd.abort', cause),
     );
   }
 
