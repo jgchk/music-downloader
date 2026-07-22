@@ -61,6 +61,13 @@ export const acquisitionRequestSchema = z.discriminatedUnion('kind', [
     targetType: targetTypeSchema,
   }),
   z.object({
+    // A MusicBrainz release-*group* id (an album identity); resolved to a representative official
+    // edition. Albums only — a release group has no track (recording) analogue.
+    kind: z.literal('release-group'),
+    mbid: z.string().min(1),
+    targetType: z.literal('album'),
+  }),
+  z.object({
     kind: z.literal('descriptor'),
     targetType: targetTypeSchema,
     artist: z.string().min(1),

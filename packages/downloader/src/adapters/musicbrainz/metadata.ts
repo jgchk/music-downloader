@@ -7,22 +7,30 @@ import type { Logger } from '../../application/logging/logger.js';
 import type { ZodType } from 'zod';
 import { fetchHttpClient } from '../support/http.js';
 import type { HttpClient } from '../support/http.js';
-import { bestMatchId, recordingToTarget, releaseCandidateIds, releaseToTarget } from './mapping.js';
+import {
+  bestMatchId,
+  recordingToTarget,
+  releaseCandidateIds,
+  releaseGroupCandidateIds,
+  releaseToTarget,
+} from './mapping.js';
 import {
   mbRecordingSchema,
   mbRecordingSearchSchema,
+  mbReleaseGroupBrowseSchema,
   mbReleaseSchema,
   mbReleaseSearchSchema,
 } from './schemas.js';
 
 /**
- * The MusicBrainz `MetadataPort` adapter (D12). Resolves a request — by MBID or by structured
- * descriptor — into a canonical {@link Target}. An album descriptor searches, resolves the album's
- * identity to a confident, unambiguous release group and selects an edition within it
- * ({@link releaseCandidateIds}), then fetches releases in order until one yields a target; a track
- * descriptor uses the flat {@link bestMatchId} guard. Not-found / no-confident-match is the
- * *business* outcome `unresolved`; only transport faults or unexpected HTTP statuses become an
- * `InfraError`.
+ * The MusicBrainz `MetadataPort` adapter (D12). Resolves a request — by release/recording MBID, by
+ * release-*group* MBID, or by structured descriptor — into a canonical {@link Target}. An album
+ * descriptor searches, resolves the album's identity to a confident, unambiguous release group and
+ * selects an edition within it ({@link releaseCandidateIds}), then fetches releases in order until
+ * one yields a target; a release-group request browses the group's editions and selects a
+ * representative official one ({@link releaseGroupCandidateIds}); a track descriptor uses the flat
+ * {@link bestMatchId} guard. Not-found / no-confident-match is the *business* outcome `unresolved`;
+ * only transport faults or unexpected HTTP statuses become an `InfraError`.
  */
 
 const UNRESOLVED: MetadataResolution = { kind: 'unresolved' };
@@ -73,6 +81,9 @@ export class MusicBrainzMetadata implements MetadataPort {
         ? this.resolveReleaseById(request.mbid)
         : this.resolveRecordingById(request.mbid);
     }
+    if (request.kind === 'release-group') {
+      return this.resolveReleaseByReleaseGroup(request.mbid);
+    }
     return request.targetType === 'album'
       ? this.resolveReleaseByDescriptor(request.artist, request.title)
       : this.resolveRecordingByDescriptor(request.artist, request.title);
@@ -96,6 +107,16 @@ export class MusicBrainzMetadata implements MetadataPort {
     if (json === undefined) return UNRESOLVED;
     const target = recordingToTarget(json);
     return target === undefined ? UNRESOLVED : { kind: 'resolved', target };
+  }
+
+  private async resolveReleaseByReleaseGroup(mbid: string): Promise<MetadataResolution> {
+    const url = `${this.baseUrl}/release?release-group=${encodeURIComponent(mbid)}&inc=media&fmt=json&limit=${RELEASE_SEARCH_LIMIT}`;
+    const json = await this.getJson(url, mbReleaseGroupBrowseSchema);
+    for (const id of releaseGroupCandidateIds(json?.releases)) {
+      const resolution = await this.resolveReleaseById(id);
+      if (resolution.kind === 'resolved') return resolution;
+    }
+    return UNRESOLVED;
   }
 
   private async resolveReleaseByDescriptor(

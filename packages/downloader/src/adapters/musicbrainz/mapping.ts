@@ -1,6 +1,12 @@
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
-import type { MbRecording, MbRelease, MbScoredEntry, MbScoredRelease } from './schemas.js';
+import type {
+  MbBrowseRelease,
+  MbRecording,
+  MbRelease,
+  MbScoredEntry,
+  MbScoredRelease,
+} from './schemas.js';
 
 /**
  * Pure mapping from MusicBrainz JSON to the normalized, source-agnostic {@link Target} (D11,
@@ -106,12 +112,19 @@ interface GroupedRelease {
   readonly groupTitle: string;
 }
 
-// Real MusicBrainz dates are year-leading (`2013`, `2016-11-04`), so they order chronologically
-// under a plain lexicographic compare; an undated or non-year-leading value maps to a sentinel that
-// sorts after them all, since ':' (0x3A) follows '9' (0x39).
-const UNDATED = ':';
-function dateKey(date: string | undefined): string {
-  return date !== undefined && /^\d{4}/.test(date) ? date : UNDATED;
+// Order MusicBrainz dates chronologically by (year, month, day) components rather than lexically:
+// a lexical compare ranks a year-only `2012` *before* a same-year `2012-10-22`, letting an imprecise
+// date displace a precisely-dated edition. Missing month/day map to a sentinel (99) that sorts after
+// any real component, so within a year a fully-specified date precedes a year-only one; an undated or
+// non-year-leading value maps to +Infinity and sorts after every dated release.
+const DATE_COMPONENT_SENTINEL = 99;
+function dateKey(date: string | undefined): number {
+  const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/.exec(date ?? '');
+  if (match === null) return Number.POSITIVE_INFINITY;
+  const year = Number(match[1]);
+  const month = match[2] !== undefined ? Number(match[2]) : DATE_COMPONENT_SENTINEL;
+  const day = match[3] !== undefined ? Number(match[3]) : DATE_COMPONENT_SENTINEL;
+  return year * 10000 + month * 100 + day;
 }
 
 /**
@@ -197,4 +210,80 @@ export function releaseCandidateIds(
   }
 
   return [...winner.members].sort(compareReleases(wanted)).map((m) => m.id);
+}
+
+/** One edition (release) of a known release group, reduced to the fields the picker needs. */
+export interface ReleaseGroupEdition {
+  readonly id: string;
+  readonly status: string | undefined;
+  readonly date: string | undefined;
+  readonly trackCount: number;
+}
+
+/**
+ * The most common track count among the editions, breaking a tie toward the *lower* count (the more
+ * conservative, standard-like edition). Map iteration is insertion order, so the tie rule is applied
+ * explicitly rather than relying on it. Assumes a non-empty input.
+ */
+function modalTrackCount(editions: readonly ReleaseGroupEdition[]): number {
+  const frequency = new Map<number, number>();
+  for (const edition of editions) {
+    frequency.set(edition.trackCount, (frequency.get(edition.trackCount) ?? 0) + 1);
+  }
+  let modal = 0;
+  let modalFrequency = 0;
+  for (const [count, freq] of frequency) {
+    if (freq > modalFrequency || (freq === modalFrequency && count < modal)) {
+      modal = count;
+      modalFrequency = freq;
+    }
+  }
+  return modal;
+}
+
+/**
+ * The ordered release ids to try for a release-group request (identity is given, so there is no
+ * search, grouping, or cross-group ambiguity guard — and no request-title tier, since a bare group
+ * id expresses no edition intent). Selection is confined to *official* editions: restrict to those
+ * whose track count equals the modal count of the official editions, then order by earliest date
+ * (chronological, precise before year-only within a year) with stable input order as the final
+ * tiebreak. A group with no official edition (or no editions) yields no candidates — the adapter
+ * reports that as *unresolved*. The caller fetches the ids in order and takes the first that yields a
+ * valid target, so an edition with unusable metadata falls through to the next.
+ */
+export function releaseGroupEditionIds(
+  editions: readonly ReleaseGroupEdition[],
+): readonly string[] {
+  const official = editions.filter((edition) => edition.status === 'Official');
+  if (official.length === 0) return [];
+  const modal = modalTrackCount(official);
+  return official
+    .filter((edition) => edition.trackCount === modal)
+    .sort((a, b) => {
+      const aDate = dateKey(a.date);
+      const bDate = dateKey(b.date);
+      return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+    })
+    .map((edition) => edition.id);
+}
+
+/**
+ * Reduce a release-group browse (identity-typed editions) to the ordered release ids to try, via
+ * {@link releaseGroupEditionIds}. An edition's total track count is the sum of its media's
+ * `track-count`s (an unknown count contributes 0); editions without an id are dropped, since there
+ * is nothing to fetch. Empty, all-non-official, or missing input yields no candidates → *unresolved*.
+ */
+export function releaseGroupCandidateIds(
+  releases: readonly MbBrowseRelease[] | undefined,
+): readonly string[] {
+  const editions: ReleaseGroupEdition[] = [];
+  for (const release of releases ?? []) {
+    if (release.id === undefined) continue;
+    const trackCount = (release.media ?? []).reduce(
+      (sum, medium) => sum + (medium['track-count'] ?? 0),
+      0,
+    );
+    editions.push({ id: release.id, status: release.status, date: release.date, trackCount });
+  }
+  return releaseGroupEditionIds(editions);
 }

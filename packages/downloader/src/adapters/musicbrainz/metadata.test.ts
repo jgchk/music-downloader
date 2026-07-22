@@ -184,6 +184,105 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
+  const byReleaseGroup = (mbid: string): AcquisitionRequest => ({
+    kind: 'release-group',
+    mbid,
+    targetType: 'album',
+  });
+
+  const browse = (releases: unknown[]): HttpResponse => ok({ releases });
+
+  it('resolves a release-group request to the modal official edition', async () => {
+    const result = (
+      await resolver([
+        [
+          '/release?release-group=rg-1',
+          browse([
+            // 19-track deluxe must not win over the 13-track standard editions
+            {
+              id: 'deluxe',
+              status: 'Official',
+              date: '2014-10-27',
+              media: [{ 'track-count': 19 }],
+            },
+            { id: 'std', status: 'Official', date: '2014-10-27', media: [{ 'track-count': 13 }] },
+            { id: 'std2', status: 'Official', date: '2015-01-01', media: [{ 'track-count': 13 }] },
+          ]),
+        ],
+        ['/release/std', releaseFixture('std')],
+      ]).resolve(byReleaseGroup('rg-1'))
+    )._unsafeUnwrap();
+
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'std', type: 'album' } });
+  });
+
+  it('requests the recorded browse path with inc=media for a release-group request', async () => {
+    const urls: string[] = [];
+    const capturing: HttpClient = {
+      send: ({ url }) => {
+        urls.push(url);
+        return Promise.resolve(
+          url.includes('/release/std')
+            ? releaseFixture('std')
+            : browse([
+                { id: 'std', status: 'Official', date: '2020', media: [{ 'track-count': 10 }] },
+              ]),
+        );
+      },
+    };
+
+    await new MusicBrainzMetadata(silentLogger(), capturing).resolve(byReleaseGroup('rg-9'));
+
+    const browseUrl = new URL(urls[0]!);
+    expect(browseUrl.searchParams.get('release-group')).toBe('rg-9');
+    expect(browseUrl.searchParams.get('inc')).toBe('media');
+  });
+
+  it('reports unresolved when the release group is not found', async () => {
+    const result = (await resolver([]).resolve(byReleaseGroup('missing')))._unsafeUnwrap();
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('reports unresolved when the release group has no official edition', async () => {
+    const result = (
+      await resolver([
+        [
+          '/release?release-group=rg-2',
+          browse([{ id: 'boot', status: 'Bootleg', date: '2001', media: [{ 'track-count': 12 }] }]),
+        ],
+      ]).resolve(byReleaseGroup('rg-2'))
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('reports unresolved when the release group is empty', async () => {
+    const result = (
+      await resolver([['/release?release-group=rg-3', browse([])]]).resolve(byReleaseGroup('rg-3'))
+    )._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('falls through to the next edition when the modal pick has unusable data', async () => {
+    const sparse = ok({ id: 'edition-a', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
+    const result = (
+      await resolver([
+        [
+          '/release?release-group=rg-4',
+          browse([
+            { id: 'edition-a', status: 'Official', date: '2010', media: [{ 'track-count': 13 }] },
+            { id: 'edition-b', status: 'Official', date: '2011', media: [{ 'track-count': 13 }] },
+          ]),
+        ],
+        ['/release/edition-a', sparse], // earliest modal edition, but no tracks → no valid target
+        ['/release/edition-b', releaseFixture('edition-b')],
+      ]).resolve(byReleaseGroup('rg-4'))
+    )._unsafeUnwrap();
+
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'edition-b' } });
+  });
+
   it('resolves a recording by MBID into a single-track target', async () => {
     const result = (
       await resolver([['/recording/rec-1', recordingFixture('rec-1')]]).resolve(trackById)

@@ -10,9 +10,14 @@ import type { ValidationVerdict } from '../validation/verdict.js';
  * frequency transfer progress is deliberately kept OFF the stream (D1) as an ephemeral read model.
  */
 
-/** What the caller asked for: a MusicBrainz id, or a structured descriptor to resolve (D12). */
+/**
+ * What the caller asked for: a MusicBrainz release/recording id, a MusicBrainz release-*group* id
+ * (an album identity, resolved to a representative official edition), or a structured descriptor to
+ * resolve (D12).
+ */
 export type AcquisitionRequest =
   | { readonly kind: 'musicbrainz'; readonly mbid: string; readonly targetType: TargetType }
+  | { readonly kind: 'release-group'; readonly mbid: string; readonly targetType: 'album' }
   | {
       readonly kind: 'descriptor';
       readonly targetType: TargetType;

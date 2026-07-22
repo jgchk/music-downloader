@@ -19,6 +19,22 @@ describe('submitAcquisitionRequestSchema', () => {
     expect(parsed.request).toMatchObject({ kind: 'descriptor', artist: 'A' });
   });
 
+  it('accepts a release-group request (album only)', () => {
+    const parsed = submitAcquisitionRequestSchema.parse({
+      request: { kind: 'release-group', mbid: 'rg-1', targetType: 'album' },
+    });
+
+    expect(parsed.request).toMatchObject({ kind: 'release-group', mbid: 'rg-1' });
+  });
+
+  it('rejects a release-group request targeting a track', () => {
+    expect(() =>
+      submitAcquisitionRequestSchema.parse({
+        request: { kind: 'release-group', mbid: 'rg-1', targetType: 'track' },
+      }),
+    ).toThrow();
+  });
+
   it('rejects an unknown request kind', () => {
     expect(() =>
       submitAcquisitionRequestSchema.parse({ request: { kind: 'torrent', mbid: 'x' } }),

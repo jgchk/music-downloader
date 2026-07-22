@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mbRecordingSchema,
   mbRecordingSearchSchema,
+  mbReleaseGroupBrowseSchema,
   mbReleaseSchema,
   mbReleaseSearchSchema,
 } from './schemas.js';
@@ -120,5 +121,36 @@ describe('MusicBrainz contract schemas', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'release-group', 'id']);
+  });
+
+  it('accepts a release-group browse carrying every consumed edition field', () => {
+    const parsed = mbReleaseGroupBrowseSchema.parse({
+      releases: [
+        {
+          id: 'rel-1',
+          title: 'Album',
+          status: 'Official',
+          date: '2014-10-27',
+          media: [{ 'track-count': 8 }, { 'track-count': 5 }],
+        },
+      ],
+    });
+
+    expect(parsed.releases?.[0]?.media?.map((m) => m['track-count'])).toEqual([8, 5]);
+  });
+
+  it('tolerates a browse edition missing status, date, and media', () => {
+    expect(mbReleaseGroupBrowseSchema.parse({ releases: [{ id: 'rel-1' }] }).releases).toEqual([
+      { id: 'rel-1' },
+    ]);
+  });
+
+  it('rejects a browse edition whose media track-count is not a number', () => {
+    const result = mbReleaseGroupBrowseSchema.safeParse({
+      releases: [{ id: 'x', media: [{ 'track-count': 'ten' }] }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'media', 0, 'track-count']);
   });
 });

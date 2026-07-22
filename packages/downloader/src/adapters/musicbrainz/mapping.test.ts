@@ -4,8 +4,11 @@ import {
   normalizeTitle,
   recordingToTarget,
   releaseCandidateIds,
+  releaseGroupCandidateIds,
+  releaseGroupEditionIds,
   releaseToTarget,
 } from './mapping.js';
+import type { ReleaseGroupEdition } from './mapping.js';
 import type { MbScoredRelease } from './schemas.js';
 
 describe('releaseToTarget', () => {
@@ -203,6 +206,17 @@ describe('releaseCandidateIds', () => {
 
     // one release group → confident; canonical order is earliest official first
     expect(ids).toEqual(['b', 'a', 'c']);
+  });
+
+  it('sorts a fully-specified date before a year-only date of the same year', () => {
+    const ids = releaseCandidateIds(
+      [hit({ id: 'yearonly', date: '2012' }), hit({ id: 'full', date: '2012-10-22' })],
+      'Album',
+    );
+
+    // a precise date is more canonical than a vague year-only date within the same year,
+    // so imprecision never displaces a precisely-dated edition
+    expect(ids).toEqual(['full', 'yearonly']);
   });
 
   it('is ambiguous when two different release groups score within the margin', () => {
@@ -470,5 +484,139 @@ describe('releaseCandidateIds', () => {
 
   it('skips a hit that carries no id', () => {
     expect(releaseCandidateIds([{ score: 100, title: 'Album' }], 'Album')).toEqual([]);
+  });
+});
+
+describe('releaseGroupEditionIds', () => {
+  const edition = (over: Partial<ReleaseGroupEdition> & { id: string }): ReleaseGroupEdition => ({
+    status: 'Official',
+    date: '2020',
+    trackCount: 12,
+    ...over,
+  });
+
+  it('returns no candidates for an empty group', () => {
+    expect(releaseGroupEditionIds([])).toEqual([]);
+  });
+
+  it('returns no candidates when the group has no official edition', () => {
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'boot', status: 'Bootleg', date: '2001' }),
+      edition({ id: 'promo', status: 'Promotion', date: '2002' }),
+    ]);
+    expect(ids).toEqual([]);
+  });
+
+  it('prefers the modal official track count over a divergent (deluxe) edition', () => {
+    // 13-track standard dominates the official editions; the 19-track deluxe must not win
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'deluxe', trackCount: 19, date: '2014-10-27' }),
+      edition({ id: 'std-a', trackCount: 13, date: '2014-10-27' }),
+      edition({ id: 'std-b', trackCount: 13, date: '2015-03-01' }),
+      edition({ id: 'std-c', trackCount: 13, date: '2016-01-01' }),
+    ]);
+    expect(ids).toEqual(['std-a', 'std-b', 'std-c']);
+  });
+
+  it('prefers a modal edition over an earlier official edition of divergent track count', () => {
+    // the earliest official edition has a non-modal (12) count; the modal (10) editions win
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'earlyodd', trackCount: 12, date: '2000-01-01' }),
+      edition({ id: 'modal-a', trackCount: 10, date: '2005-01-01' }),
+      edition({ id: 'modal-b', trackCount: 10, date: '2006-01-01' }),
+    ]);
+    expect(ids).toEqual(['modal-a', 'modal-b']);
+  });
+
+  it('ignores non-official editions when computing the mode and selecting', () => {
+    // non-official 15-track editions outnumber the official 12-track ones, but only officials count
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'v1', status: 'Bootleg', trackCount: 15, date: '2011' }),
+      edition({ id: 'v2', status: 'Bootleg', trackCount: 15, date: '2012' }),
+      edition({ id: 'v3', status: 'Bootleg', trackCount: 15, date: '2013' }),
+      edition({ id: 'official', status: 'Official', trackCount: 12, date: '2012-05-01' }),
+    ]);
+    expect(ids).toEqual(['official']);
+  });
+
+  it('breaks a modal tie toward the lower track count', () => {
+    // two official counts equally common (12 x2, 14 x2) -> pick the 12-track editions
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'a12', trackCount: 12, date: '2001' }),
+      edition({ id: 'b14', trackCount: 14, date: '2002' }),
+      edition({ id: 'c12', trackCount: 12, date: '2003' }),
+      edition({ id: 'd14', trackCount: 14, date: '2004' }),
+    ]);
+    expect(ids).toEqual(['a12', 'c12']);
+  });
+
+  it('orders modal editions by earliest date, precise before year-only within a year', () => {
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'yearonly', date: '2012' }),
+      edition({ id: 'later', date: '2013-01-01' }),
+      edition({ id: 'full', date: '2012-06-15' }),
+    ]);
+    expect(ids).toEqual(['full', 'yearonly', 'later']);
+  });
+
+  it('keeps stable input order among modal editions with equal dates', () => {
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'first', date: '2000' }),
+      edition({ id: 'second', date: '2000' }),
+    ]);
+    expect(ids).toEqual(['first', 'second']);
+  });
+});
+
+describe('releaseGroupCandidateIds', () => {
+  it('returns no candidates for empty or missing input', () => {
+    expect(releaseGroupCandidateIds(undefined)).toEqual([]);
+    expect(releaseGroupCandidateIds([])).toEqual([]);
+  });
+
+  it('sums each edition media track-counts and picks the modal official edition', () => {
+    const ids = releaseGroupCandidateIds([
+      // deluxe: 8 + 11 = 19 tracks
+      {
+        id: 'deluxe',
+        status: 'Official',
+        date: '2014-10-27',
+        media: [{ 'track-count': 8 }, { 'track-count': 11 }],
+      },
+      // standard editions: 13 tracks each (the mode)
+      { id: 'std-a', status: 'Official', date: '2014-10-27', media: [{ 'track-count': 13 }] },
+      {
+        id: 'std-b',
+        status: 'Official',
+        date: '2015-01-01',
+        media: [{ 'track-count': 6 }, { 'track-count': 7 }],
+      },
+    ]);
+
+    expect(ids).toEqual(['std-a', 'std-b']);
+  });
+
+  it('drops editions without an id and treats a medium with no track-count as zero', () => {
+    const ids = releaseGroupCandidateIds([
+      { status: 'Official', date: '2001', media: [{ 'track-count': 12 }] }, // no id → dropped
+      // second medium carries no track-count → contributes 0, total stays 12
+      { id: 'known', status: 'Official', date: '2002', media: [{ 'track-count': 12 }, {}] },
+    ]);
+
+    expect(ids).toEqual(['known']);
+  });
+
+  it('treats an edition with no media as zero tracks', () => {
+    expect(releaseGroupCandidateIds([{ id: 'x', status: 'Official', date: '2000' }])).toEqual([
+      'x',
+    ]);
+  });
+
+  it('returns no candidates when no edition is official', () => {
+    expect(
+      releaseGroupCandidateIds([
+        { id: 'boot', status: 'Bootleg', date: '2001', media: [{ 'track-count': 12 }] },
+      ]),
+    ).toEqual([]);
   });
 });
