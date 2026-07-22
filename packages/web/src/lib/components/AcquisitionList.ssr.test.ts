@@ -39,4 +39,34 @@ describe('AcquisitionList (SSR)', () => {
     expect(body).toContain('Exhausted (Stalled)');
     expect(body).toContain('Searching');
   });
+
+  it('presents an awaiting-selection row as action-needed while a searching row stays generic', () => {
+    const { body } = render(AcquisitionList, {
+      props: {
+        acquisitions: [
+          {
+            acquisitionId: 'acq-waiting',
+            status: 'AwaitingManualSelection',
+            attempts: 0,
+            rejectedCount: 0,
+            history: [],
+            candidates: [{ releaseMbid: 'r1', title: 'OK Computer', trackCount: 12 }],
+          },
+          {
+            acquisitionId: 'acq-searching',
+            status: 'Searching',
+            target: { artist: 'A', title: 'T' },
+            attempts: 1,
+            rejectedCount: 0,
+            history: [],
+          },
+        ],
+      },
+    });
+    expect(body).toContain('data-phase="attention"');
+    expect(body).toContain('Action needed');
+    expect(body).toContain('OK Computer — awaiting your edition choice');
+    expect(body).not.toContain('(resolving…)');
+    expect(body).toContain('data-phase="pending"');
+  });
 });

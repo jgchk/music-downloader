@@ -7,6 +7,7 @@ describe('review detail page (SSR)', () => {
     const { body } = render(Page, {
       props: {
         data: {
+          attentionCount: 0,
           pending: { importId: 'imp-1', path: '/intake/x', review: { kind: 'no-match' } },
         },
         params: { id: 'imp-1' },

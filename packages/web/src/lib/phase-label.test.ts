@@ -6,6 +6,7 @@ describe('phaseLabel', () => {
     ['pending', 'Working'],
     ['fulfilled', 'Done'],
     ['failed', 'Failed'],
+    ['attention', 'Action needed'],
   ] as const)('labels %s as %s', (phase, label) => {
     expect(phaseLabel(phase)).toBe(label);
   });

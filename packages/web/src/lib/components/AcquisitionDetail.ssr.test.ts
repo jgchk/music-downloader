@@ -106,6 +106,23 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('data-testid="cancel"');
   });
 
+  it('headlines the awaited edition choice when no target is resolved yet', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        acquisition: {
+          ...working,
+          status: 'AwaitingManualSelection' as const,
+          target: undefined,
+          currentCandidate: undefined,
+          history: [],
+          candidates: [{ releaseMbid: 'boot-1', title: 'Live at Budokan', trackCount: 12 }],
+        },
+      },
+    });
+    expect(body).toContain('<h1>Live at Budokan — awaiting your edition choice</h1>');
+    expect(body).not.toContain('(resolving…)');
+  });
+
   it('renders no edition-candidates section outside the awaiting-selection state', () => {
     const { body } = render(AcquisitionDetail, { props: { acquisition: working } });
     expect(body).not.toContain('data-testid="edition-candidates"');
