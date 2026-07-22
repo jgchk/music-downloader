@@ -21,10 +21,14 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 {
     case 'NotFound':
     case 'UnknownImport':
       return 404;
+    case 'AlreadyExists':
+    case 'IllegalTransition':
+    case 'NoOpenReview':
+    case 'NoRetainedCandidate':
+    case 'ConcurrencyConflict':
+      return 409;
     case 'InfraError':
       return 500;
-    default:
-      return 409;
   }
 }
 
