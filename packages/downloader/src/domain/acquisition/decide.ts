@@ -148,6 +148,13 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
     case 'RecordManualSelectionRequested':
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
+      // Manual selection exists only for release-group requests (its editions ARE albums, which is
+      // what lets the resume hardcode an album resolution). A resolver reporting needsSelection for
+      // any other request kind is out of protocol; degrading to the failure outcome keeps the
+      // domain — not the adapter — the guard, and keeps the resume's assumption unforgeable.
+      if (state.request.kind !== 'release-group') {
+        return ok([{ type: 'MetadataResolutionFailed' }]);
+      }
       // An empty menu is not a choice — it is the unresolved outcome wearing a costume. Guarding
       // here (not just in the adapter) keeps "AwaitingManualSelection has a non-empty menu" true
       // for every history decide can produce, so the pause can never be a dead end.

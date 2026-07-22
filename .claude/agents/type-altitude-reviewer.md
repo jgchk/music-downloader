@@ -27,7 +27,7 @@ The dividing question is never "read vs write." It is: **does this type cross a 
 
 **Required shape: flat, per-use-case, optional fields — and logic-free.** (Young/Dahan/Dudycz: the read side is a derived cache of query answers, not a model.)
 
-- Optional fields for state-dependent data are **correct here, by design** — do NOT flag `candidates?`/`location?` on a view as a missing union. The invariant ("candidates only while awaiting selection") is enforced upstream by the authoritative fold; the projection inherits it.
+- Optional fields for state-dependent data are **correct here, by design** — do NOT flag a view's phase-dependent optional field as a missing union *when its producer guards emission* (see below). The invariant is enforced upstream by the authoritative fold; the projection inherits it. A field-shaped-like-a-known-good-example whose producer does NOT guard emission is still a finding — judge the guard, not the field name.
 - What you DO check:
   - The view is **derived only from the fold/authoritative state** — a projection that computes or re-decides business rules (beyond reshaping) is logic in the wrong place.
   - Each state-dependent optional field's population rule is **documented at the field** ("present only while X"). Undocumented conditional fields are how consumers invent wrong assumptions.
@@ -38,10 +38,11 @@ The dividing question is never "read vs write." It is: **does this type cross a 
 **Required shape: discriminant tag + optional flattened fields; additive-only evolution.** (This is Wlaschin's own union→DTO encoding; independently, proto3's removal of `required` and GraphQL's nullable-by-default make the same bet.)
 
 - The asymmetry that decides everything: **adding an optional field is invisible to every consumer; adding a union arm or enum value is a breaking change for every exhaustive/strict consumer.** So:
-  - A **closed discriminated union** (e.g. `z.discriminatedUnion`) in a wire schema is acceptable only for shapes that are genuinely closed (a fixed request-kind set the same repo controls end-to-end) — flag it wherever the set is expected to grow across versions.
+  - A **closed discriminated union** (e.g. `z.discriminatedUnion`) in a wire schema is acceptable when its producer and every consumer compile and deploy together (growth is then a compile-checked, atomic change). Flag it only where the arms will grow **across independently deployed parties** — that is the case where an added arm becomes a runtime break instead of a build break.
   - New states/outcomes enter the contract as **new enum values + new optional fields**, never by restructuring existing fields. Verify contract tests pin additivity.
   - Optional means optional: no consumer-side assumption that a field is present for a given tag unless the contract documents it.
-- Flag: a DTO importing/aliasing domain types directly (the anti-corruption mapping must copy); a wire union whose arms will grow; a "required" field added to an existing shape.
+- Flag: a DTO importing/aliasing domain types directly (the anti-corruption mapping must copy); a wire union whose arms will grow across deployables; a "required" field added to an existing shape.
+- **In-process facades**: when the "wire" schema and all its consumers live in one deployable (a modular monolith's facade), exhaustive no-default switches over its unions are *compile pressure, not drift risk* — treat them by altitude-1 rules, not as missing tolerant defaults. The additive-evolution rules still apply the moment the same schema is also served to out-of-process consumers (HTTP/MCP).
 
 ### 4. In-process view models at the UI edge (components, stores, page state)
 
@@ -53,13 +54,14 @@ The dividing question is never "read vs write." It is: **does this type cross a 
 ## What to inspect
 
 1. Get the change scope (the diff / file list you were given; otherwise the working-copy diff against `trunk()`/`main` — this repo uses `jj`, so prefer `jj diff -r 'trunk()..@' --git`).
-2. Classify every added/changed state-carrying type by altitude. In this repo the layers live at (confirm with Glob/Grep, don't trust the description): `packages/*/src/domain/**` (altitude 1), `packages/*/src/application/projections/**` and aggregate `snapshot` projections (altitude 2), `packages/*/src/facade/schemas.ts` + `src/interfaces/contracts/**` (altitude 3), `packages/web/src/**` (altitude 4).
+2. Classify every added/changed state-carrying type by altitude. In this repo the layers live at (confirm with Glob/Grep, don't trust the description): `packages/*/src/domain/**` (altitude 1), `packages/*/src/application/projections/**` and aggregate `snapshot` projections (altitude 2), `packages/*/src/facade/schemas.ts` (in-process facade wire — see the in-process note) + `packages/*/src/interfaces/contracts/**` (out-of-process published contracts) (altitude 3), `packages/web/src/**` (altitude 4).
 3. Apply that altitude's rules — and only that altitude's. The most valuable findings are **misapplied virtues**: union-shaping a wire contract, optional-field-shaping a domain state, re-deciding business rules in a projection, raw-enum exhaustive switches in the UI.
 4. For each finding, cite `file:line`, name the altitude and the violated rule, and state the concrete failure it enables (which consumer breaks, which illegal state becomes constructible, which drift goes unnoticed).
 
 ## Report format
 
-- **Critical**: an illegal state became representable *and constructible* in the domain, or a wire contract change is breaking (union arm added to an open set, field requirement tightened).
+- **Critical**: an illegal state became representable *and constructible* in the domain — where "constructible" means reachable through the **composed shipped system** (some real producer emits the enabling command/event) — or a wire contract change is breaking (union arm added across deployables, field requirement tightened).
+- Reachable only via a command **no shipped producer emits** (the domain accepts it, but every current adapter guards it away) is **Important**, not Critical: the defect is an invariant enforced in the wrong layer, waiting for the next producer.
 - **Important**: invariant enforced in the wrong layer (adapter/caller instead of decider); undocumented conditional DTO field; projection containing decisions; UI exhaustive-switch on a wire enum without fallback.
 - **Suggestion**: missing parse step at the UI edge (defensive guards accumulating); documentation-only gaps.
 
