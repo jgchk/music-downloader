@@ -162,8 +162,10 @@ export class SlskdDownload implements DownloadPort {
     let lastProgressAt = start;
     const captured = new Set<string>();
     for (;;) {
+      // 404 = the user has no transfers at slskd (a state, not a fault): an empty page lets the
+      // stall/queue budgets settle the outcome instead of wedging retry on a vanished collection.
       const payload = slskdTransfersSchema.parse(
-        await this.client.get(this.downloadsPath(username)),
+        await this.client.getOr(this.downloadsPath(username), {}),
       );
       const mine = flattenDownloads(payload).filter(
         (transfer): transfer is SlskdTransfer & { filename: string } =>
@@ -230,7 +232,9 @@ export class SlskdDownload implements DownloadPort {
     const ownedKeys = filenames.map((filename) =>
       this.transferKey(acquisitionId, username, filename),
     );
-    const payload = slskdTransfersSchema.parse(await this.client.get(this.downloadsPath(username)));
+    const payload = slskdTransfersSchema.parse(
+      await this.client.getOr(this.downloadsPath(username), {}),
+    );
     const mine = flattenDownloads(payload).filter(
       (transfer): transfer is OwnedTransfer =>
         transfer.filename !== undefined && wanted.has(transfer.filename),
@@ -320,7 +324,9 @@ export class SlskdDownload implements DownloadPort {
 
   /** Re-poll the user's downloads, narrowed to the transfers this teardown owns. */
   private async pollMine(username: string, wanted: ReadonlySet<string>): Promise<OwnedTransfer[]> {
-    const payload = slskdTransfersSchema.parse(await this.client.get(this.downloadsPath(username)));
+    const payload = slskdTransfersSchema.parse(
+      await this.client.getOr(this.downloadsPath(username), {}),
+    );
     return flattenDownloads(payload).filter(
       (transfer): transfer is OwnedTransfer =>
         transfer.filename !== undefined && wanted.has(transfer.filename),

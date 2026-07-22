@@ -87,6 +87,38 @@ describe('SlskdClient', () => {
     await expect(client.get('/api/v0/searches/s1')).rejects.toThrow('slskd responded 500');
   });
 
+  describe('getOr', () => {
+    it('returns the fallback for a 404 (an absent collection is a state, not a fault)', async () => {
+      const { http } = recordingClient({ status: 404, body: '' });
+      const client = new SlskdClient(http);
+
+      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).resolves.toEqual({});
+    });
+
+    it('parses a 2xx body like a plain GET', async () => {
+      const { http } = recordingClient({ status: 200, body: JSON.stringify({ directories: [] }) });
+      const client = new SlskdClient(http);
+
+      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).resolves.toEqual({
+        directories: [],
+      });
+    });
+
+    it('still throws on other non-2xx statuses', async () => {
+      const { http } = recordingClient({ status: 500, body: 'boom' });
+      const client = new SlskdClient(http);
+
+      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).rejects.toThrowError(/500/);
+    });
+
+    it('returns undefined for an empty 2xx body, like a plain GET', async () => {
+      const { http } = recordingClient({ status: 204, body: '' });
+      const client = new SlskdClient(http);
+
+      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).resolves.toBeUndefined();
+    });
+  });
+
   describe('delIfPresent', () => {
     it('resolves on a successful delete', async () => {
       const { http, sent } = recordingClient({ status: 204, body: '' });
