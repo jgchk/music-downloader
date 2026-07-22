@@ -4,4 +4,8 @@ export * from './mapping.js';
 export * from './transfers.js';
 export * from './search.js';
 export * from './download.js';
+export * from './poll.js';
+export * from './transfer-ledger.js';
+export * from './teardown.js';
+export * from './staged-files.js';
 export * from './resource-remover.js';
