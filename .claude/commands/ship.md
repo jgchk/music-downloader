@@ -53,7 +53,7 @@ CI's required `version-check` re-runs `version:prep --check`, so this commit mus
 
 1. Create a bookmark and push: `jj bookmark create <change-name> -r @` then `jj git push --bookmark <change-name> --allow-new`.
 2. `gh pr create --head <change-name>` with a concise body: what the change does, link to the archived OpenSpec change, review outcome (cycles run, anything consciously skipped). End the body with the standard Claude Code attribution line.
-3. Watch required checks (`version-check`, `quality`, `test`): `gh pr checks <PR#> --watch`. `web-e2e` is advisory — note a failure but it does not block. If a required check fails, fix, commit, `jj git push --bookmark <change-name>`, and re-watch.
+3. Watch required checks (`version-check`, `quality`, `test`): `gh pr checks <PR#> --watch`. If a required check fails, fix, commit, `jj git push --bookmark <change-name>`, and re-watch.
 4. **CHECKPOINT — stop and ask the user to confirm the merge**, presenting: PR URL, version, one-paragraph summary, review-cycle summary, check status.
 5. On confirmation: `gh pr merge <PR#> --rebase` (always pass the PR number explicitly — detached-HEAD breaks gh's branch inference; do not pass `--delete-branch`). Then `jj git fetch` to confirm the commit landed on `main`.
 6. Retire the workspace now that its work is on trunk: `cd` back to the main repo, `jj workspace forget <change>`, and remove the workspace directory. Only do this after verifying the merge via `gh pr view <PR#> --json state` and the fetch.
