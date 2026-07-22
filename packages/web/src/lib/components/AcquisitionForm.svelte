@@ -21,23 +21,26 @@
     Request kind
     <select name="kind" bind:value={kind} data-testid="kind">
       <option value="musicbrainz">MusicBrainz release</option>
+      <option value="release-group">MusicBrainz release group</option>
       <option value="descriptor">Artist / title descriptor</option>
     </select>
   </label>
 
-  <label>
-    Target type
-    <!-- Explicit per-option `selected` (not select-level `value`): the compiler's select_value
-         helper emits a nullish guard our `??` fallback makes unreachable (spike rule). -->
-    <select name="targetType">
-      <option value="album" selected={(values.targetType ?? 'album') === 'album'}>Album</option>
-      <option value="track" selected={values.targetType === 'track'}>Track</option>
-    </select>
-  </label>
-
-  {#if kind === 'musicbrainz'}
+  {#if kind !== 'release-group'}
     <label>
-      MusicBrainz ID
+      Target type
+      <!-- Explicit per-option `selected` (not select-level `value`): the compiler's select_value
+           helper emits a nullish guard our `??` fallback makes unreachable (spike rule). -->
+      <select name="targetType" data-testid="target-type">
+        <option value="album" selected={(values.targetType ?? 'album') === 'album'}>Album</option>
+        <option value="track" selected={values.targetType === 'track'}>Track</option>
+      </select>
+    </label>
+  {/if}
+
+  {#if kind === 'musicbrainz' || kind === 'release-group'}
+    <label>
+      {kind === 'release-group' ? 'MusicBrainz release-group ID' : 'MusicBrainz ID'}
       <input name="mbid" value={values.mbid ?? ''} data-testid="mbid" />
     </label>
   {:else}

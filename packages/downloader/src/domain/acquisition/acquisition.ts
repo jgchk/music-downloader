@@ -3,7 +3,7 @@ import type { CandidateIdentity } from '../candidate/candidate.js';
 import type { AcquisitionCommand } from './commands.js';
 import { decide } from './decide.js';
 import type { DomainError } from './decide.js';
-import type { AcquisitionEvent } from './events.js';
+import type { AcquisitionEvent, EditionCandidate } from './events.js';
 import { react } from './react.js';
 import type { Effect } from './react.js';
 import { foldEvents, isTerminal } from './state.js';
@@ -35,6 +35,8 @@ export interface AcquisitionSnapshot {
   readonly attempts: number;
   readonly rejectedCount: number;
   readonly location?: string;
+  /** The retained candidate editions, present only while awaiting manual selection. */
+  readonly candidates?: readonly EditionCandidate[];
 }
 
 /**
@@ -82,6 +84,7 @@ export class Acquisition {
       attempts: 'attempts' in state ? state.attempts : 0,
       rejectedCount: 'rejected' in state ? state.rejected.length : 0,
       location: 'location' in state ? state.location : undefined,
+      candidates: state.phase === 'AwaitingManualSelection' ? state.candidates : undefined,
     };
   }
 }

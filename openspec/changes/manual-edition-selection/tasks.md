@@ -20,9 +20,9 @@
 
 ## 4. Interfaces & UI
 
-- [ ] 4.1 Write a failing test for a read model exposing awaiting-selection acquisitions with their candidate editions; implement it.
-- [ ] 4.2 Write a failing test for the select-edition command on the facade / HTTP surface (and MCP if in scope); implement additively, returning the modeled rejection for stale/unknown selections.
-- [ ] 4.3 Write failing UI tests and implement the awaiting-selection surface (candidate list + choose action, modeled error on stale selection).
+- [x] 4.1 Write a failing test for a read model exposing awaiting-selection acquisitions with their candidate editions; implement it.
+- [x] 4.2 Write a failing test for the select-edition command on the facade / HTTP surface (and MCP if in scope); implement additively, returning the modeled rejection for stale/unknown selections.
+- [x] 4.3 Write failing UI tests and implement the awaiting-selection surface (candidate list + choose action, modeled error on stale selection).
 
 ## 5. Contract tests & the gate
 

@@ -16,6 +16,13 @@ describe('AcquisitionForm', () => {
     await expect.element(page.getByTestId('mbid')).toBeVisible();
   });
 
+  it('offers the release-group kind: id field shown, target type fixed to album', async () => {
+    render(AcquisitionForm, {});
+    await page.getByTestId('kind').selectOptions('release-group');
+    await expect.element(page.getByTestId('mbid')).toBeVisible();
+    expect(page.getByTestId('target-type').query()).toBeNull();
+  });
+
   it('renders a rejected submission: error banner plus echoed values', async () => {
     render(AcquisitionForm, {
       error: 'Invalid input: title required',

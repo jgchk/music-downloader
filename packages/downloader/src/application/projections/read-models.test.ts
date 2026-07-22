@@ -9,9 +9,11 @@ import { FakeEventStore } from '../__fixtures__/fakes.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import {
+  awaitingSelectionHistory,
   defaultPolicies,
   matchingCandidate,
   rankedOf,
+  sampleEditionCandidates,
   sampleRequest,
   sampleTarget,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
@@ -88,6 +90,23 @@ describe('projectStatus — target description', () => {
       },
     ]);
     expect(view.target).toEqual({ artist: 'Artist', title: 'Album' });
+  });
+});
+
+describe('projectStatus — awaiting manual edition selection', () => {
+  it('exposes the retained candidate editions while awaiting a choice', () => {
+    const view = projectStatus('acq-1', awaitingSelectionHistory());
+    expect(view.status).toBe('AwaitingManualSelection');
+    expect(view.candidates).toEqual(sampleEditionCandidates);
+  });
+
+  it('drops the candidates once an edition is selected and the flow resumes', () => {
+    const view = projectStatus('acq-1', [
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+    ]);
+    expect(view.status).toBe('Pending');
+    expect(view.candidates).toBeUndefined();
   });
 });
 

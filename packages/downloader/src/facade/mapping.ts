@@ -84,6 +84,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     rejectedCount: view.rejectedCount,
     location: view.location,
     history: view.history.map(historyEntryToDto),
+    candidates: view.candidates?.map((candidate) => ({ ...candidate })),
   };
 }
 

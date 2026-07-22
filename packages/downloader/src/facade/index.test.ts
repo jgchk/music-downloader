@@ -1,7 +1,12 @@
 import { errAsync, okAsync } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import type { EventStorePort } from '../application/ports/event-store-port.js';
+import {
+  awaitingSelectionHistory,
+  sampleEditionCandidates,
+} from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { testWiring } from './__fixtures__/wiring.js';
+import type { TestWiring } from './__fixtures__/wiring.js';
 import {
   acquisitionListResultSchema,
   acquisitionStatusResultSchema,
@@ -9,6 +14,7 @@ import {
   createDownloaderFacade,
   downloaderFacadeErrorSchema,
   progressResultSchema,
+  selectEditionResultSchema,
   submitAcquisitionResultSchema,
 } from './facade.js';
 
@@ -143,7 +149,85 @@ describe('createDownloaderFacade', () => {
     });
   });
 
+  describe('selectEdition', () => {
+    async function awaitingWiring(): Promise<TestWiring> {
+      const wiring = testWiring();
+      await wiring.store.append('acq-1', 0, awaitingSelectionHistory(), {
+        acquisitionId: 'acq-1',
+        occurredAt: 't',
+      });
+      wiring.sync();
+      return wiring;
+    }
+
+    it('accepts a retained candidate and resumes the acquisition', async () => {
+      const wiring = await awaitingWiring();
+      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'boot-1' });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(selectEditionResultSchema.parse(roundTrip(result.value))).toEqual({
+          acquisitionId: 'acq-1',
+        });
+      }
+      expect(wiring.store.all().map((entry) => entry.type)).toContain('EditionSelected');
+    });
+
+    it('returns the modeled UnknownEdition rejection for an off-menu choice', async () => {
+      const wiring = await awaitingWiring();
+      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'off-menu' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toEqual({ kind: 'UnknownEdition', releaseMbid: 'off-menu' });
+        expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
+      }
+    });
+
+    it('returns the modeled IllegalTransition rejection when not awaiting a selection', async () => {
+      const wiring = testWiring();
+      const submitted = await wiring.facade.submitAcquisition(VALID_SUBMIT);
+      if (!submitted.ok) throw new Error('submit failed');
+
+      const result = await wiring.facade.selectEdition({
+        id: submitted.value.acquisitionId,
+        releaseMbid: 'boot-1',
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatchObject({ kind: 'IllegalTransition', command: 'SelectEdition' });
+      }
+    });
+
+    it('rejects invalid input as a modeled validation error', async () => {
+      const facade = createDownloaderFacade(testWiring().deps);
+      const result = await facade.selectEdition({ id: 'acq-1' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
+    });
+  });
+
   describe('getAcquisition', () => {
+    it('exposes the candidate editions while an acquisition awaits manual selection', async () => {
+      const wiring = testWiring();
+      await wiring.store.append('acq-1', 0, awaitingSelectionHistory(), {
+        acquisitionId: 'acq-1',
+        occurredAt: 't',
+      });
+      wiring.sync();
+
+      const result = wiring.facade.getAcquisition({ id: 'acq-1' });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(acquisitionStatusResultSchema.parse(roundTrip(result.value))).toEqual(result.value);
+        expect(result.value.status).toBe('AwaitingManualSelection');
+        expect(result.value.candidates).toEqual(sampleEditionCandidates);
+      }
+    });
+
     it('returns the status view for a known acquisition', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);

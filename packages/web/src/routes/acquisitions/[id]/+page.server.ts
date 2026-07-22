@@ -30,4 +30,19 @@ export const actions: Actions = {
     }
     redirect(303, `/acquisitions/${params.id}`);
   },
+
+  // Manual edition selection: submit the chosen edition; a stale or off-menu choice comes back as
+  // the facade's modeled rejection and renders as the action error, never a crash (web-ui spec).
+  select: async ({ locals, params, request }) => {
+    const data = await request.formData();
+    const releaseMbid = data.get('releaseMbid');
+    const result = await locals.facades.downloader.selectEdition({
+      id: params.id,
+      releaseMbid: typeof releaseMbid === 'string' ? releaseMbid : '',
+    });
+    if (!result.ok) {
+      return fail(statusOf(result.error), { message: messageOf(result.error) });
+    }
+    redirect(303, `/acquisitions/${params.id}`);
+  },
 };

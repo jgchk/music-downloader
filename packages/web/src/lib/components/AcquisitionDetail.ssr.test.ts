@@ -55,6 +55,46 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('Rejected after delivery (bad rip)');
   });
 
+  it('lists the candidate editions with a choose action while awaiting manual selection', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        acquisition: {
+          ...working,
+          status: 'AwaitingManualSelection' as const,
+          currentCandidate: undefined,
+          history: [],
+          candidates: [
+            {
+              releaseMbid: 'boot-1',
+              title: 'Live at Budokan',
+              date: '1995-05-01',
+              country: 'JP',
+              format: 'CD',
+              trackCount: 12,
+            },
+            { releaseMbid: 'boot-2', trackCount: 10 },
+          ],
+        },
+      },
+    });
+    expect(body).toContain('data-testid="edition-candidates"');
+    expect(body).toContain('Live at Budokan');
+    expect(body).toContain('1995-05-01');
+    expect(body).toContain('JP');
+    expect(body).toContain('CD');
+    expect(body).toContain('12');
+    expect(body).toContain('action="?/select"');
+    expect(body).toContain('value="boot-1"');
+    expect(body).toContain('value="boot-2"');
+    // Awaiting selection is not terminal: cancelling remains available.
+    expect(body).toContain('data-testid="cancel"');
+  });
+
+  it('renders no edition-candidates section outside the awaiting-selection state', () => {
+    const { body } = render(AcquisitionDetail, { props: { acquisition: working } });
+    expect(body).not.toContain('data-testid="edition-candidates"');
+  });
+
   it('renders an action failure and an empty history', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
