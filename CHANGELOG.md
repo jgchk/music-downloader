@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.3.1](https://github.com/jgchk/music-downloader/compare/v3.3.0...v3.3.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **downloader:** tolerate null MusicBrainz metadata fields and bound HTTP requests ([c61287a](https://github.com/jgchk/music-downloader/commit/c61287ab7bfc4c4e3ee12ca76420ff512c2b48e5))
+
 ## [3.3.0](https://github.com/jgchk/music-downloader/compare/v3.2.1...v3.3.0) (2026-07-22)
 
 
