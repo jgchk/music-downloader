@@ -50,7 +50,10 @@ export class TransferLedger {
   ): Promise<ReadonlySet<string>> {
     const rows = await this.ledger.liveByAcquisition(acquisitionId);
     if (rows.isErr()) {
-      this.logger.warn({ err: rows.error }, 'ledger: list live transfers failed');
+      this.logger.error(
+        { err: rows.error },
+        'ledger: list live transfers failed; degrading to a plain enqueue — a prior live transfer will not be re-attached',
+      );
       return new Set();
     }
     return new Set(

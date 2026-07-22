@@ -1,7 +1,7 @@
 import { ResultAsync } from 'neverthrow';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { Target } from '../../domain/target/target.js';
-import { classifiedFault } from '../support/fault.js';
+import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { SearchPort } from '../../application/ports/outbound-ports.js';
 import type {
@@ -56,7 +56,7 @@ export class SlskdSearch implements SearchPort {
     round: number,
   ): ResultAsync<readonly Candidate[], InfraError> {
     return ResultAsync.fromPromise(this.doSearch(acquisitionId, target, round), (cause) =>
-      classifiedFault('slskd.search', cause),
+      infraError('slskd.search', String(cause), cause),
     );
   }
 

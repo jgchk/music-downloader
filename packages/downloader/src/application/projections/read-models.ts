@@ -8,7 +8,9 @@ import type {
 } from '../../domain/acquisition/events.js';
 import type { ValidationReason } from '../../domain/validation/verdict.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
+import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
+import type { Logger } from '../logging/logger.js';
 
 /**
  * Read-model projections (D7): each is a fold over the log and therefore rebuildable from it.
@@ -52,9 +54,9 @@ export interface AcquisitionStatusView {
   /** The candidate editions on offer, present only while awaiting manual selection. */
   readonly candidates?: readonly EditionCandidate[];
   /**
-   * Present (true) when the acquisition's current effect exhausted its retry budget with no
-   * modeled failure to degrade to — dead-lettered, awaiting an operator (reactor-durability D2).
-   * Additive: absent for every acquisition that is progressing normally.
+   * Present (true) when the acquisition's current effect dead-lettered — its retry budget spent,
+   * or a permanent fault, with no modeled failure to degrade to — awaiting an operator
+   * (reactor-durability D2). Additive: absent for every acquisition progressing normally.
    */
   readonly stalled?: boolean;
 }
@@ -131,7 +133,7 @@ export class AcquisitionStatusProjection {
   }
 }
 
-// --- Stalled acquisitions (reactor-durability D2/D4) -------------------------------------------
+// --- Stalled acquisitions (reactor-durability D2/D5) -------------------------------------------
 
 /**
  * The in-memory face of the reactor's dead-lettered effects: seeded from the dead-letter store at
@@ -152,6 +154,31 @@ export class StalledReadModel {
 
   isStalled(acquisitionId: string): boolean {
     return this.stalled.has(acquisitionId);
+  }
+}
+
+/**
+ * Boot-time retention + seeding (reactor-durability D2): prune dead letters older than the
+ * horizon, then load the survivors' stream ids into the in-memory exposure. Both store faults
+ * degrade to a served-but-unmarked boot — logged, never fatal: the truth stays in the store and
+ * the next boot retries.
+ */
+export async function seedStalledReadModel(
+  deadLetters: DeadLetterStore,
+  stalled: StalledReadModel,
+  subscription: string,
+  horizonIso: string,
+  logger: Logger,
+): Promise<void> {
+  const pruned = await deadLetters.prune(subscription, horizonIso);
+  if (pruned.isErr()) logger.warn({ err: pruned.error }, 'stalled retention prune failed');
+  const letters = await deadLetters.list(subscription);
+  if (letters.isErr()) {
+    logger.error({ err: letters.error }, 'stalled read-model seed failed');
+    return;
+  }
+  for (const letter of letters.value) {
+    if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }
 

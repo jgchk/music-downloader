@@ -339,7 +339,11 @@ describe('SlskdDownload', () => {
   });
 
   describe('reconcile-before-enqueue (reactor-durability D3)', () => {
-    /** The prior attempt's write-ahead rows, as a crashed poller would have left them. */
+    /**
+     * The prior attempt's write-ahead rows, as a crashed poller would have left them. The
+     * resourceKey follows TransferLedger.keyFor's `${username}|${remoteFilename}` contract —
+     * drifting from it makes the rows invisible to reconciliation (posts would become 1).
+     */
     function seedLedgeredTransfers(ledger: FakeResourceLedger): void {
       for (const name of ['01.flac', '02.flac']) {
         ledger.created.push({
@@ -364,6 +368,21 @@ describe('SlskdDownload', () => {
 
       expect(result._unsafeUnwrap().kind).toBe('completed');
       expect(harness.counts.posts).toBe(0); // never enqueued again — polling resumed
+    });
+
+    it('re-enqueues when the source retains only a subset of the ledgered transfers', async () => {
+      // Resuming over a partial survival would settle the poll over the present file alone and
+      // report an under-delivered candidate as completed — a partial must re-enqueue instead.
+      const onlyFirst = poll([
+        transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      ]);
+      const harness = downloader({ polls: [onlyFirst, bothSucceeded], events: [bothCompleted] });
+      seedLedgeredTransfers(harness.ledger);
+
+      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+
+      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(harness.counts.posts).toBe(1);
     });
 
     it('re-enqueues when the ledgered transfers were lost at the source', async () => {

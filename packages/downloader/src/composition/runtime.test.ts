@@ -336,12 +336,24 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     expect(lines.join('')).toContain('stalled read-model seed failed');
   });
 
-  it('prunes dead letters older than the retention horizon at boot', async () => {
+  it('prunes dead letters older than the retention horizon at boot, unstalling the stream', async () => {
     const runtime = await seededRuntime('2020-01-01T00:00:00.000Z'); // far beyond 30 days
 
     const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
     expect(status.ok).toBe(true);
     expect(status.ok && status.value.stalled).toBeFalsy();
+
+    // No longer stalled, the acquisition is fair game for the startup re-drive: the backgrounded
+    // pass (with its production jitter sleep) drives it to its outcome.
+    await vi.waitFor(
+      () => {
+        expect(runtime.facade.getAcquisition({ id: 'acq-stalled' })).toMatchObject({
+          ok: true,
+          value: { status: 'Fulfilled' },
+        });
+      },
+      { timeout: 5_000 },
+    );
   });
 });
 

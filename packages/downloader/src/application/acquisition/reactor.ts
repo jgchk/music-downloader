@@ -1,6 +1,5 @@
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { Effect } from '../../domain/acquisition/acquisition.js';
-import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
 import type { Logger } from '../logging/logger.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type {
@@ -10,71 +9,32 @@ import type {
   StoredEvent,
 } from '../ports/event-store-port.js';
 import type { ParkedEffect, ParkedEffectStore } from '../ports/parked-effect-port.js';
+import type { Clock } from '../ports/system-ports.js';
 import type { StalledReadModel } from '../projections/read-models.js';
-import { applyCommand } from './command-handler.js';
 import type { CommandError } from './command-handler.js';
+import { EffectLander } from './effect-lander.js';
+import { classifyCommandError, describeCommandError } from './failure-classification.js';
 import { interpretEffect } from './interpreter.js';
 import type { InterpreterDeps } from './interpreter.js';
 import { DEFAULT_RETRY_POLICY, nextRetry } from './retry-policy.js';
 import type { RetryPolicy } from './retry-policy.js';
-
-/**
- * Effect-failure classification (reactor-durability D2): a transient infrastructure fault or a
- * concurrency conflict earns backoff; a permanent fault the adapter recognized short-circuits the
- * budget and lands immediately; a domain rejection is a stale/illegal outcome the stream has
- * already settled — advance past it.
- */
-function isRetryable(error: CommandError): boolean {
-  return (
-    (error.kind === 'InfraError' && error.permanent !== true) ||
-    error.kind === 'ConcurrencyConflict'
-  );
-}
-
-function isPermanentFault(error: CommandError): boolean {
-  return error.kind === 'InfraError' && error.permanent === true;
-}
-
-function describeError(error: CommandError): string {
-  return error.kind === 'InfraError'
-    ? `${error.operation}: ${error.message}`
-    : JSON.stringify(error);
-}
-
-/**
- * The modeled landing for a budget-exhausted (or permanently failed) effect: degrade to the
- * effect's business failure through the normal command path where one exists (D2). Effects with
- * no modeled failure return undefined and dead-letter instead.
- */
-function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
-  switch (effect.type) {
-    case 'ResolveMetadata':
-      return { type: 'RecordMetadataFailed' };
-    case 'Download':
-      // Hours without progress IS a stalled download; the rejection advances the candidate ladder.
-      return { type: 'RecordDownloadFailed', reason: 'Stalled' };
-    case 'AbortDownload':
-      // The abort's settlement: reject the pending candidate as the interpreter would have.
-      return { type: 'RecordDownloadFailed', reason: 'Cancelled' };
-    default:
-      // Search, Validate, Import, Cleanup: no modeled failure to degrade to — dead-letter.
-      return undefined;
-  }
-}
 
 type DispatchOutcome =
   | { readonly kind: 'ok' }
   | { readonly kind: 'retry'; readonly effect: Effect; readonly error: CommandError };
 
 /**
- * The durable reactor / process manager (D8): the one component that fires real effects, so it
- * must survive crashes without double-firing. It resumes from a durable checkpoint (at-least-once
- * delivery) and advances the checkpoint only after an event's effect is dispatched — so a restart
- * mid-download never re-dispatches an already-fired effect. A retryable effect failure parks its
+ * The durable reactor / process manager (bootstrap D8): the one component that fires real
+ * effects, so it must survive crashes without losing or wedging work. It resumes from a durable
+ * checkpoint (at-least-once delivery) and advances the checkpoint only once an event's effect is
+ * dispatched OR durably parked; after a restart, pending work is re-derived from folded state and
+ * re-dispatched through the idempotent path (reactor-durability D3) — the download adapter
+ * reconciles and re-attaches rather than downloading twice. A retryable effect failure parks its
  * OWN stream (durable entry + exponential backoff) while the checkpoint advances past it, so one
  * poisoned acquisition never stalls the rest (reactor-durability D1); the retry scheduler runs on
- * the same drain mutex, and a spent budget lands somewhere modeled (D2). Operational logs are
- * correlated by `acquisitionId` (D15); the pure `react`/`decide`/`evolve` stay log-free.
+ * the same drain mutex, and a spent budget lands somewhere modeled via the {@link EffectLander}
+ * (D2). Operational logs are correlated by `acquisitionId` (bootstrap D15); the pure
+ * `react`/`decide`/`evolve` stay log-free.
  */
 export const REACTOR_CONSUMER = 'acquisition-reactor';
 
@@ -84,34 +44,25 @@ export interface ReactorDeps {
   readonly bus: EventBus;
   readonly parked: ParkedEffectStore;
   readonly deadLetters: DeadLetterStore;
-  /** The queryable face of dead-lettered effects (D4); the reactor marks and clears it. */
+  /** The queryable face of dead-lettered effects (reactor-durability D2/D5). */
   readonly stalled: StalledReadModel;
   readonly logger: Logger;
   readonly interpreter: InterpreterDeps;
-  /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
-  readonly interval?: (fn: () => void, ms: number) => () => void;
+  readonly clock: Clock;
+  /** The fallback poll timer (composition supplies the real `setInterval`); returns a stopper. */
+  readonly interval: (fn: () => void, ms: number) => () => void;
+  /** Sleep for the re-drive pass's jitter (composition supplies the real timeout). */
+  readonly sleep: (ms: number) => Promise<void>;
+  /** Jitter roll ∈ [0, 1] (composition supplies `Math.random`). */
+  readonly random: () => number;
   readonly pollIntervalMs?: number;
   readonly retryPolicy?: RetryPolicy;
-  /** Jitter roll ∈ [0, 1] (defaults to `Math.random`) — injectable for deterministic tests. */
-  readonly random?: () => number;
-  /** Injectable sleep for the re-drive pass's jitter (defaults to a real timeout). */
-  readonly sleep?: (ms: number) => Promise<void>;
   /** Upper bound of the jittered gap between re-driven streams (rate limit, D3). */
   readonly redriveGapMs?: number;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_REDRIVE_GAP_MS = 1_000;
-
-const defaultSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-const defaultInterval = (fn: () => void, ms: number): (() => void) => {
-  const handle = setInterval(fn, ms);
-  return () => {
-    clearInterval(handle);
-  };
-};
 
 export class Reactor {
   private lastProcessed = 0;
@@ -122,8 +73,18 @@ export class Reactor {
   private stopped = false;
   /** The dispatch mutex: drain passes and the startup re-drive serialize through this chain. */
   private mutex: Promise<void> = Promise.resolve();
+  private readonly lander: EffectLander;
 
-  constructor(private readonly deps: ReactorDeps) {}
+  constructor(private readonly deps: ReactorDeps) {
+    this.lander = new EffectLander({
+      interpreter: deps.interpreter,
+      deadLetters: deps.deadLetters,
+      stalled: deps.stalled,
+      clock: deps.clock,
+      logger: deps.logger,
+      subscription: REACTOR_CONSUMER,
+    });
+  }
 
   /**
    * Failures inside a pass are values (neverthrow) — an actual throw is a bug. It is caught and
@@ -142,11 +103,7 @@ export class Reactor {
   }
 
   private now(): Date {
-    return this.deps.interpreter.clock.now();
-  }
-
-  private roll(): number {
-    return (this.deps.random ?? Math.random)();
+    return this.deps.clock.now();
   }
 
   /**
@@ -160,12 +117,20 @@ export class Reactor {
   async start(): Promise<void> {
     const checkpoint = await this.deps.checkpoints.load(REACTOR_CONSUMER);
     if (this.stopped) return; // stopped while loading (a backgrounded boot torn down early)
+    if (checkpoint.isErr()) {
+      // Replaying from the log start is safe (idempotent effects + decide's stale guards) but
+      // noisy and slow — the operator must be able to tell it apart from a fresh consumer.
+      this.deps.logger.error(
+        { err: checkpoint.error },
+        'checkpoint load failed; replaying from the log start',
+      );
+    }
     this.lastProcessed = checkpoint.unwrapOr(0);
 
     this.unsubscribe = this.deps.bus.subscribe(() => {
       void this.drain();
     });
-    this.stopInterval = (this.deps.interval ?? defaultInterval)(() => {
+    this.stopInterval = this.deps.interval(() => {
       void this.drain();
     }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
 
@@ -249,14 +214,23 @@ export class Reactor {
   private async redriveStream(streamId: string, events: readonly StoredEvent[]): Promise<void> {
     if (this.deps.stalled.isStalled(streamId)) return; // landed; awaiting an operator
     const park = await this.deps.parked.find(streamId);
-    if (park.isErr() || park.value !== undefined) return; // the retry scheduler owns it
+    if (park.isErr()) {
+      // The stream may be mid-retry; re-driving blind could double-dispatch, so skip this boot —
+      // but say so: an unlogged skip here is the "pending forever, nothing in the logs" class.
+      this.deps.logger.error(
+        { acquisitionId: streamId, err: park.error },
+        'startup re-drive park lookup failed; stream skipped this boot',
+      );
+      return;
+    }
+    if (park.value !== undefined) return; // the retry scheduler owns it
     const acquisition = Acquisition.fromHistory(events.map((entry) => entry.event));
     if (acquisition.isTerminal) return;
     const last = events[events.length - 1]!;
     if (acquisition.reactTo(last.event).length === 0) return; // nothing pending (e.g. paused)
 
     const gap = this.deps.redriveGapMs ?? DEFAULT_REDRIVE_GAP_MS;
-    await (this.deps.sleep ?? defaultSleep)(gap * this.roll());
+    await this.deps.sleep(gap * this.deps.random());
     this.deps.logger.info(
       { acquisitionId: streamId, phase: acquisition.phase },
       'startup re-drive dispatching the pending effect',
@@ -309,7 +283,7 @@ export class Reactor {
     } else if (wasStalled) {
       // A stalled acquisition's stream was driven successfully again (a cancellation, an operator
       // resubmission): its dead letters are resolved — clear them and the stalled exposure.
-      await this.clearStalled(stored.streamId);
+      await this.lander.clearStalled(stored.streamId);
     }
     await this.advanceTo(stored.globalSeq);
   }
@@ -318,7 +292,9 @@ export class Reactor {
    * Dispatch the effects of `stored` against the fold of the stream prefix up to and including it
    * (D1): a co-emitted or redelivered event sees its own post-state, never a later one. Permanent
    * faults land inside (degrade or dead-letter); a domain rejection is stale — recorded and
-   * advanced past (D5); only a retryable failure is surfaced to the caller to park.
+   * advanced past, per decide's stale-outcome contract. The caller is handed a `retry` for a
+   * retryable failure — or for a permanent fault whose landing itself failed on infrastructure,
+   * so the park backs off before the landing is re-attempted.
    */
   private async dispatchEvent(
     stored: StoredEvent,
@@ -329,20 +305,23 @@ export class Reactor {
     for (const effect of acquisition.reactTo(stored.event)) {
       const result = await interpretEffect(this.deps.interpreter, stored.streamId, effect);
       if (result.isErr()) {
-        if (isPermanentFault(result.error)) {
-          const landed = await this.land(stored, effect, result.error, 1);
-          if (!landed) return { kind: 'retry', effect, error: result.error };
-          break;
+        switch (classifyCommandError(result.error)) {
+          case 'permanent': {
+            const landed = await this.lander.land(stored, effect, result.error, 1);
+            if (!landed) return { kind: 'retry', effect, error: result.error };
+            break;
+          }
+          case 'retryable':
+            return { kind: 'retry', effect, error: result.error };
+          case 'rejection':
+            // Stale/illegal outcome — the stream has already settled it. Record and advance past
+            // it; retrying would only re-fire the same rejection forever.
+            this.deps.logger.warn(
+              { acquisitionId: stored.streamId, effect: effect.type, err: result.error },
+              'effect follow-on rejected as stale; advancing past it',
+            );
+            break;
         }
-        if (isRetryable(result.error)) {
-          return { kind: 'retry', effect, error: result.error };
-        }
-        // Stale/illegal outcome — the stream has already settled it. Record and advance past it
-        // (D5); retrying would only re-fire the same rejection forever.
-        this.deps.logger.warn(
-          { acquisitionId: stored.streamId, effect: effect.type, err: result.error },
-          'effect follow-on rejected as stale; advancing past it',
-        );
         break;
       }
       this.deps.logger.debug(
@@ -353,17 +332,20 @@ export class Reactor {
     return { kind: 'ok' };
   }
 
-  /** Durably park the stream at `stored` for a backed-off retry. False if the park write failed. */
+  /**
+   * Durably park the stream at `stored` for a backed-off retry — or, on a zero-width budget,
+   * land straight away. False only when the durable write (or landing) failed, so the caller
+   * holds the checkpoint instead.
+   */
   private async parkStream(
     stored: StoredEvent,
     effect: Effect,
     error: CommandError,
   ): Promise<boolean> {
     const now = this.now();
-    const schedule = nextRetry(this.policy, 1, now, now, this.roll());
+    const schedule = nextRetry(this.policy, 1, now, now, this.deps.random());
     if (schedule.kind === 'exhausted') {
-      // A zero-width budget: land straight away rather than schedule an impossible retry.
-      return this.land(stored, effect, error, 1);
+      return this.lander.land(stored, effect, error, 1);
     }
     const entry: ParkedEffect = {
       streamId: stored.streamId,
@@ -371,7 +353,7 @@ export class Reactor {
       attempt: 1,
       parkedAt: now.toISOString(),
       nextRetryAt: schedule.nextRetryAt.toISOString(),
-      lastError: describeError(error),
+      lastError: describeCommandError(error),
     };
     const written = await this.deps.parked.park(entry);
     if (written.isErr()) {
@@ -423,7 +405,7 @@ export class Reactor {
         { acquisitionId: entry.streamId, globalSeq: entry.globalSeq },
         'parked event missing from its stream; clearing the park',
       );
-      await this.deps.parked.clear(entry.streamId);
+      await this.clearPark(entry.streamId);
       return;
     }
 
@@ -442,9 +424,15 @@ export class Reactor {
     // exactly right, so permanents need no special case in the schedule.
     const attempt = entry.attempt + 1;
     const now = this.now();
-    const schedule = nextRetry(this.policy, attempt, new Date(entry.parkedAt), now, this.roll());
+    const schedule = nextRetry(
+      this.policy,
+      attempt,
+      new Date(entry.parkedAt),
+      now,
+      this.deps.random(),
+    );
     if (schedule.kind === 'exhausted') {
-      const landed = await this.land(stored, outcome.effect, outcome.error, attempt);
+      const landed = await this.lander.land(stored, outcome.effect, outcome.error, attempt);
       if (landed) await this.resumeStream(entry, stream.value);
       return;
     }
@@ -452,7 +440,7 @@ export class Reactor {
       ...entry,
       attempt,
       nextRetryAt: schedule.nextRetryAt.toISOString(),
-      lastError: describeError(outcome.error),
+      lastError: describeCommandError(outcome.error),
     });
     if (rescheduled.isErr()) {
       this.deps.logger.error(
@@ -490,89 +478,27 @@ export class Reactor {
         return;
       }
     }
-    await this.deps.parked.clear(entry.streamId);
+    await this.clearPark(entry.streamId);
   }
 
-  /**
-   * Land a permanently failed or budget-exhausted effect (D2): degrade to its modeled business
-   * failure through the normal command path where one exists; dead-letter with full context — and
-   * expose the acquisition as stalled — where none does. Returns false when the landing itself
-   * failed on infrastructure (the caller keeps the park so the landing is never lost).
-   */
-  private async land(
-    stored: StoredEvent,
-    effect: Effect,
-    error: CommandError,
-    attempt: number,
-  ): Promise<boolean> {
-    const command = degradeCommand(effect);
-    if (command !== undefined) {
-      const applied = await applyCommand(this.deps.interpreter, stored.streamId, command);
-      if (applied.isOk()) {
-        this.deps.logger.error(
-          { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
-          'retry budget exhausted; degrading to modeled failure',
-        );
-        return true;
-      }
-      if (isRetryable(applied.error) || isPermanentFault(applied.error)) {
-        this.deps.logger.error(
-          { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
-          'degrade command failed; will land again',
-        );
-        return false;
-      }
-      // The domain rejected the degrade: the stream has already settled past it — landed.
-      this.deps.logger.warn(
-        { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
-        'degrade rejected as stale; stream already settled',
-      );
-      return true;
-    }
-
-    const recorded = await this.deps.deadLetters.record({
-      subscription: REACTOR_CONSUMER,
-      globalSeq: stored.globalSeq,
-      streamId: stored.streamId,
-      error: JSON.stringify({
-        effect: effect.type,
-        attempt,
-        error: describeError(error),
-      }),
-      occurredAt: this.now().toISOString(),
-    });
-    if (recorded.isErr()) {
-      this.deps.logger.error(
-        { acquisitionId: stored.streamId, effect: effect.type, err: recorded.error },
-        'dead-letter write failed; will land again',
-      );
-      return false;
-    }
-    this.deps.stalled.mark(stored.streamId);
-    this.deps.logger.error(
-      { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
-      'retry budget exhausted; effect dead-lettered and acquisition stalled',
-    );
-    return true;
-  }
-
-  /** Resolution clears retention (D2): the stream's letters and its stalled exposure go together. */
-  private async clearStalled(streamId: string): Promise<void> {
-    const cleared = await this.deps.deadLetters.clearStream(REACTOR_CONSUMER, streamId);
+  /** Clear a park, loudly: a lingering past-due entry re-fires its effect on every tick. */
+  private async clearPark(streamId: string): Promise<void> {
+    const cleared = await this.deps.parked.clear(streamId);
     if (cleared.isErr()) {
-      // Stay marked stalled — the letters still exist; a later successful event retries the clear.
       this.deps.logger.error(
         { acquisitionId: streamId, err: cleared.error },
-        'failed to clear resolved dead letters',
+        'failed to clear the resolved park; its effect will re-fire each tick until cleared',
       );
-      return;
     }
-    this.deps.stalled.clear(streamId);
-    this.deps.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
   }
 
   private async advanceTo(globalSeq: number): Promise<void> {
     this.lastProcessed = globalSeq;
-    await this.deps.checkpoints.save(REACTOR_CONSUMER, globalSeq);
+    const saved = await this.deps.checkpoints.save(REACTOR_CONSUMER, globalSeq);
+    if (saved.isErr()) {
+      // The in-memory cursor advances regardless: at-least-once tolerates the redelivery a stale
+      // durable checkpoint causes after a restart, but the operator must see it happening.
+      this.deps.logger.error({ globalSeq, err: saved.error }, 'checkpoint save failed');
+    }
   }
 }

@@ -119,6 +119,15 @@ function wire(opts: E2eOptions) {
     stalled: stalledModel,
     logger: silentLogger(),
     interpreter,
+    clock: fixedClock(),
+    interval: (fn, ms) => {
+      const handle = setInterval(fn, ms);
+      return () => {
+        clearInterval(handle);
+      };
+    },
+    sleep: () => Promise.resolve(),
+    random: () => 1,
   });
   const deps: UseCaseDeps = {
     store,

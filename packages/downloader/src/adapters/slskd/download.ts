@@ -2,7 +2,7 @@ import { ResultAsync } from 'neverthrow';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadFailureReason, DownloadedFile } from '../../domain/acquisition/events.js';
-import { classifiedFault } from '../support/fault.js';
+import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   DownloadPort,
@@ -89,7 +89,7 @@ export class SlskdDownload implements DownloadPort {
   ): ResultAsync<DownloadResult, InfraError> {
     return ResultAsync.fromPromise(
       this.doDownload(acquisitionId, candidate, policy, onProgress),
-      (cause) => classifiedFault('slskd.download', cause),
+      (cause) => infraError('slskd.download', String(cause), cause),
     );
   }
 
@@ -179,11 +179,19 @@ export class SlskdDownload implements DownloadPort {
     }
   }
 
-  /** True when the source still lists the prior attempt's transfers — polling resumes on them. */
+  /**
+   * True only when the source still lists EVERY wanted transfer — polling resumes on them. A
+   * partial survival must re-enqueue: resuming over a subset would settle `aggregate` on the
+   * present files alone and surface an under-delivered candidate as a completed one.
+   */
   private async reattach(username: string, wanted: ReadonlySet<string>): Promise<boolean> {
     const present = await pollOwnedTransfers(this.client, username, wanted);
-    if (present.length === 0) {
-      this.logger.warn({ username }, 'ledgered transfers lost at the source; re-enqueueing');
+    const covered = new Set(present.map((transfer) => transfer.filename));
+    if (covered.size < wanted.size) {
+      this.logger.warn(
+        { username, present: covered.size, wanted: wanted.size },
+        'ledgered transfers missing at the source; re-enqueueing',
+      );
       return false;
     }
     this.logger.info({ username, count: present.length }, 're-attaching to live slskd transfers');
@@ -200,7 +208,7 @@ export class SlskdDownload implements DownloadPort {
     candidate: Candidate,
   ): ResultAsync<readonly DownloadedFile[], InfraError> {
     return ResultAsync.fromPromise(this.doAbort(acquisitionId, candidate), (cause) =>
-      classifiedFault('slskd.abort', cause),
+      infraError('slskd.abort', String(cause), cause),
     );
   }
 
