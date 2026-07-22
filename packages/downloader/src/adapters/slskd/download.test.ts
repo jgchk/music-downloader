@@ -444,6 +444,14 @@ describe('SlskdDownload', () => {
     });
   });
 
+  it('treats a 404 mid-download poll as vanished transfers and stalls out, not an infra fault', async () => {
+    const { adapter } = downloader({ polls: [{ status: 404, body: '' }] });
+
+    const result = await adapter.download(ACQ, candidate, policy(200, 1000), () => undefined);
+
+    expect(result._unsafeUnwrap()).toMatchObject({ kind: 'failed', reason: 'Stalled' });
+  });
+
   it('surfaces a contract-violating poll body as an InfraError', async () => {
     const { adapter } = downloader({
       polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
@@ -712,6 +720,17 @@ describe('SlskdDownload', () => {
       // The completed file's source-reported staged path is returned for the domain to discard.
       expect(result._unsafeUnwrap()).toEqual([{ name: '01.flac', path: stagedPath('01.flac') }]);
       expect(ledger.removed).toHaveLength(2);
+    });
+
+    it('treats a 404 transfer listing as already-gone: nothing to abort, success (prod 2026-07-22)', async () => {
+      // slskd 404s the downloads collection for a user with no transfers; for an abort that IS
+      // the desired end state — converge instead of wedging the reactor on a retryable fault.
+      const { adapter, deletes } = downloader({ polls: [{ status: 404, body: '' }] });
+
+      const result = await adapter.abort(ACQ, candidate);
+
+      expect(result._unsafeUnwrap()).toEqual([]);
+      expect(deletes).toEqual([]);
     });
 
     it('is a no-op when the candidate has no transfers left', async () => {

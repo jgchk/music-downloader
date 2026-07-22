@@ -63,6 +63,21 @@ export class SlskdClient {
   }
 
   /**
+   * GET a resource, returning `notFound` for a 404 — for collections whose absence is a *state*,
+   * not a fault: slskd 404s the downloads listing of a user with no transfers, and for the abort
+   * and poll paths that means "nothing there" (converge), never "retry until it exists" (which
+   * wedged the reactor on a cancelled acquisition's abort, prod 2026-07-22). Other non-2xx throw.
+   */
+  async getOr(path: string, notFound: unknown): Promise<unknown> {
+    const response = await this.dispatch('GET', path);
+    if (response.status === 404) return notFound;
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`slskd responded ${response.status} for GET ${path}`);
+    }
+    return response.body === '' ? undefined : JSON.parse(response.body);
+  }
+
+  /**
    * DELETE a resource, treating a 404 (already absent) as success — the resource is in the desired
    * end state, so cancel+remove is idempotent. Any other non-2xx still throws. Used for the removals
    * where "already gone" must converge rather than error (settled-transfer cleanup, the sweep).
