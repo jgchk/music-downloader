@@ -6,6 +6,9 @@ coverage/
 *.log
 *.sqlite
 *.sqlite-*
+# Event-store SQLite files (module data dirs) — created by local dev/runtime
+*.db
+*.db-*
 .DS_Store
 .env
 .env.*
