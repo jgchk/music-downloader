@@ -8,11 +8,15 @@ import { DEFAULT_DOWNLOAD_POLICY } from '../../domain/policy/policies.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import {
+  awaitingSelectionHistory,
+  defaultPolicies,
   importingHistory,
   matchingCandidate,
   requestedHistory,
   resolvedHistory,
+  sampleEditionCandidates,
   sampleFiles,
+  sampleGroupRequest,
   sampleRequest,
   sampleTarget,
   selectedHistory,
@@ -75,6 +79,48 @@ describe('interpretEffect — metadata resolution', () => {
       request: { kind: 'musicbrainz', mbid: 'x', targetType: 'album' },
     });
     expect(appendedTypes()).toContain('MetadataResolutionFailed');
+  });
+
+  it('records a needs-selection outcome as a manual-selection request, candidates verbatim', async () => {
+    await seed([
+      { type: 'AcquisitionRequested', request: sampleGroupRequest, policies: defaultPolicies() },
+    ]);
+    const ports = stubPorts({
+      metadata: {
+        resolve: vi.fn(() =>
+          okAsync({ kind: 'needsSelection' as const, candidates: sampleEditionCandidates }),
+        ),
+      },
+    });
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'ResolveMetadata',
+      request: sampleGroupRequest,
+    });
+    const paused = store
+      .all()
+      .map((entry) => entry.event)
+      .find(
+        (event): event is Extract<AcquisitionEvent, { type: 'ManualSelectionRequested' }> =>
+          event.type === 'ManualSelectionRequested',
+      );
+    expect(paused?.candidates).toEqual(sampleEditionCandidates);
+  });
+
+  it('resolves the chosen edition on the resume path and records the target', async () => {
+    await seed([...awaitingSelectionHistory(), { type: 'EditionSelected', releaseMbid: 'boot-1' }]);
+    const resolve = vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget }));
+    const ports = stubPorts({ metadata: { resolve } });
+    // The effect `react` emits for EditionSelected: the direct-by-release-id request.
+    await interpretEffect(deps(ports), 'acq-1', {
+      type: 'ResolveMetadata',
+      request: { kind: 'musicbrainz', mbid: 'boot-1', targetType: 'album' },
+    });
+    expect(resolve).toHaveBeenCalledWith({
+      kind: 'musicbrainz',
+      mbid: 'boot-1',
+      targetType: 'album',
+    });
+    expect(appendedTypes()).toContain('TargetResolved');
   });
 
   it('propagates an infrastructure fault without appending', async () => {

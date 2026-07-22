@@ -15,8 +15,8 @@
 
 ## 3. Application wiring
 
-- [ ] 3.1 Write a failing interpreter test: `needsSelection` maps to `ManualSelectionRequested`; implement the third-outcome branch in `interpreter.ts`.
-- [ ] 3.2 Write a failing test for the select-edition effect path (resolving the chosen release id) and wire it through the interpreter/command handler.
+- [x] 3.1 Write a failing interpreter test: `needsSelection` maps to `ManualSelectionRequested`; implement the third-outcome branch in `interpreter.ts`.
+- [x] 3.2 Write a failing test for the select-edition effect path (resolving the chosen release id) and wire it through the interpreter/command handler.
 
 ## 4. Interfaces & UI
 

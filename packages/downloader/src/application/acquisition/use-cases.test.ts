@@ -5,12 +5,14 @@ import {
   getAcquisitionProgress,
   listAcquisitions,
   recordExternalValidationFailure,
+  selectEdition,
   submitAcquisition,
 } from './use-cases.js';
 import type { UseCaseDeps } from './use-cases.js';
 import { FakeEventStore, fixedClock, sequentialIds } from '../__fixtures__/fakes.js';
 import { AcquisitionStatusProjection, ProgressReadModel } from '../projections/read-models.js';
 import {
+  awaitingSelectionHistory,
   defaultPolicies,
   fulfilledHistory,
   matchingCandidate,
@@ -48,6 +50,45 @@ describe('cancelAcquisition', () => {
     const result = await cancelAcquisition(d, acquisitionId);
     expect(result.isOk()).toBe(true);
     expect((d.store as FakeEventStore).all().map((e) => e.type)).toContain('AcquisitionCancelled');
+  });
+});
+
+describe('selectEdition', () => {
+  async function awaitingDeps(): Promise<UseCaseDeps> {
+    const d = deps();
+    await (d.store as FakeEventStore).append('acq-1', 0, awaitingSelectionHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: 't',
+    });
+    return d;
+  }
+
+  it('appends the selection for an acquisition awaiting one', async () => {
+    const d = await awaitingDeps();
+    const result = await selectEdition(d, 'acq-1', 'boot-1');
+    expect(result.isOk()).toBe(true);
+    expect((d.store as FakeEventStore).all().map((e) => e.type)).toContain('EditionSelected');
+  });
+
+  it('surfaces the modeled rejection for an off-menu edition', async () => {
+    const d = await awaitingDeps();
+    const result = await selectEdition(d, 'acq-1', 'not-on-the-menu');
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'UnknownEdition',
+      releaseMbid: 'not-on-the-menu',
+    });
+  });
+
+  it('surfaces the modeled rejection for an acquisition not awaiting selection', async () => {
+    const d = deps();
+    const { acquisitionId } = (
+      await submitAcquisition(d, { request: sampleRequest, policies: defaultPolicies() })
+    )._unsafeUnwrap();
+    const result = await selectEdition(d, acquisitionId, 'boot-1');
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'IllegalTransition',
+      command: 'SelectEdition',
+    });
   });
 });
 
