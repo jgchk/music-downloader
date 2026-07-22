@@ -5,6 +5,7 @@ import {
   recordingToTarget,
   releaseCandidateIds,
   releaseGroupCandidateIds,
+  releaseGroupEditionCandidates,
   releaseGroupEditionIds,
   releaseToTarget,
 } from './mapping.js';
@@ -618,5 +619,89 @@ describe('releaseGroupCandidateIds', () => {
         { id: 'boot', status: 'Bootleg', date: '2001', media: [{ 'track-count': 12 }] },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('releaseGroupEditionCandidates', () => {
+  it('presents no candidates for empty or missing input', () => {
+    expect(releaseGroupEditionCandidates(undefined)).toEqual([]);
+    expect(releaseGroupEditionCandidates([])).toEqual([]);
+  });
+
+  it('presents every identified edition with its identifying metadata', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { status: 'Bootleg', date: '2001', media: [{ 'track-count': 9 }] }, // no id → nothing to select
+      {
+        id: 'boot',
+        title: 'Live at Budokan',
+        status: 'Bootleg',
+        date: '1995-05-01',
+        country: 'JP',
+        media: [{ 'track-count': 12, format: 'CD' }],
+      },
+    ]);
+
+    expect(candidates).toEqual([
+      {
+        releaseMbid: 'boot',
+        title: 'Live at Budokan',
+        date: '1995-05-01',
+        country: 'JP',
+        format: 'CD',
+        trackCount: 12,
+      },
+    ]);
+  });
+
+  it('sums track counts across media and joins the distinct formats', () => {
+    const candidates = releaseGroupEditionCandidates([
+      {
+        id: 'double',
+        media: [
+          { 'track-count': 8, format: 'CD' },
+          { 'track-count': 5, format: 'CD' },
+          { 'track-count': 1, format: 'DVD-Video' },
+        ],
+      },
+    ]);
+
+    expect(candidates[0]).toMatchObject({ trackCount: 14, format: 'CD + DVD-Video' });
+  });
+
+  it('leaves presentation fields absent when the browse omits them', () => {
+    const candidates = releaseGroupEditionCandidates([{ id: 'sparse' }]);
+
+    expect(candidates).toEqual([{ releaseMbid: 'sparse', trackCount: 0 }]);
+  });
+
+  it('treats a null country and media format as absent (MusicBrainz reports unknowns as null)', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: 'nulled', country: null, media: [{ 'track-count': 3, format: null }] },
+    ]);
+
+    expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 3 }]);
+  });
+
+  it('orders candidates by the picker heuristic: modal track count first, then earliest date', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: 'odd', date: '1990', media: [{ 'track-count': 20 }] },
+      { id: 'late-modal', date: '2002-06-01', media: [{ 'track-count': 12 }] },
+      { id: 'early-modal', date: '2001', media: [{ 'track-count': 12 }] },
+    ]);
+
+    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([
+      'early-modal',
+      'late-modal',
+      'odd',
+    ]);
+  });
+
+  it('keeps stable input order among candidates with equal rank', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: 'first', date: '2000', media: [{ 'track-count': 10 }] },
+      { id: 'second', date: '2000', media: [{ 'track-count': 10 }] },
+    ]);
+
+    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual(['first', 'second']);
   });
 });

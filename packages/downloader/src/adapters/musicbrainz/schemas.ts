@@ -71,15 +71,25 @@ export const mbReleaseSearchSchema = z.object({
  * One edition of a known release group, as returned by the browse `GET /release?release-group={mbid}
  * &inc=media&fmt=json`. A browse carries no relevance `score` (identity is given); the picker reads
  * only `status` and `date` (edition selection) and the per-medium `track-count`s, whose sum is the
- * edition's total track count. All fields are optional — a sparse edition degrades selection (e.g.
- * an unknown track count of 0 simply won't be modal), never the resolution as a whole.
+ * edition's total track count. `country` and the per-medium `format` are consumed solely to present
+ * candidate editions for manual selection (manual-edition-selection). All fields are optional — a
+ * sparse edition degrades selection or presentation (e.g. an unknown track count of 0 simply won't
+ * be modal), never the resolution as a whole.
  */
 const browseReleaseSchema = z.object({
   id: z.string().optional(),
   title: z.string().optional(),
   status: z.string().optional(),
   date: z.string().optional(),
-  media: z.array(z.object({ 'track-count': z.number().optional() })).optional(),
+  country: z.string().nullable().optional(), // null = MusicBrainz doesn't know — a value, not drift
+  media: z
+    .array(
+      z.object({
+        'track-count': z.number().optional(),
+        format: z.string().nullable().optional(), // null = unknown medium format, likewise
+      }),
+    )
+    .optional(),
 });
 
 /** `GET /release?release-group={mbid}&inc=media&fmt=json` — the editions of one release group. */

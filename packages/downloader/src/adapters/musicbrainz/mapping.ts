@@ -1,5 +1,6 @@
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
+import type { EditionCandidate } from '../../domain/acquisition/events.js';
 import type {
   MbBrowseRelease,
   MbRecording,
@@ -127,6 +128,13 @@ function dateKey(date: string | undefined): number {
   return year * 10000 + month * 100 + day;
 }
 
+/** Chronological comparison of two MusicBrainz dates via {@link dateKey}; equal keys rank equal. */
+function compareDates(a: string | undefined, b: string | undefined): number {
+  const aKey = dateKey(a);
+  const bKey = dateKey(b);
+  return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+}
+
 /**
  * Order the releases within a resolved album (release group): those whose title matches the
  * requested title after normalization come first (edition intent expressed in the request text),
@@ -141,9 +149,7 @@ function compareReleases(wantedTitle: string) {
     if (titleRank !== 0) return titleRank;
     const statusRank = Number(a.status !== 'Official') - Number(b.status !== 'Official');
     if (statusRank !== 0) return statusRank;
-    const aDate = dateKey(a.date);
-    const bDate = dateKey(b.date);
-    return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+    return compareDates(a.date, b.date);
   };
 }
 
@@ -225,7 +231,7 @@ export interface ReleaseGroupEdition {
  * conservative, standard-like edition). Map iteration is insertion order, so the tie rule is applied
  * explicitly rather than relying on it. Assumes a non-empty input.
  */
-function modalTrackCount(editions: readonly ReleaseGroupEdition[]): number {
+function modalTrackCount(editions: ReadonlyArray<Pick<ReleaseGroupEdition, 'trackCount'>>): number {
   const frequency = new Map<number, number>();
   for (const edition of editions) {
     frequency.set(edition.trackCount, (frequency.get(edition.trackCount) ?? 0) + 1);
@@ -248,8 +254,9 @@ function modalTrackCount(editions: readonly ReleaseGroupEdition[]): number {
  * whose track count equals the modal count of the official editions, then order by earliest date
  * (chronological, precise before year-only within a year) with stable input order as the final
  * tiebreak. A group with no official edition (or no editions) yields no candidates — the adapter
- * reports that as *unresolved*. The caller fetches the ids in order and takes the first that yields a
- * valid target, so an edition with unusable metadata falls through to the next.
+ * then offers the group's editions for manual selection ({@link releaseGroupEditionCandidates}), or
+ * reports *unresolved* when there are none. The caller fetches the ids in order and takes the first
+ * that yields a valid target, so an edition with unusable metadata falls through to the next.
  */
 export function releaseGroupEditionIds(
   editions: readonly ReleaseGroupEdition[],
@@ -259,11 +266,7 @@ export function releaseGroupEditionIds(
   const modal = modalTrackCount(official);
   return official
     .filter((edition) => edition.trackCount === modal)
-    .sort((a, b) => {
-      const aDate = dateKey(a.date);
-      const bDate = dateKey(b.date);
-      return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
-    })
+    .sort((a, b) => compareDates(a.date, b.date))
     .map((edition) => edition.id);
 }
 
@@ -279,11 +282,56 @@ export function releaseGroupCandidateIds(
   const editions: ReleaseGroupEdition[] = [];
   for (const release of releases ?? []) {
     if (release.id === undefined) continue;
-    const trackCount = (release.media ?? []).reduce(
-      (sum, medium) => sum + (medium['track-count'] ?? 0),
-      0,
-    );
-    editions.push({ id: release.id, status: release.status, date: release.date, trackCount });
+    editions.push({
+      id: release.id,
+      status: release.status,
+      date: release.date,
+      trackCount: totalTrackCount(release),
+    });
   }
   return releaseGroupEditionIds(editions);
+}
+
+/** An edition's total track count: the sum of its media's `track-count`s (unknown contributes 0). */
+function totalTrackCount(release: MbBrowseRelease): number {
+  return (release.media ?? []).reduce((sum, medium) => sum + (medium['track-count'] ?? 0), 0);
+}
+
+/**
+ * The candidate editions to offer for manual selection when a group has editions but no official
+ * one (the `needsSelection` outcome). Every edition with an id is presented — none is silently
+ * dropped, since the whole point is a human judging editions the picker won't. Ordered by the
+ * picker's heuristic so the most standard-looking edition leads: modal track count first, then
+ * earliest date, stable input order as the final tiebreak. Presentation fields pass through
+ * sparsely; an edition's distinct media formats join into one display string (e.g. `CD + DVD`).
+ */
+export function releaseGroupEditionCandidates(
+  releases: readonly MbBrowseRelease[] | undefined,
+): readonly EditionCandidate[] {
+  const candidates: EditionCandidate[] = [];
+  for (const release of releases ?? []) {
+    if (release.id === undefined) continue;
+    const formats = [
+      ...new Set(
+        (release.media ?? [])
+          .map((medium) => medium.format)
+          .filter((format): format is string => typeof format === 'string'),
+      ),
+    ];
+    candidates.push({
+      releaseMbid: release.id,
+      title: release.title,
+      date: release.date,
+      country: release.country ?? undefined,
+      format: formats.length > 0 ? formats.join(' + ') : undefined,
+      trackCount: totalTrackCount(release),
+    });
+  }
+  if (candidates.length === 0) return candidates;
+  const modal = modalTrackCount(candidates);
+  return [...candidates].sort((a, b) => {
+    const modalRank = Number(a.trackCount !== modal) - Number(b.trackCount !== modal);
+    if (modalRank !== 0) return modalRank;
+    return compareDates(a.date, b.date);
+  });
 }
