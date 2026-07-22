@@ -26,7 +26,7 @@
 
 ## 5. Contract tests & the gate
 
-- [ ] 5.1 Extend contract tests for the additive select-edition command and the `needsSelection` outcome (no breaking change).
-- [ ] 5.2 Ensure every scenario in the `metadata-resolution`, `acquisition-lifecycle`, and `web-ui` deltas is covered by a test.
-- [ ] 5.3 Run `pnpm check` and `openspec validate manual-edition-selection --strict`; fix gaps.
-- [ ] 5.4 Manually verify end-to-end: a release-group MBID with no official edition pauses, and a manual choice resumes to import.
+- [x] 5.1 Extend contract tests for the additive select-edition command and the `needsSelection` outcome (no breaking change).
+- [x] 5.2 Ensure every scenario in the `metadata-resolution`, `acquisition-lifecycle`, and `web-ui` deltas is covered by a test.
+- [x] 5.3 Run `pnpm check` and `openspec validate manual-edition-selection --strict`; fix gaps.
+- [x] 5.4 Manually verify end-to-end: a release-group MBID with no official edition pauses, and a manual choice resumes to import.

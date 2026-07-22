@@ -4,6 +4,7 @@ import {
   bestMatchId,
   releaseCandidateIds,
   releaseGroupCandidateIds,
+  releaseGroupEditionCandidates,
 } from '../../src/adapters/musicbrainz/mapping.js';
 import {
   mbRecordingSearchSchema,
@@ -178,5 +179,49 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
     expect(browse.headers['user-agent']).toBe(USER_AGENT);
     expect(rgServer.requests.some((r) => r.path === `/release/${pickedId}`)).toBe(true);
     expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid: pickedId } });
+  });
+});
+
+// A group whose recorded editions are all non-official (manual-edition-selection): the adapter must
+// offer them for manual choice instead of resolving or failing — and fetch no edition lookup.
+describe('MusicBrainz release-group no-official contract (tier 1)', () => {
+  const browseEntry = fixtures.find((f) => f.name === 'release-group-no-official-browse.json')!;
+  const releaseGroupMbid = browseEntry.fixture.request.query!['release-group']!;
+
+  let rgServer: FixtureServer;
+  beforeEach(async () => {
+    rgServer = await startFixtureServer([browseEntry]);
+  });
+  afterEach(async () => {
+    await rgServer.close();
+  });
+
+  it('yields needsSelection with the candidate editions from real data', async () => {
+    const releases = mbReleaseGroupBrowseSchema.parse(browseEntry.fixture.response.body).releases;
+    // the recorded case: editions exist, none official
+    expect(releaseGroupCandidateIds(releases)).toEqual([]);
+    const expected = releaseGroupEditionCandidates(releases);
+    expect(expected.length).toBeGreaterThan(0);
+
+    const adapter = new MusicBrainzMetadata(silentLogger(), undefined, {
+      baseUrl: rgServer.baseUrl,
+      userAgent: USER_AGENT,
+    });
+    const result = (
+      await adapter.resolve({ kind: 'release-group', mbid: releaseGroupMbid, targetType: 'album' })
+    )._unsafeUnwrap();
+
+    const browse = rgServer.requests.find((r) => r.path === '/release')!;
+    expect(browse.query).toMatchObject(browseEntry.fixture.request.query!);
+    expect(browse.headers['user-agent']).toBe(USER_AGENT);
+    // no edition lookup happens: the pause carries presentation values, not fetched targets
+    expect(rgServer.requests).toHaveLength(1);
+    expect(result).toEqual({ kind: 'needsSelection', candidates: expected });
+
+    // the real recorded data exercises the presentation fields end to end
+    const candidates = (result as Extract<typeof result, { kind: 'needsSelection' }>).candidates;
+    expect(candidates.some((candidate) => candidate.format !== undefined)).toBe(true);
+    expect(candidates.some((candidate) => candidate.country !== undefined)).toBe(true);
+    expect(candidates.every((candidate) => candidate.releaseMbid.length > 0)).toBe(true);
   });
 });
