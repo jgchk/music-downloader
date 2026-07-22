@@ -11,6 +11,14 @@ describe('requestToDomain', () => {
       targetType: 'album',
     });
   });
+
+  it('carries a release-group request through to the domain shape', () => {
+    expect(requestToDomain({ kind: 'release-group', mbid: 'rg-1', targetType: 'album' })).toEqual({
+      kind: 'release-group',
+      mbid: 'rg-1',
+      targetType: 'album',
+    });
+  });
 });
 
 describe('resolvePolicies', () => {

@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MusicBrainzMetadata } from '../../src/adapters/musicbrainz/metadata.js';
-import { bestMatchId, releaseCandidateIds } from '../../src/adapters/musicbrainz/mapping.js';
+import {
+  bestMatchId,
+  releaseCandidateIds,
+  releaseGroupCandidateIds,
+} from '../../src/adapters/musicbrainz/mapping.js';
 import {
   mbRecordingSearchSchema,
+  mbReleaseGroupBrowseSchema,
   mbReleaseSearchSchema,
 } from '../../src/adapters/musicbrainz/schemas.js';
 import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
@@ -129,5 +134,49 @@ describe('MusicBrainz contract (tier 1)', () => {
         target: { type: 'track', mbid: expectedId },
       });
     }
+  });
+});
+
+// The release-group browse shares the `/release` path with the release search, and the fixture
+// server routes by path alone, so this tier seeds a server with only the release-group fixtures.
+describe('MusicBrainz release-group contract (tier 1)', () => {
+  const browseEntry = fixtures.find((f) => f.name === 'release-group-browse.json')!;
+  const lookupEntry = fixtures.find((f) => f.name === 'release-group-lookup.json')!;
+  const releaseGroupMbid = browseEntry.fixture.request.query!['release-group']!;
+
+  let rgServer: FixtureServer;
+  beforeEach(async () => {
+    rgServer = await startFixtureServer([browseEntry, lookupEntry]);
+  });
+  afterEach(async () => {
+    await rgServer.close();
+  });
+
+  function rgAdapter(): MusicBrainzMetadata {
+    return new MusicBrainzMetadata(silentLogger(), undefined, {
+      baseUrl: rgServer.baseUrl,
+      userAgent: USER_AGENT,
+    });
+  }
+
+  it('browses the group and resolves the picker-selected edition from real data', async () => {
+    // over the recorded browse, the picker selects the modal-official-track-count edition
+    const editions = mbReleaseGroupBrowseSchema.parse(browseEntry.fixture.response.body).releases;
+    const candidates = releaseGroupCandidateIds(editions);
+    const pickedId = lookupEntry.fixture.request.path.split('/').at(-1)!;
+    expect(candidates[0]).toBe(pickedId);
+
+    const request: AcquisitionRequest = {
+      kind: 'release-group',
+      mbid: releaseGroupMbid,
+      targetType: 'album',
+    };
+    const result = (await rgAdapter().resolve(request))._unsafeUnwrap();
+
+    const browse = rgServer.requests.find((r) => r.path === '/release')!;
+    expect(browse.query).toMatchObject(browseEntry.fixture.request.query!);
+    expect(browse.headers['user-agent']).toBe(USER_AGENT);
+    expect(rgServer.requests.some((r) => r.path === `/release/${pickedId}`)).toBe(true);
+    expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid: pickedId } });
   });
 });

@@ -1,10 +1,4 @@
-# metadata-resolution Specification
-
-## Purpose
-
-Define how a musical request is resolved into a canonical, source-agnostic target via a metadata source, and how unresolvable or ambiguous requests fail cleanly before any search begins.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: A request resolves to a canonical target
 
@@ -65,6 +59,8 @@ The system SHALL resolve a musical request into a canonical target — carrying 
 - **WHEN** edition selection orders them by earliest release date
 - **THEN** the fully-specified edition sorts before the year-only edition
 
+## ADDED Requirements
+
 ### Requirement: A release-group request resolves to a representative edition
 
 The system SHALL accept a request that names a MusicBrainz release group by identifier and resolve it into a canonical target by selecting one representative **official** edition (release) within that group, without searching or judging cross-group ambiguity (the identity is given). Because a bare release-group identifier expresses no edition-title intent, edition selection SHALL NOT apply the request-title precedence used by the descriptor path. The system SHALL select the edition from among the group's official editions as follows: restrict to those whose total track count equals the modal (most common) track count of the official editions; among those, earliest release date (compared chronologically as in the canonical-target requirement); and break any remaining tie deterministically by stable order. When two track counts are equally common (a modal tie), the system SHALL restrict to the lower track count before applying the remaining criteria. A selected edition that cannot yield a valid target SHALL be skipped in favor of the next edition in selection order.
@@ -104,33 +100,3 @@ The system SHALL, when a release-group request resolves to a group that contains
 - **WHEN** the request is resolved
 - **THEN** the acquisition terminates with a metadata-resolution failure
 - **AND** the system does not produce a target from any of the non-official editions
-
-### Requirement: Unresolvable requests fail cleanly
-
-The system SHALL, when a request cannot be resolved to a confident match, terminate the acquisition with a metadata-resolution failure that is visible to the caller, rather than proceeding to search. For album requests without an identifier, ambiguity SHALL be judged at the identity (release group) level: multiple high-scoring editions of one release group are not ambiguity, and comparably-scored sibling groups are not ambiguity when exactly one group's title equals the request title after normalization; comparably-scored groups from different release groups SHALL be ambiguous when none — or more than one — of them bears the requested title.
-
-#### Scenario: No match found
-
-- **GIVEN** a request for which the metadata source returns no candidates
-- **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure
-
-#### Scenario: Distinct albums genuinely sharing a title fail safe
-
-- **GIVEN** a request whose title equals, after normalization, the titles of two or more comparably high-scoring release groups
-- **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure rather than guessing between them
-
-#### Scenario: No titled match and close scores remain ambiguous
-
-- **GIVEN** a request whose title equals no high-confidence release group's title after normalization, and whose top two groups score within the ambiguity margin
-- **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure
-
-### Requirement: The target model is source-agnostic
-The system SHALL express the resolved target in a normalized model that does not depend on metadata-source-specific fields, so that additional metadata sources can be added without changing downstream matching.
-
-#### Scenario: Downstream matching consumes the normalized target
-- **GIVEN** a target produced by the MusicBrainz source
-- **WHEN** matching scores a candidate against it
-- **THEN** matching reads only normalized target fields, not source-specific ones

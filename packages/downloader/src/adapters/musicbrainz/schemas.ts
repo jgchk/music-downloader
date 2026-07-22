@@ -67,6 +67,26 @@ export const mbReleaseSearchSchema = z.object({
   releases: z.array(scoredReleaseSchema).optional(),
 });
 
+/**
+ * One edition of a known release group, as returned by the browse `GET /release?release-group={mbid}
+ * &inc=media&fmt=json`. A browse carries no relevance `score` (identity is given); the picker reads
+ * only `status` and `date` (edition selection) and the per-medium `track-count`s, whose sum is the
+ * edition's total track count. All fields are optional — a sparse edition degrades selection (e.g.
+ * an unknown track count of 0 simply won't be modal), never the resolution as a whole.
+ */
+const browseReleaseSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().optional(),
+  status: z.string().optional(),
+  date: z.string().optional(),
+  media: z.array(z.object({ 'track-count': z.number().optional() })).optional(),
+});
+
+/** `GET /release?release-group={mbid}&inc=media&fmt=json` — the editions of one release group. */
+export const mbReleaseGroupBrowseSchema = z.object({
+  releases: z.array(browseReleaseSchema).optional(),
+});
+
 /** `GET /recording?query=…&fmt=json`. */
 export const mbRecordingSearchSchema = z.object({
   recordings: z.array(scoredEntrySchema).optional(),
@@ -78,3 +98,5 @@ export type MbScoredEntry = z.infer<typeof scoredEntrySchema>;
 export type MbScoredRelease = z.infer<typeof scoredReleaseSchema>;
 export type MbReleaseSearch = z.infer<typeof mbReleaseSearchSchema>;
 export type MbRecordingSearch = z.infer<typeof mbRecordingSearchSchema>;
+export type MbReleaseGroupBrowse = z.infer<typeof mbReleaseGroupBrowseSchema>;
+export type MbBrowseRelease = z.infer<typeof browseReleaseSchema>;

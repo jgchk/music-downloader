@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Acquisition } from './acquisition.js';
 import type { Effect } from './acquisition.js';
 import type { AcquisitionCommand } from './commands.js';
-import type { AcquisitionEvent } from './events.js';
+import type { AcquisitionEvent, AcquisitionRequest } from './events.js';
 import {
   defaultPolicies,
   fulfilledHistory,
@@ -524,6 +524,18 @@ describe('Acquisition.reactTo — the event → effect table', () => {
       policies,
     });
     expect(effects).toEqual([{ type: 'ResolveMetadata', request: sampleRequest }]);
+  });
+
+  it('resolves metadata for a release-group request, carrying it verbatim to the effect', () => {
+    const request: AcquisitionRequest = {
+      kind: 'release-group',
+      mbid: 'rg-1',
+      targetType: 'album',
+    };
+    const effects = Acquisition.fromHistory([
+      { type: 'AcquisitionRequested', request, policies },
+    ]).reactTo({ type: 'AcquisitionRequested', request, policies });
+    expect(effects).toEqual([{ type: 'ResolveMetadata', request }]);
   });
 
   it('searches after a target resolves', () => {
