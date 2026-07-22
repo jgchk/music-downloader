@@ -121,11 +121,17 @@ export class MusicBrainzMetadata implements MetadataPort {
       if (resolution.kind === 'resolved') return resolution;
     }
     // No official edition to pick — offer the group's editions for a human to choose. When an
-    // official edition existed but yielded no usable target, that stays unresolved: the picker did
-    // its job and the data was bad, which manual selection cannot fix.
+    // official edition existed but yielded no usable target, that stays unresolved (the spec scopes
+    // manual selection to groups with *no* official edition); note the group's untried editions are
+    // dropped with it, so the log below is the only trace of what was attempted.
     if (officialIds.length === 0) {
       const candidates = releaseGroupEditionCandidates(json?.releases);
       if (candidates.length > 0) return { kind: 'needsSelection', candidates };
+    } else {
+      this.logger.warn(
+        { releaseGroup: mbid, tried: officialIds },
+        'every picked official edition yielded no usable target; unresolved',
+      );
     }
     return UNRESOLVED;
   }

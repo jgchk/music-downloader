@@ -218,10 +218,18 @@ describe('MusicBrainz release-group no-official contract (tier 1)', () => {
     expect(rgServer.requests).toHaveLength(1);
     expect(result).toEqual({ kind: 'needsSelection', candidates: expected });
 
-    // the real recorded data exercises the presentation fields end to end
+    // Anchors against independently recorded facts (not the mapping's own output): the 1969 US
+    // vinyl is the earliest modal-track-count edition of the recorded browse, and none of the
+    // five recorded editions may be dropped.
     const candidates = (result as Extract<typeof result, { kind: 'needsSelection' }>).candidates;
+    expect(candidates).toHaveLength(5);
+    expect(candidates[0]).toMatchObject({
+      releaseMbid: 'df92850f-2a3e-44ba-bdb2-d3d96beea3ae',
+      date: '1969',
+      country: 'US',
+      trackCount: 24,
+    });
     expect(candidates.some((candidate) => candidate.format !== undefined)).toBe(true);
-    expect(candidates.some((candidate) => candidate.country !== undefined)).toBe(true);
     expect(candidates.every((candidate) => candidate.releaseMbid.length > 0)).toBe(true);
   });
 });

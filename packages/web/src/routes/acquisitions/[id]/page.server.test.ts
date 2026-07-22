@@ -116,7 +116,7 @@ describe('select action', () => {
     expect(selectEdition).toHaveBeenCalledWith({ id: 'acq-1', releaseMbid: '' });
   });
 
-  it('surfaces the modeled rejection for a stale or off-menu selection', async () => {
+  it('surfaces the modeled rejection for an off-menu selection', async () => {
     const selectEdition = vi.fn().mockResolvedValue({
       ok: false,
       error: { kind: 'UnknownEdition', releaseMbid: 'off-menu' },
@@ -127,5 +127,18 @@ describe('select action', () => {
     };
     expect(result.status).toBe(400);
     expect(result.data.message).toContain('off-menu');
+  });
+
+  it('surfaces the modeled rejection for a stale selection (the acquisition moved on)', async () => {
+    const selectEdition = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { kind: 'IllegalTransition', command: 'SelectEdition', phase: 'Searching' },
+    });
+    const result = (await actions.select!(selectEventFor({ selectEdition }, 'boot-1'))) as {
+      status: number;
+      data: { message: string };
+    };
+    expect(result.status).toBe(409);
+    expect(result.data.message).toContain('Searching');
   });
 });

@@ -818,6 +818,13 @@ describe('Acquisition.execute — manual edition selection', () => {
     ]);
   });
 
+  it('degrades an empty candidate menu to a metadata failure instead of a dead-end pause', () => {
+    const events = Acquisition.fromHistory(requestedHistory())
+      .execute({ type: 'RecordManualSelectionRequested', candidates: [] })
+      ._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'MetadataResolutionFailed' }]);
+  });
+
   it('absorbs a manual-selection report arriving on a terminal acquisition', () => {
     const cancelled = [...requestedHistory(), { type: 'AcquisitionCancelled' } as const];
     const result = Acquisition.fromHistory(cancelled).execute({
@@ -859,7 +866,6 @@ describe('Acquisition.execute — manual edition selection', () => {
       kind: 'UnknownEdition',
       releaseMbid: 'not-a-candidate',
     });
-    expect(acq.phase).toBe('AwaitingManualSelection'); // no state change
   });
 
   it('rejects a selection on an acquisition that is not awaiting one', () => {

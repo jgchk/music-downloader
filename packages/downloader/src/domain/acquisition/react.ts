@@ -47,6 +47,8 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
     case 'EditionSelected':
       // The resume: resolve exactly the chosen release, reusing the direct-by-release-id path — no
       // new "release id → target" logic exists for manual selection (manual-edition-selection D2).
+      // `targetType: 'album'` is safe by construction: needsSelection only arises from release-group
+      // requests, whose type pins album — and a chosen edition is an album release by definition.
       return [
         {
           type: 'ResolveMetadata',

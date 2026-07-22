@@ -77,6 +77,7 @@ describe('selectEdition', () => {
       kind: 'UnknownEdition',
       releaseMbid: 'not-on-the-menu',
     });
+    expect((d.store as FakeEventStore).all().map((e) => e.type)).not.toContain('EditionSelected');
   });
 
   it('surfaces the modeled rejection for an acquisition not awaiting selection', async () => {

@@ -2,6 +2,7 @@ import type { ZodType } from 'zod';
 import {
   mbRecordingSchema,
   mbRecordingSearchSchema,
+  mbReleaseGroupBrowseSchema,
   mbReleaseSchema,
   mbReleaseSearchSchema,
 } from '../../../src/adapters/musicbrainz/schemas.js';
@@ -28,6 +29,9 @@ export const fixtureSchemas: Record<string, ZodType> = {
   'musicbrainz/recording-lookup.json': mbRecordingSchema,
   'musicbrainz/release-search.json': mbReleaseSearchSchema,
   'musicbrainz/recording-search.json': mbRecordingSearchSchema,
+  'musicbrainz/release-group-browse.json': mbReleaseGroupBrowseSchema,
+  'musicbrainz/release-group-lookup.json': mbReleaseSchema,
+  'musicbrainz/release-group-no-official-browse.json': mbReleaseGroupBrowseSchema,
   'slskd/search-create.json': slskdSearchStateSchema,
   'slskd/search-state.json': slskdSearchStateSchema,
   'slskd/search-responses.json': slskdSearchResponsesSchema,

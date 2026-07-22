@@ -49,7 +49,7 @@ export function messageOf(error: FacadeError): string {
     case 'UnknownCandidate':
       return `Unknown candidate: ${error.candidate}.`;
     case 'UnknownEdition':
-      return `Unknown edition: ${error.releaseMbid}. Reload — the available editions may have changed.`;
+      return `Unknown edition: ${error.releaseMbid}. It is not among the offered candidates — reload and choose from the list.`;
     case 'NoRetainedCandidate':
       return 'This import did not arrive from the downloader with a retained candidate, so a download retry cannot be requested. Plain reject is still available.';
     case 'ConcurrencyConflict':
