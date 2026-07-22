@@ -10,6 +10,11 @@ import type { HttpClient } from '../support/http.js';
 
 const DEFAULT_BASE_URL = 'http://localhost:5030';
 
+/** The per-user downloads collection path, shared by enqueue, polling, teardown, and the sweep. */
+export function downloadsPath(username: string): string {
+  return `/api/v0/transfers/downloads/${encodeURIComponent(username)}`;
+}
+
 export interface SlskdConfig {
   readonly baseUrl?: string;
   readonly apiKey?: string;

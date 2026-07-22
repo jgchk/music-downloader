@@ -12,6 +12,9 @@ import type { SlskdTransfer, SlskdTransfersPayload } from './schemas.js';
 
 export type { SlskdTransfer };
 
+/** A transfer we own: narrowed to a known `filename` (the polls filter foreign/filenameless ones). */
+export type OwnedTransfer = SlskdTransfer & { readonly filename: string };
+
 /**
  * slskd's `GET …/downloads/{username}` returns a single user object whose transfers are grouped by
  * directory under `directories`; flatten those groups to a flat file list.

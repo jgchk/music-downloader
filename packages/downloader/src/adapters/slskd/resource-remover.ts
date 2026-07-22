@@ -6,7 +6,7 @@ import type {
   SourceResourceRemover,
 } from '../../application/ports/resource-ledger-port.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { SlskdClient } from './client.js';
+import { downloadsPath, SlskdClient } from './client.js';
 import { slskdTransfersSchema } from './schemas.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
@@ -76,7 +76,7 @@ export class SlskdResourceRemover implements SourceResourceRemover {
       const id = current.id ?? capturedId ?? '';
       this.logger.debug({ username, id, terminal }, 'sweeping slskd transfer');
       await this.client.delIfPresent(
-        `/api/v0/transfers/downloads/${encodeURIComponent(username)}/${encodeURIComponent(id)}?remove=${terminal}`,
+        `${downloadsPath(username)}/${encodeURIComponent(id)}?remove=${terminal}`,
       );
       if (round >= MAX_REMOVE_ROUNDS) break;
       await this.timer.sleep(this.pollIntervalMs);
@@ -91,9 +91,7 @@ export class SlskdResourceRemover implements SourceResourceRemover {
     filename: string,
     capturedId: string | undefined,
   ): Promise<SlskdTransfer | undefined> {
-    const payload = slskdTransfersSchema.parse(
-      await this.client.get(`/api/v0/transfers/downloads/${encodeURIComponent(username)}`),
-    );
+    const payload = slskdTransfersSchema.parse(await this.client.get(downloadsPath(username)));
     return flattenDownloads(payload).find(
       (transfer) =>
         transfer.filename === filename || (capturedId !== undefined && transfer.id === capturedId),
