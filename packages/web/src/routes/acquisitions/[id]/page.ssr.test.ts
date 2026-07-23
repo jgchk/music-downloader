@@ -15,8 +15,8 @@ describe('acquisition detail page (SSR)', () => {
           acquisition: {
             acquisitionId: 'acq-1',
             status: 'Searching',
-            attempts: 0,
-            rejectedCount: 0,
+            attempts: 2,
+            rejectedCount: 1,
             history: [],
           },
           timeline: [],
@@ -29,7 +29,7 @@ describe('acquisition detail page (SSR)', () => {
       },
     });
     expect(body).toContain('data-testid="status">Searching<');
-    expect(body).toContain('0 attempts, 0 candidates rejected');
+    expect(body).toContain('2 attempts, 1 candidates rejected');
     expect(body).toContain('data-testid="action-error"');
   });
 });

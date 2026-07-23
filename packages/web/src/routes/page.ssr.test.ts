@@ -9,8 +9,8 @@ describe('landing page (SSR)', () => {
         data: {
           attentionCount: 0,
           pathname: '/',
-          counts: { acquisitions: 4, pendingReviews: 0 },
-          errors: { acquisitions: undefined, pendingReviews: undefined },
+          acquisitions: { kind: 'ok', count: 4 },
+          pendingReviews: { kind: 'ok', count: 0 },
         },
         params: {},
         form: null,

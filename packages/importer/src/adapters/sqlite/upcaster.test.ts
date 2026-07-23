@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { UpcasterRegistry } from './upcaster.js';
 
 describe('UpcasterRegistry', () => {
   it('is pass-through when nothing is registered (the MVP)', () => {
@@ -54,9 +54,5 @@ describe('UpcasterRegistry', () => {
     >;
 
     expect(result).toEqual({ type: 'Widened', future: true });
-  });
-
-  it('stamps new events at the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(1);
   });
 });

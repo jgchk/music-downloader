@@ -51,4 +51,25 @@ describe('ffprobe contract (tier 1)', () => {
       channels: 2,
     });
   });
+
+  it('recovers bitDepth from a numeric bits_per_sample on recorded lossless-PCM stdout', async () => {
+    // WAV pcm_s16le has no `bits_per_raw_sample`; real ffprobe reports depth as a numeric
+    // `bits_per_sample`. This pins the adapter's numeric-fallback branch against real output —
+    // the FLAC fixture only exercises the string `bits_per_raw_sample` path.
+    const fixture = loadFixture('lossless-pcm.json');
+    const runner = replayRunner(JSON.stringify(fixture.stdout));
+    const probe = new FfmpegAudioProbe(silentLogger(), runner);
+
+    const result = (await probe.probe('/staging/01.wav'))._unsafeUnwrap();
+
+    expect(result).toEqual({
+      decodedCleanly: true,
+      codec: 'pcm_s16le',
+      durationMs: 1000,
+      sampleRate: 44_100,
+      bitDepth: 16,
+      bitrate: 1_411_200,
+      channels: 2,
+    });
+  });
 });

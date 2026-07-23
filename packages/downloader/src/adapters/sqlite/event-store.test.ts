@@ -115,6 +115,22 @@ describe('SqliteEventStore', () => {
     expect(seen[0]!.globalSeq).toBe(1);
   });
 
+  it('still commits (returns ok) when a publish-after-commit subscriber throws', async () => {
+    // publish() runs AFTER the append transaction commits: a subscriber that throws must never
+    // turn an already-durable append into a failure. The bus isolates the throw; append stays ok.
+    const bus = new InProcessEventBus(silentLogger());
+    const store = new SqliteEventStore(freshDatabase(), new UpcasterRegistry(), bus);
+    bus.subscribe(() => {
+      throw new Error('projection boom');
+    });
+
+    const result = await store.append('acq-1', 0, [IMPORTED], META);
+
+    expect(result.isOk()).toBe(true);
+    const readBack = await store.readStream('acq-1');
+    expect(readBack._unsafeUnwrap()).toHaveLength(1);
+  });
+
   it('stamps every appended event at the current schema version', async () => {
     const database = freshDatabase();
     const store = new SqliteEventStore(database);

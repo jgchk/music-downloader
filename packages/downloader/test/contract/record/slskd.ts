@@ -191,6 +191,11 @@ async function main(): Promise<void> {
   // JSON-encoded string; a `DownloadFileComplete` carries the authoritative localFilename + transfer
   // id the staged-path resolver decodes. A completion only appears once a download has finished, so
   // run this recorder against an instance that has completed at least one download for full coverage.
+  // NOTE: the committed events.json/options.json fixtures predate this recorder capture (they were
+  // hand-maintained), so their `request` blocks lack the `query` recorded here. Re-record both against
+  // a live slskd instance on the next slskd pin bump to make the recorder byte-faithful to them; the
+  // decode/request-shape tests are unaffected in the meantime (the fixture server captures the real
+  // outbound request, not the fixture file).
   const events = await call('GET', `/api/v0/events?offset=0&limit=${EVENTS_LIMIT}`);
   write(
     'events.json',

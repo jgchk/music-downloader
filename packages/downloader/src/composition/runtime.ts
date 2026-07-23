@@ -140,6 +140,12 @@ export async function createDownloaderRuntime(
   } else {
     logger.error({ err: backlog.error }, 'projection rebuild failed');
   }
+  // These two read models are kept live by the bus alone: boot-rebuilt from `readAll(0)` above,
+  // then followed forward here with NO catch-up cursor of their own. The event bus now isolates
+  // each handler in its own try/catch, so a throw from an `apply` is swallowed and logged rather
+  // than propagated — a deliberate trade of fault-isolation over live self-repair. The cost: that
+  // one dropped event leaves the in-memory model diverged from the log until the next restart,
+  // which rebuilds it from scratch. The error log is the signal; reboot is the repair.
   bus.subscribe((stored) => {
     status.apply(stored);
     libraryView.apply(stored);
