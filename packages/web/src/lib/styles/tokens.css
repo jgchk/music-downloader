@@ -11,12 +11,18 @@
 
 :root {
   /* -- Primitives: spacing + type families ---------------------------------- */
-  --step-0: 0.25rem;  --step-1: 0.5rem;   --step-2: 0.75rem;
-  --step-3: 1rem;     --step-4: 1.5rem;   --step-5: 2rem;    --step-6: 3rem;
+  --step-0: 0.25rem;
+  --step-1: 0.5rem;
+  --step-2: 0.75rem;
+  --step-3: 1rem;
+  --step-4: 1.5rem;
+  --step-5: 2rem;
+  --step-6: 3rem;
 
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
 }
 
 :root {
@@ -63,12 +69,8 @@
   --surface-blur: 0px;
 
   /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
-  --nav-dir: row;                    /* row = topbar, column = sidebar */
+  --nav-dir: row; /* row = topbar, column = sidebar */
   --shell-cols: 1fr;
   --shell-rows: auto auto 1fr auto;
-  --shell-areas:
-    "masthead"
-    "nav"
-    "main"
-    "status";
+  --shell-areas: 'masthead' 'nav' 'main' 'status';
 }
