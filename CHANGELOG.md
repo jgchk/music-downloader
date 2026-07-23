@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.10.0](https://github.com/jgchk/music-downloader/compare/v3.9.0...v3.10.0) (2026-07-23)
+
+### Features
+
+* **lint:** adopt eslint-plugin-unicorn (recommended) across the codebase ([873a476](https://github.com/jgchk/music-downloader/commit/873a4761582622750e355249a043ea942ca53b6b)), references [Iterator#toArray](https://github.com/Iterator/issues/toArray)
 ## [3.9.0](https://github.com/jgchk/music-downloader/compare/v3.8.2...v3.9.0) (2026-07-23)
 
 ### Features
