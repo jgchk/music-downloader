@@ -159,8 +159,9 @@ describe('fixture semantics the domain relies on', () => {
     };
     expect(applied.status).toBe('applied');
     expect(applied.failures.length).toBeGreaterThan(0);
-    expect(typeof applied.failures[0]!.stage).toBe('string');
-    expect(applied.failures[0]!.stage).not.toBe('');
+    // Pin the concrete stage name the bridge records: a rename here is a contract regression that
+    // would otherwise slip through a mere non-empty-string check.
+    expect(applied.failures[0]!.stage).toBe('import-pipeline');
     expect(typeof applied.failures[0]!.message).toBe('string');
     expect(applied.failures[0]!.message).not.toBe('');
   });

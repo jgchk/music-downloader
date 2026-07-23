@@ -8,7 +8,7 @@ import type { EventMetadata, StoredEvent } from '../../application/ports/event-s
 import { InProcessEventBus } from './event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from './event-store.js';
 import { openEventDatabase, type EventDatabase } from './schema.js';
-import { UpcasterRegistry } from './upcaster.js';
+import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 const META: EventMetadata = { importId: 'imp-1', occurredAt: '2026-07-03T12:00:00.000Z' };
 
@@ -154,6 +154,18 @@ describe('SqliteEventStore', () => {
     expect(result.isOk()).toBe(true);
     const readBack = await store.readStream('imp-1');
     expect(readBack._unsafeUnwrap()).toHaveLength(1);
+  });
+
+  it('stamps every appended event at the current schema version', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+
+    await store.append('imp-1', 0, [APPLIED], META);
+
+    const row = database
+      .prepare('SELECT schema_version AS schemaVersion FROM events WHERE stream_id = ?')
+      .get('imp-1') as { schemaVersion: number };
+    expect(row.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('upcasts stored events on read', async () => {

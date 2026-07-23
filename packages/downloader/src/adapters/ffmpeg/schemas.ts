@@ -4,9 +4,12 @@ import { z } from 'zod';
  * The codified consumer contract for `ffprobe -print_format json` output. These schemas model only
  * the fields the probe adapter reads (D5) and tolerate unknown ones — ffprobe emits dozens of fields
  * per stream, so `z.object` strips extras rather than rejecting. A *consumed* field changing type
- * fails validation, turning a broken or incompatible ffprobe into a modeled boundary failure at parse
- * time rather than a silent all-`undefined` degrade. The inferred types replace the hand-written
- * interfaces so the contract and the compile-time view of the payload cannot diverge.
+ * fails validation, turning that class of broken/incompatible ffprobe into a modeled boundary
+ * failure at parse time rather than a silent all-`undefined` degrade. Note the guarantee is scoped
+ * to type drift: a consumed field that is *omitted* still passes (every field is optional) and
+ * degrades to `undefined`/`''` downstream — validation catches type changes, not disappearances.
+ * The inferred types replace the hand-written interfaces so the contract and the compile-time view
+ * of the payload cannot diverge.
  *
  * Bit depth arrives under two field names depending on codec: `bits_per_raw_sample` (a *string*) on
  * most lossless codecs, `bits_per_sample` (a *number*) on others — both are modeled so the adapter

@@ -85,19 +85,33 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-async function main(): Promise<void> {
-  const check = process.argv.includes('--check');
-  const reader = detectReader();
+/**
+ * The side-effecting sinks the orchestration abort/report through, injected so a test can drive the
+ * flow without exiting the process or writing to a real stdout. `fail` aborts loudly (it returns
+ * `never`); `log` reports progress. The CLI wires the process-level versions in {@link main}.
+ */
+export interface PrepEffects {
+  fail: (message: string) => never;
+  log: (message: string) => void;
+}
 
+/**
+ * The version:prep orchestration, parameterised over its reader and effects so both the write path
+ * and the `--check` gate (including the concurrent-branch collision guard) can be exercised without
+ * touching the process. {@link main} supplies the real reader + effects; the CLI behaviour is
+ * unchanged — this is the same body it used to inline.
+ */
+export async function run(
+  reader: ReleaseReader,
+  check: boolean,
+  { fail: abort, log }: PrepEffects,
+): Promise<void> {
   // Best-effort: CI checks out with full history/tags; locally the developer may already have them.
   reader.fetch();
 
-  let computed: Computed;
-  try {
-    computed = await compute(reader);
-  } catch (error) {
-    fail(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const computed = await compute(reader).catch((error: unknown) =>
+    abort(`version:prep: ${error instanceof Error ? error.message : String(error)}`),
+  );
   const { version, bumped, section } = computed;
 
   if (!check) {
@@ -109,12 +123,12 @@ async function main(): Promise<void> {
 
     if (bumped && section !== null) {
       writeFileSync(CHANGELOG, assembleChangelog(reader.baseChangelog(), section));
-      process.stdout.write(
+      log(
         `version:prep: prepared ${version}. Review the diff, then commit ${PKG} and ${CHANGELOG}.\n`,
       );
     } else {
       writeFileSync(CHANGELOG, reader.baseChangelog());
-      process.stdout.write(`version:prep: no releasable commits — staying at ${version}\n`);
+      log(`version:prep: no releasable commits — staying at ${version}\n`);
     }
     return;
   }
@@ -127,7 +141,7 @@ async function main(): Promise<void> {
   // than silently overwriting that release. Only a real bump can collide (an unbumped range stays
   // at the last released version, which of course still has its tag).
   if (bumped && isReleaseTagTaken(version, reader.releaseTags())) {
-    fail(
+    abort(
       `version:prep --check: v${version} is already a release tag — a concurrent branch shipped it ` +
         `while this one was open.\nRebase onto origin/main and re-run \`pnpm version:prep\`.`,
     );
@@ -135,7 +149,7 @@ async function main(): Promise<void> {
 
   const committedVersion = versionOf(reader.committedPackageJson());
   if (committedVersion !== version) {
-    fail(
+    abort(
       `version:prep --check: expected version ${version} but ${PKG} has ${committedVersion}.\n` +
         `Run \`pnpm version:prep\` and commit ${PKG} and ${CHANGELOG}.`,
     );
@@ -145,14 +159,20 @@ async function main(): Promise<void> {
     try {
       extractChangelogSection(reader.committedChangelog(), version);
     } catch {
-      fail(
+      abort(
         `version:prep --check: ${CHANGELOG} has no section for ${version}.\n` +
           `Run \`pnpm version:prep\` and commit ${PKG} and ${CHANGELOG}.`,
       );
     }
   }
 
-  process.stdout.write(`version:prep --check: branch is prepped for ${version}\n`);
+  log(`version:prep --check: branch is prepped for ${version}\n`);
+}
+
+async function main(): Promise<void> {
+  const check = process.argv.includes('--check');
+  const reader = detectReader();
+  await run(reader, check, { fail, log: (message) => void process.stdout.write(message) });
 }
 
 // Run only as the CLI entry point; importing the module (the unit tests) must not touch the tree.

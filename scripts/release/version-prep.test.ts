@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleChangelog, compute, isReleaseTagTaken } from './version-prep.ts';
+import { assembleChangelog, compute, isReleaseTagTaken, run } from './version-prep.ts';
 import type { ReleaseReader } from './reader.ts';
 import type { RangeCommit } from './render-changelog-section.ts';
 
@@ -17,15 +17,20 @@ const fullSha = (short: string): string => short.padEnd(40, '0');
  * A read-only {@link ReleaseReader} over in-memory state. `compute` only consults `releaseTags` and
  * `rangeCommits`; the tree-reading members are stubbed since they belong to the write/check shell.
  */
-const fakeReader = (state: { tags: string[]; commits: RangeCommit[] }): ReleaseReader => ({
+const fakeReader = (state: {
+  tags: string[];
+  commits: RangeCommit[];
+  committedPackageJson?: string;
+  committedChangelog?: string;
+}): ReleaseReader => ({
   fetch() {
     /* no remote in a unit test */
   },
   releaseTags: () => state.tags,
   rangeCommits: () => state.commits,
   baseChangelog: () => '',
-  committedPackageJson: () => '',
-  committedChangelog: () => '',
+  committedPackageJson: () => state.committedPackageJson ?? '',
+  committedChangelog: () => state.committedChangelog ?? '',
 });
 
 describe('assembleChangelog', () => {
@@ -133,5 +138,82 @@ describe('isReleaseTagTaken', () => {
 
   it('is free when the next version has no tag yet (the normal bump)', () => {
     expect(isReleaseTagTaken('3.5.4', ['v3.5.3'])).toBe(false);
+  });
+});
+
+/**
+ * Drives the `--check` orchestration end-to-end over a fake reader to prove the collision guard is
+ * actually *wired* — compute → read `releaseTags()` → abort loudly, ahead of the version-match
+ * check, and short-circuited on an unbumped range — not merely that its pure predicate is correct.
+ * The captured effects stand in for the CLI's `process.exit`/stdout: `fail` aborts by throwing (it
+ * returns `never`), so a rejection is the loud non-zero abort and no success line is logged.
+ */
+describe('run (--check collision guard wiring)', () => {
+  const captureEffects = (): {
+    logs: string[];
+    effects: { fail: (message: string) => never; log: (message: string) => void };
+  } => {
+    const logs: string[] = [];
+    return {
+      logs,
+      effects: {
+        fail: (message: string): never => {
+          throw new Error(message);
+        },
+        log: (message: string) => {
+          logs.push(message);
+        },
+      },
+    };
+  };
+
+  it('aborts loudly, ahead of the version-match check, when a concurrent branch tagged the computed version', async () => {
+    const { effects, logs } = captureEffects();
+    // A `fix` off v3.5.3 computes v3.5.4. Between anchoring (which reads the tags, then the range)
+    // and the guard's fresh read, a concurrent branch's v3.5.4 tag becomes visible — the exact race
+    // the guard defends. The committed package.json deliberately does NOT match the computed 3.5.4,
+    // so if the guard ever regressed *after* the version-match check, that check would abort first
+    // with a different message and this assertion on the rebase message would catch it.
+    let raced = false;
+    const reader: ReleaseReader = {
+      ...fakeReader({ tags: [], commits: [], committedPackageJson: '{ "version": "3.5.3" }' }),
+      releaseTags: () => (raced ? ['v3.5.3', 'v3.5.4'] : ['v3.5.3']),
+      rangeCommits: () => {
+        raced = true;
+        return [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }];
+      },
+    };
+
+    await expect(run(reader, true, effects)).rejects.toThrow(
+      /v3\.5\.4 is already a release tag[\s\S]*Rebase onto origin\/main/,
+    );
+    expect(logs).toEqual([]);
+  });
+
+  it('does not fire the guard on a normal prep whose computed version has no tag yet', async () => {
+    const { effects, logs } = captureEffects();
+    const reader = fakeReader({
+      tags: ['v3.5.3'],
+      commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
+      committedPackageJson: '{ "version": "3.5.4" }',
+      committedChangelog: '## [3.5.4](https://example.com/compare/v3.5.3...v3.5.4) (2026-07-23)\n',
+    });
+
+    await expect(run(reader, true, effects)).resolves.toBeUndefined();
+    expect(logs.join('')).toContain('branch is prepped for 3.5.4');
+  });
+
+  it('short-circuits the guard on an unbumped range even though the anchor tag exists', async () => {
+    const { effects, logs } = captureEffects();
+    // No releasable commits: the version stays at the anchor v3.5.3, whose tag of course exists.
+    // Only the `bumped &&` short-circuit keeps the guard from misreading that as a collision.
+    const reader = fakeReader({
+      tags: ['v3.5.3'],
+      commits: [{ hash: fullSha('abc1234'), message: 'chore(deps): bump vitest' }],
+      committedPackageJson: '{ "version": "3.5.3" }',
+    });
+
+    await expect(run(reader, true, effects)).resolves.toBeUndefined();
+    expect(logs.join('')).toContain('branch is prepped for 3.5.3');
   });
 });

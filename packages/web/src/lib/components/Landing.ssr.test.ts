@@ -5,7 +5,10 @@ import Landing from './Landing.svelte';
 describe('Landing (SSR)', () => {
   it('renders the facade-backed counts as the dashboard body', () => {
     const { body } = render(Landing, {
-      props: { counts: { acquisitions: 3, pendingReviews: 1 } },
+      props: {
+        acquisitions: { kind: 'ok', count: 3 },
+        pendingReviews: { kind: 'ok', count: 1 },
+      },
     });
     // Brand, primary nav, and the request action now live in the app shell
     // (+layout.svelte); Landing is just the dashboard body — a title and the two
@@ -15,14 +18,11 @@ describe('Landing (SSR)', () => {
     expect(body).toContain('data-testid="review-count">1<');
   });
 
-  it('shows the acquisitions apology, not a false zero, when only that read failed', () => {
+  it('shows the acquisitions apology, not a false zero, when only that section is unavailable', () => {
     const { body } = render(Landing, {
       props: {
-        counts: { acquisitions: 0, pendingReviews: 4 },
-        errors: {
-          acquisitions: 'Acquisitions are unavailable right now.',
-          pendingReviews: undefined,
-        },
+        acquisitions: { kind: 'unavailable', message: 'Acquisitions are unavailable right now.' },
+        pendingReviews: { kind: 'ok', count: 4 },
       },
     });
     expect(body).toContain('data-testid="acquisition-error"');
@@ -32,13 +32,13 @@ describe('Landing (SSR)', () => {
     expect(body).toContain('data-testid="review-count">4<');
   });
 
-  it('shows the reviews apology, not a false zero, when only that read failed', () => {
+  it('shows the reviews apology, not a false zero, when only that section is unavailable', () => {
     const { body } = render(Landing, {
       props: {
-        counts: { acquisitions: 7, pendingReviews: 0 },
-        errors: {
-          acquisitions: undefined,
-          pendingReviews: 'Import reviews are unavailable right now.',
+        acquisitions: { kind: 'ok', count: 7 },
+        pendingReviews: {
+          kind: 'unavailable',
+          message: 'Import reviews are unavailable right now.',
         },
       },
     });

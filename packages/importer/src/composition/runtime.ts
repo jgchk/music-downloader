@@ -190,6 +190,11 @@ export async function createImporterRuntime(
     return err({ kind: 'ProjectionRebuildFailed', detail: backlog.error.message });
   }
   status.rebuild(backlog.value);
+  // This read-model projection is kept live only by the bus — no catch-up cursor; it is fully
+  // rebuilt from `readAll(0)` above at every boot. Trade-off: the event bus wraps each handler in
+  // its own try/catch, so if an `apply` here throws, the bus swallows and logs it and the in-memory
+  // read model diverges from the log until the next restart (which rebuilds it). Acceptable because
+  // it is a queryable projection, not a decision input, and the divergence self-heals on reboot.
   bus.subscribe((stored) => {
     status.apply(stored);
   });

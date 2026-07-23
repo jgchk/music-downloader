@@ -26,18 +26,18 @@ function locals(over: { listAcquisitions?: () => unknown; listPendingReviews?: (
 }
 
 describe('landing load', () => {
-  it('composes counts from independent facade queries (reads only), no failures', () => {
+  it('parses each section as a healthy count from independent facade queries (reads only)', () => {
     const { locals: event } = locals({
       listAcquisitions: () => ({ acquisitions: [{}, {}] }),
       listPendingReviews: () => ({ reviews: [{}] }),
     });
     expect(load({ locals: event } as never)).toEqual({
-      counts: { acquisitions: 2, pendingReviews: 1 },
-      errors: { acquisitions: undefined, pendingReviews: undefined },
+      acquisitions: { kind: 'ok', count: 2 },
+      pendingReviews: { kind: 'ok', count: 1 },
     });
   });
 
-  it('logs and degrades only the acquisitions section when its read faults, still rendering', () => {
+  it('logs and degrades only the acquisitions section to an unavailable apology when its read faults', () => {
     const fault = new Error('downloader store gone');
     const { locals: event, warnings } = locals({
       listAcquisitions: () => {
@@ -46,16 +46,13 @@ describe('landing load', () => {
       listPendingReviews: () => ({ reviews: [{}] }),
     });
     expect(load({ locals: event } as never)).toEqual({
-      counts: { acquisitions: 0, pendingReviews: 1 },
-      errors: {
-        acquisitions: 'Acquisitions are unavailable right now.',
-        pendingReviews: undefined,
-      },
+      acquisitions: { kind: 'unavailable', message: 'Acquisitions are unavailable right now.' },
+      pendingReviews: { kind: 'ok', count: 1 },
     });
     expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });
 
-  it('logs and degrades only the reviews section when its read faults, still rendering', () => {
+  it('logs and degrades only the reviews section to an unavailable apology when its read faults', () => {
     const fault = new Error('importer store gone');
     const { locals: event, warnings } = locals({
       listAcquisitions: () => ({ acquisitions: [{}, {}] }),
@@ -64,10 +61,10 @@ describe('landing load', () => {
       },
     });
     expect(load({ locals: event } as never)).toEqual({
-      counts: { acquisitions: 2, pendingReviews: 0 },
-      errors: {
-        acquisitions: undefined,
-        pendingReviews: 'Import reviews are unavailable right now.',
+      acquisitions: { kind: 'ok', count: 2 },
+      pendingReviews: {
+        kind: 'unavailable',
+        message: 'Import reviews are unavailable right now.',
       },
     });
     expect(warnings).toEqual([{ err: fault, module: 'importer' }]);
