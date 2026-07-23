@@ -84,7 +84,7 @@ function deletedSearchIds(requests: readonly HttpRequest[]): string[] {
 describe('SlskdSearch', () => {
   it('creates, awaits completion, groups responses, records ownership, and deletes after harvest', async () => {
     const { adapter, ledger, requests } = searcher({
-      state: () => json({ isComplete: true }),
+      state: () => json({ isComplete: true, state: 'Completed, TimedOut', responseCount: 1 }),
       responses: json(albumResponses),
     });
 
@@ -164,10 +164,9 @@ describe('SlskdSearch', () => {
 
     const result = await adapter.search(ACQ, albumTarget, 1);
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      kind: 'InfraError',
-      operation: 'slskd.search',
-    });
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
+    expect(error.message).toContain('reported 3 responses');
     expect(deletedSearchIds(requests)).toEqual([]);
     expect(ledger.removed).toEqual([]);
   });
@@ -194,14 +193,40 @@ describe('SlskdSearch', () => {
     expect(result._unsafeUnwrap()).toHaveLength(1);
   });
 
-  it('tolerates a create response without a search id', async () => {
-    const result = await searcher({ create: json({}), responses: json([]) }).adapter.search(
-      ACQ,
-      albumTarget,
-      1,
+  it('faults when the create response carries no search id', async () => {
+    const { adapter, ledger, requests } = searcher({ create: json({}) });
+
+    const result = await adapter.search(ACQ, albumTarget, 1);
+
+    // An id-less create is an incoherent read — the search could never be polled or swept.
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
+    expect(error.message).toContain('no search id');
+    expect(ledger.created).toEqual([]);
+    expect(deletedSearchIds(requests)).toEqual([]);
+  });
+
+  it('trusts a harvest smaller than the advertised response count', async () => {
+    // responseCount tallies per-peer responses; only an all-or-nothing contradiction faults.
+    const result = await searcher({
+      state: () => json({ isComplete: true, responseCount: 180 }),
+      responses: json(albumResponses),
+    }).adapter.search(ACQ, albumTarget, 1);
+
+    expect(result._unsafeUnwrap()).toHaveLength(1);
+  });
+
+  it("defaults the deadline to 60s, above slskd's own search duration", async () => {
+    const search = new SlskdSearch(
+      silentLogger(),
+      new FakeResourceLedger(),
+      new SlskdClient(httpFor({ state: () => json({ isComplete: false }) }, [])),
+      fakeTimer(),
     );
 
-    expect(result._unsafeUnwrap()).toEqual([]);
+    const result = await search.search(ACQ, albumTarget, 1);
+
+    expect(result._unsafeUnwrapErr().message).toContain('60000ms');
   });
 
   it('still returns candidates when deleting the harvested search fails', async () => {

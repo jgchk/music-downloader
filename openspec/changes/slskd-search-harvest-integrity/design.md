@@ -40,13 +40,19 @@ If the deadline elapses with the search still incomplete, `doSearch` returns an 
 
 ### D3 — Self-consistency guard on the harvest
 
-After completion, if the search state reports `responseCount > 0` but `/responses` yields zero responses, the harvest is contradicted by the source's own bookkeeping → `InfraError`. This catches slskd-side finalization failures (the "Failed to finalize search" case) independent of the timing race. `responseCount` is added to `slskdSearchStateSchema` as an optional field (tolerant reader); the guard only engages when the field is present. A genuine zero — `responseCount: 0` (or absent) with zero responses — remains a valid empty business result.
+After completion, if the search state reports `responseCount > 0` but `/responses` yields zero responses, the harvest is contradicted by the source's own bookkeeping → `InfraError`. This catches slskd-side finalization failures (the "Failed to finalize search" case) independent of the timing race. `responseCount` is added to `slskdSearchStateSchema` as an optional field (tolerant reader); the guard only engages when the field is present — an absent field disarms it, which the adapter logs at `warn` so an slskd upgrade dropping the field is visible, and the contract tier asserts the field's *presence* in the recorded capture so a re-record that loses it fails loudly. A genuine zero — `responseCount: 0` (or absent) with zero responses — remains a valid empty business result.
+
+*Accepted risk:* the guard is deliberately all-or-nothing. A partial truncation (`responseCount: 180`, harvest of 5) passes as trusted, because the two endpoints have not been proven count-equivalent and a stricter `<` comparison could false-fault every real search. Revisit if a partial-finalization failure is ever observed.
+
+An adjacent integrity gate rides along: a create response without a search id is an incoherent read (the search could never be polled, harvested, or swept) and faults immediately instead of proceeding with an empty key.
 
 ### D4 — No mid-flight delete; faulted searches go to the sweep
 
 The adapter deletes the search only on the harvest path. On either fault path (D2/D3) the search is left running/finalized on the source and its ledger row stays live; the existing startup sweep retires it at next boot. Deleting a finalized search later is already a tolerated no-op-style delete. This removes the operation that corrupts slskd's search task today.
 
 *Trade-off:* between boots, faulted searches accumulate in slskd (a lightweight DB row each, bounded by fault frequency). Accepted; an in-process deferred delete adds concurrency for negligible benefit.
+
+*Known compound gap (accepted):* the ledger `recordCreated` write stays best-effort. If that write fails *and* the search then faults, the search has no ledger row and is invisible to the sweep — a permanently orphaned slskd row, surfaced only by the ledger-failure warn. Blast radius is one lightweight row per double-failure; failing the whole search on a ledger blip would contradict the stewardship tier's "bookkeeping never fails a working search" contract, so the gap is documented rather than closed.
 
 ### D5 — Empty round rides the existing ladder
 

@@ -11,9 +11,9 @@ import { z } from 'zod';
 
 /**
  * `POST /api/v0/searches` and `GET /api/v0/searches/{id}`. `state`/`responseCount` describe the
- * search's own bookkeeping: slskd counts responses as they arrive but persists them only at
- * finalization, so the harvest is trusted only when `isComplete` and consistent with
- * `responseCount` (harvest integrity).
+ * search's own bookkeeping: slskd (observed on 0.22.5) counts responses as they arrive but
+ * persists them only at finalization, so a harvest is trusted only when `isComplete` — and a
+ * non-zero `responseCount` must be matched by a non-empty harvest (harvest integrity).
  */
 export const slskdSearchStateSchema = z.object({
   id: z.string().optional(),

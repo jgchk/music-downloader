@@ -19,6 +19,12 @@ The system SHALL treat a source search's responses as harvestable only after the
 - **WHEN** the adapter harvests it
 - **THEN** the search port yields an empty candidate set as a valid business outcome
 
+#### Scenario: A create response without a search identifier is a fault
+
+- **GIVEN** a source that acknowledges search creation without returning a search identifier
+- **WHEN** the adapter attempts to track the search
+- **THEN** the search port yields an infrastructure fault (retryable) — an unidentifiable search can never be polled, harvested, or swept
+
 ### Requirement: A harvest contradicted by the source's own bookkeeping is a fault
 
 The system SHALL compare the harvested responses against the response count the source reports for the search; a harvest that returns no responses while the source reports one or more responses received SHALL surface as a retryable infrastructure fault, not as an empty candidate set. When the source does not report a response count, the harvest SHALL be accepted as-is (tolerant reader).
