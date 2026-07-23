@@ -25,7 +25,7 @@
 
 ## 4. Verification and ship-readiness
 
-- [ ] 4.1 Full gate green (`pnpm check`) with 100% merged coverage — no waivers added
-- [ ] 4.2 Out-of-process E2E still green (`pnpm test:e2e`); confirm the e2e slskd path completes searches within the new deadline
+- [x] 4.1 Full gate green (`pnpm check`) with 100% merged coverage — no waivers added
+- [x] 4.2 Out-of-process E2E still green (`pnpm test:e2e`); confirm the e2e slskd path completes searches within the new deadline
 - [ ] 4.3 Live verification on flight after deploy: re-request the two falsely-exhausted acquisitions (Nirosta Steel — MY SKYSCRAPER, Mort Garson — Mother Earth's Plantasia) and confirm they progress past search with candidates; confirm no new "Failed to execute/finalize search" pairs in slskd's log
 - [ ] 4.4 Sync delta specs into `openspec/specs` and archive the change
