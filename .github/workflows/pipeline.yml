@@ -162,7 +162,7 @@ jobs:
         run: pnpm test:e2e
       - name: Upload Playwright traces (parity-phase failures)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces
           path: packages/web/test-results/
