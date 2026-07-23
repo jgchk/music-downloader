@@ -1,5 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { UpcasterRegistry } from './upcaster.js';
+import { legacyRejectResolvedData } from './__fixtures__/legacy-review-resolved.js';
+import {
+  buildUpcasterRegistry,
+  CURRENT_SCHEMA_VERSION,
+  reviewResolvedV1ToV2,
+  UpcasterRegistry,
+} from './upcaster.js';
+
+describe('reviewResolvedV1ToV2', () => {
+  it('lifts the legacy verb to reject-unusable-delivery, preserving reasons', () => {
+    expect(reviewResolvedV1ToV2(legacyRejectResolvedData(['corrupt rip']))).toEqual({
+      type: 'ReviewResolved',
+      resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
+    });
+  });
+
+  it('passes a ReviewResolved carrying any other resolution kind through untouched', () => {
+    const v1 = { type: 'ReviewResolved', resolution: { kind: 'reject', reason: 'wrong album' } };
+
+    // Byte-for-byte: a non-rejection-of-delivery resolution is not this rename's concern.
+    expect(reviewResolvedV1ToV2(v1)).toBe(v1);
+  });
+});
+
+describe('buildUpcasterRegistry', () => {
+  it('lifts a v1 ReviewResolved rejection and leaves a v2 one alone', () => {
+    const registry = buildUpcasterRegistry();
+
+    expect(registry.upcast('ReviewResolved', 1, legacyRejectResolvedData(['corrupt rip']))).toEqual(
+      {
+        type: 'ReviewResolved',
+        resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
+      },
+    );
+
+    const v2 = {
+      type: 'ReviewResolved',
+      resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
+    };
+    expect(registry.upcast('ReviewResolved', CURRENT_SCHEMA_VERSION, v2)).toEqual(v2);
+  });
+
+  it('leaves a non-ReviewResolved type untouched', () => {
+    const registry = buildUpcasterRegistry();
+    const data = { type: 'ImportApplied', location: '/library/album' };
+
+    expect(registry.upcast('ImportApplied', 1, data)).toBe(data);
+  });
+});
 
 describe('UpcasterRegistry', () => {
   it('is pass-through when nothing is registered (the MVP)', () => {

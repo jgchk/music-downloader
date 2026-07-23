@@ -8,6 +8,7 @@ import { InProcessEventBus } from '../adapters/sqlite/event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from '../adapters/sqlite/event-store.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
+import { legacyRejectResolvedData } from '../adapters/sqlite/__fixtures__/legacy-review-resolved.js';
 import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
@@ -18,7 +19,14 @@ import type {
   TaggerPort,
 } from '../application/ports/outbound-ports.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
-import { requested } from '../domain/import/__fixtures__/import-fixtures.js';
+import {
+  candidate,
+  MATCH_REVIEW,
+  proposed,
+  requested,
+  SOURCE,
+} from '../domain/import/__fixtures__/import-fixtures.js';
+import { asDistance } from '../domain/shared/__fixtures__/distance.js';
 import { createImporterRuntime } from './runtime.js';
 import type { ImporterRuntime, ImporterRuntimeConfig } from './runtime.js';
 
@@ -161,6 +169,45 @@ describe('createImporterRuntime', () => {
     const view = runtime.facade.getImport({ id: 'imp-stalled' });
     expect(view.ok).toBe(true);
     if (view.ok) expect(view.value.stalled).toBeUndefined();
+  });
+
+  it('upcasts a raw-inserted v1 legacy-verb rejection row on read (wired registry)', async () => {
+    // A legacy on-disk stream: a downloader-delivered import rejected as unusable, whose
+    // `ReviewResolved` was persisted at schema v1 under the pre-rename verb. Booting the runtime
+    // over it proves the store is wired with the populated upcaster registry, not an empty one.
+    const directory = mkdtempSync(path.join(tmpdir(), 'importer-db-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const databaseFile = path.join(directory, 'events.db');
+
+    const database = openEventDatabase(databaseFile);
+    const insert = database.prepare(
+      `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+       VALUES (?, ?, ?, 1, ?, ?)`,
+    );
+    const meta = JSON.stringify({ importId: 'imp-legacy', occurredAt: '2026-07-10T12:00:00.000Z' });
+    const legacyStream: Record<string, unknown>[] = [
+      requested({ source: SOURCE }),
+      proposed([candidate({ distance: asDistance(0.5) })]),
+      MATCH_REVIEW,
+      legacyRejectResolvedData(['corrupt rip']),
+    ];
+    for (const [version, event] of legacyStream.entries()) {
+      insert.run('imp-legacy', version, event.type, JSON.stringify(event), meta);
+    }
+    database.close();
+
+    const result = await createImporterRuntime(config({ databaseFile }), silentLogger(), {
+      tagger: fakeTagger(),
+      intake: { deleteRelease: () => okAsync<void>(undefined) },
+    });
+    const runtime = result._unsafeUnwrap();
+    cleanups.push(() => runtime.stop());
+
+    const view = runtime.facade.getImport({ id: 'imp-legacy' });
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const resolved = view.value.history.find((entry) => entry.kind === 'review-resolved');
+    expect(resolved).toMatchObject({ resolution: 'reject-unusable-delivery' });
   });
 
   it('returns the startup error as a value when the beets config is unusable', async () => {

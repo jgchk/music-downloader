@@ -16,7 +16,7 @@ import { OutboundFeed } from './outbound-feed.js';
 function verdictHistory(): ImportEvent[] {
   return [
     ...awaitingReviewWithCandidate(),
-    resolved({ kind: 'reject-and-retry-download', reasons: ['corrupt rip'] }),
+    resolved({ kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] }),
     {
       type: 'ReleaseVerdictRecorded',
       acquisitionId: SOURCE.acquisitionId,

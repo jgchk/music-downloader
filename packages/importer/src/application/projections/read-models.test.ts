@@ -133,7 +133,7 @@ describe('projectStatus', () => {
   it('narrates a recorded release verdict beside its rejection', () => {
     const history = [
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download', reasons: ['corrupt rip'] }),
+      resolved({ kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] }),
       {
         type: 'ReleaseVerdictRecorded',
         acquisitionId: SOURCE.acquisitionId,
@@ -145,7 +145,7 @@ describe('projectStatus', () => {
     expect(view.history).toContainEqual({
       kind: 'review-resolved',
       at: 't',
-      resolution: 'reject-and-retry-download',
+      resolution: 'reject-unusable-delivery',
     });
     expect(view.history).toContainEqual({
       kind: 'release-verdict-recorded',

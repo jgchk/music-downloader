@@ -33,7 +33,7 @@ export const resolutionVerbSchema = z.enum([
   'manual-tags',
   'import-as-is',
   'reject',
-  'reject-and-retry-download',
+  'reject-unusable-delivery',
   'accept',
   'retry-enrichment',
 ]);
@@ -187,13 +187,14 @@ export const resolveReviewRequestSchema = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('reject'), reason: z.string().min(1).optional() }),
   z.object({
     /**
-     * Reject (files deleted, import terminal `rejected`) AND record a release verdict so the
-     * delivering downloader retries the acquisition with a different copy. Only for imports that
-     * arrived from the downloader with a retained candidate; otherwise refused with
-     * `NoRetainedCandidate` (plain `reject` remains available). Use `reject` for "wrong thing to
-     * have", this verb for "right thing, bad copy".
+     * Reject the delivered copy as unusable: files deleted, import terminal `rejected`, AND a
+     * release verdict recorded (the fact that the delivered copy was rejected as unusable, carrying
+     * the acquisition id, delivered candidate, and reasons as opaque provenance). Only for imports
+     * that retain a delivered candidate's identity; otherwise refused with `NoRetainedCandidate`
+     * (plain `reject` remains available). Use `reject` for "wrong thing to have", this verb for
+     * "right thing, bad copy".
      */
-    verb: z.literal('reject-and-retry-download'),
+    verb: z.literal('reject-unusable-delivery'),
     reasons: z.array(z.string().min(1)).optional(),
   }),
   z.object({ verb: z.literal('accept') }),

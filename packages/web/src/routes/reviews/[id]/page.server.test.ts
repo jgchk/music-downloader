@@ -60,7 +60,7 @@ describe('resolve action', () => {
       .fn()
       .mockResolvedValue({ ok: false, error: { kind: 'NoRetainedCandidate' } });
     const result = (await actions.resolve!(
-      eventFor({ resolveReview }, { verb: 'reject-and-retry-download' }),
+      eventFor({ resolveReview }, { verb: 'reject-unusable-delivery' }),
     )) as { status: number; data: { message: string } };
     expect(result.status).toBe(409);
     expect(result.data.message).toContain('Plain reject is still available');

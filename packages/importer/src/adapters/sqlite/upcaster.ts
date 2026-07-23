@@ -3,13 +3,13 @@ import type { ImportEvent } from '../../domain/import/events.js';
 /**
  * Event versioning / upcasting seam: persisted events are immutable facts that live forever,
  * so every stored event carries a schema version, and read-side upcasters transform an old shape
- * forward (`v1 → v2 → …`) before `evolve` ever sees it. The MVP registry is pass-through — the
- * seam exists so the first real schema change is a localized, tested upcaster rather than a
- * migration, exactly the ES form of the no-breaking-change policy.
+ * forward (`v1 → v2 → …`) before `evolve` ever sees it. The seam exists so a schema change is a
+ * localized, tested upcaster rather than a migration, exactly the ES form of the no-breaking-change
+ * policy. Its first real use lifts the legacy resolution verb (see {@link reviewResolvedV1ToV2}).
  */
 
 /** The schema version stamped on every event written today. */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /** Transforms one on-disk event payload from version N to version N+1. */
 export type Upcaster = (data: Record<string, unknown>) => Record<string, unknown>;
@@ -43,4 +43,22 @@ export class UpcasterRegistry {
     }
     return current as unknown as ImportEvent;
   }
+}
+
+/**
+ * The importer's first upcaster: an earlier version stored the rejection-of-a-bad-delivery verb
+ * under the downloader's action name (`reject-and-retry-download`). The importer now speaks its own
+ * language (`reject-unusable-delivery`), so a stored v1 `ReviewResolved` carrying the old token is
+ * rewritten forward on read — reasons preserved. Any other resolution kind is not this rename's
+ * concern and passes through byte-for-byte, so the pure domain only ever sees its own vocabulary.
+ */
+export const reviewResolvedV1ToV2: Upcaster = (data) => {
+  const resolution = data.resolution as { readonly kind?: string } | undefined;
+  if (resolution?.kind !== 'reject-and-retry-download') return data;
+  return { ...data, resolution: { ...resolution, kind: 'reject-unusable-delivery' } };
+};
+
+/** The populated registry wired in composition: every registered upcaster in one testable place. */
+export function buildUpcasterRegistry(): UpcasterRegistry {
+  return new UpcasterRegistry().register('ReviewResolved', 1, reviewResolvedV1ToV2);
 }

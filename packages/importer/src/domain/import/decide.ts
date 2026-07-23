@@ -18,7 +18,7 @@ export type DomainError =
   | { readonly kind: 'NoOpenReview' }
   | { readonly kind: 'InvalidResolution'; readonly detail: string }
   | { readonly kind: 'UnknownCandidate'; readonly candidate: string }
-  /** reject-and-retry-download needs a retained delivered candidate; this import has none. */
+  /** reject-unusable-delivery needs a retained delivered candidate; this import has none. */
   | { readonly kind: 'NoRetainedCandidate' };
 
 type Decision = Result<readonly ImportEvent[], DomainError>;
@@ -91,9 +91,10 @@ function decideResolutionForReview(state: AwaitingReviewState, resolution: Resol
     );
     if (!isKnown)
       return err({ kind: 'UnknownCandidate', candidate: candidateReferenceKey(resolution.ref) });
-  } else if (resolution.kind === 'reject-and-retry-download') {
-    // The verdict must echo the identity the sender fulfilled with (its stale-guard compares it);
-    // without a retained candidate the verb is refused precisely — plain reject stays available.
+  } else if (resolution.kind === 'reject-unusable-delivery') {
+    // The verdict echoes back the exact copy the importer judged (opaque provenance for the
+    // consumer); without a retained candidate the verb is refused precisely — plain reject stays
+    // available.
     const source = state.source;
     if (source?.candidate === undefined) return err({ kind: 'NoRetainedCandidate' });
     return ok([
@@ -209,7 +210,7 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
           const reason = settled.reason ?? 'rejected by review';
           return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);
         }
-        case 'reject-and-retry-download': {
+        case 'reject-unusable-delivery': {
           const reasons = settled.reasons ?? [];
           const reason = reasons.length > 0 ? reasons.join('; ') : 'rejected by review';
           return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);

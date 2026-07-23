@@ -70,9 +70,9 @@ export function react(event: ImportEvent, state: ImportState): readonly Effect[]
             : [];
         }
         case 'reject':
-        case 'reject-and-retry-download': {
-          // Both rejection verbs owe the same intake hygiene; the verdict itself is a record-only
-          // fact the outbound publisher consumes, never an effect here.
+        case 'reject-unusable-delivery': {
+          // Both rejection verbs owe the same intake hygiene; the release verdict is a record-only
+          // fact, never an effect here.
           return state.phase === 'awaiting-review'
             ? [{ type: 'DeleteIntake', directory: state.directory }]
             : [];

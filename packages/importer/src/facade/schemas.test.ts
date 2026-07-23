@@ -51,8 +51,8 @@ describe('resolveReviewRequestSchema', () => {
     ],
     [{ verb: 'import-as-is' }],
     [{ verb: 'reject', reason: 'wrong rip' }],
-    [{ verb: 'reject-and-retry-download', reasons: ['corrupt rip', 'transcode'] }],
-    [{ verb: 'reject-and-retry-download' }],
+    [{ verb: 'reject-unusable-delivery', reasons: ['corrupt rip', 'transcode'] }],
+    [{ verb: 'reject-unusable-delivery' }],
     [{ verb: 'accept' }],
     [{ verb: 'retry-enrichment' }],
   ])('accepts %j', (payload) => {
@@ -72,7 +72,7 @@ describe('resolveReviewRequestSchema', () => {
 
   it('refuses an empty reason string on the retry verb (omit it instead)', () => {
     expect(
-      resolveReviewRequestSchema.safeParse({ verb: 'reject-and-retry-download', reasons: [''] })
+      resolveReviewRequestSchema.safeParse({ verb: 'reject-unusable-delivery', reasons: [''] })
         .success,
     ).toBe(false);
   });

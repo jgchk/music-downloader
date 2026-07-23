@@ -61,7 +61,7 @@ export interface ProposingState extends Requested {
  */
 export type PendingRejection = Extract<
   Resolution,
-  { kind: 'reject' } | { kind: 'reject-and-retry-download' }
+  { kind: 'reject' } | { kind: 'reject-unusable-delivery' }
 >;
 
 export interface AwaitingReviewState extends Requested {
@@ -151,7 +151,7 @@ function evolveResolved(state: AwaitingReviewState, resolution: Resolution): Imp
       return { phase: 'proposing', ...requestedOf(state), candidates: state.candidates };
     }
     case 'reject':
-    case 'reject-and-retry-download': {
+    case 'reject-unusable-delivery': {
       // The review is settled; the intake deletion is still owed, so the phase holds until
       // `ImportRejected` records the outcome.
       return { ...state, settled: resolution };
