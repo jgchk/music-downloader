@@ -18,7 +18,9 @@
   <header class="masthead">
     <a class="wordmark" href="/"><span class="mark" aria-hidden="true">▚</span> music</a>
     <span class="spacer"></span>
-    <a class="btn primary" href="/acquisitions/new"><span aria-hidden="true">＋</span> Request a download</a>
+    <a class="btn primary" href="/acquisitions/new"
+      ><span aria-hidden="true">＋</span> Request a download</a
+    >
     <SkinSwitcher />
   </header>
 

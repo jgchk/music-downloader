@@ -6,23 +6,26 @@
    Activate with <html data-skin="forum">.
    ============================================================================ */
 
-:root[data-skin="forum"] {
+:root[data-skin='forum'] {
   color-scheme: light;
 
   --bg: #dfe3e8;
   --surface: #ffffff;
-  --surface-2: #dee3e7;      /* the iconic subSilver row2 blue-grey */
-  --border: #98aab1;         /* subSilver hairline */
+  --surface-2: #dee3e7; /* the iconic subSilver row2 blue-grey */
+  --border: #98aab1; /* subSilver hairline */
   --text: #1a1a1a;
   --text-muted: #5c6f7c;
-  --accent: #006699;         /* THE forum blue */
+  --accent: #006699; /* THE forum blue */
   --accent-contrast: #ffffff;
   --focus: #006699;
 
-  --ok: #3f7a3f;  --warn: #cc6600;  --danger: #a83232;  --info: #006699;
+  --ok: #3f7a3f;
+  --warn: #cc6600;
+  --danger: #a83232;
+  --info: #006699;
 
-  --font-body: Verdana, Tahoma, Geneva, "DejaVu Sans", sans-serif;
-  --font-head: Verdana, Tahoma, Geneva, "DejaVu Sans", sans-serif;
+  --font-body: Verdana, Tahoma, Geneva, 'DejaVu Sans', sans-serif;
+  --font-head: Verdana, Tahoma, Geneva, 'DejaVu Sans', sans-serif;
   --fw-head: 700;
   --fs-root: 11px;
   --fs-h1: 1.3rem;
@@ -48,62 +51,67 @@
   --nav-dir: row;
   --shell-cols: 1fr;
   --shell-rows: auto auto 1fr auto;
-  --shell-areas:
-    "masthead"
-    "nav"
-    "main"
-    "status";
+  --shell-areas: 'masthead' 'nav' 'main' 'status';
 }
-:root[data-skin="forum"] body {
+:root[data-skin='forum'] body {
   background:
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0 1px, transparent 1px 3px),
-    var(--bg);
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.015) 0 1px, transparent 1px 3px), var(--bg);
 }
 
 /* Logo banner + raised primary button on it */
-:root[data-skin="forum"] .masthead {
+:root[data-skin='forum'] .masthead {
   background: linear-gradient(#0a5c85, #013655);
   border: 1px solid #01293f;
   padding: 8px 12px;
   color: #cfe4f0;
 }
-:root[data-skin="forum"] .wordmark { color: #fff; }
-:root[data-skin="forum"] .wordmark .mark { color: #7fd0f0; }
+:root[data-skin='forum'] .wordmark {
+  color: #fff;
+}
+:root[data-skin='forum'] .wordmark .mark {
+  color: #7fd0f0;
+}
 
 /* Raised Win2k buttons, with a dominant primary */
-:root[data-skin="forum"] button,
-:root[data-skin="forum"] .btn {
+:root[data-skin='forum'] button,
+:root[data-skin='forum'] .btn {
   border-radius: 0;
   background: linear-gradient(#f7f8f9, #d6dce1);
   color: #1a1a1a;
   border: 1px solid #7d858c;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.5);
-  box-shadow: inset -1px -1px 0 rgba(0,0,0,0.22), inset 1px 1px 0 rgba(255,255,255,0.8);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset -1px -1px 0 rgba(0, 0, 0, 0.22),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.8);
 }
-:root[data-skin="forum"] button:hover,
-:root[data-skin="forum"] .btn:hover { border-color: #55606a; }
-:root[data-skin="forum"] button:active,
-:root[data-skin="forum"] .btn:active {
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.28), inset -1px -1px 0 rgba(255,255,255,0.55);
+:root[data-skin='forum'] button:hover,
+:root[data-skin='forum'] .btn:hover {
+  border-color: #55606a;
 }
-:root[data-skin="forum"] .btn.primary {
+:root[data-skin='forum'] button:active,
+:root[data-skin='forum'] .btn:active {
+  box-shadow:
+    inset 1px 1px 0 rgba(0, 0, 0, 0.28),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.55);
+}
+:root[data-skin='forum'] .btn.primary {
   background: linear-gradient(#3d9bd4, #1f6fa6);
   color: #fff;
   border: 1px solid #14547f;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
 }
 
 /* Inset form wells */
-:root[data-skin="forum"] input,
-:root[data-skin="forum"] select,
-:root[data-skin="forum"] textarea {
+:root[data-skin='forum'] input,
+:root[data-skin='forum'] select,
+:root[data-skin='forum'] textarea {
   border-radius: 0;
   border: 1px solid #7d858c;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.18);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.18);
 }
 
 /* Connected-tab navbar strip with a clearly-selected tab */
-:root[data-skin="forum"] nav.primary ul {
+:root[data-skin='forum'] nav.primary ul {
   background: linear-gradient(#6f9ac0, #45749f);
   border: 1px solid #2f5980;
   border-radius: 0;
@@ -111,15 +119,17 @@
   gap: 0;
   box-shadow: none;
 }
-:root[data-skin="forum"] nav.primary a {
+:root[data-skin='forum'] nav.primary a {
   color: #fff;
   border-radius: 0;
   padding: 6px 16px;
-  border-right: 1px solid rgba(255,255,255,0.22);
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
   text-decoration: none;
 }
-:root[data-skin="forum"] nav.primary a:hover { background: rgba(255,255,255,0.16); }
-:root[data-skin="forum"] nav.primary a[aria-current="page"] {
+:root[data-skin='forum'] nav.primary a:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+:root[data-skin='forum'] nav.primary a[aria-current='page'] {
   background: var(--bg);
   color: #013655;
   font-weight: 700;
@@ -127,47 +137,66 @@
 }
 
 /* Page + section headings become gradient caption bars */
-:root[data-skin="forum"] main h1,
-:root[data-skin="forum"] main h2 {
+:root[data-skin='forum'] main h1,
+:root[data-skin='forum'] main h2 {
   padding: 5px 10px;
   color: #fff;
   border: 1px solid #01405c;
   background: linear-gradient(#0d78a8, #005f86);
 }
-:root[data-skin="forum"] main h2 {
+:root[data-skin='forum'] main h2 {
   border-color: #2f5980;
   background: linear-gradient(#5b8bb0, #3f6d92);
 }
 
 /* Classic gradient column headers + zebra rows */
-:root[data-skin="forum"] thead th {
+:root[data-skin='forum'] thead th {
   background: linear-gradient(#5b8bb0, #3f6d92);
   color: #fff;
   border-bottom: 1px solid #2f5980;
 }
-:root[data-skin="forum"] tbody tr:nth-child(odd) td  { background: #ffffff; }
-:root[data-skin="forum"] tbody tr:nth-child(even) td { background: var(--surface-2); }
-:root[data-skin="forum"] tbody tr:hover td { background: #eef4d6; }
-:root[data-skin="forum"] tbody tr[aria-current="true"] td { background: #fff3c4; }
-:root[data-skin="forum"] a { text-decoration: underline; }
-:root[data-skin="forum"] .wordmark,
-:root[data-skin="forum"] nav.primary a,
-:root[data-skin="forum"] button,
-:root[data-skin="forum"] .btn { text-decoration: none; }
+:root[data-skin='forum'] tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+:root[data-skin='forum'] tbody tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+:root[data-skin='forum'] tbody tr:hover td {
+  background: #eef4d6;
+}
+:root[data-skin='forum'] tbody tr[aria-current='true'] td {
+  background: #fff3c4;
+}
+:root[data-skin='forum'] a {
+  text-decoration: underline;
+}
+:root[data-skin='forum'] .wordmark,
+:root[data-skin='forum'] nav.primary a,
+:root[data-skin='forum'] button,
+:root[data-skin='forum'] .btn {
+  text-decoration: none;
+}
 
 /* Beveled tags & status labels (Win2k widget look) */
-:root[data-skin="forum"] .chip,
-:root[data-skin="forum"] .badge {
+:root[data-skin='forum'] .chip,
+:root[data-skin='forum'] .badge {
   border-radius: 0;
   border: 1px solid #98aab1;
   background: #fff;
-  box-shadow: inset -1px -1px 0 #cfd6da, inset 1px 1px 0 #fff;
+  box-shadow:
+    inset -1px -1px 0 #cfd6da,
+    inset 1px 1px 0 #fff;
 }
-:root[data-skin="forum"] .chip { color: #333; }
+:root[data-skin='forum'] .chip {
+  color: #333;
+}
 
 /* Skin switcher as a flat beveled segmented control (not raised buttons) */
-:root[data-skin="forum"] .segmented { background: #c8ccd0; border: 1px solid #6f757b; }
-:root[data-skin="forum"] .segmented button {
+:root[data-skin='forum'] .segmented {
+  background: #c8ccd0;
+  border: 1px solid #6f757b;
+}
+:root[data-skin='forum'] .segmented button {
   background: #dfe3e8;
   color: #1a1a1a;
   border: 0;
@@ -175,30 +204,39 @@
   box-shadow: none;
   text-shadow: none;
 }
-:root[data-skin="forum"] .segmented button:last-child { border-right: 0; }
-:root[data-skin="forum"] .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+:root[data-skin='forum'] .segmented button:last-child {
+  border-right: 0;
+}
+:root[data-skin='forum'] .segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}
 
 /* Panels get a gradient title bar (bleeds to the panel edges) */
-:root[data-skin="forum"] .panel { box-shadow: none; }
-:root[data-skin="forum"] .panel > .region-head {
+:root[data-skin='forum'] .panel {
+  box-shadow: none;
+}
+:root[data-skin='forum'] .panel > .region-head {
   margin: calc(var(--stack-gap) * -1) calc(var(--stack-gap) * -1) var(--stack-gap);
   padding: 5px 10px;
   background: linear-gradient(#0d78a8, #005f86);
   border-bottom: 1px solid #01405c;
   color: #fff;
 }
-:root[data-skin="forum"] .panel > .region-head h1,
-:root[data-skin="forum"] .panel > .region-head h2,
-:root[data-skin="forum"] .panel > .region-head h3 {
+:root[data-skin='forum'] .panel > .region-head h1,
+:root[data-skin='forum'] .panel > .region-head h2,
+:root[data-skin='forum'] .panel > .region-head h3 {
   color: #fff;
   background: none;
   border: 0;
   padding: 0;
 }
-:root[data-skin="forum"] .panel > .region-head .eyebrow { color: #dcecf6; }
+:root[data-skin='forum'] .panel > .region-head .eyebrow {
+  color: #dcecf6;
+}
 
 /* Inset desktop status bar */
-:root[data-skin="forum"] .statusbar {
+:root[data-skin='forum'] .statusbar {
   background: #d4d8dc;
   border: 1px solid #9aa0a6;
   border-radius: 0;

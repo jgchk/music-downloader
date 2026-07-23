@@ -3,7 +3,7 @@
    monospace, sharp corners. Activate with <html data-skin="terminal">.
    ============================================================================ */
 
-:root[data-skin="terminal"] {
+:root[data-skin='terminal'] {
   color-scheme: dark;
 
   --bg: #100f0c;
@@ -16,7 +16,10 @@
   --accent-contrast: #14100a;
   --focus: #f2b656;
 
-  --ok: #8bb45a;  --warn: #e0a54a;  --danger: #d76a4a;  --info: #6fa6b4;
+  --ok: #8bb45a;
+  --warn: #e0a54a;
+  --danger: #d76a4a;
+  --info: #6fa6b4;
 
   --font-body: var(--font-mono);
   --font-head: var(--font-mono);
@@ -45,15 +48,12 @@
   --nav-dir: row;
   --shell-cols: 1fr;
   --shell-rows: auto auto 1fr auto;
-  --shell-areas:
-    "masthead"
-    "nav"
-    "main"
-    "status";
+  --shell-areas: 'masthead' 'nav' 'main' 'status';
 }
-:root[data-skin="terminal"] body {
+:root[data-skin='terminal'] body {
   background:
-    repeating-linear-gradient(0deg, rgba(232,168,60,0.025) 0 2px, transparent 2px 4px),
-    var(--bg);
+    repeating-linear-gradient(0deg, rgba(232, 168, 60, 0.025) 0 2px, transparent 2px 4px), var(--bg);
 }
-:root[data-skin="terminal"] .chip { border-radius: 0; }
+:root[data-skin='terminal'] .chip {
+  border-radius: 0;
+}

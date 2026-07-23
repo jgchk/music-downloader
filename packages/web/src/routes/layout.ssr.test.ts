@@ -4,10 +4,23 @@ import { describe, expect, it } from 'vitest';
 import Layout from './+layout.svelte';
 
 const children = createRawSnippet(() => ({
-  render: () => '<main data-testid="page-body">the page</main>',
+  render: () => '<div data-testid="page-body">the page</div>',
 }));
 
 describe('root layout (SSR)', () => {
+  it('frames the page in a single-main landmark skeleton', () => {
+    const { body } = render(Layout, {
+      props: { data: { attentionCount: 0 }, params: {}, children },
+    });
+    // The shell owns exactly one main landmark; pages render inside it.
+    expect(body.match(/<main[\s>]/g)).toHaveLength(1);
+    expect(body).toContain('<header');
+    expect(body).toContain('<footer');
+    // The primary navigation is a labelled landmark.
+    expect(body).toMatch(/<nav[^>]*aria-label="Primary"/);
+    expect(body).toContain('data-testid="page-body"');
+  });
+
   it('renders the site navigation with a count badge over the page body', () => {
     const { body } = render(Layout, {
       props: { data: { attentionCount: 2 }, params: {}, children },
