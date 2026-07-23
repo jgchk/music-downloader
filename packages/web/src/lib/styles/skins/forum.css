@@ -148,6 +148,7 @@
 :root[data-skin="forum"] tbody tr:nth-child(odd) td  { background: #ffffff; }
 :root[data-skin="forum"] tbody tr:nth-child(even) td { background: var(--surface-2); }
 :root[data-skin="forum"] tbody tr:hover td { background: #eef4d6; }
+:root[data-skin="forum"] tbody tr[aria-current="true"] td { background: #fff3c4; }
 :root[data-skin="forum"] a { text-decoration: underline; }
 :root[data-skin="forum"] .wordmark,
 :root[data-skin="forum"] nav.primary a,
@@ -176,6 +177,25 @@
 }
 :root[data-skin="forum"] .segmented button:last-child { border-right: 0; }
 :root[data-skin="forum"] .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+/* Panels get a gradient title bar (bleeds to the panel edges) */
+:root[data-skin="forum"] .panel { box-shadow: none; }
+:root[data-skin="forum"] .panel > .region-head {
+  margin: calc(var(--stack-gap) * -1) calc(var(--stack-gap) * -1) var(--stack-gap);
+  padding: 5px 10px;
+  background: linear-gradient(#0d78a8, #005f86);
+  border-bottom: 1px solid #01405c;
+  color: #fff;
+}
+:root[data-skin="forum"] .panel > .region-head h1,
+:root[data-skin="forum"] .panel > .region-head h2,
+:root[data-skin="forum"] .panel > .region-head h3 {
+  color: #fff;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+:root[data-skin="forum"] .panel > .region-head .eyebrow { color: #dcecf6; }
 
 /* Inset desktop status bar */
 :root[data-skin="forum"] .statusbar {

@@ -8,6 +8,8 @@ describe('acquisition detail page (SSR)', () => {
       props: {
         data: {
           attentionCount: 0,
+          list: { acquisitions: [] },
+          selectedId: 'acq-1',
           acquisition: {
             acquisitionId: 'acq-1',
             status: 'Searching',

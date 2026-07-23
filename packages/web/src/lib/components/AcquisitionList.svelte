@@ -5,9 +5,11 @@
 
   interface Props {
     acquisitions: readonly AcquisitionStatusResponseDto[];
+    /** The acquisition currently open in the detail pane, marked as the current row. */
+    selectedId?: string;
   }
 
-  let { acquisitions }: Props = $props();
+  let { acquisitions, selectedId = undefined }: Props = $props();
 </script>
 
 <p><a href="/acquisitions/new" data-testid="new-acquisition">Request a download</a></p>
@@ -21,7 +23,10 @@
     </thead>
     <tbody>
       {#each acquisitions as acquisition (acquisition.acquisitionId)}
-        <tr data-testid="acquisition-row">
+        <tr
+          data-testid="acquisition-row"
+          aria-current={acquisition.acquisitionId === selectedId ? 'true' : undefined}
+        >
           <td>
             <a href={`/acquisitions/${acquisition.acquisitionId}`}>
               {targetDescription(acquisition)}

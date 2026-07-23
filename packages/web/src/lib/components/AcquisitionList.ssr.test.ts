@@ -40,6 +40,25 @@ describe('AcquisitionList (SSR)', () => {
     expect(body).toContain('Searching');
   });
 
+  it('marks the selected acquisition as the current row', () => {
+    const { body } = render(AcquisitionList, {
+      props: {
+        acquisitions: [
+          {
+            acquisitionId: 'acq-1',
+            status: 'Searching',
+            target: { artist: 'A', title: 'T' },
+            attempts: 1,
+            rejectedCount: 0,
+            history: [],
+          },
+        ],
+        selectedId: 'acq-1',
+      },
+    });
+    expect(body).toContain('aria-current="true"');
+  });
+
   it('presents an awaiting-selection row as action-needed while a searching row stays generic', () => {
     const { body } = render(AcquisitionList, {
       props: {
