@@ -18,10 +18,10 @@
 
 ## 3. Contract tier: witness the newly-consumed field
 
-- [ ] 3.1 Extend the slskd recorder script to capture a completed search's state snapshot (carrying `responseCount`) alongside the responses fixture, with provenance
-- [ ] 3.2 Record the fixture against a real slskd and commit it sanitized
-- [ ] 3.3 Contract replay test: the recorded search-state fixture parses through `slskdSearchStateSchema`; the search adapter's polling request/harvest sequence asserted over real HTTP against the fixture server
-- [ ] 3.4 Update the consumed-surface manifest if the search-state operation's consumed shape is declared there
+- [x] 3.1 Extend the slskd recorder script to capture a completed search's state snapshot (carrying `responseCount`) alongside the responses fixture, with provenance
+- [x] 3.2 Record the fixture against a real slskd and commit it sanitized
+- [x] 3.3 Contract replay test: the recorded search-state fixture parses through `slskdSearchStateSchema`; the search adapter's polling request/harvest sequence asserted over real HTTP against the fixture server
+- [x] 3.4 Update the consumed-surface manifest if the search-state operation's consumed shape is declared there
 
 ## 4. Verification and ship-readiness
 

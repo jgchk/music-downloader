@@ -2,11 +2,22 @@
   "request": {
     "method": "GET",
     "urlPath": "/api/v0/searches/search-1",
-    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+    "headers": {
+      "X-API-Key": {
+        "equalTo": "test-key"
+      }
+    }
   },
   "response": {
     "status": 200,
-    "headers": { "Content-Type": "application/json" },
-    "jsonBody": { "id": "search-1", "isComplete": true }
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "id": "search-1",
+      "isComplete": true,
+      "state": "Completed, TimedOut",
+      "responseCount": 1
+    }
   }
 }
