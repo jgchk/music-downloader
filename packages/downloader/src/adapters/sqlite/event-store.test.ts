@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-identity.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,7 +14,7 @@ const META: EventMetadata = { acquisitionId: 'acq-1', occurredAt: '2026-07-03T12
 
 const IMPORTED: AcquisitionEvent = {
   type: 'Imported',
-  candidate: { username: 'peer', path: '/incoming/album', sizeBytes: 1024 },
+  candidate: asCandidateIdentity({ username: 'peer', path: '/incoming/album', sizeBytes: 1024 }),
   location: '/library/album',
 };
 const FULFILLED: AcquisitionEvent = { type: 'AcquisitionFulfilled', location: '/library/album' };

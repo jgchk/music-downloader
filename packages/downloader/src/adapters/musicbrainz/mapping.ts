@@ -1,3 +1,5 @@
+import { branded } from '../../domain/shared/brand.js';
+import type { Mbid } from '../../domain/shared/mbid.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import type { EditionCandidate } from '../../domain/acquisition/events.js';
@@ -35,6 +37,15 @@ function parseYear(date: string | null | undefined): number | undefined {
   return Number.isInteger(year) && year > 0 ? year : undefined;
 }
 
+/**
+ * Brand a MusicBrainz id as an {@link Mbid} at this ACL edge. MusicBrainz is the *authoritative
+ * issuer* of mbids, so its ids are trusted and branded directly — unlike a user-supplied id, which
+ * the facade validates with `parseMbid` before it ever reaches the domain.
+ */
+function optionalMbid(id: string | undefined): Mbid | undefined {
+  return id === undefined ? undefined : branded<Mbid>(id);
+}
+
 export function releaseToTarget(release: MbRelease): Target | undefined {
   const tracks = (release.media ?? []).flatMap((medium) =>
     (medium.tracks ?? []).map((track, index) => ({
@@ -49,7 +60,7 @@ export function releaseToTarget(release: MbRelease): Target | undefined {
     title: release.title ?? '',
     tracks,
     year: parseYear(release.date),
-    mbid: release.id,
+    mbid: optionalMbid(release.id),
   });
   return result.isOk() ? result.value : undefined;
 }
@@ -60,7 +71,7 @@ export function recordingToTarget(recording: MbRecording): Target | undefined {
     artist: artistCreditName(recording['artist-credit']),
     title: recording.title ?? '',
     tracks: [{ position: 1, title: recording.title ?? '', durationMs: recording.length ?? 0 }],
-    mbid: recording.id,
+    mbid: optionalMbid(recording.id),
   });
   return result.isOk() ? result.value : undefined;
 }
@@ -313,7 +324,8 @@ export function releaseGroupEditionCandidates(
 ): readonly EditionCandidate[] {
   const candidates: EditionCandidate[] = [];
   for (const release of releases ?? []) {
-    if (release.id === undefined) continue;
+    const releaseMbid = optionalMbid(release.id);
+    if (releaseMbid === undefined) continue;
     const formats = [
       ...new Set(
         (release.media ?? [])
@@ -322,7 +334,7 @@ export function releaseGroupEditionCandidates(
       ),
     ];
     candidates.push({
-      releaseMbid: release.id,
+      releaseMbid,
       title: release.title ?? undefined,
       date: release.date ?? undefined,
       country: release.country ?? undefined,

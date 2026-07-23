@@ -1,3 +1,5 @@
+import type { Distance } from '../shared/distance.js';
+
 /**
  * Domain events — the facts that make up an import's history (event-sourcing). They narrate the
  * import *process* only: beets' library database remains the system of record for the library
@@ -13,7 +15,7 @@ export interface ImportHints {
 
 /** The policy stamped onto the request: distance at or below the threshold auto-applies. */
 export interface ImportPolicy {
-  readonly autoApplyThreshold: number;
+  readonly autoApplyThreshold: Distance;
 }
 
 /**
@@ -56,7 +58,7 @@ export function candidateRefKey(ref: CandidateRef): string {
 /** One component of beets' distance breakdown (e.g. `tracks`, `missing_tracks`, `year`). */
 export interface CandidatePenalty {
   readonly name: string;
-  readonly amount: number;
+  readonly amount: Distance;
 }
 
 /** One entry of the item-to-track mapping beets computed for a candidate. */
@@ -71,7 +73,7 @@ export interface ProposedCandidate {
   readonly ref: CandidateRef;
   readonly artist: string;
   readonly album: string;
-  readonly distance: number;
+  readonly distance: Distance;
   readonly penalties: readonly CandidatePenalty[];
   readonly tracks: readonly TrackMapping[];
 }
@@ -163,7 +165,7 @@ export type ImportEvent =
       readonly duplicates: readonly DuplicateIncumbent[];
       readonly pinnedId?: string;
     }
-  | { readonly type: 'AutoApplySelected'; readonly ref: CandidateRef; readonly distance: number }
+  | { readonly type: 'AutoApplySelected'; readonly ref: CandidateRef; readonly distance: Distance }
   | { readonly type: 'ReviewRequired'; readonly cause: ReviewCause }
   | { readonly type: 'ReviewResolved'; readonly resolution: Resolution }
   | { readonly type: 'ImportApplied'; readonly location: string }

@@ -5,17 +5,18 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { DownloadedFile } from '../../domain/acquisition/events.js';
+import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import { FilesystemLibrary, nodeLibraryFileSystem } from './library.js';
 import type { LibraryConfig, LibraryFileSystem } from './library.js';
 
-const TARGET: Target = {
+const TARGET: Target = createTarget({
   type: 'album',
   artist: 'The Band',
   title: 'Great Album',
   tracks: [{ position: 1, title: 'One', durationMs: 1000 }],
   year: 2020,
-};
+})._unsafeUnwrap();
 
 const roots: string[] = [];
 

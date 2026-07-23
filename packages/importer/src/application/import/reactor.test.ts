@@ -6,6 +6,7 @@ import {
   candidate,
   requested,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
+import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import { infraError } from '../ports/errors.js';
 import {
@@ -93,7 +94,7 @@ describe('Reactor', () => {
         propose: vi.fn(() =>
           okAsync({
             kind: 'proposal' as const,
-            candidates: [candidate({ distance: 0.01 })],
+            candidates: [candidate({ distance: asDistance(0.01) })],
             duplicates: [],
           }),
         ),
@@ -212,10 +213,10 @@ describe('Reactor', () => {
             [
               {
                 type: 'CandidatesProposed',
-                candidates: [candidate({ distance: 0.01 })],
+                candidates: [candidate({ distance: asDistance(0.01) })],
                 duplicates: [],
               },
-              { type: 'AutoApplySelected', ref: candidate().ref, distance: 0.01 },
+              { type: 'AutoApplySelected', ref: candidate().ref, distance: asDistance(0.01) },
             ],
             { importId, occurredAt: 't' },
           )
@@ -391,8 +392,12 @@ describe('Reactor', () => {
     const ref = candidate().ref;
     await seed([
       requested(),
-      { type: 'CandidatesProposed', candidates: [candidate({ distance: 0.01 })], duplicates: [] },
-      { type: 'AutoApplySelected', ref, distance: 0.01 },
+      {
+        type: 'CandidatesProposed',
+        candidates: [candidate({ distance: asDistance(0.01) })],
+        duplicates: [],
+      },
+      { type: 'AutoApplySelected', ref, distance: asDistance(0.01) },
       { type: 'ImportApplied', location: '/library/Artist/Album' },
     ]);
     const interpret = vi.fn(() => okAsync([]));

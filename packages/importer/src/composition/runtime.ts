@@ -8,6 +8,7 @@ import { FilesystemIntake } from '../adapters/filesystem/intake.js';
 import { InProcessEventBus } from '../adapters/sqlite/event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from '../adapters/sqlite/event-store.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
+import { parseDistance } from '../domain/shared/distance.js';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
 import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { interpretEffect } from '../application/import/interpreter.js';
@@ -95,7 +96,8 @@ export interface ImporterRuntime {
 
 export type ImporterStartupError =
   | { readonly kind: 'BeetsConfigUnusable'; readonly detail: string }
-  | { readonly kind: 'ProjectionRebuildFailed'; readonly detail: string };
+  | { readonly kind: 'ProjectionRebuildFailed'; readonly detail: string }
+  | { readonly kind: 'InvalidAutoApplyThreshold'; readonly detail: string };
 
 /** True only for the "the directory is not there (yet)" errnos — everything else is a real fault. */
 function isDirectoryAbsent(error: unknown): boolean {
@@ -121,6 +123,16 @@ export async function createImporterRuntime(
   overrides: ImporterRuntimeOverrides = {},
 ): Promise<Result<ImporterRuntime, ImporterStartupError>> {
   const clock = overrides.clock ?? { now: () => new Date() };
+
+  // The configured auto-apply threshold crosses the edge here: parse it into a branded Distance so
+  // the domain's `distance > threshold` routing can never turn on an out-of-range or NaN bound.
+  const autoApplyThreshold = parseDistance(config.autoApplyThreshold);
+  if (autoApplyThreshold.isErr()) {
+    return err({
+      kind: 'InvalidAutoApplyThreshold',
+      detail: `autoApplyThreshold must be within [0, 1], got ${config.autoApplyThreshold}`,
+    });
+  }
 
   const tagger =
     overrides.tagger ??
@@ -180,7 +192,7 @@ export async function createImporterRuntime(
     store,
     clock,
     status,
-    policy: { autoApplyThreshold: config.autoApplyThreshold },
+    policy: { autoApplyThreshold: autoApplyThreshold.value },
   };
   const facade = createImporterFacade(deps);
   const feed = new OutboundFeed(store, publishedEventMapping);

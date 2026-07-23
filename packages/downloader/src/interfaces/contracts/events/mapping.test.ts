@@ -7,6 +7,8 @@ import {
   sampleFiles,
   sampleTarget,
 } from '../../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+import { asMbid } from '../../../domain/shared/__fixtures__/mbid.js';
+import { createTarget } from '../../../domain/target/target.js';
 import type { Target } from '../../../domain/target/target.js';
 import { publishedEventMapping } from './mapping.js';
 
@@ -52,7 +54,10 @@ describe('publishedEventMapping.publishes', () => {
 
 describe('publishedEventMapping.render — acquisition.fulfilled', () => {
   it('renders the fat payload from the stream prefix', () => {
-    const target: Target = { ...sampleTarget, mbid: 'release-mbid-1' };
+    const target: Target = createTarget({
+      ...sampleTarget,
+      mbid: asMbid('release-mbid-1'),
+    })._unsafeUnwrap();
     const rendered = renderLast(fulfilledHistory(target))._unsafeUnwrap();
 
     expect(rendered.type).toBe('acquisition.fulfilled');

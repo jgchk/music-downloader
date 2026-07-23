@@ -20,6 +20,7 @@ import {
   requested,
   resolved,
 } from './__fixtures__/import-fixtures.js';
+import { asDistance } from '../shared/__fixtures__/distance.js';
 import type { ImportCommand } from './commands.js';
 import type { ImportEvent } from './events.js';
 import { Import } from './import.js';
@@ -82,10 +83,10 @@ describe('recording a proposal', () => {
   ): ImportCommand => ({ type: 'RecordProposal', candidates, duplicates, pinnedId });
 
   it('auto-applies the best candidate at or under the threshold', () => {
-    const strong = candidate({ distance: 0.02 });
+    const strong = candidate({ distance: asDistance(0.02) });
     const weaker = candidate({
       ref: { dataSource: 'MusicBrainz', albumId: 'album-2' },
-      distance: 0.4,
+      distance: asDistance(0.4),
     });
     const events = given([requested()])
       .execute(record([weaker, strong]))
@@ -97,7 +98,7 @@ describe('recording a proposal', () => {
         duplicates: [],
         pinnedId: undefined,
       },
-      { type: 'AutoApplySelected', ref: strong.ref, distance: 0.02 },
+      { type: 'AutoApplySelected', ref: strong.ref, distance: asDistance(0.02) },
     ]);
     // Order-independent: the best candidate wins from either position.
     const reversed = given([requested()])
@@ -107,7 +108,7 @@ describe('recording a proposal', () => {
   });
 
   it('routes a weak match to review with the best candidate named', () => {
-    const weak = candidate({ distance: 0.6 });
+    const weak = candidate({ distance: asDistance(0.6) });
     const events = given([requested()])
       .execute(record([weak]))
       ._unsafeUnwrap();
@@ -118,7 +119,7 @@ describe('recording a proposal', () => {
   });
 
   it('marks a hint-contradicted weak match as hinted (distance governs, D4)', () => {
-    const weak = candidate({ distance: 0.6 });
+    const weak = candidate({ distance: asDistance(0.6) });
     const events = given([requested({ hints: HINTS })])
       .execute(record([weak]))
       ._unsafeUnwrap();
@@ -131,14 +132,14 @@ describe('recording a proposal', () => {
       resolved({ kind: 'supply-id', mbReleaseId: 'mb-2' }),
     ];
     const events = given(history)
-      .execute(record([candidate({ distance: 0.6 })]))
+      .execute(record([candidate({ distance: asDistance(0.6) })]))
       ._unsafeUnwrap();
     expect(events[1]).toMatchObject({ cause: { kind: 'match-review', hinted: true } });
   });
 
   it('marks the proposal hinted when the interpreter reports the pinned id', () => {
     const events = given([requested()])
-      .execute(record([candidate({ distance: 0.6 })], [], 'mb-9'))
+      .execute(record([candidate({ distance: asDistance(0.6) })], [], 'mb-9'))
       ._unsafeUnwrap();
     expect(events[0]).toMatchObject({ type: 'CandidatesProposed', pinnedId: 'mb-9' });
     expect(events[1]).toMatchObject({ cause: { hinted: true } });
@@ -151,7 +152,7 @@ describe('recording a proposal', () => {
 
   it('routes a strong match with an incumbent to duplicate review, never auto-replace', () => {
     const events = given([requested()])
-      .execute(record([candidate({ distance: 0.01 })], [INCUMBENT]))
+      .execute(record([candidate({ distance: asDistance(0.01) })], [INCUMBENT]))
       ._unsafeUnwrap();
     expect(events[1]).toEqual({
       type: 'ReviewRequired',
@@ -284,7 +285,7 @@ describe('resolving a review', () => {
 
   it('accepts each verb against an open match review', () => {
     for (const resolution of [
-      { kind: 'apply-candidate', ref: candidate({ distance: 0.5 }).ref },
+      { kind: 'apply-candidate', ref: candidate({ distance: asDistance(0.5) }).ref },
       { kind: 'supply-id', mbReleaseId: 'mb-2' },
       { kind: 'refresh-candidates' },
       { kind: 'manual-tags', tags: MANUAL_TAGS },
@@ -347,7 +348,7 @@ describe('resolving a review', () => {
     ).toEqual({ kind: 'NoRetainedCandidate' });
     const legacy = [
       requested({ source: { acquisitionId: 'acq-legacy' } }),
-      proposed([candidate({ distance: 0.5 })]),
+      proposed([candidate({ distance: asDistance(0.5) })]),
       MATCH_REVIEW,
     ];
     expect(
@@ -658,7 +659,7 @@ describe('the snapshot projection', () => {
     const snapshot = given(awaitingMatchReview()).snapshot;
     expect(snapshot.openReview).toEqual({
       cause: { kind: 'match-review', hinted: false, best: candidate().ref },
-      candidates: [candidate({ distance: 0.5 })],
+      candidates: [candidate({ distance: asDistance(0.5) })],
     });
   });
 

@@ -60,7 +60,13 @@ const ABANDONED: DownloadResult = { kind: 'failed', reason: 'Stalled', files: PA
 const IMPORTED: ImportResult = { kind: 'imported', location: '/library/Radiohead/Kid A (2000)' };
 const CONFLICT: ImportResult = { kind: 'conflict', location: '/library/Radiohead/Kid A (2000)' };
 
-const SUBMIT_BODY = { request: { kind: 'musicbrainz', mbid: 'mbid-1', targetType: 'album' } };
+const SUBMIT_BODY = {
+  request: {
+    kind: 'musicbrainz',
+    mbid: '11111111-1111-4111-8111-111111111111',
+    targetType: 'album',
+  },
+};
 
 function candidateWithSpeed(username: string, speedBytesPerSec: number): Candidate {
   const base = matchingCandidate(username);

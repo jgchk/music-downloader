@@ -1,3 +1,8 @@
+import { err, ok } from 'neverthrow';
+import type { Result } from 'neverthrow';
+import { branded } from '../shared/brand.js';
+import type { Brand } from '../shared/brand.js';
+
 /**
  * A source-agnostic candidate: one peer's copy of the target, already grouped to the
  * target's granularity by the SearchPort (D11). A fileset (folder) for a release, a single
@@ -5,11 +10,49 @@
  * (D5) inspects the actual bytes later.
  */
 
-/** Stable cross-round identity: `(username, path, size)` (D6). Drives dedup and the rejected-set. */
-export interface CandidateIdentity {
+/**
+ * Stable cross-round identity: `(username, path, size)` (D6). Drives dedup and the rejected-set —
+ * so it is branded (compile-time only, runtime-erased) and can only be minted through
+ * {@link parseCandidateIdentity}, which proves the key is sound before it ever seeds a Set/Map.
+ * The value serializes on events as a plain object, unchanged.
+ */
+export type CandidateIdentity = Brand<
+  {
+    readonly username: string;
+    readonly path: string;
+    readonly sizeBytes: number;
+  },
+  'CandidateIdentity'
+>;
+
+/** The unvalidated shape a source reports, parsed at the adapter edge into a {@link CandidateIdentity}. */
+export interface CandidateIdentityInput {
   readonly username: string;
   readonly path: string;
   readonly sizeBytes: number;
+}
+
+export type InvalidCandidateIdentity =
+  | { readonly kind: 'EmptyUsername' }
+  | { readonly kind: 'EmptyPath' }
+  | { readonly kind: 'InvalidSize' };
+
+/** Parse-don't-validate: reject a blank username/path or a negative/non-finite size at the edge. */
+export function parseCandidateIdentity(
+  input: CandidateIdentityInput,
+): Result<CandidateIdentity, InvalidCandidateIdentity> {
+  if (input.username.trim() === '') return err({ kind: 'EmptyUsername' });
+  if (input.path.trim() === '') return err({ kind: 'EmptyPath' });
+  if (!Number.isFinite(input.sizeBytes) || input.sizeBytes < 0) {
+    return err({ kind: 'InvalidSize' });
+  }
+  return ok(
+    branded<CandidateIdentity>({
+      username: input.username,
+      path: input.path,
+      sizeBytes: input.sizeBytes,
+    }),
+  );
 }
 
 export interface CandidateFile {

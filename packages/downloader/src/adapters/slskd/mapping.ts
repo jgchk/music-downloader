@@ -1,7 +1,7 @@
+import { parseCandidateIdentity } from '../../domain/candidate/candidate.js';
 import type {
   Candidate,
   CandidateFile,
-  CandidateIdentity,
   SourceReliability,
 } from '../../domain/candidate/candidate.js';
 import type { TargetType } from '../../domain/target/target.js';
@@ -36,8 +36,8 @@ function codecOf(filename: string): string | undefined {
   return dot === -1 ? undefined : filename.slice(dot + 1).toLowerCase();
 }
 
-function toCandidateFile(file: SlskdSearchFile): CandidateFile {
-  const filename = file.filename ?? '';
+/** The resolved name is threaded in from the caller — only files with a name survive to here. */
+function toCandidateFile(file: SlskdSearchFile, filename: string): CandidateFile {
   return {
     name: baseName(filename),
     sizeBytes: file.size ?? 0,
@@ -62,13 +62,17 @@ function trackCandidates(
   files: readonly SlskdSearchFile[],
   source: SourceReliability,
 ): Candidate[] {
-  return files.map((file) => {
-    const identity: CandidateIdentity = {
+  return files.flatMap((file) => {
+    // Parse at this ACL edge: a file with no username/path is unaddressable, so it is dropped
+    // rather than admitted with a blank (collision-prone) dedup key.
+    const filename = file.filename ?? '';
+    const identity = parseCandidateIdentity({
       username,
-      path: file.filename ?? '',
+      path: filename,
       sizeBytes: file.size ?? 0,
-    };
-    return { identity, files: [toCandidateFile(file)], source };
+    });
+    if (identity.isErr()) return [];
+    return [{ identity: identity.value, files: [toCandidateFile(file, filename)], source }];
   });
 }
 
@@ -77,20 +81,29 @@ function folderCandidates(
   files: readonly SlskdSearchFile[],
   source: SourceReliability,
 ): Candidate[] {
-  const byFolder = new Map<string, SlskdSearchFile[]>();
+  const byFolder = new Map<string, { file: SlskdSearchFile; filename: string }[]>();
   for (const file of files) {
-    const folder = folderOf(file.filename ?? '');
+    const filename = file.filename ?? '';
+    const folder = folderOf(filename);
+    const entry = { file, filename };
     const bucket = byFolder.get(folder);
-    if (bucket === undefined) byFolder.set(folder, [file]);
-    else bucket.push(file);
+    if (bucket === undefined) byFolder.set(folder, [entry]);
+    else bucket.push(entry);
   }
-  return [...byFolder].map(([folder, folderFiles]) => {
-    const identity: CandidateIdentity = {
+  return [...byFolder].flatMap(([folder, entries]) => {
+    const identity = parseCandidateIdentity({
       username,
       path: folder,
-      sizeBytes: folderFiles.reduce((sum, file) => sum + (file.size ?? 0), 0),
-    };
-    return { identity, files: folderFiles.map(toCandidateFile), source };
+      sizeBytes: entries.reduce((sum, entry) => sum + (entry.file.size ?? 0), 0),
+    });
+    if (identity.isErr()) return [];
+    return [
+      {
+        identity: identity.value,
+        files: entries.map((entry) => toCandidateFile(entry.file, entry.filename)),
+        source,
+      },
+    ];
   });
 }
 

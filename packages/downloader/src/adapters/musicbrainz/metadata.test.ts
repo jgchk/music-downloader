@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
+import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { MusicBrainzMetadata } from './metadata.js';
 
@@ -33,8 +34,16 @@ function resolver(routes: Array<[string, HttpResponse]>): MusicBrainzMetadata {
   return new MusicBrainzMetadata(silentLogger(), http(routes));
 }
 
-const albumById: AcquisitionRequest = { kind: 'musicbrainz', mbid: 'rel-1', targetType: 'album' };
-const trackById: AcquisitionRequest = { kind: 'musicbrainz', mbid: 'rec-1', targetType: 'track' };
+const albumById: AcquisitionRequest = {
+  kind: 'musicbrainz',
+  mbid: asMbid('rel-1'),
+  targetType: 'album',
+};
+const trackById: AcquisitionRequest = {
+  kind: 'musicbrainz',
+  mbid: asMbid('rec-1'),
+  targetType: 'track',
+};
 
 describe('MusicBrainzMetadata', () => {
   it('resolves a release by MBID into a canonical target', async () => {
@@ -186,7 +195,7 @@ describe('MusicBrainzMetadata', () => {
 
   const byReleaseGroup = (mbid: string): AcquisitionRequest => ({
     kind: 'release-group',
-    mbid,
+    mbid: asMbid(mbid),
     targetType: 'album',
   });
 

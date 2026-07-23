@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTarget, totalDurationMs, trackCount } from './target.js';
 import type { TargetInput } from './target.js';
+import { asMbid } from '../shared/__fixtures__/mbid.js';
 
 function albumInput(overrides: Partial<TargetInput> = {}): TargetInput {
   return {
@@ -8,7 +9,7 @@ function albumInput(overrides: Partial<TargetInput> = {}): TargetInput {
     artist: 'Boards of Canada',
     title: 'Music Has the Right to Children',
     year: 1998,
-    mbid: 'b1392450-e666-3926-a536-22c65f834433',
+    mbid: asMbid('b1392450-e666-3926-a536-22c65f834433'),
     tracks: [
       { position: 1, title: 'Wildlife Analysis', durationMs: 78000 },
       { position: 2, title: 'An Eagle in Your Mind', durationMs: 380000 },

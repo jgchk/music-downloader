@@ -1,5 +1,6 @@
 import type { Candidate, CandidateRef } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
+import type { Mbid } from '../shared/mbid.js';
 import type { Target } from '../target/target.js';
 import type { ValidationVerdict } from '../validation/verdict.js';
 import type {
@@ -29,7 +30,7 @@ export type AcquisitionCommand =
   | {
       // The user's choice among the retained candidates (valid only while awaiting selection).
       readonly type: 'SelectEdition';
-      readonly releaseMbid: string;
+      readonly releaseMbid: Mbid;
     }
   | { readonly type: 'RecordSearchResults'; readonly candidates: readonly Candidate[] }
   | { readonly type: 'RecordDownloadCompleted'; readonly files: readonly DownloadedFile[] }

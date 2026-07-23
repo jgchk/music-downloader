@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { EventStorePort } from '../application/ports/event-store-port.js';
 import {
   awaitingSelectionHistory,
+  defaultPolicies,
   sampleEditionCandidates,
+  sampleGroupRequest,
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+import { asMbid } from '../domain/shared/__fixtures__/mbid.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
@@ -24,8 +27,13 @@ import {
  * failure is a modeled error value, never a throw.
  */
 
+// User-supplied mbids cross the facade edge as UUIDs (parsed with parseMbid); tests use real ones.
+const MBID_1 = '11111111-1111-4111-8111-111111111111';
+const RETAINED_EDITION = '22222222-2222-4222-8222-222222222222';
+const OFF_MENU_EDITION = '33333333-3333-4333-8333-333333333333';
+
 const VALID_SUBMIT = {
-  request: { kind: 'musicbrainz', mbid: 'mbid-1', targetType: 'album' },
+  request: { kind: 'musicbrainz', mbid: MBID_1, targetType: 'album' },
 } as const;
 
 /** Round-trip a value through JSON and assert nothing was lost. */
@@ -50,6 +58,19 @@ describe('createDownloaderFacade', () => {
     it('returns a modeled validation error for schema-invalid input, without throwing', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
       const result = await facade.submitAcquisition({ request: { kind: 'nonsense' } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('ValidationFailed');
+        expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
+      }
+    });
+
+    it('rejects a schema-valid but non-UUID MusicBrainz id as a validation error', async () => {
+      const facade = createDownloaderFacade(testWiring().deps);
+      const result = await facade.submitAcquisition({
+        request: { kind: 'musicbrainz', mbid: 'not-a-uuid', targetType: 'album' },
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -152,17 +173,32 @@ describe('createDownloaderFacade', () => {
   describe('selectEdition', () => {
     async function awaitingWiring(): Promise<TestWiring> {
       const wiring = testWiring();
-      await wiring.store.append('acq-1', 0, awaitingSelectionHistory(), {
-        acquisitionId: 'acq-1',
-        occurredAt: 't',
-      });
+      await wiring.store.append(
+        'acq-1',
+        0,
+        [
+          {
+            type: 'AcquisitionRequested',
+            request: sampleGroupRequest,
+            policies: defaultPolicies(),
+          },
+          {
+            type: 'ManualSelectionRequested',
+            candidates: [{ releaseMbid: asMbid(RETAINED_EDITION), trackCount: 12 }],
+          },
+        ],
+        { acquisitionId: 'acq-1', occurredAt: 't' },
+      );
       wiring.sync();
       return wiring;
     }
 
     it('accepts a retained candidate and resumes the acquisition', async () => {
       const wiring = await awaitingWiring();
-      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'boot-1' });
+      const result = await wiring.facade.selectEdition({
+        id: 'acq-1',
+        releaseMbid: RETAINED_EDITION,
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -175,11 +211,14 @@ describe('createDownloaderFacade', () => {
 
     it('returns the modeled UnknownEdition rejection for an off-menu choice', async () => {
       const wiring = await awaitingWiring();
-      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'off-menu' });
+      const result = await wiring.facade.selectEdition({
+        id: 'acq-1',
+        releaseMbid: OFF_MENU_EDITION,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toEqual({ kind: 'UnknownEdition', releaseMbid: 'off-menu' });
+        expect(result.error).toEqual({ kind: 'UnknownEdition', releaseMbid: OFF_MENU_EDITION });
         expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
       }
     });
@@ -191,7 +230,7 @@ describe('createDownloaderFacade', () => {
 
       const result = await wiring.facade.selectEdition({
         id: submitted.value.acquisitionId,
-        releaseMbid: 'boot-1',
+        releaseMbid: RETAINED_EDITION,
       });
 
       expect(result.ok).toBe(false);
@@ -203,6 +242,14 @@ describe('createDownloaderFacade', () => {
     it('rejects invalid input as a modeled validation error', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
       const result = await facade.selectEdition({ id: 'acq-1' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
+    });
+
+    it('rejects a non-UUID releaseMbid as a modeled validation error', async () => {
+      const wiring = await awaitingWiring();
+      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'not-a-uuid' });
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');

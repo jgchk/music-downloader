@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-identity.js';
 import { baseName, mapSearchResponses, remoteFilename } from './mapping.js';
 
 const richFile = {
@@ -58,45 +59,48 @@ describe('mapSearchResponses', () => {
     ]);
   });
 
-  it('splits files across folders, folding sizeless/nameless files into the root group', () => {
+  it('splits files across folders, dropping the rootless group with no addressable path', () => {
+    // `loose` and the nameless file fold into the root group (path ''); an empty path yields no
+    // sound dedup key, so `parseCandidateIdentity` rejects that group and the ACL drops it. The
+    // kept folder also carries `notes` (no extension, no advertised size) to exercise the file
+    // mapping's codec/size fallbacks.
     const candidates = mapSearchResponses(
-      [{ files: [richFile, { filename: 'loose', size: 40 }, {}] }],
+      [
+        {
+          username: 'u2',
+          files: [richFile, { filename: '@@a\\Album\\notes' }, { filename: 'loose', size: 40 }, {}],
+        },
+      ],
       'album',
     );
 
     expect(candidates).toEqual([
       {
-        identity: { username: '', path: '@@a\\Album', sizeBytes: 100 },
-        files: [expect.objectContaining({ name: '01 Track.FLAC' })],
-        source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 0 },
-      },
-      {
-        identity: { username: '', path: '', sizeBytes: 40 },
+        identity: asCandidateIdentity({ username: 'u2', path: '@@a\\Album', sizeBytes: 100 }),
         files: [
-          expect.objectContaining({ name: 'loose', codec: undefined }),
-          expect.objectContaining({ name: '', sizeBytes: 0 }),
+          expect.objectContaining({ name: '01 Track.FLAC' }),
+          expect.objectContaining({ name: 'notes', codec: undefined, sizeBytes: 0 }),
         ],
         source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 0 },
       },
     ]);
   });
 
-  it('ignores a response that advertises no files', () => {
-    expect(mapSearchResponses([{ username: 'u3' }], 'album')).toEqual([]);
+  it('ignores a response that advertises neither a username nor any files', () => {
+    expect(mapSearchResponses([{}], 'album')).toEqual([]);
   });
 
-  it('yields one candidate per file for a track target', () => {
+  it('yields one candidate per file for a track target, dropping a nameless (pathless) file', () => {
     const candidates = mapSearchResponses([{ username: 'u1', files: [richFile, {}] }], 'track');
 
     expect(candidates).toEqual([
       {
-        identity: { username: 'u1', path: '@@a\\Album\\01 Track.FLAC', sizeBytes: 100 },
+        identity: asCandidateIdentity({
+          username: 'u1',
+          path: '@@a\\Album\\01 Track.FLAC',
+          sizeBytes: 100,
+        }),
         files: [expect.objectContaining({ name: '01 Track.FLAC' })],
-        source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 0 },
-      },
-      {
-        identity: { username: 'u1', path: '', sizeBytes: 0 },
-        files: [expect.objectContaining({ name: '', sizeBytes: 0 })],
         source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 0 },
       },
     ]);

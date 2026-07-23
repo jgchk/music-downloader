@@ -2,6 +2,7 @@ import type { ResultAsync } from 'neverthrow';
 import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
 import type { CandidateRef } from '../../domain/candidate/candidate.js';
 import type { AcquisitionPolicies } from '../../domain/policy/policies.js';
+import type { Mbid } from '../../domain/shared/mbid.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { IdGenerator } from '../ports/system-ports.js';
 import type {
@@ -56,7 +57,7 @@ export function cancelAcquisition(
 export function selectEdition(
   deps: CommandDeps,
   acquisitionId: string,
-  releaseMbid: string,
+  releaseMbid: Mbid,
 ): ResultAsync<void, CommandError> {
   return applyCommand(deps, acquisitionId, { type: 'SelectEdition', releaseMbid }).map(
     () => undefined,

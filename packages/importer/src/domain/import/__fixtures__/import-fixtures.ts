@@ -10,10 +10,11 @@ import type {
   ProposedCandidate,
   Resolution,
 } from '../events.js';
+import { asDistance } from '../../shared/__fixtures__/distance.js';
 
 /** Deterministic builders for domain tests. */
 
-export const POLICY: ImportPolicy = { autoApplyThreshold: 0.1 };
+export const POLICY: ImportPolicy = { autoApplyThreshold: asDistance(0.1) };
 export const DIRECTORY = '/intake/Artist - Album';
 export const HINTS: ImportHints = { mbReleaseId: 'mb-release-1', artist: 'Artist', album: 'Album' };
 
@@ -31,8 +32,8 @@ export function candidate(overrides: Partial<ProposedCandidate> = {}): ProposedC
     ref: { dataSource: 'MusicBrainz', albumId: 'album-1' },
     artist: 'Artist',
     album: 'Album',
-    distance: 0.05,
-    penalties: [{ name: 'tracks', amount: 0.05 }],
+    distance: asDistance(0.05),
+    penalties: [{ name: 'tracks', amount: asDistance(0.05) }],
     tracks: [{ path: `${DIRECTORY}/01 Track.flac`, title: 'Track', index: 1 }],
     ...overrides,
   };
@@ -74,7 +75,7 @@ export function resolved(resolution: Resolution): ImportEvent {
 export const AUTO_APPLIED: ImportEvent = {
   type: 'AutoApplySelected',
   ref: { dataSource: 'MusicBrainz', albumId: 'album-1' },
-  distance: 0.05,
+  distance: asDistance(0.05),
 };
 
 export const MATCH_REVIEW: ImportEvent = {
@@ -92,12 +93,16 @@ export const REMEDIATION: ImportEvent = { type: 'RemediationRequired', failures:
 
 /** A history that lands in `awaiting-review` (weak match) with one listed candidate. */
 export function awaitingMatchReview(): ImportEvent[] {
-  return [requested(), proposed([candidate({ distance: 0.5 })]), MATCH_REVIEW];
+  return [requested(), proposed([candidate({ distance: asDistance(0.5) })]), MATCH_REVIEW];
 }
 
 /** As above, but downloader-delivered with a retained candidate (verdict-capable). */
 export function awaitingReviewWithCandidate(): ImportEvent[] {
-  return [requested({ source: SOURCE }), proposed([candidate({ distance: 0.5 })]), MATCH_REVIEW];
+  return [
+    requested({ source: SOURCE }),
+    proposed([candidate({ distance: asDistance(0.5) })]),
+    MATCH_REVIEW,
+  ];
 }
 
 /** A history that auto-applied and landed `applied`. */

@@ -1,5 +1,7 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
+import { branded } from '../shared/brand.js';
+import type { Brand } from '../shared/brand.js';
 
 /**
  * Quality as ordered buckets + a hard floor (D11), not a continuous scalar — so hi-res never
@@ -69,15 +71,13 @@ export function resolveQualityBucket(attrs: QualityAttributes): QualityBucket {
   return 'LOSSY_LOW';
 }
 
-export interface QualityPolicy {
-  readonly order: readonly QualityBucket[];
-  readonly floor: QualityBucket;
-}
-
-export const DEFAULT_QUALITY_POLICY: QualityPolicy = {
-  order: QUALITY_BUCKETS,
-  floor: 'LOSSY_LOW',
-};
+export type QualityPolicy = Brand<
+  {
+    readonly order: readonly QualityBucket[];
+    readonly floor: QualityBucket;
+  },
+  'QualityPolicy'
+>;
 
 export type QualityPolicyError =
   { readonly kind: 'EmptyOrder' } | { readonly kind: 'FloorNotInOrder' };
@@ -88,8 +88,13 @@ export function createQualityPolicy(
 ): Result<QualityPolicy, QualityPolicyError> {
   if (order.length === 0) return err({ kind: 'EmptyOrder' });
   if (!order.includes(floor)) return err({ kind: 'FloorNotInOrder' });
-  return ok({ order: [...order], floor });
+  return ok(branded<QualityPolicy>({ order: [...order], floor }));
 }
+
+export const DEFAULT_QUALITY_POLICY: QualityPolicy = createQualityPolicy(
+  QUALITY_BUCKETS,
+  'LOSSY_LOW',
+)._unsafeUnwrap();
 
 /** Rank within the policy order; absent buckets sort worst (Infinity). Lower rank = higher quality. */
 export function bucketRank(policy: QualityPolicy, bucket: QualityBucket): number {

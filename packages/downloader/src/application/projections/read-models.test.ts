@@ -7,6 +7,7 @@ import {
   projectStatus,
 } from './read-models.js';
 import { FakeEventStore } from '../__fixtures__/fakes.js';
+import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import {
@@ -104,7 +105,7 @@ describe('projectStatus — awaiting manual edition selection', () => {
   it('drops the candidates once an edition is selected and the flow resumes', () => {
     const view = projectStatus('acq-1', [
       ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
     ]);
     expect(view.status).toBe('Pending');
     expect(view.candidates).toBeUndefined();

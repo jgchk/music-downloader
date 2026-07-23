@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CommandError } from '../application/acquisition/command-handler.js';
+import { parseMbid } from '../domain/shared/mbid.js';
 import {
   cancelAcquisition as cancelAcquisitionUseCase,
   getAcquisition as getAcquisitionUseCase,
@@ -110,10 +111,17 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
     async submitAcquisition(input) {
       const parsed = submitAcquisitionRequestSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
+      const request = requestToDomain(parsed.data.request);
+      if (request.isErr()) {
+        return fail({
+          kind: 'ValidationFailed',
+          message: 'request carries a malformed MusicBrainz id',
+        });
+      }
       const policies = resolvePolicies(parsed.data);
       if (policies.isErr()) return fail({ kind: 'InvalidPolicy' });
       const result = await submitAcquisitionUseCase(deps, {
-        request: requestToDomain(parsed.data.request),
+        request: request.value,
         policies: policies.value,
       });
       return result.match(
@@ -135,7 +143,14 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
     async selectEdition(input) {
       const parsed = selectEditionInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await selectEditionUseCase(deps, parsed.data.id, parsed.data.releaseMbid);
+      const releaseMbid = parseMbid(parsed.data.releaseMbid);
+      if (releaseMbid.isErr()) {
+        return fail({
+          kind: 'ValidationFailed',
+          message: 'releaseMbid is not a valid MusicBrainz id',
+        });
+      }
+      const result = await selectEditionUseCase(deps, parsed.data.id, releaseMbid.value);
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),

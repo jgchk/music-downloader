@@ -72,9 +72,9 @@ describe('bucketRank / meetsFloor / compareQuality', () => {
 
   it('ranks by position, with absent buckets worst', () => {
     expect(bucketRank(policy, 'LOSSLESS_HIRES')).toBe(0);
-    expect(bucketRank({ order: ['LOSSLESS'], floor: 'LOSSLESS' }, 'UNKNOWN')).toBe(
-      Number.POSITIVE_INFINITY,
-    );
+    expect(
+      bucketRank(createQualityPolicy(['LOSSLESS'], 'LOSSLESS')._unsafeUnwrap(), 'UNKNOWN'),
+    ).toBe(Number.POSITIVE_INFINITY);
   });
 
   it('admits buckets at or above the floor and excludes those below', () => {

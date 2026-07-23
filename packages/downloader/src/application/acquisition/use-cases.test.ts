@@ -10,6 +10,7 @@ import {
 } from './use-cases.js';
 import type { UseCaseDeps } from './use-cases.js';
 import { FakeEventStore, fixedClock, sequentialIds } from '../__fixtures__/fakes.js';
+import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import {
   AcquisitionStatusProjection,
   ProgressReadModel,
@@ -70,14 +71,14 @@ describe('selectEdition', () => {
 
   it('appends the selection for an acquisition awaiting one', async () => {
     const d = await awaitingDeps();
-    const result = await selectEdition(d, 'acq-1', 'boot-1');
+    const result = await selectEdition(d, 'acq-1', asMbid('boot-1'));
     expect(result.isOk()).toBe(true);
     expect((d.store as FakeEventStore).all().map((e) => e.type)).toContain('EditionSelected');
   });
 
   it('surfaces the modeled rejection for an off-menu edition', async () => {
     const d = await awaitingDeps();
-    const result = await selectEdition(d, 'acq-1', 'not-on-the-menu');
+    const result = await selectEdition(d, 'acq-1', asMbid('not-on-the-menu'));
     expect(result._unsafeUnwrapErr()).toEqual({
       kind: 'UnknownEdition',
       releaseMbid: 'not-on-the-menu',
@@ -90,7 +91,7 @@ describe('selectEdition', () => {
     const { acquisitionId } = (
       await submitAcquisition(d, { request: sampleRequest, policies: defaultPolicies() })
     )._unsafeUnwrap();
-    const result = await selectEdition(d, acquisitionId, 'boot-1');
+    const result = await selectEdition(d, acquisitionId, asMbid('boot-1'));
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'IllegalTransition',
       command: 'SelectEdition',

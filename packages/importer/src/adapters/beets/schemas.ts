@@ -9,7 +9,9 @@ import { z } from 'zod';
 
 export const bridgePenaltySchema = z.object({
   name: z.string(),
-  amount: z.number(),
+  // A distance component: the [0, 1] bound (which also rejects NaN/Infinity) is the parse edge for
+  // the domain's branded Distance, so a drifted bridge surfaces as an InfraError, never a misroute.
+  amount: z.number().min(0).max(1),
 });
 
 export const bridgeTrackSchema = z.object({
@@ -23,7 +25,9 @@ export const bridgeCandidateSchema = z.object({
   album_id: z.string().min(1),
   artist: z.string(),
   album: z.string(),
-  distance: z.number().min(0),
+  // The overall match distance; the [0, 1] bound (rejecting NaN/Infinity) is the parse edge for the
+  // domain's branded Distance that the auto-apply routing turns on.
+  distance: z.number().min(0).max(1),
   penalties: z.array(bridgePenaltySchema),
   tracks: z.array(bridgeTrackSchema),
 });
