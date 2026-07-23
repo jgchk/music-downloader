@@ -10,7 +10,7 @@ const children = createRawSnippet(() => ({
 describe('root layout (SSR)', () => {
   it('frames the page in a single-main landmark skeleton', () => {
     const { body } = render(Layout, {
-      props: { data: { attentionCount: 0 }, params: {}, children },
+      props: { data: { attentionCount: 0, pathname: '/' }, params: {}, children },
     });
     // The shell owns exactly one main landmark; pages render inside it.
     expect(body.match(/<main[\s>]/g)).toHaveLength(1);
@@ -21,9 +21,24 @@ describe('root layout (SSR)', () => {
     expect(body).toContain('data-testid="page-body"');
   });
 
+  it('marks the active section (including child routes) with aria-current', () => {
+    const { body } = render(Layout, {
+      props: { data: { attentionCount: 0, pathname: '/acquisitions/acq-1' }, params: {}, children },
+    });
+    // Acquisitions stays current on its [id] child route; Home does not become current.
+    expect(body).toMatch(/<a href="\/acquisitions" aria-current="page"/);
+    expect(body).not.toMatch(/<a href="\/" aria-current="page"/);
+
+    // …and on an exact section match (not just a child route).
+    const exact = render(Layout, {
+      props: { data: { attentionCount: 0, pathname: '/reviews' }, params: {}, children },
+    });
+    expect(exact.body).toMatch(/<a href="\/reviews" aria-current="page"/);
+  });
+
   it('renders the site navigation with a count badge over the page body', () => {
     const { body } = render(Layout, {
-      props: { data: { attentionCount: 2 }, params: {}, children },
+      props: { data: { attentionCount: 2, pathname: '/' }, params: {}, children },
     });
     expect(body).toContain('data-testid="site-nav"');
     expect(body).toContain('href="/acquisitions"');
@@ -35,7 +50,7 @@ describe('root layout (SSR)', () => {
 
   it('renders no badge at all when nothing waits', () => {
     const { body } = render(Layout, {
-      props: { data: { attentionCount: 0 }, params: {}, children },
+      props: { data: { attentionCount: 0, pathname: '/' }, params: {}, children },
     });
     expect(body).toContain('Needs attention');
     expect(body).not.toContain('data-testid="attention-badge"');

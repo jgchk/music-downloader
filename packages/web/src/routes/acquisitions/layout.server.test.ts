@@ -1,30 +1,53 @@
 import { describe, expect, it } from 'vitest';
+import type { Logger } from 'pino';
 import type { DownloaderFacade } from '@music/downloader';
 import { load } from './+layout.server.js';
 
-const list = { acquisitions: [{ acquisitionId: 'acq-1' }] };
-
-function run(pathname: string): { list: unknown; selectedId: string | undefined } {
-  const facades = {
-    downloader: { listAcquisitions: () => list } as unknown as DownloaderFacade,
-  };
-  return load({ locals: { facades }, url: new URL(`http://host${pathname}`) } as never) as {
-    list: unknown;
-    selectedId: string | undefined;
+function event(over: { listAcquisitions?: () => unknown; id?: string }): {
+  event: { locals: App.Locals; params: { id?: string } };
+  warnings: unknown[];
+} {
+  const warnings: unknown[] = [];
+  return {
+    warnings,
+    event: {
+      params: { id: over.id },
+      locals: {
+        facades: {
+          downloader: {
+            listAcquisitions:
+              over.listAcquisitions ?? (() => ({ acquisitions: [{ acquisitionId: 'acq-1' }] })),
+          } as unknown as DownloaderFacade,
+        },
+        logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
+      } as unknown as App.Locals,
+    },
   };
 }
 
 describe('acquisitions layout load', () => {
-  it('returns the facade list with no selection on the index', () => {
-    expect(run('/acquisitions')).toEqual({ list, selectedId: undefined });
+  it('returns the guarded list with no selection on the index', () => {
+    const { event: e } = event({ id: undefined });
+    expect(load(e as never)).toEqual({
+      acquisitions: [{ acquisitionId: 'acq-1' }],
+      listFailed: false,
+      selectedId: undefined,
+    });
   });
 
-  it('derives the selected id from a detail URL (with or without a trailing slash)', () => {
-    expect(run('/acquisitions/acq-1').selectedId).toBe('acq-1');
-    expect(run('/acquisitions/acq-1/').selectedId).toBe('acq-1');
+  it('carries the route param as the selected id', () => {
+    const { event: e } = event({ id: 'acq-1' });
+    expect((load(e as never) as { selectedId: string | undefined }).selectedId).toBe('acq-1');
   });
 
-  it('treats the new-request route as no selection', () => {
-    expect(run('/acquisitions/new').selectedId).toBeUndefined();
+  it('degrades to an empty, flagged list and logs when the downloader read throws', () => {
+    const fault = new Error('downloader store gone');
+    const { event: e, warnings } = event({
+      listAcquisitions: () => {
+        throw fault;
+      },
+    });
+    expect(load(e as never)).toEqual({ acquisitions: [], listFailed: true, selectedId: undefined });
+    expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });
 });

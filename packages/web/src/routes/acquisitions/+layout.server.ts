@@ -1,13 +1,21 @@
 import type { LayoutServerLoad } from './$types';
+import { guardedRead } from '$lib/server/facade-reads.js';
 
 /**
- * The acquisitions master pane: one facade read model (web-ui: progress observation), shared by
- * the index and every `[id]` detail view so the list stays put while a selection is inspected.
- * The selected id is derived from the URL — the layout's own params don't carry the child `[id]`
- * — so the list can mark the current row. `new` is a sibling route, not a selection.
+ * The acquisitions master pane: the list read is guarded (web-ui spec: one module failing never
+ * empties the queue) so a downloader fault degrades the list to empty-and-flagged while the detail
+ * pane and the new-request form — which don't need the list — keep rendering. `selectedId` is the
+ * route param (`undefined` on the index and the `/new` sibling), used to mark the current row.
  */
-export const load: LayoutServerLoad = ({ locals, url }) => {
-  const match = /^\/acquisitions\/([^/]+)\/?$/.exec(url.pathname);
-  const selectedId = match && match[1] !== 'new' ? match[1] : undefined;
-  return { list: locals.facades.downloader.listAcquisitions(), selectedId };
+export const load: LayoutServerLoad = ({ locals, params }) => {
+  const acquisitions = guardedRead(
+    locals.logger,
+    'downloader',
+    () => locals.facades.downloader.listAcquisitions().acquisitions,
+  );
+  return {
+    acquisitions: acquisitions.entries,
+    listFailed: acquisitions.failed,
+    selectedId: params.id,
+  };
 };

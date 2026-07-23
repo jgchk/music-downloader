@@ -6,7 +6,13 @@ describe('new acquisition page (SSR)', () => {
   it('renders the form untouched', () => {
     const { body } = render(Page, {
       props: {
-        data: { attentionCount: 0, list: { acquisitions: [] }, selectedId: undefined },
+        data: {
+          attentionCount: 0,
+          pathname: '/acquisitions/new',
+          acquisitions: [],
+          listFailed: false,
+          selectedId: undefined,
+        },
         params: {},
         form: null,
       },
@@ -18,7 +24,13 @@ describe('new acquisition page (SSR)', () => {
   it('renders a failed action with message and echoed values', () => {
     const { body } = render(Page, {
       props: {
-        data: { attentionCount: 0, list: { acquisitions: [] }, selectedId: undefined },
+        data: {
+          attentionCount: 0,
+          pathname: '/acquisitions/new',
+          acquisitions: [],
+          listFailed: false,
+          selectedId: undefined,
+        },
         params: {},
         form: { message: 'Invalid input: mbid required', values: { kind: 'musicbrainz' } },
       },

@@ -8,7 +8,9 @@ describe('acquisition detail page (SSR)', () => {
       props: {
         data: {
           attentionCount: 0,
-          list: { acquisitions: [] },
+          pathname: '/acquisitions/acq-1',
+          acquisitions: [],
+          listFailed: false,
           selectedId: 'acq-1',
           acquisition: {
             acquisitionId: 'acq-1',

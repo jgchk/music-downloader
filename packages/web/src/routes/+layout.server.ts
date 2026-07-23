@@ -8,7 +8,7 @@ import { guardedRead } from '$lib/server/facade-reads.js';
  * badge is discovery, not truth: a failing module read is logged and contributes zero here
  * rather than breaking every page; the queue page models the failure per section.
  */
-export const load: LayoutServerLoad = ({ locals }) => {
+export const load: LayoutServerLoad = ({ locals, url }) => {
   const reviews = guardedRead(
     locals.logger,
     'importer',
@@ -19,5 +19,9 @@ export const load: LayoutServerLoad = ({ locals }) => {
     'downloader',
     () => locals.facades.downloader.listAcquisitions().acquisitions,
   );
-  return { attentionCount: attentionItems(reviews.entries, acquisitions.entries).length };
+  return {
+    attentionCount: attentionItems(reviews.entries, acquisitions.entries).length,
+    // The current path drives the primary nav's active-tab state in +layout.svelte.
+    pathname: url.pathname,
+  };
 };

@@ -8,6 +8,7 @@ describe('attention queue page (SSR)', () => {
       props: {
         data: {
           attentionCount: 0,
+          pathname: '/reviews',
           items: [],
           errors: { importer: undefined, downloader: undefined },
         },
@@ -24,6 +25,7 @@ describe('attention queue page (SSR)', () => {
       props: {
         data: {
           attentionCount: 0,
+          pathname: '/reviews',
           items: [],
           errors: { importer: 'Import reviews are unavailable right now.', downloader: undefined },
         },

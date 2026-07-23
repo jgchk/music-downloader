@@ -3,10 +3,11 @@
 
    Two tiers:
    - PRIMITIVES: raw, context-free scales. Never referenced by components.
-   - SEMANTIC: intent-named tokens that components read. A skin is nothing but
-     a remap of this layer (see lib/styles/skins/*). Swapping the skin swaps the
-     whole look — and, via the --shell-* tokens, the whole layout — with no DOM
-     change. Keep component CSS reading ONLY the semantic tokens below.
+   - SEMANTIC: intent-named tokens that components read. A skin remaps this layer
+     (and the --shell-* layout tokens), and may add a focused block of skin-specific
+     element rules for looks tokens can't express — see lib/styles/skins/*. Swapping
+     the skin swaps the whole look — and, via the --shell-* tokens, the whole layout —
+     with no DOM change. Keep component CSS reading ONLY the semantic tokens below.
    ============================================================================ */
 
 :root {
