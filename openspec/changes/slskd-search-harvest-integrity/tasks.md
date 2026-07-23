@@ -2,10 +2,10 @@
 
 ## 1. Domain: an empty round rides the retry ladder
 
-- [ ] 1.1 Red: decider tests — `RecordSearchCompleted` with zero ranked candidates and rounds remaining emits `SearchRequested` (next round), not `AcquisitionExhausted`; including on the first round
-- [ ] 1.2 Red: decider tests — zero ranked candidates with the search-round budget spent emits `AcquisitionExhausted`; existing rejection-driven ladder behavior unchanged
-- [ ] 1.3 Green: route the empty-`ranked` branch of `RecordSearchCompleted` in `decide.ts` through the ladder choice (`selectNext` semantics against the post-round state)
-- [ ] 1.4 State/evolve tests still hold: replaying existing streams is unchanged (no `evolve` edits); phase transitions for the new `SearchRequested` path covered
+- [x] 1.1 Red: decider tests — `RecordSearchCompleted` with zero ranked candidates and rounds remaining emits `SearchRequested` (next round), not `AcquisitionExhausted`; including on the first round
+- [x] 1.2 Red: decider tests — zero ranked candidates with the search-round budget spent emits `AcquisitionExhausted`; existing rejection-driven ladder behavior unchanged
+- [x] 1.3 Green: route the empty-`ranked` branch of `RecordSearchCompleted` in `decide.ts` through the ladder choice (`selectNext` semantics against the post-round state)
+- [x] 1.4 State/evolve tests still hold: replaying existing streams is unchanged (no `evolve` edits); phase transitions for the new `SearchRequested` path covered
 
 ## 2. Adapter: completion-gated harvest and fault paths
 

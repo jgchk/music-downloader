@@ -117,8 +117,33 @@ describe('Acquisition.execute — happy path', () => {
     expect(selected.candidate.identity.username).toBe('a');
   });
 
-  it('exhausts when a search yields nothing usable', () => {
+  it('re-searches when a round yields nothing usable and rounds remain', () => {
     const events = Acquisition.fromHistory(resolvedHistory())
+      .execute({ type: 'RecordSearchResults', candidates: [] })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'SearchRequested']);
+    expect(events[2]).toEqual({ type: 'SearchRequested', round: 2 });
+  });
+
+  it('exhausts only once the search-round budget is spent on empty rounds', () => {
+    const emptyRound = (round: number): AcquisitionEvent[] => [
+      { type: 'SearchCompleted', round, candidates: [] },
+      { type: 'CandidatesRanked', ranked: [] },
+      { type: 'SearchRequested', round: round + 1 },
+    ];
+    const events = Acquisition.fromHistory([
+      ...resolvedHistory(),
+      ...emptyRound(1),
+      ...emptyRound(2),
+    ])
+      .execute({ type: 'RecordSearchResults', candidates: [] })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'AcquisitionExhausted']);
+  });
+
+  it('exhausts on an empty round when the policy allows a single round', () => {
+    const oneRound = defaultPolicies({ retry: { maxSearchRounds: 1, maxTotalAttempts: 15 } });
+    const events = Acquisition.fromHistory(resolvedHistory(oneRound))
       .execute({ type: 'RecordSearchResults', candidates: [] })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'AcquisitionExhausted']);
