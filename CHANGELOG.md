@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.9.0](https://github.com/jgchk/music-downloader/compare/v3.8.2...v3.9.0) (2026-07-23)
+
+### Features
+
+* **importer:** reactor-durability parity — durable retry budget + stalled read-model ([e9fc3e4](https://github.com/jgchk/music-downloader/commit/e9fc3e4f0fd758702a076348e956f9df3e920856))
 ## [3.8.2](https://github.com/jgchk/music-downloader/compare/v3.8.1...v3.8.2) (2026-07-23)
 
 ### Bug Fixes
