@@ -76,7 +76,7 @@ export class SlskdSearch implements SearchPort {
     const created = slskdSearchStateSchema.parse(
       await this.client.post('/api/v0/searches', { searchText }),
     );
-    if (created.id === undefined) {
+    if (created.id === undefined || created.id === '') {
       // An id-less create is an incoherent read: the search may exist server-side but could never
       // be polled, harvested, or swept — fault loudly rather than track a resource by ''.
       throw new Error('slskd search create returned no search id');

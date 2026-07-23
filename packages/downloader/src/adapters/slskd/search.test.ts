@@ -183,28 +183,31 @@ describe('SlskdSearch', () => {
     expect(deletedSearchIds(requests)).toEqual(['s1']);
   });
 
-  it('harvests a completed search whose state omits the response count', async () => {
-    // Tolerant reader: an absent responseCount cannot contradict the harvest.
+  it('accepts an empty harvest when the state omits the response count (gate disarmed)', async () => {
+    // Tolerant reader: with no responseCount there is nothing for an empty harvest to contradict.
     const result = await searcher({
       state: () => json({ isComplete: true }),
-      responses: json(albumResponses),
+      responses: json([]),
     }).adapter.search(ACQ, albumTarget, 1);
 
-    expect(result._unsafeUnwrap()).toHaveLength(1);
+    expect(result._unsafeUnwrap()).toEqual([]);
   });
 
-  it('faults when the create response carries no search id', async () => {
-    const { adapter, ledger, requests } = searcher({ create: json({}) });
+  it.each([{ body: {} }, { body: { id: '' } }])(
+    'faults when the create response carries no usable search id ($body)',
+    async ({ body }) => {
+      const { adapter, ledger, requests } = searcher({ create: json(body) });
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+      const result = await adapter.search(ACQ, albumTarget, 1);
 
-    // An id-less create is an incoherent read — the search could never be polled or swept.
-    const error = result._unsafeUnwrapErr();
-    expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
-    expect(error.message).toContain('no search id');
-    expect(ledger.created).toEqual([]);
-    expect(deletedSearchIds(requests)).toEqual([]);
-  });
+      // An id-less create is an incoherent read — the search could never be polled or swept.
+      const error = result._unsafeUnwrapErr();
+      expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
+      expect(error.message).toContain('no search id');
+      expect(ledger.created).toEqual([]);
+      expect(deletedSearchIds(requests)).toEqual([]);
+    },
+  );
 
   it('trusts a harvest smaller than the advertised response count', async () => {
     // responseCount tallies per-peer responses; only an all-or-nothing contradiction faults.
