@@ -123,4 +123,18 @@ describe('response schemas', () => {
       expect(pendingReviewSchema.parse(payload)).toEqual(payload);
     }
   });
+
+  it('accepts the additive availableActions set present and absent', () => {
+    const base = { importId: 'imp-1', path: '/intake/a', review: { kind: 'no-match' } };
+    expect(pendingReviewSchema.parse(base).availableActions).toBeUndefined();
+    const withActions = {
+      ...base,
+      availableActions: ['supply-id', 'refresh-candidates', 'reject'],
+    };
+    expect(pendingReviewSchema.parse(withActions).availableActions).toEqual([
+      'supply-id',
+      'refresh-candidates',
+      'reject',
+    ]);
+  });
 });

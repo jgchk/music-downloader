@@ -5,7 +5,10 @@ import {
   INCUMBENT,
   candidate,
 } from '../domain/import/__fixtures__/import-fixtures.js';
-import type { ImportStatusView } from '../application/projections/read-models.js';
+import type {
+  ImportStatusView,
+  PendingReviewView,
+} from '../application/projections/read-models.js';
 import { asDistance } from '../domain/shared/__fixtures__/distance.js';
 import { toImportId } from '../domain/shared/import-id.js';
 import {
@@ -76,6 +79,7 @@ describe('reviewToDto', () => {
       reviewToDto({
         cause: { kind: 'match-review', hinted: true, best: candidate().ref },
         candidates: [candidate()],
+        availableActions: [],
       }),
     ).toEqual({
       kind: 'match-review',
@@ -87,6 +91,7 @@ describe('reviewToDto', () => {
       reviewToDto({
         cause: { kind: 'duplicate-review', incumbents: [INCUMBENT] },
         candidates: [candidate()],
+        availableActions: [],
       }),
     ).toEqual({ kind: 'duplicate-review', incumbents: [INCUMBENT], candidates: [candidate()] });
   });
@@ -121,6 +126,7 @@ describe('reviewToDto', () => {
         best: enriched.ref,
       },
       candidates: [enriched],
+      availableActions: [],
     });
     expect(dto).toEqual({
       kind: 'match-review',
@@ -134,13 +140,23 @@ describe('reviewToDto', () => {
   it('maps an unhinted match review, no-match, and remediation', () => {
     const best = { dataSource: 'MusicBrainz', albumId: 'album-9' };
     expect(
-      reviewToDto({ cause: { kind: 'match-review', hinted: false, best }, candidates: [] }),
+      reviewToDto({
+        cause: { kind: 'match-review', hinted: false, best },
+        candidates: [],
+        availableActions: [],
+      }),
     ).toEqual({ kind: 'match-review', hinted: false, best, candidates: [] });
-    expect(reviewToDto({ cause: { kind: 'no-match' }, candidates: [] })).toEqual({
+    expect(
+      reviewToDto({ cause: { kind: 'no-match' }, candidates: [], availableActions: [] }),
+    ).toEqual({
       kind: 'no-match',
     });
     expect(
-      reviewToDto({ cause: { kind: 'remediation-review', failures: [FAILURE] }, candidates: [] }),
+      reviewToDto({
+        cause: { kind: 'remediation-review', failures: [FAILURE] },
+        candidates: [],
+        availableActions: [],
+      }),
     ).toEqual({ kind: 'remediation-review', failures: [FAILURE] });
   });
 });
@@ -177,19 +193,51 @@ describe('statusViewToDto / pendingReviewToDto', () => {
       importId: toImportId('imp-2'),
       directory: DIRECTORY,
       phase: 'awaiting-review',
-      openReview: { cause: { kind: 'no-match' }, candidates: [] },
+      openReview: {
+        cause: { kind: 'no-match' },
+        candidates: [],
+        availableActions: ['supply-id', 'reject'],
+      },
       history: [],
     };
-    expect(statusViewToDto(withReview).review).toEqual({ kind: 'no-match' });
+    const statusDto = statusViewToDto(withReview);
+    expect(statusDto.review).toEqual({ kind: 'no-match' });
+    // The status-view embed is informational: it does NOT carry the actionable verb set.
+    expect(statusDto.review).not.toHaveProperty('availableActions');
   });
 
-  it('maps a pending review item', () => {
+  it('maps a pending review item, carrying its permitted verb set', () => {
     expect(
       pendingReviewToDto({
         importId: toImportId('imp-1'),
         directory: DIRECTORY,
-        review: { cause: { kind: 'no-match' }, candidates: [] },
+        review: {
+          cause: { kind: 'no-match' },
+          candidates: [],
+          availableActions: ['supply-id', 'refresh-candidates', 'reject'],
+        },
       }),
-    ).toEqual({ importId: 'imp-1', path: DIRECTORY, review: { kind: 'no-match' } });
+    ).toEqual({
+      importId: 'imp-1',
+      path: DIRECTORY,
+      review: { kind: 'no-match' },
+      availableActions: ['supply-id', 'refresh-candidates', 'reject'],
+    });
+  });
+
+  it('projects each review kind’s permitted set onto the pending DTO', () => {
+    const pending = (review: PendingReviewView['review']): readonly string[] | undefined =>
+      pendingReviewToDto({ importId: toImportId('imp-1'), directory: DIRECTORY, review })
+        .availableActions;
+    expect(
+      pending({ cause: { kind: 'no-match' }, candidates: [], availableActions: ['reject'] }),
+    ).toEqual(['reject']);
+    expect(
+      pending({
+        cause: { kind: 'remediation-review', failures: [FAILURE] },
+        candidates: [],
+        availableActions: ['accept', 'retry-enrichment'],
+      }),
+    ).toEqual(['accept', 'retry-enrichment']);
   });
 });

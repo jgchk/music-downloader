@@ -119,7 +119,7 @@
   </p>
 {/if}
 
-{#if isCancellable(acquisition.status)}
+{#if isCancellable(acquisition)}
   <form method="POST" action="?/cancel">
     <button type="submit" data-testid="cancel">Cancel</button>
   </form>

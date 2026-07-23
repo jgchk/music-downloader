@@ -94,6 +94,8 @@ describe('statusViewToDto', () => {
         { kind: 'imported', at: 't3', candidate, location: '/lib/a' },
         { kind: 'fulfillment-rejected', at: 't4', candidate, reasons: ['corrupt stub'] },
       ],
+      cancellable: true,
+      awaitingSelection: false,
     };
 
     const dto = statusViewToDto(view);
@@ -116,6 +118,8 @@ describe('statusViewToDto', () => {
       attempts: 0,
       rejectedCount: 0,
       history: [],
+      cancellable: true,
+      awaitingSelection: false,
     };
 
     expect(statusViewToDto(view).currentCandidate).toBeUndefined();
@@ -128,10 +132,40 @@ describe('statusViewToDto', () => {
       attempts: 0,
       rejectedCount: 0,
       history: [],
+      cancellable: true,
+      awaitingSelection: false,
       stalled: true,
     };
 
     expect(statusViewToDto(view).stalled).toBe(true);
+  });
+
+  it('carries the decided lifecycle flags through to the wire', () => {
+    const cancellableAwaiting: AcquisitionStatusView = {
+      acquisitionId: 'acq-1',
+      status: 'AwaitingManualSelection',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+      cancellable: true,
+      awaitingSelection: true,
+    };
+    const cancellableDto = statusViewToDto(cancellableAwaiting);
+    expect(cancellableDto.cancellable).toBe(true);
+    expect(cancellableDto.awaitingSelection).toBe(true);
+
+    const terminal: AcquisitionStatusView = {
+      acquisitionId: 'acq-2',
+      status: 'Fulfilled',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+      cancellable: false,
+      awaitingSelection: false,
+    };
+    const terminalDto = statusViewToDto(terminal);
+    expect(terminalDto.cancellable).toBe(false);
+    expect(terminalDto.awaitingSelection).toBe(false);
   });
 });
 

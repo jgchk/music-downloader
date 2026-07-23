@@ -23,7 +23,7 @@ import {
 import { asDistance } from '../shared/__fixtures__/distance.js';
 import { toAcquisitionId } from '../shared/acquisition-id.js';
 import type { ImportCommand } from './commands.js';
-import type { ImportEvent } from './events.js';
+import type { CandidateReference, ImportEvent, Resolution, ResolutionKind } from './events.js';
 import { Import } from './import.js';
 
 const SUBMIT: ImportCommand = { type: 'SubmitImport', directory: DIRECTORY, policy: POLICY };
@@ -678,6 +678,16 @@ describe('the snapshot projection', () => {
     expect(snapshot.openReview).toEqual({
       cause: { kind: 'match-review', hinted: false, best: candidate().ref },
       candidates: [candidate({ distance: asDistance(0.5) })],
+      // A match review with candidates but no retained delivered candidate: every verb but the
+      // retry (no candidate to re-verdict).
+      availableActions: [
+        'apply-candidate',
+        'supply-id',
+        'refresh-candidates',
+        'manual-tags',
+        'import-as-is',
+        'reject',
+      ],
     });
   });
 
@@ -746,5 +756,108 @@ describe('the snapshot projection', () => {
     const agg = given(appliedHistory());
     expect(agg.phase).toBe('applied');
     expect(agg.isTerminal).toBe(true);
+  });
+});
+
+describe('the open review’s available actions', () => {
+  const noMatchReview: ImportEvent[] = [
+    requested(),
+    proposed([]),
+    { type: 'ReviewRequired', cause: { kind: 'no-match' } },
+  ];
+  const duplicateReview: ImportEvent[] = [
+    requested(),
+    proposed([candidate({ distance: asDistance(0.01) })], [INCUMBENT]),
+    { type: 'ReviewRequired', cause: { kind: 'duplicate-review', incumbents: [INCUMBENT] } },
+  ];
+
+  // Each review kind's curated verb set, one row per kind so a broken curation names its own kind.
+  it.each([
+    // match-review, candidates present, no retained delivered candidate: no reject-and-retry.
+    [
+      'match-review without a retained candidate',
+      awaitingMatchReview(),
+      [
+        'apply-candidate',
+        'supply-id',
+        'refresh-candidates',
+        'manual-tags',
+        'import-as-is',
+        'reject',
+      ],
+    ],
+    // no-match has no candidates, so apply-candidate is withheld.
+    [
+      'no-match',
+      noMatchReview,
+      ['supply-id', 'refresh-candidates', 'manual-tags', 'import-as-is', 'reject'],
+    ],
+    // duplicate-review offers a narrow, curated set (apply present — candidates exist).
+    ['duplicate-review', duplicateReview, ['apply-candidate', 'reject']],
+    // a remediation review permits exactly its own two verbs.
+    ['remediation-review', remediationHistory(), ['accept', 'retry-enrichment']],
+  ] as const)('curates %s to exactly its permitted verbs', (_label, history, expected) => {
+    expect(given(history).snapshot.openReview?.availableActions).toEqual(expected);
+  });
+
+  it('joins reject-unusable-delivery when a delivered candidate is retained', () => {
+    expect(given(awaitingReviewWithCandidate()).snapshot.openReview?.availableActions).toContain(
+      'reject-unusable-delivery',
+    );
+  });
+
+  // A minimal valid resolution for a verb, so the cross-check exercises the real `decide` path.
+  const resolutionFor = (kind: ResolutionKind, reference: CandidateReference): Resolution => {
+    switch (kind) {
+      case 'apply-candidate': {
+        return { kind, ref: reference };
+      }
+      case 'supply-id': {
+        return { kind, mbReleaseId: 'mb-2' };
+      }
+      case 'manual-tags': {
+        return { kind, tags: MANUAL_TAGS };
+      }
+      case 'reject': {
+        return { kind, reason: 'no' };
+      }
+      case 'reject-unusable-delivery': {
+        return { kind, reasons: ['bad rip'] };
+      }
+      case 'refresh-candidates':
+      case 'import-as-is':
+      case 'accept':
+      case 'retry-enrichment': {
+        return { kind };
+      }
+    }
+  };
+
+  it('never lists a verb `decide` would refuse (cross-checked against the decider)', () => {
+    const reviews: readonly ImportEvent[][] = [
+      awaitingMatchReview(),
+      awaitingReviewWithCandidate(),
+      noMatchReview,
+      duplicateReview,
+      remediationHistory(),
+    ];
+    for (const history of reviews) {
+      const aggregate = given(history);
+      const review = aggregate.snapshot.openReview;
+      expect(review).toBeDefined();
+      const listedReference = review?.candidates[0]?.ref ?? {
+        dataSource: 'MusicBrainz',
+        albumId: 'x',
+      };
+      const actions = review?.availableActions ?? [];
+      for (const verb of actions) {
+        const outcome = aggregate.execute({
+          type: 'ResolveReview',
+          resolution: resolutionFor(verb, listedReference),
+        });
+        // `decide` accepts every listed verb — a refusal (any Err) would be a lie in the set.
+        expect(outcome.isOk(), `decide refused a listed verb: ${verb}`).toBe(true);
+      }
+    }
   });
 });

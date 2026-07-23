@@ -21,25 +21,40 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
   };
 }
 
-describe('statusTone / isTerminal / isCancellable', () => {
+describe('statusTone', () => {
+  // The tone table stays a presentation mapping the web layer owns — exhaustive on purpose.
   it.each([
-    ['Empty', 'pending', false],
-    ['Pending', 'pending', false],
-    ['AwaitingManualSelection', 'attention', false],
-    ['Searching', 'pending', false],
-    ['Selecting', 'pending', false],
-    ['Downloading', 'pending', false],
-    ['Validating', 'pending', false],
-    ['Importing', 'pending', false],
-    ['Fulfilled', 'fulfilled', true],
-    ['Exhausted', 'failed', true],
-    ['Cancelled', 'failed', true],
-    ['MetadataFailed', 'failed', true],
-    ['Conflicted', 'failed', true],
-  ] as const)('%s -> %s (terminal: %s)', (status, tone, terminal) => {
+    ['Empty', 'pending'],
+    ['Pending', 'pending'],
+    ['AwaitingManualSelection', 'attention'],
+    ['Searching', 'pending'],
+    ['Selecting', 'pending'],
+    ['Downloading', 'pending'],
+    ['Validating', 'pending'],
+    ['Importing', 'pending'],
+    ['Fulfilled', 'fulfilled'],
+    ['Exhausted', 'failed'],
+    ['Cancelled', 'failed'],
+    ['MetadataFailed', 'failed'],
+    ['Conflicted', 'failed'],
+  ] as const)('%s -> %s', (status, tone) => {
     expect(statusTone(status)).toBe(tone);
-    expect(isTerminal(status)).toBe(terminal);
-    expect(isCancellable(status)).toBe(!terminal);
+  });
+});
+
+describe('isCancellable / isTerminal — read the decided flag, not the enum', () => {
+  it('tracks the decided cancellable flag, independent of the status enum', () => {
+    // A terminal-looking status marked cancellable is cancellable; a working-looking status marked
+    // not-cancellable is not — the flag wins, proving the enum is no longer consulted.
+    expect(isCancellable(acquisition({ status: 'Fulfilled', cancellable: true }))).toBe(true);
+    expect(isTerminal(acquisition({ status: 'Fulfilled', cancellable: true }))).toBe(false);
+    expect(isCancellable(acquisition({ status: 'Downloading', cancellable: false }))).toBe(false);
+    expect(isTerminal(acquisition({ status: 'Downloading', cancellable: false }))).toBe(true);
+  });
+
+  it('degrades to not-cancellable and not-terminal when the flag is absent (older producer)', () => {
+    expect(isCancellable(acquisition({ status: 'Downloading' }))).toBe(false);
+    expect(isTerminal(acquisition({ status: 'Exhausted' }))).toBe(false);
   });
 });
 
@@ -111,6 +126,7 @@ describe('outcomeSummary', () => {
       outcomeSummary(
         acquisition({
           status: 'Exhausted',
+          cancellable: false,
           history: [
             { kind: 'selected', at: 't', candidate },
             { kind: 'download-failed', at: 't', candidate, reason: 'Stalled' },
@@ -125,7 +141,15 @@ describe('outcomeSummary', () => {
   });
 
   it('renders a failed terminal state without reasons plainly', () => {
-    expect(outcomeSummary(acquisition({ status: 'Cancelled' }))).toBe('Cancelled');
+    expect(outcomeSummary(acquisition({ status: 'Cancelled', cancellable: false }))).toBe(
+      'Cancelled',
+    );
+  });
+
+  it('shows no outcome for a failed status when the decided flag is absent (older producer)', () => {
+    // The terminal gate reads the flag, so an absent flag degrades to no outcome line — never a
+    // re-derivation from the status enum.
+    expect(outcomeSummary(acquisition({ status: 'Exhausted' }))).toBeUndefined();
   });
 });
 

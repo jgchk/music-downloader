@@ -155,5 +155,10 @@ export function pendingReviewToDto(view: PendingReviewView): PendingReviewDto {
     importId: view.importId,
     path: view.directory,
     review: reviewToDto(view.review),
+    // The importer's decided, curated verb set for this review (always populated here — an absent
+    // set on the wire means an older producer). The embedded status-view review (`reviewToDto`)
+    // deliberately does NOT carry it: the pending review is the actionable surface, the status
+    // review is informational.
+    availableActions: [...view.review.availableActions],
   };
 }

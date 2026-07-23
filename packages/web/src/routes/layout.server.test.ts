@@ -32,8 +32,14 @@ const awaiting = {
   attempts: 0,
   rejectedCount: 0,
   history: [],
+  awaitingSelection: true,
 };
-const searching = { ...awaiting, acquisitionId: 'acq-2', status: 'Searching' };
+const searching = {
+  ...awaiting,
+  acquisitionId: 'acq-2',
+  status: 'Searching',
+  awaitingSelection: false,
+};
 
 describe('root layout load', () => {
   it('counts the attention items across both modules', () => {

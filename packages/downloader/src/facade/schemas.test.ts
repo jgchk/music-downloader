@@ -95,6 +95,35 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(acquisitionStatusResponseSchema.parse({ ...base, stalled: true }).stalled).toBe(true);
   });
 
+  it('accepts the additive lifecycle flags present (true/false) and absent', () => {
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'Downloading',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    const absent = acquisitionStatusResponseSchema.parse(base);
+    expect(absent.cancellable).toBeUndefined();
+    expect(absent.awaitingSelection).toBeUndefined();
+
+    const cancellable = acquisitionStatusResponseSchema.parse({
+      ...base,
+      cancellable: true,
+      awaitingSelection: true,
+    });
+    expect(cancellable.cancellable).toBe(true);
+    expect(cancellable.awaitingSelection).toBe(true);
+
+    const terminal = acquisitionStatusResponseSchema.parse({
+      ...base,
+      cancellable: false,
+      awaitingSelection: false,
+    });
+    expect(terminal.cancellable).toBe(false);
+    expect(terminal.awaitingSelection).toBe(false);
+  });
+
   it('rejects an unknown status', () => {
     expect(() =>
       acquisitionStatusResponseSchema.parse({

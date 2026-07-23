@@ -13,6 +13,8 @@ const working = {
   attempts: 2,
   rejectedCount: 1,
   history: [{ kind: 'selected' as const, at: 't', candidate }],
+  // A non-terminal acquisition: the downloader decides it cancellable, and the detail renders that.
+  cancellable: true,
 };
 
 function dl(entry: DownloaderHistoryEntry): TimelineEntry {
@@ -46,7 +48,12 @@ describe('AcquisitionDetail (SSR)', () => {
   it('renders every downloader timeline kind, labelling the hand-off apart from a library import', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
-        acquisition: { ...working, status: 'Fulfilled' as const, currentCandidate: undefined },
+        acquisition: {
+          ...working,
+          status: 'Fulfilled' as const,
+          currentCandidate: undefined,
+          cancellable: false,
+        },
         importState: 'present',
         timeline: [
           dl({ kind: 'selected', at: 't0', candidate }),
@@ -71,7 +78,12 @@ describe('AcquisitionDetail (SSR)', () => {
     const reference = { dataSource: 'MusicBrainz', albumId: 'a1' };
     const { body } = render(AcquisitionDetail, {
       props: {
-        acquisition: { ...working, status: 'Fulfilled' as const, currentCandidate: undefined },
+        acquisition: {
+          ...working,
+          status: 'Fulfilled' as const,
+          currentCandidate: undefined,
+          cancellable: false,
+        },
         importState: 'present',
         timeline: [
           im({ kind: 'requested', at: 'i0' }),
@@ -131,6 +143,16 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).not.toContain('data-testid="import-unavailable"');
   });
 
+  it('withholds the cancel affordance when the decided flag is absent (older producer)', () => {
+    const { cancellable, ...absent } = working;
+    void cancellable;
+    const { body } = render(AcquisitionDetail, {
+      props: { acquisition: absent, importState: 'none', timeline: [] },
+    });
+    // No re-derivation from the status enum: an absent flag degrades to no cancel button.
+    expect(body).not.toContain('data-testid="cancel"');
+  });
+
   it('renders a fulfilled acquisition without a cancel affordance', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
@@ -139,6 +161,7 @@ describe('AcquisitionDetail (SSR)', () => {
           status: 'Fulfilled' as const,
           currentCandidate: undefined,
           location: '/lib/x',
+          cancellable: false,
         },
         importState: 'present',
         timeline: [],

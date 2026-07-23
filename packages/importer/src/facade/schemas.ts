@@ -209,6 +209,10 @@ export const pendingReviewSchema = z.object({
   importId: z.string(),
   path: z.string(),
   review: reviewSchema,
+  // The resolution verbs the importer permits for this review — its own decided, curated set (never
+  // a verb the resolve decision would refuse). Additive/optional: the facade always populates it, an
+  // absent set means an older producer and a consumer should offer no actions rather than re-derive.
+  availableActions: z.array(resolutionVerbSchema).optional(),
 });
 
 export const reviewListResponseSchema = z.object({

@@ -65,6 +65,17 @@ export interface AcquisitionStatusView {
   /** The candidate editions on offer, present only while awaiting manual selection. */
   readonly candidates?: readonly EditionCandidate[];
   /**
+   * Whether a cancellation would still do something — the exact fact the domain's cancel guard
+   * decides (`!isTerminal`), read from its source rather than re-derived from the phase name. A
+   * consumer renders the cancel affordance from this instead of pattern-matching the status enum.
+   */
+  readonly cancellable: boolean;
+  /**
+   * Whether the acquisition is paused for a human's edition choice (the `AwaitingManualSelection`
+   * phase). The decided human-pause a consumer's attention queue reads, distinct from the badge tone.
+   */
+  readonly awaitingSelection: boolean;
+  /**
    * Present (true) when the acquisition's current effect dead-lettered — its retry budget spent,
    * or a permanent fault, with no modeled failure to degrade to — awaiting an operator
    * (reactor-durability D2). Additive: absent for every acquisition progressing normally.
@@ -122,7 +133,8 @@ export function projectStatus(
   stored: readonly StoredEvent[],
 ): AcquisitionStatusView {
   const events = stored.map((entry) => entry.event);
-  const snapshot = Acquisition.fromHistory(events).snapshot;
+  const acquisition = Acquisition.fromHistory(events);
+  const snapshot = acquisition.snapshot;
   const history: StatusHistoryEntry[] = [];
   let target: { artist: string; title: string } | undefined;
   for (const event of events) {
@@ -146,6 +158,8 @@ export function projectStatus(
     location: snapshot.location,
     history,
     candidates: snapshot.candidates,
+    cancellable: !acquisition.isTerminal,
+    awaitingSelection: snapshot.phase === 'AwaitingManualSelection',
   };
 }
 

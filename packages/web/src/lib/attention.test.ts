@@ -25,6 +25,7 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
     attempts: 0,
     rejectedCount: 0,
     history: [],
+    awaitingSelection: true,
     ...over,
   };
 }
@@ -70,21 +71,26 @@ describe('attentionItems', () => {
     ]);
   });
 
-  it('excludes every acquisition status that is not awaiting manual selection', () => {
-    const statuses = [
-      'Pending',
-      'Searching',
-      'Downloading',
-      'Fulfilled',
-      'Exhausted',
-      'Cancelled',
-      'MetadataFailed',
-      'Conflicted',
-    ] as const;
-    const acquisitions = statuses.map((status, index) =>
-      acquisition({ acquisitionId: `acq-${index}`, status }),
-    );
-    expect(attentionItems([], acquisitions)).toEqual([]);
+  it('queues on the decided flag, not the badge tone or the status enum', () => {
+    // Flag true but a non-attention status/tone → still queued (the flag drives membership).
+    const flaggedNonAttention = acquisition({
+      acquisitionId: 'acq-flagged',
+      status: 'Downloading',
+      awaitingSelection: true,
+    });
+    // Flag false but the attention-toned awaiting status → excluded (tone does not drive membership).
+    const attentionTonedNotFlagged = acquisition({
+      acquisitionId: 'acq-toned',
+      status: 'AwaitingManualSelection',
+      awaitingSelection: false,
+    });
+    const items = attentionItems([], [flaggedNonAttention, attentionTonedNotFlagged]);
+    expect(items.map((entry) => entry.id)).toEqual(['acq-flagged']);
+  });
+
+  it('excludes an acquisition whose awaiting-selection flag is absent (older producer)', () => {
+    const absent = acquisition({ acquisitionId: 'acq-absent', awaitingSelection: undefined });
+    expect(attentionItems([], [absent])).toEqual([]);
   });
 
   it('composes both modules into one queue, in facade order while nothing carries a date', () => {

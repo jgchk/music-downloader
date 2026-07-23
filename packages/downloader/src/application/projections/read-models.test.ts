@@ -14,11 +14,16 @@ import type { StoredEvent } from '../ports/event-store-port.js';
 import {
   awaitingSelectionHistory,
   defaultPolicies,
+  importingHistory,
   matchingCandidate,
   rankedOf,
+  requestedHistory,
+  resolvedHistory,
   sampleEditionCandidates,
   sampleRequest,
   sampleTarget,
+  selectedHistory,
+  validatingHistory,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 
 const a = matchingCandidate('a');
@@ -143,6 +148,69 @@ describe('projectStatus — awaiting manual edition selection', () => {
     );
     expect(view.status).toBe('Pending');
     expect(view.candidates).toBeUndefined();
+  });
+});
+
+describe('projectStatus — decided lifecycle flags', () => {
+  // A Selecting state: a candidate ranked, none yet in flight (non-terminal, not awaiting).
+  const selectingHistory: AcquisitionEvent[] = [
+    ...selectedHistory([a, b]),
+    { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+    { type: 'CandidateRejected', candidate: a.identity },
+  ];
+
+  // One reachable history per terminal phase — the domain's own terminal set (state.ts TERMINAL_PHASES).
+  const terminalHistories: Record<
+    'Fulfilled' | 'Exhausted' | 'Cancelled' | 'MetadataFailed' | 'Conflicted',
+    AcquisitionEvent[]
+  > = {
+    Fulfilled: history,
+    Exhausted: [...selectingHistory, { type: 'AcquisitionExhausted' }],
+    Cancelled: [...selectedHistory([a]), { type: 'AcquisitionCancelled' }],
+    MetadataFailed: [...requestedHistory(), { type: 'MetadataResolutionFailed' }],
+    Conflicted: [...importingHistory([a]), { type: 'ImportConflicted', location: '/x' }],
+  };
+
+  // One reachable history per non-terminal, non-awaiting phase — the whole non-terminal set save
+  // AwaitingManualSelection, which the awaiting-selection test below covers on its own.
+  const nonTerminalHistories: Record<
+    'Empty' | 'Pending' | 'Searching' | 'Selecting' | 'Downloading' | 'Validating' | 'Importing',
+    AcquisitionEvent[]
+  > = {
+    Empty: [],
+    Pending: requestedHistory(),
+    Searching: resolvedHistory(),
+    Selecting: selectingHistory,
+    Downloading: selectedHistory([a]),
+    Validating: validatingHistory([a]),
+    Importing: importingHistory([a]),
+  };
+
+  it.each(Object.entries(terminalHistories))(
+    'reports terminal %s as not cancellable and not awaiting',
+    (phase, events) => {
+      const view = projectStatus('acq-1', stored(events));
+      expect(view.status).toBe(phase);
+      expect(view.cancellable).toBe(false);
+      expect(view.awaitingSelection).toBe(false);
+    },
+  );
+
+  it.each(Object.entries(nonTerminalHistories))(
+    'reports non-terminal %s as cancellable and not awaiting',
+    (phase, events) => {
+      const view = projectStatus('acq-1', stored(events));
+      expect(view.status).toBe(phase);
+      expect(view.cancellable).toBe(true);
+      expect(view.awaitingSelection).toBe(false);
+    },
+  );
+
+  it('reports an awaiting-selection acquisition as awaiting selection and still cancellable', () => {
+    const awaiting = projectStatus('acq-1', stored(awaitingSelectionHistory()));
+    expect(awaiting.status).toBe('AwaitingManualSelection');
+    expect(awaiting.awaitingSelection).toBe(true);
+    expect(awaiting.cancellable).toBe(true);
   });
 });
 
