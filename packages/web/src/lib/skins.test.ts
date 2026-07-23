@@ -10,8 +10,10 @@ describe('skins', () => {
     expect(isSkin(undefined)).toBe(false);
   });
 
-  it('defaults to the first shipped skin', () => {
-    expect(DEFAULT_SKIN).toBe(SKINS[0]);
+  it('defaults to forum', () => {
+    // Pin the intended default to the literal (not SKINS[0], which would restate the
+    // implementation): a reorder of SKINS that changes the default should fail here.
+    expect(DEFAULT_SKIN).toBe('forum');
   });
 
   it("app.html's no-flash allow-list stays in step with the skin set", () => {
