@@ -8,7 +8,7 @@ import {
   resolveReview as resolveReviewUseCase,
   submitImport as submitImportUseCase,
 } from '../application/import/use-cases.js';
-import type { UseCaseDeps } from '../application/import/use-cases.js';
+import type { UseCaseDependencies } from '../application/import/use-cases.js';
 import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
@@ -17,8 +17,6 @@ import {
   statusViewToDto,
 } from './mapping.js';
 import {
-  importListResponseSchema,
-  importStatusResponseSchema,
   resolveReviewRequestSchema,
   reviewListResponseSchema,
   submitImportRequestSchema,
@@ -89,8 +87,7 @@ export const resolveReviewInputSchema = z.object({
 
 export const submitImportResultSchema = z.object({ importId: z.string() });
 export const resolveReviewResultSchema = z.object({ importId: z.string() });
-export const importStatusResultSchema = importStatusResponseSchema;
-export const importListResultSchema = importListResponseSchema;
+
 export const reviewListResultSchema = reviewListResponseSchema;
 
 export type ReviewListResponse = z.infer<typeof reviewListResultSchema>;
@@ -110,12 +107,12 @@ export interface ImporterFacade {
   listPendingReviews(): ReviewListResponse;
 }
 
-export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
+export function createImporterFacade(dependencies: UseCaseDependencies): ImporterFacade {
   return {
     async submitImport(input) {
       const parsed = submitImportRequestSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await submitImportUseCase(deps, {
+      const result = await submitImportUseCase(dependencies, {
         directory: parsed.data.path,
         hints: hintsToDomain(parsed.data),
       });
@@ -129,7 +126,7 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
       const parsed = resolveReviewInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const result = await resolveReviewUseCase(
-        deps,
+        dependencies,
         // Schema-proven non-empty above; lift the addressed id into its brand for the use-case.
         toImportId(parsed.data.id),
         resolutionToDomain(parsed.data.resolution),
@@ -143,7 +140,7 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
     getImport(input) {
       const parsed = importIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const view = getImportUseCase(deps, toImportId(parsed.data.id));
+      const view = getImportUseCase(dependencies, toImportId(parsed.data.id));
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },
@@ -151,17 +148,24 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
     getImportForAcquisition(input) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const view = getImportForAcquisitionUseCase(deps, parsed.data.acquisitionId);
+      const view = getImportForAcquisitionUseCase(dependencies, parsed.data.acquisitionId);
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },
 
     listImports() {
-      return { imports: listImportsUseCase(deps).map(statusViewToDto) };
+      return { imports: listImportsUseCase(dependencies).map((item) => statusViewToDto(item)) };
     },
 
     listPendingReviews() {
-      return { reviews: listPendingReviewsUseCase(deps).map(pendingReviewToDto) };
+      return {
+        reviews: listPendingReviewsUseCase(dependencies).map((item) => pendingReviewToDto(item)),
+      };
     },
   };
 }
+
+export {
+  importListResponseSchema as importListResultSchema,
+  importStatusResponseSchema as importStatusResultSchema,
+} from './schemas.js';

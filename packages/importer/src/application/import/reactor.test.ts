@@ -43,14 +43,14 @@ beforeEach(() => {
 });
 
 function realInterpret(ports: EffectPorts): EffectInterpreter {
-  const deps = { store, clock: fixedClock(), ports };
-  return (importId, effect) => interpretEffect(deps, importId, effect);
+  const dependencies = { store, clock: fixedClock(), ports };
+  return (importId, effect) => interpretEffect(dependencies, importId, effect);
 }
 
 function reactor(
   interpret: EffectInterpreter,
   overrides: {
-    interval?: (fn: () => void, ms: number) => () => void;
+    interval?: (function_: () => void, ms: number) => () => void;
     retryBudget?: number;
   } = {},
 ): Reactor {
@@ -253,8 +253,8 @@ describe('Reactor', () => {
       .mockReturnValueOnce(errAsync(infraError('bridge.propose', 'spawn failed')))
       .mockReturnValue(okAsync([]));
     const r = reactor(interpret, {
-      interval: (fn) => {
-        ticks.push(fn);
+      interval: (function_) => {
+        ticks.push(function_);
         return () => {};
       },
     });
@@ -286,7 +286,7 @@ describe('Reactor', () => {
       await r.start();
 
       await seed([requested()]); // appended with the bus detached: only the poll can find it
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5000);
       expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
 
       r.stop();
@@ -300,10 +300,7 @@ describe('Reactor', () => {
 
   it('coalesces wakeups that arrive while a drain is running', async () => {
     await seed([requested()]);
-    let release: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
     const interpret = vi.fn(() => okAsync([]));
     const slowFirst = vi.fn<EffectInterpreter>((importId, effect) => {
       void importId;
@@ -402,7 +399,7 @@ describe('Reactor', () => {
   });
 
   it('reacts against the stream prefix as of the event, not a whole-stream fold', async () => {
-    const ref = candidate().ref;
+    const reference = candidate().ref;
     await seed([
       requested(),
       {
@@ -410,7 +407,7 @@ describe('Reactor', () => {
         candidates: [candidate({ distance: asDistance(0.01) })],
         duplicates: [],
       },
-      { type: 'AutoApplySelected', ref, distance: asDistance(0.01) },
+      { type: 'AutoApplySelected', ref: reference, distance: asDistance(0.01) },
       { type: 'ImportApplied', location: '/library/Artist/Album' },
     ]);
     const interpret = vi.fn(() => okAsync([]));

@@ -13,14 +13,17 @@ export type FailureClass = 'retryable' | 'permanent' | 'rejection';
 
 export function classifyCommandError(error: CommandError): FailureClass {
   switch (error.kind) {
-    case 'InfraError':
+    case 'InfraError': {
       return error.permanent === true ? 'permanent' : 'retryable';
-    case 'ConcurrencyConflict':
+    }
+    case 'ConcurrencyConflict': {
       return 'retryable';
+    }
     case 'AlreadyExists':
     case 'IllegalTransition':
-    case 'UnknownEdition':
+    case 'UnknownEdition': {
       return 'rejection';
+    }
   }
 }
 

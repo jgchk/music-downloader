@@ -17,7 +17,7 @@ import type { ResultAsync } from 'neverthrow';
  * construction, invisible here, so a shared source's other tenants are never touched. Per-row fault
  * isolation keeps one failure from stalling the rest; unconverged rows are retried on the next boot.
  */
-export interface SweepDeps {
+export interface SweepDependencies {
   readonly ledger: ResourceLedgerStore;
   readonly remover: SourceResourceRemover;
   readonly store: EventStorePort;
@@ -25,12 +25,15 @@ export interface SweepDeps {
 }
 
 export class SourceResourceSweep {
-  constructor(private readonly deps: SweepDeps) {}
+  constructor(private readonly dependencies: SweepDependencies) {}
 
   async run(): Promise<void> {
-    const live = await this.deps.ledger.allLive();
+    const live = await this.dependencies.ledger.allLive();
     if (live.isErr()) {
-      this.deps.logger.error({ err: live.error }, 'sweep: cannot read the ownership ledger');
+      this.dependencies.logger.error(
+        { err: live.error },
+        'sweep: cannot read the ownership ledger',
+      );
       return;
     }
     for (const resource of live.value) await this.sweepOne(resource);
@@ -40,7 +43,7 @@ export class SourceResourceSweep {
     const acquisitionId = resource.acquisitionId;
     const terminal = await this.isTerminal(acquisitionId);
     if (terminal.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { err: terminal.error, acquisitionId },
         'sweep: terminal check failed',
       );
@@ -48,9 +51,9 @@ export class SourceResourceSweep {
     }
     if (!terminal.value) return; // an in-flight acquisition still owns this — leave it to the reactor
 
-    const removed = await this.deps.remover.remove(resource);
+    const removed = await this.dependencies.remover.remove(resource);
     if (removed.isErr()) {
-      this.deps.logger.warn(
+      this.dependencies.logger.warn(
         { err: removed.error, acquisitionId },
         'sweep: source removal failed; will retry next boot',
       );
@@ -59,20 +62,23 @@ export class SourceResourceSweep {
     if (!removed.value) {
       // The record was cancelled but has not yet transitioned to removable — leave the row live so
       // the next boot's sweep converges it (design D1), rather than marking a lingering record gone.
-      this.deps.logger.debug(
+      this.dependencies.logger.debug(
         { acquisitionId },
         'sweep: record not yet confirmed gone; will retry next boot',
       );
       return;
     }
-    const marked = await this.deps.ledger.markRemoved(resource);
+    const marked = await this.dependencies.ledger.markRemoved(resource);
     if (marked.isErr()) {
-      this.deps.logger.warn({ err: marked.error, acquisitionId }, 'sweep: markRemoved failed');
+      this.dependencies.logger.warn(
+        { err: marked.error, acquisitionId },
+        'sweep: markRemoved failed',
+      );
     }
   }
 
   private isTerminal(acquisitionId: string): ResultAsync<boolean, InfraError> {
-    return this.deps.store
+    return this.dependencies.store
       .readStream(acquisitionId)
       .map((stored) => Acquisition.fromHistory(stored.map((entry) => entry.event)).isTerminal);
   }

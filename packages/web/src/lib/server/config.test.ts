@@ -80,7 +80,7 @@ describe('loadComposedConfig', () => {
       REACTOR_STALLED_RETENTION_MS: '86400000',
     })._unsafeUnwrap();
     expect(tuned.downloader.reactor).toEqual({
-      retry: { initialDelayMs: 1000, maxDelayMs: 60000, budgetMs: 3_600_000 },
+      retry: { initialDelayMs: 1000, maxDelayMs: 60_000, budgetMs: 3_600_000 },
       stalledRetentionMs: 86_400_000,
     });
   });

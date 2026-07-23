@@ -63,8 +63,10 @@ describe('OutboundFeed', () => {
     await seed('acq-1');
     const feed = new OutboundFeed(store, mapping);
 
-    const first = (await feed.read(0, 100))._unsafeUnwrap();
-    const again = (await feed.read(0, 100))._unsafeUnwrap();
+    const readResult = await feed.read(0, 100);
+    const first = readResult._unsafeUnwrap();
+    const readResult2 = await feed.read(0, 100);
+    const again = readResult2._unsafeUnwrap();
 
     expect(again).toStrictEqual(first);
     const prefixLength = (first.events[0]!.data as { prefixLength: number }).prefixLength;
@@ -76,7 +78,8 @@ describe('OutboundFeed', () => {
     const feed = new OutboundFeed(store, mapping);
 
     // A batch smaller than the history scans only unpublished rows: no events, cursor advances.
-    const batch = (await feed.read(0, 2))._unsafeUnwrap();
+    const readResult3 = await feed.read(0, 2);
+    const batch = readResult3._unsafeUnwrap();
 
     expect(batch.events).toHaveLength(0);
     expect(batch.scannedTo).toBe(2);
@@ -85,10 +88,12 @@ describe('OutboundFeed', () => {
   it('advances the scan boundary past trailing unpublished events', async () => {
     await seed('acq-1');
     const feed = new OutboundFeed(store, mapping);
-    const full = (await feed.read(0, 100))._unsafeUnwrap();
+    const readResult4 = await feed.read(0, 100);
+    const full = readResult4._unsafeUnwrap();
 
     // Reading from the published event's position scans the (empty) tail without re-rendering.
-    const tail = (await feed.read(full.events[0]!.globalSeq, 100))._unsafeUnwrap();
+    const readResult5 = await feed.read(full.events[0]!.globalSeq, 100);
+    const tail = readResult5._unsafeUnwrap();
 
     expect(tail.events).toHaveLength(0);
     expect(tail.scannedTo).toBe(full.events[0]!.globalSeq);

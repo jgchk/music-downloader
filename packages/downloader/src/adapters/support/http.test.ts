@@ -9,13 +9,13 @@ let server: Server;
 let base: string;
 
 beforeAll(async () => {
-  server = createServer((req, res) => {
-    if (req.url === '/hang') return; // never respond — the timeout must fire
+  server = createServer((request, response) => {
+    if (request.url === '/hang') return; // never respond — the timeout must fire
     let body = '';
-    req.on('data', (chunk: Buffer) => (body += chunk.toString()));
-    req.on('end', () => {
-      res.writeHead(200, { 'content-type': 'text/plain' });
-      res.end(`${req.method} ${req.url} ${body}`);
+    request.on('data', (chunk: Buffer) => (body += chunk.toString()));
+    request.on('end', () => {
+      response.writeHead(200, { 'content-type': 'text/plain' });
+      response.end(`${request.method} ${request.url} ${body}`);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

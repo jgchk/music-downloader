@@ -12,7 +12,7 @@ export interface RetryPolicy {
 }
 
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
-  initialDelayMs: 5_000,
+  initialDelayMs: 5000,
   maxDelayMs: 900_000, // 15 min
   budgetMs: 21_600_000, // 6 h — deliberately generous: only a permanent condition exhausts it
 };

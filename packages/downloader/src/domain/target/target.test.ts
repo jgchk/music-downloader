@@ -11,8 +11,8 @@ function albumInput(overrides: Partial<TargetInput> = {}): TargetInput {
     year: 1998,
     mbid: asMbid('b1392450-e666-3926-a536-22c65f834433'),
     tracks: [
-      { position: 1, title: 'Wildlife Analysis', durationMs: 78000 },
-      { position: 2, title: 'An Eagle in Your Mind', durationMs: 380000 },
+      { position: 1, title: 'Wildlife Analysis', durationMs: 78_000 },
+      { position: 2, title: 'An Eagle in Your Mind', durationMs: 380_000 },
     ],
     ...overrides,
   };
@@ -33,7 +33,7 @@ describe('createTarget', () => {
   });
 
   it('rejects an empty artist', () => {
-    const result = createTarget(albumInput({ artist: '   ' }));
+    const result = createTarget(albumInput({ artist: ' '.repeat(3) }));
     expect(result._unsafeUnwrapErr()).toEqual({ kind: 'EmptyArtist' });
   });
 
@@ -61,6 +61,6 @@ describe('derived accessors', () => {
   });
 
   it('sums per-track durations', () => {
-    expect(totalDurationMs(createTarget(albumInput())._unsafeUnwrap())).toBe(458000);
+    expect(totalDurationMs(createTarget(albumInput())._unsafeUnwrap())).toBe(458_000);
   });
 });

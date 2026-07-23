@@ -7,14 +7,18 @@ import type { PendingReviewDto, ReviewDto } from '@music/importer';
 
 export function kindLabel(kind: ReviewDto['kind']): string {
   switch (kind) {
-    case 'match-review':
+    case 'match-review': {
       return 'Match review';
-    case 'no-match':
+    }
+    case 'no-match': {
       return 'No match';
-    case 'duplicate-review':
+    }
+    case 'duplicate-review': {
       return 'Duplicate';
-    case 'remediation-review':
+    }
+    case 'remediation-review': {
       return 'Remediation';
+    }
   }
 }
 
@@ -91,8 +95,9 @@ export function contextSummary(pending: PendingReviewDto): string {
       const hint = note === undefined ? '' : ` (${note})`;
       return `${review.candidates.length} candidate${review.candidates.length === 1 ? '' : 's'}${detail}${hint}`;
     }
-    case 'no-match':
+    case 'no-match': {
       return 'Beets found no candidates at all';
+    }
     case 'duplicate-review': {
       const incumbent = review.incumbents[0];
       const who = incumbent === undefined ? 'library' : `${incumbent.artist} — ${incumbent.album}`;

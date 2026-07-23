@@ -5,7 +5,7 @@ import type { MatchPolicy } from '../policy/policies.js';
 import {
   bucketRank,
   compareQuality,
-  meetsFloor,
+  isFloorMet,
   resolveQualityBucket,
 } from '../policy/quality-policy.js';
 import type { QualityAttributes, QualityBucket, QualityPolicy } from '../policy/quality-policy.js';
@@ -35,9 +35,11 @@ function fileAttributes(file: CandidateFile): QualityAttributes {
 export function candidateQualityBucket(candidate: Candidate, policy: QualityPolicy): QualityBucket {
   const buckets = audioFiles(candidate).map((file) => resolveQualityBucket(fileAttributes(file)));
   if (buckets.length === 0) return 'UNKNOWN';
-  return buckets.reduce((worst, bucket) =>
-    bucketRank(policy, bucket) > bucketRank(policy, worst) ? bucket : worst,
-  );
+  let worst = buckets[0]!;
+  for (const bucket of buckets) {
+    if (bucketRank(policy, bucket) > bucketRank(policy, worst)) worst = bucket;
+  }
+  return worst;
 }
 
 /** Prefer the source likeliest to deliver: faster, more free slots, shorter queue. */
@@ -66,10 +68,10 @@ export function rankCandidates(
 
   const gated = scored.filter(
     (ranked) =>
-      ranked.matchConfidence >= match.threshold && meetsFloor(quality, ranked.qualityBucket),
+      ranked.matchConfidence >= match.threshold && isFloorMet(quality, ranked.qualityBucket),
   );
 
-  return gated.sort((x, y) => {
+  return gated.toSorted((x, y) => {
     const byQuality = compareQuality(quality, x.qualityBucket, y.qualityBucket);
     if (byQuality !== 0) return byQuality;
     if (x.matchConfidence !== y.matchConfidence) return y.matchConfidence - x.matchConfidence;

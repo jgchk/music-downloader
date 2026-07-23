@@ -17,8 +17,12 @@ describe('InProcessEventBus', () => {
   it('fans committed events out to every subscriber', () => {
     const bus = new InProcessEventBus();
     const seen: number[] = [];
-    bus.subscribe((event) => seen.push(event.globalSeq));
-    bus.subscribe((event) => seen.push(event.globalSeq * 10));
+    bus.subscribe((event) => {
+      seen.push(event.globalSeq);
+    });
+    bus.subscribe((event) => {
+      seen.push(event.globalSeq * 10);
+    });
 
     bus.publish([storedAt(1), storedAt(2)]);
 
@@ -28,7 +32,9 @@ describe('InProcessEventBus', () => {
   it('stops delivering once a subscriber unsubscribes', () => {
     const bus = new InProcessEventBus();
     const seen: number[] = [];
-    const unsubscribe = bus.subscribe((event) => seen.push(event.globalSeq));
+    const unsubscribe = bus.subscribe((event) => {
+      seen.push(event.globalSeq);
+    });
 
     bus.publish([storedAt(1)]);
     unsubscribe();

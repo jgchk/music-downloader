@@ -45,7 +45,8 @@ describe('the verdict event consumer', () => {
 
     expect(outcome.isOk()).toBe(true);
     wiring.sync();
-    const stream = (await wiring.store.readStream('acq-9'))._unsafeUnwrap();
+    const readStreamResult = await wiring.store.readStream('acq-9');
+    const stream = readStreamResult._unsafeUnwrap();
     // The verdict records the rejection and revives the retry ladder behind it.
     const types = stream.map((entry) => entry.type);
     expect(types).toContain('FulfillmentRejected');
@@ -59,7 +60,8 @@ describe('the verdict event consumer', () => {
     const outcome = await consume(verdictEvent({ type: 'import.applied' }));
 
     expect(outcome.isOk()).toBe(true);
-    const stream = (await wiring.store.readStream('acq-9'))._unsafeUnwrap();
+    const readStreamResult2 = await wiring.store.readStream('acq-9');
+    const stream = readStreamResult2._unsafeUnwrap();
     expect(stream.map((entry) => entry.type)).not.toContain('FulfillmentRejected');
   });
 
@@ -68,11 +70,13 @@ describe('the verdict event consumer', () => {
     const consume = verdictEventConsumer(wiring.deps);
 
     await consume(verdictEvent());
-    const before = (await wiring.store.readStream('acq-9'))._unsafeUnwrap().length;
+    const readStreamResult3 = await wiring.store.readStream('acq-9');
+    const before = readStreamResult3._unsafeUnwrap().length;
     const again = await consume(verdictEvent());
 
     expect(again.isOk()).toBe(true);
-    const after = (await wiring.store.readStream('acq-9'))._unsafeUnwrap().length;
+    const readStreamResult4 = await wiring.store.readStream('acq-9');
+    const after = readStreamResult4._unsafeUnwrap().length;
     expect(after).toBe(before);
   });
 

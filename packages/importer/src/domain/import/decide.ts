@@ -1,7 +1,7 @@
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
 import type { ImportCommand } from './commands.js';
-import { candidateRefKey } from './events.js';
+import { candidateReferenceKey } from './events.js';
 import type { DuplicateIncumbent, ImportEvent, ProposedCandidate, Resolution } from './events.js';
 import { isNonEmpty } from '../shared/non-empty-array.js';
 import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
@@ -27,7 +27,11 @@ const NOTHING: Decision = ok([]);
 
 /** The lowest-distance candidate — beets' ordering, re-derived so `decide` never trusts input order. */
 function bestOf(candidates: NonEmptyReadonlyArray<ProposedCandidate>): ProposedCandidate {
-  return candidates.reduce((best, next) => (next.distance < best.distance ? next : best));
+  let best = candidates[0];
+  for (const next of candidates) {
+    if (next.distance < best.distance) best = next;
+  }
+  return best;
 }
 
 function decideProposal(
@@ -50,7 +54,7 @@ function decideProposal(
     pinnedId ??
     (state.phase === 'proposing' ? state.pinnedId : undefined) ??
     state.hints?.mbReleaseId;
-  const hinted = hintedReleaseId !== undefined;
+  const isHinted = hintedReleaseId !== undefined;
   if (best.distance > state.policy.autoApplyThreshold) {
     // A weak — or hint-contradicted — match goes to a human with the evidence: the candidate list
     // rides on `CandidatesProposed`, each candidate carrying its field-level diff (current-vs-proposed
@@ -59,7 +63,7 @@ function decideProposal(
       proposed,
       {
         type: 'ReviewRequired',
-        cause: { kind: 'match-review', hinted, hintedReleaseId, best: best.ref },
+        cause: { kind: 'match-review', hinted: isHinted, hintedReleaseId, best: best.ref },
       },
     ]);
   }
@@ -82,13 +86,12 @@ function decideResolutionForReview(state: AwaitingReviewState, resolution: Resol
     });
   }
   if (resolution.kind === 'apply-candidate') {
-    const known = state.candidates.some(
-      (candidate) => candidateRefKey(candidate.ref) === candidateRefKey(resolution.ref),
+    const isKnown = state.candidates.some(
+      (candidate) => candidateReferenceKey(candidate.ref) === candidateReferenceKey(resolution.ref),
     );
-    if (!known)
-      return err({ kind: 'UnknownCandidate', candidate: candidateRefKey(resolution.ref) });
-  }
-  if (resolution.kind === 'reject-and-retry-download') {
+    if (!isKnown)
+      return err({ kind: 'UnknownCandidate', candidate: candidateReferenceKey(resolution.ref) });
+  } else if (resolution.kind === 'reject-and-retry-download') {
     // The verdict must echo the identity the sender fulfilled with (its stale-guard compares it);
     // without a retained candidate the verb is refused precisely — plain reject stays available.
     const source = state.source;
@@ -119,19 +122,24 @@ function decideResolutionForApplied(state: AppliedState, resolution: Resolution)
 
 function decideResolution(state: ImportState, resolution: Resolution): Decision {
   switch (state.phase) {
-    case 'empty':
+    case 'empty': {
       return err({ kind: 'UnknownImport' });
-    case 'requested':
+    }
+    case 'requested': {
       return err({ kind: 'NoOpenReview' });
-    case 'awaiting-review':
+    }
+    case 'awaiting-review': {
       return decideResolutionForReview(state, resolution);
-    case 'applied':
+    }
+    case 'applied': {
       return decideResolutionForApplied(state, resolution);
+    }
     // A resolution already in motion (re-proposing, applying) or a settled rejection: converge.
     case 'proposing':
     case 'applying':
-    case 'rejected':
+    case 'rejected': {
       return NOTHING;
+    }
   }
 }
 
@@ -141,7 +149,7 @@ function decideResolution(state: ImportState, resolution: Resolution): Decision 
  */
 export function decide(command: ImportCommand, state: ImportState): Decision {
   switch (command.type) {
-    case 'SubmitImport':
+    case 'SubmitImport': {
       // Idempotent by stream: a live import converges on itself; a settled terminal starts a
       // fresh cycle for the re-deposited directory.
       if (state.phase !== 'empty' && !isTerminal(state)) return NOTHING;
@@ -154,17 +162,21 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
           source: command.source,
         },
       ]);
-    case 'RecordProposal':
-      return decideProposal(state, command.candidates, command.duplicates, command.pinnedId);
-    case 'RecordApplied': {
-      const retrying = state.phase === 'applied' && state.remediation?.status === 'retrying';
-      if (state.phase !== 'applying' && !retrying) return NOTHING; // stale outcome
-      const applied: ImportEvent = { type: 'ImportApplied', location: command.location };
-      return isNonEmpty(command.failures)
-        ? ok([applied, { type: 'RemediationRequired', failures: command.failures }])
-        : ok([applied]);
     }
-    case 'RecordApplySkippedDuplicate':
+    case 'RecordProposal': {
+      return decideProposal(state, command.candidates, command.duplicates, command.pinnedId);
+    }
+    case 'RecordApplied': {
+      const isRetrying = state.phase === 'applied' && state.remediation?.status === 'retrying';
+      if (!isRetrying && state.phase !== 'applying') return NOTHING; // stale outcome
+      const applied: ImportEvent = { type: 'ImportApplied', location: command.location };
+      return ok(
+        isNonEmpty(command.failures)
+          ? [applied, { type: 'RemediationRequired', failures: command.failures }]
+          : [applied],
+      );
+    }
+    case 'RecordApplySkippedDuplicate': {
       // Beets refused to import over an incumbent it only saw at apply time: route to review.
       if (state.phase !== 'applying') return NOTHING;
       if (!isNonEmpty(command.incumbents)) {
@@ -185,6 +197,7 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
           cause: { kind: 'duplicate-review', incumbents: command.incumbents },
         },
       ]);
+    }
     case 'RecordIntakeDeleted': {
       if (state.phase !== 'awaiting-review') return NOTHING;
       const settled = state.settled;
@@ -203,11 +216,13 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
         }
       }
     }
-    case 'RecordDoomed':
+    case 'RecordDoomed': {
       // A permanent effect failure dooms the import (D7): terminal `rejected`, files untouched.
       if (state.phase === 'empty' || isTerminal(state)) return NOTHING;
       return ok([{ type: 'ImportRejected', reason: command.reason, filesDeleted: false }]);
-    case 'ResolveReview':
+    }
+    case 'ResolveReview': {
       return decideResolution(state, command.resolution);
+    }
   }
 }

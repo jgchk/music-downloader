@@ -40,11 +40,13 @@ export type Effect =
  */
 export function react(event: AcquisitionEvent, state: AcquisitionState): readonly Effect[] {
   switch (event.type) {
-    case 'AcquisitionRequested':
+    case 'AcquisitionRequested': {
       return [{ type: 'ResolveMetadata', request: event.request }];
-    case 'TargetResolved':
+    }
+    case 'TargetResolved': {
       return [{ type: 'Search', target: event.target, round: 1 }];
-    case 'EditionSelected':
+    }
+    case 'EditionSelected': {
       // The resume: resolve exactly the chosen release, reusing the direct-by-release-id path — no
       // new "release id → target" logic exists for manual selection (manual-edition-selection D2).
       // `kind: 'musicbrainz'` is not a provider choice made here: `EditionSelected` carries a
@@ -60,15 +62,18 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
           request: { kind: 'musicbrainz', mbid: event.releaseMbid, targetType: 'album' },
         },
       ];
-    case 'SearchRequested':
+    }
+    case 'SearchRequested': {
       return state.phase === 'Searching'
         ? [{ type: 'Search', target: state.target, round: event.round }]
         : [];
-    case 'CandidateSelected':
+    }
+    case 'CandidateSelected': {
       return state.phase === 'Downloading'
         ? [{ type: 'Download', candidate: event.candidate, policy: state.policies.download }]
         : [];
-    case 'DownloadCompleted':
+    }
+    case 'DownloadCompleted': {
       return state.phase === 'Validating'
         ? [
             {
@@ -79,24 +84,29 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
             },
           ]
         : [];
-    case 'ValidationPassed':
+    }
+    case 'ValidationPassed': {
       return state.phase === 'Importing'
         ? [{ type: 'Import', files: state.downloadedFiles, target: state.target }]
         : [];
-    case 'CandidateRejected':
+    }
+    case 'CandidateRejected': {
       // A rejected candidate's staged files must never reach the library (D13). The files ride on
       // the event (stamped by `decide` at mint time), so cleanup targets slskd's reported location
       // rather than a path recomputed from identity (D3); legacy history without them upcasts to none.
       return [{ type: 'Cleanup', files: event.files ?? [] }];
-    case 'Imported':
+    }
+    case 'Imported': {
       // The imported candidate's now-emptied staging directory is pruned. Keyed off the event's own
       // carried files: `evolve` treats `Imported` as a state no-op, so the files live on the event,
       // not in the post-state (D3).
       return [{ type: 'Cleanup', files: event.files ?? [] }];
-    case 'ImportConflicted':
+    }
+    case 'ImportConflicted': {
       // The downloaded release will never be imported (the location is occupied) — discard staging.
       return state.phase === 'Conflicted' ? [{ type: 'Cleanup', files: event.files ?? [] }] : [];
-    case 'AcquisitionCancelled':
+    }
+    case 'AcquisitionCancelled': {
       // A settled transfer (staging `settled`) is discarded straight away, from the files carried
       // on the event (D3). A mid-download transfer (staging `in-flight`) is aborted at the source
       // first; its staging is cleaned up later, when the resulting settlement rejects the candidate.
@@ -106,6 +116,7 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
       if (state.staging.kind === 'in-flight')
         return [{ type: 'AbortDownload', candidate: state.staging.pending }];
       return [];
+    }
     case 'MetadataResolutionFailed':
     // The pause itself: an acquisition awaiting a human's edition choice does nothing — no search,
     // no download, no import — until a SelectEdition or a cancellation moves it on.
@@ -118,7 +129,8 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
     // A revival needs no effect of its own: the co-emitted CandidateRejected drives cleanup, and
     // the batch's CandidateSelected/SearchRequested drive the revival's work.
     case 'FulfillmentRejected':
-    case 'AcquisitionExhausted':
+    case 'AcquisitionExhausted': {
       return [];
+    }
   }
 }

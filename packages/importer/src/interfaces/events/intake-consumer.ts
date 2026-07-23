@@ -1,6 +1,6 @@
 import { err, ok } from 'neverthrow';
 import { findAcquisitionImport, submitImport } from '../../application/import/use-cases.js';
-import type { UseCaseDeps } from '../../application/import/use-cases.js';
+import type { UseCaseDependencies } from '../../application/import/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
 import { fulfilledToSubmission, rerootLocation } from '../contracts/intake/mapping.js';
 import { acquisitionFulfilledSchema } from '../contracts/intake/schemas.js';
@@ -26,7 +26,7 @@ export interface IntakeConsumerOptions {
 }
 
 export function intakeEventConsumer(
-  deps: UseCaseDeps,
+  dependencies: UseCaseDependencies,
   options: IntakeConsumerOptions,
 ): ConsumeHandler {
   return async (event: SeamEvent) => {
@@ -41,7 +41,7 @@ export function intakeEventConsumer(
     const { acquisitionId, location, hints, candidate } = fulfilledToSubmission(parsed.data);
     // Durable convergence first: a redelivered acquisition no-ops even after the import applied
     // and the intake directory is long gone.
-    const existing = findAcquisitionImport(deps, acquisitionId);
+    const existing = findAcquisitionImport(dependencies, acquisitionId);
     if (existing !== undefined) return ok(undefined);
 
     const rerooted = rerootLocation({
@@ -53,21 +53,21 @@ export function intakeEventConsumer(
       return err({ kind: 'Permanent' as const, reason: rerooted.error });
     }
     const directory = rerooted.value;
-    let visible: boolean;
+    let isVisible: boolean;
     try {
-      visible = await options.directoryExists(directory);
+      isVisible = await options.directoryExists(directory);
     } catch {
       // The probe itself faulted (EACCES/EIO/…) rather than reporting "absent": a genuine infra
       // fault, held and redelivered under a distinct reason instead of masquerading as missing.
       return err({ kind: 'Transient' as const, reason: 'IntakeProbeFailed' });
     }
-    if (!visible) {
+    if (!isVisible) {
       // Not visible (yet): transient, so the subscription holds and redelivers — a silent
       // acknowledgement here would drop the release on the floor.
       return err({ kind: 'Transient' as const, reason: 'IntakeDirectoryMissing' });
     }
 
-    const submitted = await submitImport(deps, {
+    const submitted = await submitImport(dependencies, {
       directory,
       hints,
       source: { acquisitionId, candidate },

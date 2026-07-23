@@ -199,7 +199,8 @@ describe('ImportStatusProjection', () => {
 
   it('rebuilds from the log, replacing prior state', () => {
     const projection = new ImportStatusProjection();
-    for (const stored of storedAll('imp-old', [requested()])) projection.apply(stored);
+    const storedEvents = storedAll('imp-old', [requested()]);
+    for (const stored of storedEvents) projection.apply(stored);
 
     projection.rebuild(storedAll('imp-1', appliedHistory()));
 
@@ -244,7 +245,7 @@ describe('seedStalledReadModel', () => {
     globalSeq: (seq += 1),
     error: 'boom',
     occurredAt,
-    ...(streamId === undefined ? {} : { streamId }),
+    ...(streamId !== undefined && { streamId }),
   });
 
   it('prunes aged letters then marks the surviving letters’ streams as stalled', async () => {

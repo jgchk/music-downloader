@@ -37,7 +37,7 @@ describe('statusOf', () => {
     ['ConcurrencyConflict', 409],
     ['InfraError', 500],
   ] as const)('%s -> %d (downloader)', (kind, status) => {
-    const error = downloaderErrors.find((e) => e.kind === kind)!;
+    const error = downloaderErrors.find((entry) => entry.kind === kind)!;
     expect(statusOf(error)).toBe(status);
   });
 
@@ -48,7 +48,7 @@ describe('statusOf', () => {
     ['UnknownCandidate', 400],
     ['NoRetainedCandidate', 409],
   ] as const)('%s -> %d (importer)', (kind, status) => {
-    const error = importerErrors.find((e) => e.kind === kind)!;
+    const error = importerErrors.find((entry) => entry.kind === kind)!;
     expect(statusOf(error)).toBe(status);
   });
 });
@@ -64,7 +64,7 @@ describe('messageOf', () => {
     ['ConcurrencyConflict', 'reload'],
     ['InfraError', 'Something went wrong'],
   ] as const)('renders the downloader %s error as a human message', (kind, needle) => {
-    const message = messageOf(downloaderErrors.find((e) => e.kind === kind)!);
+    const message = messageOf(downloaderErrors.find((entry) => entry.kind === kind)!);
     expect(message).toMatch(/\S/);
     expect(message).toContain(needle);
   });
@@ -80,7 +80,7 @@ describe('messageOf', () => {
     ['ConcurrencyConflict', 'reload'],
     ['InfraError', 'Something went wrong'],
   ] as const)('renders the importer %s error as a human message', (kind, needle) => {
-    const message = messageOf(importerErrors.find((e) => e.kind === kind)!);
+    const message = messageOf(importerErrors.find((entry) => entry.kind === kind)!);
     expect(message).toMatch(/\S/);
     expect(message).toContain(needle);
   });

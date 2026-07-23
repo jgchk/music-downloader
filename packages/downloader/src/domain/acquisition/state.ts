@@ -185,7 +185,7 @@ function progressOf(state: AcquisitionState): Progress {
 
 export function evolve(state: AcquisitionState, event: AcquisitionEvent): AcquisitionState {
   switch (event.type) {
-    case 'AcquisitionRequested':
+    case 'AcquisitionRequested': {
       if (state.phase !== 'Empty') return state;
       return {
         phase: 'Pending',
@@ -195,15 +195,19 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         searchRounds: 0,
         attempts: 0,
       };
-    case 'TargetResolved':
+    }
+    case 'TargetResolved': {
       if (state.phase !== 'Pending') return state;
       return { ...state, phase: 'Searching', target: event.target };
-    case 'MetadataResolutionFailed':
+    }
+    case 'MetadataResolutionFailed': {
       if (state.phase !== 'Pending') return state;
       return { ...state, phase: 'MetadataFailed' };
-    case 'ManualSelectionRequested':
+    }
+    case 'ManualSelectionRequested': {
       if (state.phase !== 'Pending') return state;
       return { ...state, phase: 'AwaitingManualSelection', candidates: event.candidates };
+    }
     case 'EditionSelected': {
       // Back to Pending: the chosen release id is being resolved, exactly like a fresh resolution.
       // The candidates are dropped — they were only ever the menu for this choice.
@@ -211,7 +215,7 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       const { candidates: _candidates, ...requested } = state;
       return { ...requested, phase: 'Pending' };
     }
-    case 'SearchRequested':
+    case 'SearchRequested': {
       if (state.phase !== 'Selecting') return state;
       return {
         phase: 'Searching',
@@ -222,13 +226,16 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         searchRounds: state.searchRounds,
         attempts: state.attempts,
       };
-    case 'SearchCompleted':
+    }
+    case 'SearchCompleted': {
       if (state.phase !== 'Searching') return state;
       return { ...state, searchRounds: state.searchRounds + 1 };
-    case 'CandidatesRanked':
+    }
+    case 'CandidatesRanked': {
       if (state.phase !== 'Searching') return state;
       return { ...state, phase: 'Selecting', working: event.ranked };
-    case 'CandidateSelected':
+    }
+    case 'CandidateSelected': {
       if (state.phase !== 'Selecting') return state;
       return {
         ...state,
@@ -240,12 +247,15 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         ),
         attempts: state.attempts + 1,
       };
-    case 'DownloadCompleted':
+    }
+    case 'DownloadCompleted': {
       if (state.phase !== 'Downloading') return state;
       return { ...state, phase: 'Validating', downloadedFiles: event.files };
-    case 'DownloadFailed':
+    }
+    case 'DownloadFailed': {
       return state; // the following CandidateRejected does the state work
-    case 'CandidateRejected':
+    }
+    case 'CandidateRejected': {
       // A cancelled acquisition whose mid-download candidate has now settled: drop `pending` so the
       // deferred cleanup fires once (via `react`) and any later settlement report is a no-op.
       if (state.phase === 'Cancelled') {
@@ -264,15 +274,19 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         searchRounds: state.searchRounds,
         attempts: state.attempts,
       };
-    case 'ValidationPassed':
+    }
+    case 'ValidationPassed': {
       if (state.phase !== 'Validating') return state;
       return { ...state, phase: 'Importing' };
-    case 'ValidationFailed':
+    }
+    case 'ValidationFailed': {
       return state; // the following CandidateRejected does the state work
-    case 'Imported':
+    }
+    case 'Imported': {
       // A state no-op: the co-emitted AcquisitionFulfilled carries the location; the import itself
       // is observed via `react` (staging cleanup), not folded into state.
       return state;
+    }
     case 'AcquisitionFulfilled': {
       if (state.phase !== 'Importing') return state;
       const fulfilled: FulfilledState = {
@@ -316,7 +330,7 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         attempts: state.attempts,
       };
     }
-    case 'AcquisitionExhausted':
+    case 'AcquisitionExhausted': {
       if (state.phase !== 'Selecting') return state;
       return {
         phase: 'Exhausted',
@@ -324,7 +338,8 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         searchRounds: state.searchRounds,
         attempts: state.attempts,
       };
-    case 'ImportConflicted':
+    }
+    case 'ImportConflicted': {
       if (state.phase !== 'Importing') return state;
       return {
         phase: 'Conflicted',
@@ -334,7 +349,8 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         searchRounds: state.searchRounds,
         attempts: state.attempts,
       };
-    case 'AcquisitionCancelled':
+    }
+    case 'AcquisitionCancelled': {
       if (isTerminal(state)) return state;
       // A settled transfer's files are staged and stable — retain the candidate for immediate
       // cleanup. An in-flight Downloading transfer is still being written — retain it as `pending`
@@ -354,10 +370,13 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         };
       }
       return { phase: 'Cancelled', staging: { kind: 'none' }, ...progressOf(state) };
+    }
   }
 }
 
 /** Fold a whole history into state — the replay path and a convenient test builder. */
 export function foldEvents(events: readonly AcquisitionEvent[]): AcquisitionState {
-  return events.reduce(evolve, initialState);
+  let state: AcquisitionState = initialState;
+  for (const event of events) state = evolve(state, event);
+  return state;
 }

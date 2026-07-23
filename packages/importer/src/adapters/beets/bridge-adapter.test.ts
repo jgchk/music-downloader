@@ -9,7 +9,7 @@ import type { CommandResult, CommandRunner } from './runner.js';
 const CONFIG: BeetsBridgeConfig = {
   pythonBin: '/opt/venv/bin/python3',
   beetsConfigPath: '/config/beets/config.yaml',
-  timeoutMs: 1_000,
+  timeoutMs: 1000,
   bridgeScript: '/app/bridge.py',
 };
 
@@ -37,8 +37,8 @@ function runnerReturning(...results: CommandResult[]): CommandRunner & { calls: 
   const calls: string[][] = [];
   return {
     calls,
-    run: vi.fn((_bin: string, args: readonly string[]) => {
-      calls.push([...args]);
+    run: vi.fn((_bin: string, arguments_: readonly string[]) => {
+      calls.push([...arguments_]);
       return Promise.resolve(results.shift() ?? completed('{}'));
     }),
   };
@@ -51,13 +51,12 @@ function bridge(runner: CommandRunner, config: BeetsBridgeConfig = CONFIG): Beet
 describe('propose', () => {
   it('passes the pins through and translates the proposal to port vocabulary', async () => {
     const runner = runnerReturning(completed(PROPOSAL_JSON));
-    const outcome = (
-      await bridge(runner).propose('/intake/a', {
-        searchId: 'mb-1',
-        searchArtist: 'The Beatles',
-        searchAlbum: 'Love Me Do',
-      })
-    )._unsafeUnwrap();
+    const proposeResult = await bridge(runner).propose('/intake/a', {
+      searchId: 'mb-1',
+      searchArtist: 'The Beatles',
+      searchAlbum: 'Love Me Do',
+    });
+    const outcome = proposeResult._unsafeUnwrap();
 
     expect(runner.calls[0]).toEqual([
       '/app/bridge.py',
@@ -122,9 +121,11 @@ describe('propose', () => {
       ],
       duplicates: [],
     });
-    const outcome = (
-      await bridge(runnerReturning(completed(enriched))).propose('/intake/a', {})
-    )._unsafeUnwrap();
+    const proposeResult2 = await bridge(runnerReturning(completed(enriched))).propose(
+      '/intake/a',
+      {},
+    );
+    const outcome = proposeResult2._unsafeUnwrap();
     expect(outcome).toMatchObject({
       kind: 'proposal',
       candidates: [
@@ -172,7 +173,8 @@ describe('propose', () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'doomed', kind: 'directory-not-found', reason: 'gone' })),
     );
-    const outcome = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrap();
+    const proposeResult3 = await bridge(runner).propose('/intake/a', {});
+    const outcome = proposeResult3._unsafeUnwrap();
     expect(outcome).toEqual({ kind: 'doomed', reason: 'gone' });
   });
 });
@@ -208,7 +210,8 @@ describe('apply', () => {
 
   it.each(modeCases)('builds the apply arguments for %j', async (mode, expected) => {
     const runner = runnerReturning(APPLIED);
-    const outcome = (await bridge(runner).apply('/intake/a', mode))._unsafeUnwrap();
+    const applyResult = await bridge(runner).apply('/intake/a', mode);
+    const outcome = applyResult._unsafeUnwrap();
     expect(runner.calls[0]).toEqual([
       '/app/bridge.py',
       '--config',
@@ -235,7 +238,8 @@ describe('apply', () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'skipped-duplicate', incumbents: [] })),
     );
-    const outcome = (await bridge(runner).apply('/intake/a', { kind: 'as-is' }))._unsafeUnwrap();
+    const applyResult2 = await bridge(runner).apply('/intake/a', { kind: 'as-is' });
+    const outcome = applyResult2._unsafeUnwrap();
     expect(outcome).toEqual({ kind: 'skipped-duplicate', incumbents: [] });
   });
 
@@ -243,7 +247,8 @@ describe('apply', () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'doomed', kind: 'candidate-not-found', reason: 'nope' })),
     );
-    const outcome = (await bridge(runner).apply('/intake/a', { kind: 'as-is' }))._unsafeUnwrap();
+    const applyResult3 = await bridge(runner).apply('/intake/a', { kind: 'as-is' });
+    const outcome = applyResult3._unsafeUnwrap();
     expect(outcome).toEqual({ kind: 'doomed', reason: 'nope' });
   });
 });
@@ -262,8 +267,9 @@ describe('validate', () => {
         }),
       ),
     );
-    const configuration = (await bridge(runner).validate())._unsafeUnwrap();
-    expect(configuration).toEqual({
+    const validateResult = await bridge(runner).validate();
+    const config = validateResult._unsafeUnwrap();
+    expect(config).toEqual({
       beetsVersion: '2.12.0',
       libraryDatabase: '/config/beets/library.db',
       libraryDirectory: '/music/library',
@@ -276,7 +282,8 @@ describe('validate', () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'invalid', kind: 'config-invalid', reason: 'bad yaml' })),
     );
-    const error = (await bridge(runner).validate())._unsafeUnwrapErr();
+    const validateResult2 = await bridge(runner).validate();
+    const error = validateResult2._unsafeUnwrapErr();
     expect(error).toMatchObject({
       kind: 'InfraError',
       operation: 'bridge.validate',
@@ -288,38 +295,44 @@ describe('validate', () => {
 describe('failure surfaces', () => {
   it('maps a timeout to an InfraError', async () => {
     const runner = runnerReturning(completed('', { timedOut: true }));
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult4 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult4._unsafeUnwrapErr();
     expect(error.message).toContain('timed out after 1000ms');
   });
 
   it('maps a non-zero exit to an InfraError carrying stderr', async () => {
     const runner = runnerReturning(completed('', { code: 1, stderr: 'Traceback: boom' }));
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult5 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult5._unsafeUnwrapErr();
     expect(error.message).toContain('bridge exited 1');
     expect(error.message).toContain('Traceback: boom');
   });
 
   it('reports a signal-terminated bridge distinctly', async () => {
     const runner = runnerReturning(completed('', { code: null }));
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult6 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult6._unsafeUnwrapErr();
     expect(error.message).toContain('by signal');
   });
 
   it('maps non-JSON output to an InfraError', async () => {
     const runner = runnerReturning(completed('not json'));
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult7 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult7._unsafeUnwrapErr();
     expect(error.message).toContain('non-JSON output');
   });
 
   it('maps contract drift (schema mismatch) to an InfraError, never silent misbehavior', async () => {
     const runner = runnerReturning(completed(JSON.stringify({ status: 'proposal' })));
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult8 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult8._unsafeUnwrapErr();
     expect(error.message).toContain('contract validation');
   });
 
   it('maps a spawn rejection to an InfraError', async () => {
     const runner: CommandRunner = { run: () => Promise.reject(new Error('ENOENT')) };
-    const error = (await bridge(runner).propose('/intake/a', {}))._unsafeUnwrapErr();
+    const proposeResult9 = await bridge(runner).propose('/intake/a', {});
+    const error = proposeResult9._unsafeUnwrapErr();
     expect(error.message).toContain('bridge spawn failed');
   });
 });

@@ -19,8 +19,12 @@ describe('InProcessEventBus', () => {
   it('fans committed events out to every subscriber', () => {
     const bus = new InProcessEventBus();
     const seen: number[] = [];
-    bus.subscribe((event) => seen.push(event.globalSeq));
-    bus.subscribe((event) => seen.push(event.globalSeq * 10));
+    bus.subscribe((event) => {
+      seen.push(event.globalSeq);
+    });
+    bus.subscribe((event) => {
+      seen.push(event.globalSeq * 10);
+    });
 
     bus.publish([storedAt(1), storedAt(2)]);
 
@@ -30,7 +34,9 @@ describe('InProcessEventBus', () => {
   it('stops delivering once a subscriber unsubscribes', () => {
     const bus = new InProcessEventBus();
     const seen: number[] = [];
-    const unsubscribe = bus.subscribe((event) => seen.push(event.globalSeq));
+    const unsubscribe = bus.subscribe((event) => {
+      seen.push(event.globalSeq);
+    });
 
     bus.publish([storedAt(1)]);
     unsubscribe();
@@ -70,7 +76,7 @@ describe('pollCatchUp', () => {
   it('returns the unchanged cursor when there is nothing new', async () => {
     const store = { readAll: vi.fn().mockReturnValue(okAsync([])) };
 
-    const result = await pollCatchUp(store, 7, () => undefined);
+    const result = await pollCatchUp(store, 7, () => {});
 
     expect(result._unsafeUnwrap()).toBe(7);
   });
@@ -78,7 +84,7 @@ describe('pollCatchUp', () => {
   it('surfaces an infrastructure fault from the store', async () => {
     const store = { readAll: vi.fn().mockReturnValue(errAsync(infraError('readAll', 'boom'))) };
 
-    const result = await pollCatchUp(store, 0, () => undefined);
+    const result = await pollCatchUp(store, 0, () => {});
 
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError', operation: 'readAll' });
   });

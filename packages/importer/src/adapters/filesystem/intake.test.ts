@@ -1,47 +1,50 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import { FilesystemIntake } from './intake.js';
 import type { IntakeFileSystem } from './intake.js';
 
-const tmpDirs: string[] = [];
+const temporaryDirectories: string[] = [];
 
 function freshRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'mi-intake-'));
-  tmpDirs.push(dir);
-  return dir;
+  const directory = mkdtempSync(path.join(tmpdir(), 'mi-intake-'));
+  temporaryDirectories.push(directory);
+  return directory;
 }
 
 afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true });
+  temporaryDirectories.length = 0;
 });
 
 describe('FilesystemIntake', () => {
   it('deletes a release directory and prunes its emptied parents up to the root', async () => {
     const root = freshRoot();
-    const release = join(root, 'batch-7', 'Artist - Album');
+    const release = path.join(root, 'batch-7', 'Artist - Album');
     mkdirSync(release, { recursive: true });
-    writeFileSync(join(release, '01.mp3'), 'x');
+    writeFileSync(path.join(release, '01.mp3'), 'x');
 
     const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    (await intake.deleteRelease(release))._unsafeUnwrap();
+    const releaseDeletionResult = await intake.deleteRelease(release);
+    releaseDeletionResult._unsafeUnwrap();
 
     expect(existsSync(release)).toBe(false);
-    expect(existsSync(join(root, 'batch-7'))).toBe(false); // emptied parent pruned
+    expect(existsSync(path.join(root, 'batch-7'))).toBe(false); // emptied parent pruned
     expect(existsSync(root)).toBe(true); // never the root itself
   });
 
   it('leaves a parent holding other releases untouched', async () => {
     const root = freshRoot();
-    const release = join(root, 'batch-7', 'Artist - Album');
-    const sibling = join(root, 'batch-7', 'Other - Album');
+    const release = path.join(root, 'batch-7', 'Artist - Album');
+    const sibling = path.join(root, 'batch-7', 'Other - Album');
     mkdirSync(release, { recursive: true });
     mkdirSync(sibling, { recursive: true });
 
     const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    (await intake.deleteRelease(release))._unsafeUnwrap();
+    const releaseDeletionResult2 = await intake.deleteRelease(release);
+    releaseDeletionResult2._unsafeUnwrap();
 
     expect(existsSync(release)).toBe(false);
     expect(existsSync(sibling)).toBe(true);
@@ -50,7 +53,7 @@ describe('FilesystemIntake', () => {
   it('tolerates an already-gone directory (idempotent under redelivery)', async () => {
     const root = freshRoot();
     const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const result = await intake.deleteRelease(join(root, 'never-existed'));
+    const result = await intake.deleteRelease(path.join(root, 'never-existed'));
     expect(result.isOk()).toBe(true);
   });
 
@@ -59,7 +62,7 @@ describe('FilesystemIntake', () => {
     const outside = freshRoot();
     const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
 
-    const result = await intake.deleteRelease(join(outside, 'album'));
+    const result = await intake.deleteRelease(path.join(outside, 'album'));
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
     expect(result._unsafeUnwrapErr().message).toContain('refusing to delete');
   });
@@ -75,13 +78,13 @@ describe('FilesystemIntake', () => {
   it('refuses a sneaky traversal that resolves outside the root', async () => {
     const root = freshRoot();
     const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const result = await intake.deleteRelease(join(root, '..', 'sibling'));
+    const result = await intake.deleteRelease(path.join(root, '..', 'sibling'));
     expect(result.isErr()).toBe(true);
   });
 
   it('surfaces an unexpected pruning fault as an InfraError', async () => {
     const root = freshRoot();
-    const release = join(root, 'batch', 'album');
+    const release = path.join(root, 'batch', 'album');
     const failing: IntakeFileSystem = {
       removeTree: () => Promise.resolve(),
       removeEmptyDir: () => Promise.reject(Object.assign(new Error('EACCES'), { code: 'EACCES' })),
@@ -93,7 +96,7 @@ describe('FilesystemIntake', () => {
 
   it('stops pruning quietly when a parent vanished concurrently', async () => {
     const root = freshRoot();
-    const release = join(root, 'batch', 'album');
+    const release = path.join(root, 'batch', 'album');
     const gone: IntakeFileSystem = {
       removeTree: () => Promise.resolve(),
       removeEmptyDir: () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),

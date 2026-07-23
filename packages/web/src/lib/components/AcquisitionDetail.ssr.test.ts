@@ -68,7 +68,7 @@ describe('AcquisitionDetail (SSR)', () => {
   });
 
   it('renders every importer timeline kind, attributed to the import', () => {
-    const ref = { dataSource: 'MusicBrainz', albumId: 'a1' };
+    const reference = { dataSource: 'MusicBrainz', albumId: 'a1' };
     const { body } = render(AcquisitionDetail, {
       props: {
         acquisition: { ...working, status: 'Fulfilled' as const, currentCandidate: undefined },
@@ -77,7 +77,7 @@ describe('AcquisitionDetail (SSR)', () => {
           im({ kind: 'requested', at: 'i0' }),
           im({ kind: 'proposed', at: 'i1', candidateCount: 2 }),
           im({ kind: 'proposed', at: 'i2', candidateCount: 1 }),
-          im({ kind: 'auto-apply-selected', at: 'i3', candidate: ref, distance: 0.05 }),
+          im({ kind: 'auto-apply-selected', at: 'i3', candidate: reference, distance: 0.05 }),
           im({ kind: 'review-required', at: 'i4', reviewKind: 'match-review' }),
           im({ kind: 'review-resolved', at: 'i5', resolution: 'reject' }),
           im({ kind: 'applied', at: 'i6', location: '/lib/x' }),

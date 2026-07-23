@@ -58,17 +58,17 @@ CREATE TABLE IF NOT EXISTS source_resources (
 
 /** Open (creating if absent) the event database, enable WAL, and ensure the schema exists. */
 export function openEventDatabase(filename: string): EventDatabase {
-  const db = new Database(filename);
-  db.pragma('journal_mode = WAL');
-  db.exec(SCHEMA);
-  migrate(db);
-  return db;
+  const database = new Database(filename);
+  database.pragma('journal_mode = WAL');
+  database.exec(SCHEMA);
+  migrate(database);
+  return database;
 }
 
 /** Additive in-place migrations for databases created before a column existed. */
-function migrate(db: EventDatabase): void {
-  const deadLetterColumns = db.pragma('table_info(dead_letters)') as { name: string }[];
-  if (!deadLetterColumns.some((column) => column.name === 'stream_id')) {
-    db.exec('ALTER TABLE dead_letters ADD COLUMN stream_id TEXT');
+function migrate(database: EventDatabase): void {
+  const deadLetterColumns = database.pragma('table_info(dead_letters)') as { name: string }[];
+  if (deadLetterColumns.every((column) => column.name !== 'stream_id')) {
+    database.exec('ALTER TABLE dead_letters ADD COLUMN stream_id TEXT');
   }
 }

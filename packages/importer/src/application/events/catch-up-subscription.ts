@@ -54,7 +54,7 @@ export interface SubscriptionRetryPolicy {
   readonly baseDelayMs: number; // backoff: base * 2^(attempt-1)
 }
 
-export interface CatchUpSubscriptionDeps {
+export interface CatchUpSubscriptionDependencies {
   readonly name: string; // the durable checkpoint key, unique per subscription
   readonly feed: SeamFeed;
   readonly checkpoints: CheckpointStore; // THIS module's store — never the producer's
@@ -70,11 +70,11 @@ export interface CatchUpSubscriptionDeps {
   /** The producer's post-commit wakeup — a lossy hint, never the delivery guarantee. */
   readonly wakeups?: { subscribe(listener: () => void): () => void };
   /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
-  readonly interval?: (fn: () => void, ms: number) => () => void;
+  readonly interval?: (function_: () => void, ms: number) => () => void;
 }
 
-const defaultInterval = (fn: () => void, ms: number): (() => void) => {
-  const handle = setInterval(fn, ms);
+const defaultInterval = (function_: () => void, ms: number): (() => void) => {
+  const handle = setInterval(function_, ms);
   return () => clearInterval(handle);
 };
 
@@ -86,7 +86,7 @@ export class CatchUpSubscription {
   private stopWakeups: (() => void) | undefined;
   private stopInterval: (() => void) | undefined;
 
-  constructor(private readonly deps: CatchUpSubscriptionDeps) {}
+  constructor(private readonly dependencies: CatchUpSubscriptionDependencies) {}
 
   /** True when the poison policy has stopped this subscription (checkpoint held). */
   get isHalted(): boolean {
@@ -95,15 +95,15 @@ export class CatchUpSubscription {
 
   /** Resume from the checkpoint, drain the backlog, then follow wakeups + the fallback poll. */
   async start(): Promise<void> {
-    const checkpoint = await this.deps.checkpoints.load(this.deps.name);
+    const checkpoint = await this.dependencies.checkpoints.load(this.dependencies.name);
     this.cursor = checkpoint.unwrapOr(0);
     await this.poll();
-    this.stopWakeups = this.deps.wakeups?.subscribe(() => {
+    this.stopWakeups = this.dependencies.wakeups?.subscribe(() => {
       void this.poll();
     });
-    this.stopInterval = (this.deps.interval ?? defaultInterval)(() => {
+    this.stopInterval = (this.dependencies.interval ?? defaultInterval)(() => {
       void this.poll();
-    }, this.deps.pollIntervalMs);
+    }, this.dependencies.pollIntervalMs);
   }
 
   stop(): void {
@@ -117,7 +117,7 @@ export class CatchUpSubscription {
   async reset(toGlobalSeq = 0): Promise<void> {
     this.cursor = toGlobalSeq;
     this.halted = false;
-    await this.deps.checkpoints.save(this.deps.name, toGlobalSeq);
+    await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
   }
 
   /** Serialized drain: concurrent calls coalesce into one more pass, never interleave. */
@@ -140,7 +140,7 @@ export class CatchUpSubscription {
 
   private async drain(): Promise<void> {
     for (;;) {
-      const batch = await this.deps.feed.read(this.cursor, this.deps.batchSize);
+      const batch = await this.dependencies.feed.read(this.cursor, this.dependencies.batchSize);
       if (batch.isErr()) {
         if (batch.error.kind === 'RenderError') {
           // A permanent payload-rendering defect at the producer (a mapping bug, or an event that
@@ -151,16 +151,16 @@ export class CatchUpSubscription {
           // dead-lettering for a `park` consumer would need the feed to carry the failing global
           // position; the seam error only exposes `kind`, so that is deferred.)
           this.halted = true;
-          this.deps.logger.error(
-            { subscription: this.deps.name, cursor: this.cursor, err: batch.error },
+          this.dependencies.logger.error(
+            { subscription: this.dependencies.name, cursor: this.cursor, err: batch.error },
             'seam feed render defect (permanent); subscription halted, checkpoint held',
           );
           return;
         }
         // A transient store-read fault holds the checkpoint; the fallback poll retries — a
         // defective batch is never exposed downstream, never skipped.
-        this.deps.logger.error(
-          { subscription: this.deps.name, cursor: this.cursor, err: batch.error },
+        this.dependencies.logger.error(
+          { subscription: this.dependencies.name, cursor: this.cursor, err: batch.error },
           'seam feed read failed; holding checkpoint',
         );
         return;
@@ -173,28 +173,33 @@ export class CatchUpSubscription {
         return;
       }
       if (this.cursor === before) return; // no progress: fully drained
-      await this.deps.sleep(0); // yield between batches — better-sqlite3 reads are synchronous
+      await this.dependencies.sleep(0); // yield between batches — better-sqlite3 reads are synchronous
     }
   }
 
   /** True when the drain may continue past `event`. */
   private async consume(event: SeamEvent): Promise<boolean> {
-    const { attempts, baseDelayMs } = this.deps.retry;
+    const { attempts, baseDelayMs } = this.dependencies.retry;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      const outcome = await this.deps.handler(event);
+      const outcome = await this.dependencies.handler(event);
       if (outcome.isOk()) return this.advance(event.globalSeq);
       if (outcome.error.kind === 'Permanent') {
         // Deterministic failures gain nothing from repetition — straight to the poison policy.
         return this.poison(event, outcome.error.reason);
       }
-      this.deps.logger.warn(
-        { subscription: this.deps.name, globalSeq: event.globalSeq, attempt, err: outcome.error },
+      this.dependencies.logger.warn(
+        {
+          subscription: this.dependencies.name,
+          globalSeq: event.globalSeq,
+          attempt,
+          err: outcome.error,
+        },
         'seam delivery failed',
       );
-      if (attempt < attempts) await this.deps.sleep(baseDelayMs * 2 ** (attempt - 1));
+      if (attempt < attempts) await this.dependencies.sleep(baseDelayMs * 2 ** (attempt - 1));
     }
-    this.deps.logger.error(
-      { subscription: this.deps.name, globalSeq: event.globalSeq },
+    this.dependencies.logger.error(
+      { subscription: this.dependencies.name, globalSeq: event.globalSeq },
       'seam delivery exhausted cycle retries; holding checkpoint for redelivery',
     );
     return false;
@@ -202,29 +207,29 @@ export class CatchUpSubscription {
 
   /** Apply the declared poison policy; true when the drain may advance past the event. */
   private async poison(event: SeamEvent, reason: string): Promise<boolean> {
-    if (this.deps.policy === 'halt') {
+    if (this.dependencies.policy === 'halt') {
       this.halted = true;
-      this.deps.logger.error(
-        { subscription: this.deps.name, globalSeq: event.globalSeq, reason },
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, globalSeq: event.globalSeq, reason },
         'poison event; subscription halted, checkpoint held (order over progress)',
       );
       return false;
     }
-    const parked = await this.deps.deadLetters.record({
-      subscription: this.deps.name,
+    const parked = await this.dependencies.deadLetters.record({
+      subscription: this.dependencies.name,
       globalSeq: event.globalSeq,
       error: reason,
-      occurredAt: this.deps.clock.now().toISOString(),
+      occurredAt: this.dependencies.clock.now().toISOString(),
     });
     if (parked.isErr()) {
-      this.deps.logger.error(
-        { subscription: this.deps.name, globalSeq: event.globalSeq, err: parked.error },
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, globalSeq: event.globalSeq, err: parked.error },
         'dead-letter record failed; holding checkpoint',
       );
       return false;
     }
-    this.deps.logger.error(
-      { subscription: this.deps.name, globalSeq: event.globalSeq, reason },
+    this.dependencies.logger.error(
+      { subscription: this.dependencies.name, globalSeq: event.globalSeq, reason },
       'poison event parked to dead letters; advancing (progress over order)',
     );
     return this.advance(event.globalSeq);
@@ -232,10 +237,10 @@ export class CatchUpSubscription {
 
   /** Persist the checkpoint; the cursor never advances past what the consumer has committed. */
   private async advance(toGlobalSeq: number): Promise<boolean> {
-    const saved = await this.deps.checkpoints.save(this.deps.name, toGlobalSeq);
+    const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
     if (saved.isErr()) {
-      this.deps.logger.error(
-        { subscription: this.deps.name, globalSeq: toGlobalSeq, err: saved.error },
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, globalSeq: toGlobalSeq, err: saved.error },
         'checkpoint save failed; holding for redelivery',
       );
       return false;

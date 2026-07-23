@@ -11,7 +11,7 @@ import type {
   ApplyOutcome,
   ProposeOutcome,
   ProposePins,
-  TaggerConfiguration,
+  TaggerConfig,
   TaggerPort,
 } from '../../application/ports/outbound-ports.js';
 import type { CommandResult, CommandRunner } from './runner.js';
@@ -43,24 +43,28 @@ export interface BeetsBridgeConfig {
 
 /** The bridge.py shipped with this adapter (copied into dist alongside the compiled module). */
 export function defaultBridgeScript(): string {
-  return fileURLToPath(new URL('./bridge/bridge.py', import.meta.url));
+  return fileURLToPath(new URL('bridge/bridge.py', import.meta.url));
 }
 
-function candidateArg(mode: Extract<ApplyMode, { kind: 'candidate' }>): readonly string[] {
-  const args = ['--candidate', `${mode.ref.dataSource}:${mode.ref.albumId}`];
-  if (mode.duplicateAction === 'replace') return [...args, '--duplicate-action', 'replace'];
-  if (mode.duplicateAction === 'keep-both') return [...args, '--duplicate-action', 'keep-both'];
-  return args;
+function candidateArgument(mode: Extract<ApplyMode, { kind: 'candidate' }>): readonly string[] {
+  const arguments_ = ['--candidate', `${mode.ref.dataSource}:${mode.ref.albumId}`];
+  if (mode.duplicateAction === 'replace') return [...arguments_, '--duplicate-action', 'replace'];
+  if (mode.duplicateAction === 'keep-both')
+    return [...arguments_, '--duplicate-action', 'keep-both'];
+  return arguments_;
 }
 
-function applyArgs(mode: ApplyMode): readonly string[] {
+function applyArguments(mode: ApplyMode): readonly string[] {
   switch (mode.kind) {
-    case 'candidate':
-      return candidateArg(mode);
-    case 'as-is':
+    case 'candidate': {
+      return candidateArgument(mode);
+    }
+    case 'as-is': {
       return ['--as-is'];
-    case 'manual-tags':
+    }
+    case 'manual-tags': {
       return ['--tags', JSON.stringify(mode.tags)];
+    }
   }
 }
 
@@ -109,18 +113,18 @@ export class BeetsBridge implements TaggerPort {
   }
 
   propose(directory: string, pins: ProposePins): ResultAsync<ProposeOutcome, InfraError> {
-    const args = [
+    const arguments_ = [
       'propose',
       directory,
-      ...(pins.searchId !== undefined ? ['--search-id', pins.searchId] : []),
-      ...(pins.searchArtist !== undefined ? ['--search-artist', pins.searchArtist] : []),
-      ...(pins.searchAlbum !== undefined ? ['--search-album', pins.searchAlbum] : []),
+      ...(pins.searchId === undefined ? [] : ['--search-id', pins.searchId]),
+      ...(pins.searchArtist === undefined ? [] : ['--search-artist', pins.searchArtist]),
+      ...(pins.searchAlbum === undefined ? [] : ['--search-album', pins.searchAlbum]),
     ];
-    return this.invoke('propose', args, bridgeProposeOutputSchema).map((output) => {
+    return this.invoke('propose', arguments_, bridgeProposeOutputSchema).map((output) => {
       if (output.status === 'doomed') return { kind: 'doomed', reason: output.reason };
       return {
         kind: 'proposal',
-        candidates: output.candidates.map(candidateToDomain),
+        candidates: output.candidates.map((item) => candidateToDomain(item)),
         duplicates: output.duplicates,
       };
     });
@@ -129,21 +133,24 @@ export class BeetsBridge implements TaggerPort {
   apply(directory: string, mode: ApplyMode): ResultAsync<ApplyOutcome, InfraError> {
     return this.invoke(
       'apply',
-      ['apply', directory, ...applyArgs(mode)],
+      ['apply', directory, ...applyArguments(mode)],
       bridgeApplyOutputSchema,
     ).map((output): ApplyOutcome => {
       switch (output.status) {
-        case 'applied':
+        case 'applied': {
           return { kind: 'applied', location: output.location, failures: output.failures };
-        case 'skipped-duplicate':
+        }
+        case 'skipped-duplicate': {
           return { kind: 'skipped-duplicate', incumbents: output.incumbents };
-        case 'doomed':
+        }
+        case 'doomed': {
           return { kind: 'doomed', reason: output.reason };
+        }
       }
     });
   }
 
-  validate(): ResultAsync<TaggerConfiguration, InfraError> {
+  validate(): ResultAsync<TaggerConfig, InfraError> {
     return this.invoke('validate', ['validate'], bridgeValidateOutputSchema).andThen((output) => {
       if (output.status === 'invalid') {
         // An unusable beets config can only be fixed by an operator: fail the boot loudly (D3).
@@ -162,12 +169,12 @@ export class BeetsBridge implements TaggerPort {
   /** Run one bridge invocation through the serialization queue and validate its output. */
   private invoke<Schema extends z.ZodType>(
     operation: string,
-    verbArgs: readonly string[],
+    verbArguments: readonly string[],
     schema: Schema,
   ): ResultAsync<z.infer<Schema>, InfraError> {
-    const args = ['--config', this.config.beetsConfigPath, ...verbArgs];
+    const arguments_ = ['--config', this.config.beetsConfigPath, ...verbArguments];
     const run = this.enqueue(() =>
-      this.runner.run(this.config.pythonBin, [this.script, ...args], this.config.timeoutMs),
+      this.runner.run(this.config.pythonBin, [this.script, ...arguments_], this.config.timeoutMs),
     );
     return ResultAsync.fromPromise(run, (cause) =>
       infraError(`bridge.${operation}`, `bridge spawn failed: ${String(cause)}`, cause),
@@ -219,11 +226,17 @@ export class BeetsBridge implements TaggerPort {
 
   /** Chain invocations so at most one bridge process runs at a time (design D6). */
   private enqueue<T>(job: () => Promise<T>): Promise<T> {
+    // Deliberate promise-chaining: reassigning `this.queue` to the tail of the chain IS the
+    // one-at-a-time queue — awaiting would collapse the serialization, and the two-argument
+    // `then(job, job)` runs the next job exactly once on either outcome (not a then→catch, which
+    // would run it twice if the success arm threw).
+    /* eslint-disable unicorn/prefer-await, unicorn/prefer-then-catch */
     const next = this.queue.then(job, job);
     this.queue = next.then(
-      () => undefined,
-      () => undefined,
+      () => {},
+      () => {},
     );
+    /* eslint-enable unicorn/prefer-await, unicorn/prefer-then-catch */
     return next;
   }
 }

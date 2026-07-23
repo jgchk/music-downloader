@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RETRY_POLICY, nextRetry } from './retry-policy.js';
 
-const POLICY = { initialDelayMs: 5_000, maxDelayMs: 900_000, budgetMs: 21_600_000 };
+const POLICY = { initialDelayMs: 5000, maxDelayMs: 900_000, budgetMs: 21_600_000 };
 const T0 = new Date('2026-07-22T12:00:00.000Z');
 
 const at = (offsetMs: number): Date => new Date(T0.getTime() + offsetMs);
@@ -12,7 +12,7 @@ describe('nextRetry', () => {
     const second = nextRetry(POLICY, 2, T0, T0, 1);
     const third = nextRetry(POLICY, 3, T0, T0, 1);
 
-    expect(first).toEqual({ kind: 'retry', nextRetryAt: at(5_000) });
+    expect(first).toEqual({ kind: 'retry', nextRetryAt: at(5000) });
     expect(second).toEqual({ kind: 'retry', nextRetryAt: at(10_000) });
     expect(third).toEqual({ kind: 'retry', nextRetryAt: at(20_000) });
   });
@@ -27,8 +27,8 @@ describe('nextRetry', () => {
     const floor = nextRetry(POLICY, 1, T0, T0, 0);
     const ceiling = nextRetry(POLICY, 1, T0, T0, 1);
 
-    expect(floor).toEqual({ kind: 'retry', nextRetryAt: at(2_500) });
-    expect(ceiling).toEqual({ kind: 'retry', nextRetryAt: at(5_000) });
+    expect(floor).toEqual({ kind: 'retry', nextRetryAt: at(2500) });
+    expect(ceiling).toEqual({ kind: 'retry', nextRetryAt: at(5000) });
   });
 
   it('signals exhaustion once the wall-clock budget since parking has elapsed', () => {

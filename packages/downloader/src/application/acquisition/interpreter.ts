@@ -13,7 +13,7 @@ import type {
 import type { MetadataResolution } from '../ports/outbound-ports.js';
 import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
 import { applyCommand } from './command-handler.js';
-import type { CommandDeps, CommandError } from './command-handler.js';
+import type { CommandDependencies, CommandError } from './command-handler.js';
 import { runValidation } from './validation-service.js';
 
 /**
@@ -30,7 +30,7 @@ export interface EffectPorts {
   readonly library: LibraryPort;
 }
 
-export interface InterpreterDeps extends CommandDeps {
+export interface InterpreterDependencies extends CommandDependencies {
   readonly ports: EffectPorts;
   readonly onProgress: (
     acquisitionId: string,
@@ -42,88 +42,100 @@ export interface InterpreterDeps extends CommandDeps {
 /** Each resolution outcome re-enters `decide` as its own command (manual-edition-selection D2). */
 function resolutionCommand(resolution: MetadataResolution): AcquisitionCommand {
   switch (resolution.kind) {
-    case 'resolved':
+    case 'resolved': {
       return { type: 'RecordTarget', target: resolution.target };
-    case 'needsSelection':
+    }
+    case 'needsSelection': {
       return { type: 'RecordManualSelectionRequested', candidates: resolution.candidates };
-    case 'unresolved':
+    }
+    case 'unresolved': {
       return { type: 'RecordMetadataFailed' };
+    }
   }
 }
 
 export function interpretEffect(
-  deps: InterpreterDeps,
+  dependencies: InterpreterDependencies,
   acquisitionId: string,
   effect: Effect,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
-  const { ports } = deps;
+  const { ports } = dependencies;
   switch (effect.type) {
-    case 'ResolveMetadata':
+    case 'ResolveMetadata': {
       return ports.metadata
         .resolve(effect.request)
-        .andThen((resolution) => applyCommand(deps, acquisitionId, resolutionCommand(resolution)));
+        .andThen((resolution) =>
+          applyCommand(dependencies, acquisitionId, resolutionCommand(resolution)),
+        );
+    }
 
-    case 'Search':
+    case 'Search': {
       return ports.search
         .search(acquisitionId, effect.target, effect.round)
         .andThen((candidates) =>
-          applyCommand(deps, acquisitionId, { type: 'RecordSearchResults', candidates }),
+          applyCommand(dependencies, acquisitionId, { type: 'RecordSearchResults', candidates }),
         );
+    }
 
-    case 'Download':
+    case 'Download': {
       return ports.download
         .download(acquisitionId, effect.candidate, effect.policy, (progress) =>
-          deps.onProgress(acquisitionId, effect.candidate.identity, progress),
+          dependencies.onProgress(acquisitionId, effect.candidate.identity, progress),
         )
         .andThen((result) =>
           applyCommand(
-            deps,
+            dependencies,
             acquisitionId,
             result.kind === 'completed'
               ? { type: 'RecordDownloadCompleted', files: result.files }
               : { type: 'RecordDownloadFailed', reason: result.reason, files: result.files },
           ),
         );
+    }
 
-    case 'Validate':
+    case 'Validate': {
       return runValidation(ports.probe, effect.files, effect.target, effect.matchPolicy).andThen(
         (result) =>
           applyCommand(
-            deps,
+            dependencies,
             acquisitionId,
             result.passed
               ? { type: 'RecordValidationPassed', verdict: result.verdict }
               : { type: 'RecordValidationFailed', verdict: result.verdict },
           ),
       );
+    }
 
-    case 'Import':
+    case 'Import': {
       return ports.library
         .import(effect.files, effect.target)
         .andThen((result) =>
           applyCommand(
-            deps,
+            dependencies,
             acquisitionId,
             result.kind === 'imported'
               ? { type: 'RecordImported', location: result.location }
               : { type: 'RecordImportConflict', location: result.location },
           ),
         );
+    }
 
-    case 'Cleanup':
+    case 'Cleanup': {
       return ports.library.discardStaging(effect.files).map((): readonly StoredEvent[] => []);
+    }
 
-    case 'AbortDownload':
+    case 'AbortDownload': {
       // Stop the in-flight transfer, then feed the settlement back as a failed outcome. `decide`
       // turns it into the pending candidate's rejection (staging cleanup follows via `react`); the
       // reported reason is immaterial there, so a plain `Cancelled` stands in. The abort reports the
       // subset the source already completed into staging, so its files are cleaned too (design D2).
       return ports.download.abort(acquisitionId, effect.candidate).andThen((files) =>
-        applyCommand(deps, acquisitionId, {
+        applyCommand(dependencies, acquisitionId, {
           type: 'RecordDownloadFailed',
           reason: 'Cancelled',
           files,
         }),
       );
+    }
   }
 }

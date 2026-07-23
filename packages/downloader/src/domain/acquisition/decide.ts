@@ -1,7 +1,7 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Candidate } from '../candidate/candidate.js';
-import { candidateKey, refersTo } from '../candidate/candidate.js';
+import { candidateKey, isReferringTo } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import { rankCandidates } from '../ranking/ranking.js';
 import type { RankedCandidate } from '../ranking/ranking.js';
@@ -130,23 +130,26 @@ function settleCancelled(
 
 export function decide(command: AcquisitionCommand, state: AcquisitionState): Decision {
   switch (command.type) {
-    case 'SubmitAcquisition':
+    case 'SubmitAcquisition': {
       if (state.phase !== 'Empty') return err({ kind: 'AlreadyExists' });
       return ok([
         { type: 'AcquisitionRequested', request: command.request, policies: command.policies },
       ]);
+    }
 
-    case 'RecordTarget':
+    case 'RecordTarget': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
       return ok([{ type: 'TargetResolved', target: command.target }]);
+    }
 
-    case 'RecordMetadataFailed':
+    case 'RecordMetadataFailed': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
       return ok([{ type: 'MetadataResolutionFailed' }]);
+    }
 
-    case 'RecordManualSelectionRequested':
+    case 'RecordManualSelectionRequested': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Pending') return err(illegal(command.type, state));
       // Manual selection exists only for release-group requests (its editions ARE albums, which is
@@ -161,15 +164,17 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       // for every history decide can produce, so the pause can never be a dead end.
       if (command.candidates.length === 0) return ok([{ type: 'MetadataResolutionFailed' }]);
       return ok([{ type: 'ManualSelectionRequested', candidates: command.candidates }]);
+    }
 
-    case 'SelectEdition':
+    case 'SelectEdition': {
       // A user command, not an effect result: a stale or out-of-state selection is *rejected* (the
       // caller must learn its choice did nothing), unlike Record* commands which absorb on terminal.
       if (state.phase !== 'AwaitingManualSelection') return err(illegal(command.type, state));
-      if (!state.candidates.some((candidate) => candidate.releaseMbid === command.releaseMbid)) {
+      if (state.candidates.every((candidate) => candidate.releaseMbid !== command.releaseMbid)) {
         return err({ kind: 'UnknownEdition', releaseMbid: command.releaseMbid });
       }
       return ok([{ type: 'EditionSelected', releaseMbid: command.releaseMbid }]);
+    }
 
     case 'RecordSearchResults': {
       if (isTerminal(state)) return ok([]);
@@ -181,24 +186,22 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
         state.policies.quality,
         state.policies.match,
       );
+      // The ladder decides even here: an empty round spends its round and re-searches while
+      // budget remains — a dry result is not proof of absence (peers come and go).
       const events: AcquisitionEvent[] = [
         { type: 'SearchCompleted', round: state.searchRounds + 1, candidates: command.candidates },
         { type: 'CandidatesRanked', ranked },
-      ];
-      // The ladder decides even here: an empty round spends its round and re-searches while
-      // budget remains — a dry result is not proof of absence (peers come and go).
-      events.push(
         selectNext({
           policies: state.policies,
           working: ranked,
           attempts: state.attempts,
           searchRounds: state.searchRounds + 1,
         }),
-      );
+      ];
       return ok(events);
     }
 
-    case 'RecordDownloadCompleted':
+    case 'RecordDownloadCompleted': {
       if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
         return ok(settleCancelled(state.staging.pending, command.files));
       if (isTerminal(state)) return ok([]);
@@ -206,8 +209,9 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       return ok([
         { type: 'DownloadCompleted', candidate: state.current.identity, files: command.files },
       ]);
+    }
 
-    case 'RecordDownloadFailed':
+    case 'RecordDownloadFailed': {
       if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
         return ok(settleCancelled(state.staging.pending, command.files ?? []));
       if (isTerminal(state)) return ok([]);
@@ -223,15 +227,17 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
           command.files ?? [],
         ),
       );
+    }
 
-    case 'RecordValidationPassed':
+    case 'RecordValidationPassed': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Validating') return err(illegal(command.type, state));
       return ok([
         { type: 'ValidationPassed', candidate: state.current.identity, verdict: command.verdict },
       ]);
+    }
 
-    case 'RecordValidationFailed':
+    case 'RecordValidationFailed': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Validating') return err(illegal(command.type, state));
       return ok(
@@ -245,8 +251,9 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
           stagedFilesOf(state),
         ),
       );
+    }
 
-    case 'RecordImported':
+    case 'RecordImported': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Importing') return err(illegal(command.type, state));
       return ok([
@@ -264,13 +271,15 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
           candidate: state.current.identity,
         },
       ]);
+    }
 
-    case 'RecordImportConflict':
+    case 'RecordImportConflict': {
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Importing') return err(illegal(command.type, state));
       return ok([
         { type: 'ImportConflicted', location: command.location, files: state.downloadedFiles },
       ]);
+    }
 
     case 'RecordExternalValidationFailed': {
       // Fulfilled is stable-but-defeasible (fulfillment-external-verdict D2): this one command may
@@ -280,7 +289,7 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       // the revival finds the acquisition already back in flight.
       if (state.phase !== 'Fulfilled') return ok([]);
       const resume = state.resume;
-      if (resume === undefined || !refersTo(command.candidate, resume.candidate.identity)) {
+      if (resume === undefined || !isReferringTo(command.candidate, resume.candidate.identity)) {
         return ok([]);
       }
       // The exact reject-and-advance shape of every other rejection, spending the same budgets:
@@ -301,8 +310,9 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       ]);
     }
 
-    case 'CancelAcquisition':
+    case 'CancelAcquisition': {
       if (isTerminal(state)) return ok([]);
       return ok([{ type: 'AcquisitionCancelled', files: stagedFilesOf(state) }]);
+    }
   }
 }

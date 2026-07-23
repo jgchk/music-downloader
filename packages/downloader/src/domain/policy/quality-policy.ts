@@ -46,25 +46,25 @@ const LOSSLESS_CODECS: ReadonlySet<string> = new Set([
 ]);
 
 const HIRES_BIT_DEPTH = 16;
-const HIRES_SAMPLE_RATE = 48000;
-const LOSSY_HIGH_BPS = 256000;
-const LOSSY_STANDARD_BPS = 128000;
+const HIRES_SAMPLE_RATE = 48_000;
+const LOSSY_HIGH_BPS = 256_000;
+const LOSSY_STANDARD_BPS = 128_000;
 
 /** Reason about the probed codec, not the file extension (D5). */
-export function resolveQualityBucket(attrs: QualityAttributes): QualityBucket {
-  const codec = attrs.codec.trim().toLowerCase();
-  const lossless = attrs.lossless ?? (codec !== '' && LOSSLESS_CODECS.has(codec));
+export function resolveQualityBucket(attributes: QualityAttributes): QualityBucket {
+  const codec = attributes.codec.trim().toLowerCase();
+  const isLossless = attributes.lossless ?? (codec !== '' && LOSSLESS_CODECS.has(codec));
 
-  if (lossless) {
-    const hires =
-      (attrs.bitDepth ?? HIRES_BIT_DEPTH) > HIRES_BIT_DEPTH ||
-      (attrs.sampleRate ?? HIRES_SAMPLE_RATE) > HIRES_SAMPLE_RATE;
-    return hires ? 'LOSSLESS_HIRES' : 'LOSSLESS';
+  if (isLossless) {
+    const isHires =
+      (attributes.bitDepth ?? HIRES_BIT_DEPTH) > HIRES_BIT_DEPTH ||
+      (attributes.sampleRate ?? HIRES_SAMPLE_RATE) > HIRES_SAMPLE_RATE;
+    return isHires ? 'LOSSLESS_HIRES' : 'LOSSLESS';
   }
 
-  if (codec === '' && attrs.lossless === undefined) return 'UNKNOWN';
+  if (codec === '' && attributes.lossless === undefined) return 'UNKNOWN';
 
-  const { bitrate } = attrs;
+  const { bitrate } = attributes;
   if (bitrate === undefined) return 'UNKNOWN';
   if (bitrate >= LOSSY_HIGH_BPS) return 'LOSSY_HIGH';
   if (bitrate >= LOSSY_STANDARD_BPS) return 'LOSSY_STANDARD';
@@ -99,11 +99,11 @@ export const DEFAULT_QUALITY_POLICY: QualityPolicy = createQualityPolicy(
 /** Rank within the policy order; absent buckets sort worst (Infinity). Lower rank = higher quality. */
 export function bucketRank(policy: QualityPolicy, bucket: QualityBucket): number {
   const index = policy.order.indexOf(bucket);
-  return index === -1 ? Number.POSITIVE_INFINITY : index;
+  return index === -1 ? Infinity : index;
 }
 
 /** A bucket clears the floor iff it is at least as good as the floor (D11). */
-export function meetsFloor(policy: QualityPolicy, bucket: QualityBucket): boolean {
+export function isFloorMet(policy: QualityPolicy, bucket: QualityBucket): boolean {
   return bucketRank(policy, bucket) <= bucketRank(policy, policy.floor);
 }
 

@@ -2,11 +2,11 @@
   import type { ProgressResponseDto } from '@music/downloader';
   import { formatBytes } from '$lib/acquisitions.js';
 
-  interface Props {
+  interface Properties {
     progress: ProgressResponseDto;
   }
 
-  let { progress }: Props = $props();
+  let { progress }: Properties = $props();
   const percent = $derived(Math.round(progress.percent));
 </script>
 

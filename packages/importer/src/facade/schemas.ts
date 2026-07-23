@@ -42,7 +42,7 @@ export const duplicateActionSchema = z.enum(['replace', 'keep-both']);
 
 // --- Shared shapes -----------------------------------------------------------------------------
 
-export const candidateRefSchema = z.object({
+export const candidateReferenceSchema = z.object({
   dataSource: z.string().min(1),
   albumId: z.string().min(1),
 });
@@ -94,7 +94,7 @@ export const candidateAlbumFieldsSchema = z.object({
 });
 
 export const candidateSchema = z.object({
-  ref: candidateRefSchema,
+  ref: candidateReferenceSchema,
   artist: z.string(),
   album: z.string(),
   distance: z.number(),
@@ -144,7 +144,7 @@ export const reviewSchema = z.discriminatedUnion('kind', [
     // The pinned/hinted release id when one was in play (additive), so a consumer can word the
     // hint outcome truthfully: contradicted iff it differs from `best.albumId`.
     hintedReleaseId: z.string().optional(),
-    best: candidateRefSchema.optional(),
+    best: candidateReferenceSchema.optional(),
     candidates: z.array(candidateSchema),
   }),
   z.object({ kind: z.literal('no-match') }),
@@ -177,7 +177,7 @@ export const manualTagsSchema = z.object({
 export const resolveReviewRequestSchema = z.discriminatedUnion('verb', [
   z.object({
     verb: z.literal('apply-candidate'),
-    candidate: candidateRefSchema,
+    candidate: candidateReferenceSchema,
     duplicateAction: duplicateActionSchema.optional(),
   }),
   z.object({ verb: z.literal('supply-id'), mbReleaseId: z.string().min(1) }),
@@ -233,7 +233,7 @@ export const historyEntrySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('auto-apply-selected'),
     at: z.iso.datetime(),
-    candidate: candidateRefSchema,
+    candidate: candidateReferenceSchema,
     distance: z.number(),
   }),
   z.object({
@@ -288,7 +288,7 @@ export const importListResponseSchema = z.object({
   imports: z.array(importStatusResponseSchema),
 });
 
-export const importIdParamsSchema = z.object({
+export const importIdParametersSchema = z.object({
   id: z.string().min(1),
 });
 

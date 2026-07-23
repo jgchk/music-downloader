@@ -45,17 +45,17 @@ const stripTrailingSlashes = (path: string): string => path.replace(/\/+$/u, '')
  * join the remainder onto the intake root. A location that does not fall strictly under the
  * source root — or that carries empty/`.`/`..` segments (escape attempts) — is rejected.
  */
-export function rerootLocation(args: {
+export function rerootLocation(arguments_: {
   readonly location: string;
   readonly sourceRoot: string;
   readonly intakeRoot: string;
 }): Result<string, 'OutsideSourceRoot'> {
-  const location = stripTrailingSlashes(args.location);
-  const prefix = `${stripTrailingSlashes(args.sourceRoot)}/`;
+  const location = stripTrailingSlashes(arguments_.location);
+  const prefix = `${stripTrailingSlashes(arguments_.sourceRoot)}/`;
   if (!location.startsWith(prefix)) return err('OutsideSourceRoot');
   const segments = location.slice(prefix.length).split('/');
-  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+  if (segments.some((segment) => ['', '.', '..'].includes(segment))) {
     return err('OutsideSourceRoot');
   }
-  return ok(`${stripTrailingSlashes(args.intakeRoot)}/${segments.join('/')}`);
+  return ok(`${stripTrailingSlashes(arguments_.intakeRoot)}/${segments.join('/')}`);
 }

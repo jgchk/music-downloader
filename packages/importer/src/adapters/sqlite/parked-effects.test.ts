@@ -16,8 +16,10 @@ describe('SqliteParkedEffectStore', () => {
 
     await store.park(ENTRY);
 
-    expect((await store.find(3))._unsafeUnwrap()).toEqual(ENTRY);
-    expect((await store.find(4))._unsafeUnwrap()).toBeUndefined();
+    const findResult = await store.find(3);
+    expect(findResult._unsafeUnwrap()).toEqual(ENTRY);
+    const findResult2 = await store.find(4);
+    expect(findResult2._unsafeUnwrap()).toBeUndefined();
   });
 
   it('re-parking the same position upserts the tally (one park per held event)', async () => {
@@ -26,7 +28,8 @@ describe('SqliteParkedEffectStore', () => {
     await store.park(ENTRY);
     await store.park({ ...ENTRY, attempt: 2, lastError: 'bridge.propose: still failing' });
 
-    const found = (await store.find(3))._unsafeUnwrap();
+    const findResult3 = await store.find(3);
+    const found = findResult3._unsafeUnwrap();
     expect(found?.attempt).toBe(2);
     expect(found?.lastError).toBe('bridge.propose: still failing');
   });
@@ -35,19 +38,25 @@ describe('SqliteParkedEffectStore', () => {
     const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
     await store.park(ENTRY);
 
-    expect((await store.clear(3)).isOk()).toBe(true);
-    expect((await store.clear(999)).isOk()).toBe(true);
+    const clearResult = await store.clear(3);
+    expect(clearResult.isOk()).toBe(true);
+    const clearResult2 = await store.clear(999);
+    expect(clearResult2.isOk()).toBe(true);
 
-    expect((await store.find(3))._unsafeUnwrap()).toBeUndefined();
+    const findResult4 = await store.find(3);
+    expect(findResult4._unsafeUnwrap()).toBeUndefined();
   });
 
   it('surfaces storage faults as infra errors', async () => {
-    const db = openEventDatabase(':memory:');
-    const store = new SqliteParkedEffectStore(db);
-    db.close();
+    const database = openEventDatabase(':memory:');
+    const store = new SqliteParkedEffectStore(database);
+    database.close();
 
-    expect((await store.park(ENTRY)).isErr()).toBe(true);
-    expect((await store.find(3)).isErr()).toBe(true);
-    expect((await store.clear(3)).isErr()).toBe(true);
+    const parkResult = await store.park(ENTRY);
+    expect(parkResult.isErr()).toBe(true);
+    const findResult5 = await store.find(3);
+    expect(findResult5.isErr()).toBe(true);
+    const clearResult3 = await store.clear(3);
+    expect(clearResult3.isErr()).toBe(true);
   });
 });

@@ -1,8 +1,8 @@
 <script lang="ts">
   import Landing from '$lib/components/Landing.svelte';
-  import type { PageProps } from './$types';
+  import type { PageProps as PageProperties } from './$types';
 
-  let { data }: PageProps = $props();
+  let { data }: PageProperties = $props();
 </script>
 
 <Landing counts={data.counts} />

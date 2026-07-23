@@ -49,9 +49,9 @@ beforeEach(() => {
   ledger = new FakeResourceLedger();
 });
 
-async function seed(acquisitionId: string, terminal: boolean): Promise<void> {
+async function seed(acquisitionId: string, isTerminal: boolean): Promise<void> {
   const a = matchingCandidate('a');
-  const history = terminal
+  const history = isTerminal
     ? [...selectedHistory([a]), { type: 'AcquisitionCancelled' as const }]
     : selectedHistory([a]);
   await store.append(acquisitionId, 0, history, { acquisitionId, occurredAt: 't' });
@@ -63,7 +63,8 @@ function sweep(remover: SourceResourceRemover): SourceResourceSweep {
 }
 
 async function liveAcquisitionIds(): Promise<string[]> {
-  return (await ledger.allLive())._unsafeUnwrap().map((r) => r.acquisitionId);
+  const allLiveResult = await ledger.allLive();
+  return allLiveResult._unsafeUnwrap().map((r) => r.acquisitionId);
 }
 
 describe('SourceResourceSweep', () => {

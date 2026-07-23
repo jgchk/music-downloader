@@ -41,7 +41,7 @@ describe('slskd contract schemas', () => {
       {
         username: 'peer1',
         hasFreeUploadSlot: true,
-        uploadSpeed: 5000000,
+        uploadSpeed: 5_000_000,
         queueLength: 0,
         lockedFileCount: 3, // unknown to the contract
         files: [
@@ -49,7 +49,7 @@ describe('slskd contract schemas', () => {
             filename: 'a.flac',
             size: 100,
             bitRate: 900,
-            sampleRate: 44100,
+            sampleRate: 44_100,
             bitDepth: 16,
             length: 10,
           },
@@ -123,7 +123,7 @@ describe('slskd contract schemas', () => {
   it('decodes a DownloadFileComplete payload, stripping unknown fields', () => {
     const parsed = slskdDownloadFileCompleteSchema.parse({
       localFilename: '/app/downloads/2007 - Alive/13 Human.mp3',
-      remoteFilename: '@@x\\Alive\\13 Human.mp3',
+      remoteFilename: String.raw`@@x\Alive\13 Human.mp3`,
       transfer: { id: '2f3b3fd5', state: 'Completed, Succeeded' }, // extra transfer field stripped
       state: 'Completed', // unknown to the contract (stripped)
     });

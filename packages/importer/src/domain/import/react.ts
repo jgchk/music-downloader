@@ -28,7 +28,7 @@ export type Effect =
  */
 export function react(event: ImportEvent, state: ImportState): readonly Effect[] {
   switch (event.type) {
-    case 'ImportRequested':
+    case 'ImportRequested': {
       return [
         {
           type: 'Propose',
@@ -38,19 +38,22 @@ export function react(event: ImportEvent, state: ImportState): readonly Effect[]
           searchAlbum: event.hints?.album,
         },
       ];
-    case 'AutoApplySelected':
+    }
+    case 'AutoApplySelected': {
       return state.phase === 'applying'
         ? [{ type: 'Apply', directory: state.directory, mode: state.mode }]
         : [];
-    case 'ReviewResolved':
+    }
+    case 'ReviewResolved': {
       switch (event.resolution.kind) {
         case 'apply-candidate':
         case 'import-as-is':
-        case 'manual-tags':
+        case 'manual-tags': {
           return state.phase === 'applying'
             ? [{ type: 'Apply', directory: state.directory, mode: state.mode }]
             : [];
-        case 'supply-id':
+        }
+        case 'supply-id': {
           return state.phase === 'proposing'
             ? [
                 {
@@ -60,33 +63,40 @@ export function react(event: ImportEvent, state: ImportState): readonly Effect[]
                 },
               ]
             : [];
-        case 'refresh-candidates':
+        }
+        case 'refresh-candidates': {
           return state.phase === 'proposing'
             ? [{ type: 'Propose', directory: state.directory }]
             : [];
+        }
         case 'reject':
-        case 'reject-and-retry-download':
+        case 'reject-and-retry-download': {
           // Both rejection verbs owe the same intake hygiene; the verdict itself is a record-only
           // fact the outbound publisher consumes, never an effect here.
           return state.phase === 'awaiting-review'
             ? [{ type: 'DeleteIntake', directory: state.directory }]
             : [];
-        case 'retry-enrichment':
+        }
+        case 'retry-enrichment': {
           // Re-run beets over the already-imported location: a deterministic in-place re-import
           // that re-fires the full plugin chain against files beets already owns.
           return state.phase === 'applied' && state.remediation?.status === 'retrying'
             ? [{ type: 'Apply', directory: state.location, mode: state.mode }]
             : [];
-        case 'accept':
+        }
+        case 'accept': {
           return [];
+        }
       }
+    }
 
     case 'CandidatesProposed':
     case 'ReviewRequired':
     case 'ImportApplied':
     case 'RemediationRequired':
     case 'ImportRejected':
-    case 'ReleaseVerdictRecorded':
+    case 'ReleaseVerdictRecorded': {
       return [];
+    }
   }
 }

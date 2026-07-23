@@ -1,11 +1,11 @@
 <script lang="ts">
   import { phaseLabel, type BadgePhase } from '$lib/phase-label.js';
 
-  interface Props {
+  interface Properties {
     phase: BadgePhase;
   }
 
-  let { phase }: Props = $props();
+  let { phase }: Properties = $props();
 
   const label = $derived(phaseLabel(phase));
 </script>

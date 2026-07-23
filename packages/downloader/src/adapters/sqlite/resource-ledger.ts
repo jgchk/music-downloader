@@ -26,12 +26,7 @@ interface ResourceRow {
   readonly acquisition_id: string;
 }
 
-// better-sqlite3 always throws Error values from a closed/faulted connection, so stringifying is safe.
-function errorMessage(err: unknown): string {
-  return String(err);
-}
-
-function keyParams(key: SourceResourceKey): Record<string, string> {
+function keyParameters(key: SourceResourceKey): Record<string, string> {
   return {
     source: key.source,
     kind: key.kind,
@@ -46,41 +41,41 @@ function toResource(row: ResourceRow): SourceResource {
     kind: row.kind as SourceResource['kind'],
     resourceKey: row.resource_key,
     acquisitionId: row.acquisition_id,
-    ...(row.resource_id === null ? {} : { resourceId: row.resource_id }),
+    ...(row.resource_id !== null && { resourceId: row.resource_id }),
   };
 }
 
 export class SqliteResourceLedger implements ResourceLedgerStore {
   private readonly insertStmt: Statement;
-  private readonly setIdStmt: Statement;
-  private readonly removeStmt: Statement;
+  private readonly idAssignmentStmt: Statement;
+  private readonly removalStmt: Statement;
   private readonly liveByAcqStmt: Statement;
   private readonly allLiveStmt: Statement;
 
   constructor(
-    db: EventDatabase,
+    database: EventDatabase,
     private readonly clock: Clock,
   ) {
-    this.insertStmt = db.prepare(
+    this.insertStmt = database.prepare(
       `INSERT INTO source_resources
          (source, kind, resource_key, resource_id, acquisition_id, created_at, removed_at)
        VALUES (@source, @kind, @resourceKey, @resourceId, @acquisitionId, @createdAt, NULL)
        ON CONFLICT (source, kind, resource_key, acquisition_id) DO NOTHING`,
     );
-    this.setIdStmt = db.prepare(
+    this.idAssignmentStmt = database.prepare(
       `UPDATE source_resources SET resource_id = @resourceId
        WHERE source = @source AND kind = @kind AND resource_key = @resourceKey
          AND acquisition_id = @acquisitionId`,
     );
-    this.removeStmt = db.prepare(
+    this.removalStmt = database.prepare(
       `UPDATE source_resources SET removed_at = @removedAt
        WHERE source = @source AND kind = @kind AND resource_key = @resourceKey
          AND acquisition_id = @acquisitionId`,
     );
-    this.liveByAcqStmt = db.prepare(
+    this.liveByAcqStmt = database.prepare(
       `SELECT * FROM source_resources WHERE acquisition_id = ? AND removed_at IS NULL`,
     );
-    this.allLiveStmt = db.prepare(`SELECT * FROM source_resources WHERE removed_at IS NULL`);
+    this.allLiveStmt = database.prepare(`SELECT * FROM source_resources WHERE removed_at IS NULL`);
   }
 
   recordCreated(resource: SourceResource): ResultAsync<void, InfraError> {
@@ -94,44 +89,44 @@ export class SqliteResourceLedger implements ResourceLedgerStore {
         createdAt: this.clock.now().toISOString(),
       });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('resource-ledger.recordCreated', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('resource-ledger.recordCreated', String(error), error));
     }
   }
 
   recordId(key: SourceResourceKey, resourceId: string): ResultAsync<void, InfraError> {
     try {
-      this.setIdStmt.run({ ...keyParams(key), resourceId });
+      this.idAssignmentStmt.run({ ...keyParameters(key), resourceId });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('resource-ledger.recordId', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('resource-ledger.recordId', String(error), error));
     }
   }
 
   markRemoved(key: SourceResourceKey): ResultAsync<void, InfraError> {
     try {
-      this.removeStmt.run({ ...keyParams(key), removedAt: this.clock.now().toISOString() });
+      this.removalStmt.run({ ...keyParameters(key), removedAt: this.clock.now().toISOString() });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('resource-ledger.markRemoved', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('resource-ledger.markRemoved', String(error), error));
     }
   }
 
   liveByAcquisition(acquisitionId: string): ResultAsync<readonly SourceResource[], InfraError> {
     try {
       const rows = this.liveByAcqStmt.all(acquisitionId) as ResourceRow[];
-      return okAsync<readonly SourceResource[], InfraError>(rows.map(toResource));
-    } catch (err) {
-      return errAsync(infraError('resource-ledger.liveByAcquisition', errorMessage(err), err));
+      return okAsync<readonly SourceResource[], InfraError>(rows.map((item) => toResource(item)));
+    } catch (error) {
+      return errAsync(infraError('resource-ledger.liveByAcquisition', String(error), error));
     }
   }
 
   allLive(): ResultAsync<readonly SourceResource[], InfraError> {
     try {
       const rows = this.allLiveStmt.all() as ResourceRow[];
-      return okAsync<readonly SourceResource[], InfraError>(rows.map(toResource));
-    } catch (err) {
-      return errAsync(infraError('resource-ledger.allLive', errorMessage(err), err));
+      return okAsync<readonly SourceResource[], InfraError>(rows.map((item) => toResource(item)));
+    } catch (error) {
+      return errAsync(infraError('resource-ledger.allLive', String(error), error));
     }
   }
 }

@@ -16,7 +16,7 @@ describe('createMatchPolicy', () => {
   it('rejects thresholds outside the range or NaN', () => {
     expect(createMatchPolicy(-0.1)._unsafeUnwrapErr()).toEqual({ kind: 'ThresholdOutOfRange' });
     expect(createMatchPolicy(1.1)._unsafeUnwrapErr()).toEqual({ kind: 'ThresholdOutOfRange' });
-    expect(createMatchPolicy(Number.NaN)._unsafeUnwrapErr()).toEqual({
+    expect(createMatchPolicy(NaN)._unsafeUnwrapErr()).toEqual({
       kind: 'ThresholdOutOfRange',
     });
   });

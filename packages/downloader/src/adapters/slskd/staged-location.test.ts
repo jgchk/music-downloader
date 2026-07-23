@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { SlskdEventRecord } from './schemas.js';
 import { resolveStagedPaths } from './staged-location.js';
@@ -22,7 +22,7 @@ describe('resolveStagedPaths', () => {
       STAGING,
     );
 
-    expect(resolved.get('t1')).toBe(join(STAGING, 'Test Album', '01 Track One.flac'));
+    expect(resolved.get('t1')).toBe(path.join(STAGING, 'Test Album', '01 Track One.flac'));
   });
 
   it('reports the source-renamed on-disk name, not the originally requested one', () => {
@@ -34,7 +34,7 @@ describe('resolveStagedPaths', () => {
       STAGING,
     );
 
-    expect(resolved.get('t1')).toBe(join(STAGING, 'Album', '01_123456.flac'));
+    expect(resolved.get('t1')).toBe(path.join(STAGING, 'Album', '01_123456.flac'));
   });
 
   it('resolves only the wanted ids, ignoring other event types and unrelated completions', () => {
@@ -49,8 +49,8 @@ describe('resolveStagedPaths', () => {
       STAGING,
     );
 
-    expect([...resolved.keys()]).toEqual(['t1']);
-    expect(resolved.get('t1')).toBe(join(STAGING, 'Album', '01.flac'));
+    expect(resolved.keys().toArray()).toEqual(['t1']);
+    expect(resolved.get('t1')).toBe(path.join(STAGING, 'Album', '01.flac'));
   });
 
   it('returns a partial map when the page is missing some of our ids', () => {

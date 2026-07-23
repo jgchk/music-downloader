@@ -23,14 +23,16 @@ import {
 import { asDistance } from '../shared/__fixtures__/distance.js';
 import { toAcquisitionId } from '../shared/acquisition-id.js';
 import type { ImportEvent } from './events.js';
-import { candidateRefKey } from './events.js';
+import { candidateReferenceKey } from './events.js';
 import { evolve, foldEvents, initialState, isTerminal } from './state.js';
 
 const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'no good', filesDeleted: true };
 
-describe('candidateRefKey', () => {
+describe('candidateReferenceKey', () => {
   it('keys a candidate by its (data_source, album_id) pair', () => {
-    expect(candidateRefKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe('MusicBrainz:a1');
+    expect(candidateReferenceKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe(
+      'MusicBrainz:a1',
+    );
   });
 });
 

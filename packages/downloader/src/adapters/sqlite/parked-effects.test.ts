@@ -17,8 +17,10 @@ describe('SqliteParkedEffectStore', () => {
 
     await store.park(ENTRY);
 
-    expect((await store.find('acq-1'))._unsafeUnwrap()).toEqual(ENTRY);
-    expect((await store.find('acq-2'))._unsafeUnwrap()).toBeUndefined();
+    const findResult = await store.find('acq-1');
+    expect(findResult._unsafeUnwrap()).toEqual(ENTRY);
+    const findResult2 = await store.find('acq-2');
+    expect(findResult2._unsafeUnwrap()).toBeUndefined();
   });
 
   it('re-parking the same stream upserts the scheduling state (one park per stream)', async () => {
@@ -32,7 +34,8 @@ describe('SqliteParkedEffectStore', () => {
       lastError: 'mb: still down',
     });
 
-    const found = (await store.find('acq-1'))._unsafeUnwrap();
+    const findResult3 = await store.find('acq-1');
+    const found = findResult3._unsafeUnwrap();
     expect(found?.attempt).toBe(2);
     expect(found?.nextRetryAt).toBe('2026-07-22T12:00:15.000Z');
   });
@@ -43,7 +46,8 @@ describe('SqliteParkedEffectStore', () => {
     await store.park({ ...ENTRY, streamId: 'acq-due-2', nextRetryAt: '2026-07-22T12:00:05.000Z' });
     await store.park({ ...ENTRY, streamId: 'acq-due-1', nextRetryAt: '2026-07-22T12:00:01.000Z' });
 
-    const due = (await store.due('2026-07-22T12:30:00.000Z'))._unsafeUnwrap();
+    const dueResult = await store.due('2026-07-22T12:30:00.000Z');
+    const due = dueResult._unsafeUnwrap();
 
     expect(due.map((entry) => entry.streamId)).toEqual(['acq-due-1', 'acq-due-2']);
   });
@@ -52,21 +56,29 @@ describe('SqliteParkedEffectStore', () => {
     const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
     await store.park(ENTRY);
 
-    expect((await store.clear('acq-1')).isOk()).toBe(true);
-    expect((await store.clear('acq-never-parked')).isOk()).toBe(true);
+    const clearResult = await store.clear('acq-1');
+    expect(clearResult.isOk()).toBe(true);
+    const clearResult2 = await store.clear('acq-never-parked');
+    expect(clearResult2.isOk()).toBe(true);
 
-    expect((await store.find('acq-1'))._unsafeUnwrap()).toBeUndefined();
-    expect((await store.due('2026-07-23T00:00:00.000Z'))._unsafeUnwrap()).toEqual([]);
+    const findResult4 = await store.find('acq-1');
+    expect(findResult4._unsafeUnwrap()).toBeUndefined();
+    const dueResult2 = await store.due('2026-07-23T00:00:00.000Z');
+    expect(dueResult2._unsafeUnwrap()).toEqual([]);
   });
 
   it('surfaces storage faults as infra errors', async () => {
-    const db = openEventDatabase(':memory:');
-    const store = new SqliteParkedEffectStore(db);
-    db.close();
+    const database = openEventDatabase(':memory:');
+    const store = new SqliteParkedEffectStore(database);
+    database.close();
 
-    expect((await store.park(ENTRY)).isErr()).toBe(true);
-    expect((await store.find('acq-1')).isErr()).toBe(true);
-    expect((await store.due('2026-07-23T00:00:00.000Z')).isErr()).toBe(true);
-    expect((await store.clear('acq-1')).isErr()).toBe(true);
+    const parkResult = await store.park(ENTRY);
+    expect(parkResult.isErr()).toBe(true);
+    const findResult5 = await store.find('acq-1');
+    expect(findResult5.isErr()).toBe(true);
+    const dueResult3 = await store.due('2026-07-23T00:00:00.000Z');
+    expect(dueResult3.isErr()).toBe(true);
+    const clearResult3 = await store.clear('acq-1');
+    expect(clearResult3.isErr()).toBe(true);
   });
 });

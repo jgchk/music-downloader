@@ -49,13 +49,13 @@ export interface ImportSource {
  * sources are pluggable, so a bare MusicBrainz id is ambiguous — the pair is the stable key that
  * `apply` re-resolves deterministically.
  */
-export interface CandidateRef {
+export interface CandidateReference {
   readonly dataSource: string;
   readonly albumId: string;
 }
 
-export function candidateRefKey(ref: CandidateRef): string {
-  return `${ref.dataSource}:${ref.albumId}`;
+export function candidateReferenceKey(reference: CandidateReference): string {
+  return `${reference.dataSource}:${reference.albumId}`;
 }
 
 /** One component of beets' distance breakdown (e.g. `tracks`, `missing_tracks`, `year`). */
@@ -117,7 +117,7 @@ export interface CandidateAlbumFields {
  * (see {@link TrackMapping}), and `extraItems`/`missingTracks`/`albumFields` are the new top-level fields.
  */
 export interface ProposedCandidate {
-  readonly ref: CandidateRef;
+  readonly ref: CandidateReference;
   readonly artist: string;
   readonly album: string;
   readonly distance: Distance;
@@ -164,7 +164,7 @@ export type ReviewCause =
        * and no legacy history lacks it. (The wire DTO keeps `best` optional; that is a separate,
        * additive serialization altitude.)
        */
-      readonly best: CandidateRef;
+      readonly best: CandidateReference;
     }
   | { readonly kind: 'no-match' }
   | {
@@ -199,7 +199,7 @@ export type DuplicateResolution = 'replace' | 'keep-both';
 export type Resolution =
   | {
       readonly kind: 'apply-candidate';
-      readonly ref: CandidateRef;
+      readonly ref: CandidateReference;
       readonly duplicateAction?: DuplicateResolution;
     }
   | { readonly kind: 'supply-id'; readonly mbReleaseId: string }
@@ -217,7 +217,7 @@ export type ResolutionKind = Resolution['kind'];
 export type ApplyMode =
   | {
       readonly kind: 'candidate';
-      readonly ref: CandidateRef;
+      readonly ref: CandidateReference;
       readonly duplicateAction?: DuplicateResolution;
     }
   | { readonly kind: 'as-is' }
@@ -237,7 +237,11 @@ export type ImportEvent =
       readonly duplicates: readonly DuplicateIncumbent[];
       readonly pinnedId?: string;
     }
-  | { readonly type: 'AutoApplySelected'; readonly ref: CandidateRef; readonly distance: Distance }
+  | {
+      readonly type: 'AutoApplySelected';
+      readonly ref: CandidateReference;
+      readonly distance: Distance;
+    }
   | { readonly type: 'ReviewRequired'; readonly cause: ReviewCause }
   | { readonly type: 'ReviewResolved'; readonly resolution: Resolution }
   | { readonly type: 'ImportApplied'; readonly location: string }

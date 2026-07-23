@@ -3,14 +3,14 @@ import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-
 import { baseName, mapSearchResponses, remoteFilename } from './mapping.js';
 
 const richFile = {
-  filename: '@@a\\Album\\01 Track.FLAC',
+  filename: String.raw`@@a\Album\01 Track.FLAC`,
   size: 100,
   bitRate: 1000,
-  sampleRate: 44100,
+  sampleRate: 44_100,
   bitDepth: 16,
   length: 200,
 };
-const sparseFile = { filename: '@@a\\Album\\02 Track.flac', size: 150 };
+const sparseFile = { filename: String.raw`@@a\Album\02 Track.flac`, size: 150 };
 
 describe('mapSearchResponses', () => {
   it('returns nothing for an empty response list', () => {
@@ -33,14 +33,14 @@ describe('mapSearchResponses', () => {
 
     expect(candidates).toEqual([
       {
-        identity: { username: 'u1', path: '@@a\\Album', sizeBytes: 250 },
+        identity: { username: 'u1', path: String.raw`@@a\Album`, sizeBytes: 250 },
         files: [
           {
             name: '01 Track.FLAC',
             sizeBytes: 100,
             codec: 'flac',
             bitrate: 1_000_000,
-            sampleRate: 44100,
+            sampleRate: 44_100,
             bitDepth: 16,
             durationMs: 200_000,
           },
@@ -68,7 +68,12 @@ describe('mapSearchResponses', () => {
       [
         {
           username: 'u2',
-          files: [richFile, { filename: '@@a\\Album\\notes' }, { filename: 'loose', size: 40 }, {}],
+          files: [
+            richFile,
+            { filename: String.raw`@@a\Album\notes` },
+            { filename: 'loose', size: 40 },
+            {},
+          ],
         },
       ],
       'album',
@@ -76,7 +81,11 @@ describe('mapSearchResponses', () => {
 
     expect(candidates).toEqual([
       {
-        identity: asCandidateIdentity({ username: 'u2', path: '@@a\\Album', sizeBytes: 100 }),
+        identity: asCandidateIdentity({
+          username: 'u2',
+          path: String.raw`@@a\Album`,
+          sizeBytes: 100,
+        }),
         files: [
           expect.objectContaining({ name: '01 Track.FLAC' }),
           expect.objectContaining({ name: 'notes', codec: undefined, sizeBytes: 0 }),
@@ -97,7 +106,7 @@ describe('mapSearchResponses', () => {
       {
         identity: asCandidateIdentity({
           username: 'u1',
-          path: '@@a\\Album\\01 Track.FLAC',
+          path: String.raw`@@a\Album\01 Track.FLAC`,
           sizeBytes: 100,
         }),
         files: [expect.objectContaining({ name: '01 Track.FLAC' })],
@@ -109,17 +118,19 @@ describe('mapSearchResponses', () => {
 
 describe('baseName', () => {
   it('takes the segment after the last separator', () => {
-    expect(baseName('@@a\\Album\\01.flac')).toBe('01.flac');
+    expect(baseName(String.raw`@@a\Album\01.flac`)).toBe('01.flac');
     expect(baseName('bare.mp3')).toBe('bare.mp3');
   });
 });
 
 describe('remoteFilename', () => {
   it('uses a track candidate path verbatim', () => {
-    expect(remoteFilename('@@a\\Album\\01.flac', '01.flac')).toBe('@@a\\Album\\01.flac');
+    expect(remoteFilename(String.raw`@@a\Album\01.flac`, '01.flac')).toBe(
+      String.raw`@@a\Album\01.flac`,
+    );
   });
 
   it('re-appends a file to a folder candidate path', () => {
-    expect(remoteFilename('@@a\\Album', '01.flac')).toBe('@@a\\Album\\01.flac');
+    expect(remoteFilename(String.raw`@@a\Album`, '01.flac')).toBe(String.raw`@@a\Album\01.flac`);
   });
 });

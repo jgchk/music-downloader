@@ -68,16 +68,21 @@ function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
   const candidate = { ...entry.candidate };
   const at = entry.at;
   switch (entry.kind) {
-    case 'selected':
+    case 'selected': {
       return { kind: 'selected', at, candidate };
-    case 'download-failed':
+    }
+    case 'download-failed': {
       return { kind: 'download-failed', at, candidate, reason: entry.reason };
-    case 'validation-failed':
+    }
+    case 'validation-failed': {
       return { kind: 'validation-failed', at, candidate, reasons: [...entry.reasons] };
-    case 'imported':
+    }
+    case 'imported': {
       return { kind: 'imported', at, candidate, location: entry.location };
-    case 'fulfillment-rejected':
+    }
+    case 'fulfillment-rejected': {
       return { kind: 'fulfillment-rejected', at, candidate, reasons: [...entry.reasons] };
+    }
   }
 }
 
@@ -90,7 +95,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     attempts: view.attempts,
     rejectedCount: view.rejectedCount,
     location: view.location,
-    history: view.history.map(historyEntryToDto),
+    history: view.history.map((item) => historyEntryToDto(item)),
     candidates: view.candidates?.map((candidate) => ({ ...candidate })),
     stalled: view.stalled,
   };

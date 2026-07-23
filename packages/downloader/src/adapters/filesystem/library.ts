@@ -1,5 +1,5 @@
 import { access, copyFile, mkdir, rename, rm, rmdir, unlink } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import path from 'node:path';
 import { ResultAsync } from 'neverthrow';
 import type { DownloadedFile } from '../../domain/acquisition/events.js';
 import type { Target } from '../../domain/target/target.js';
@@ -7,11 +7,11 @@ import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { ImportResult, LibraryPort } from '../../application/ports/outbound-ports.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { renderReleaseDir } from './paths.js';
+import { renderReleaseDirectory } from './paths.js';
 
 /**
  * The filesystem `LibraryPort` adapter (D13). Validated staging files are organized into the
- * library by {@link renderReleaseDir}; the existing release is *never* clobbered — an occupied
+ * library by {@link renderReleaseDirectory}; the existing release is *never* clobbered — an occupied
  * location is a business `conflict` (an `Ok` outcome), not an infra fault. Import prefers a rename
  * and falls back to copy-then-remove across filesystems (`EXDEV`). `discardStaging` removes exactly
  * the staged files it is handed (the source-reported locations carried on the cleanup event, D3)
@@ -21,29 +21,34 @@ import { renderReleaseDir } from './paths.js';
 
 /** The filesystem operations the adapter needs, as a seam so the EXDEV fallback is testable. */
 export interface LibraryFileSystem {
-  rename(src: string, dest: string): Promise<void>;
-  copyFile(src: string, dest: string): Promise<void>;
+  rename(source: string, destination: string): Promise<void>;
+  copyFile(source: string, destination: string): Promise<void>;
   unlink(path: string): Promise<void>;
-  mkdir(dir: string): Promise<void>;
+  mkdir(directory: string): Promise<void>;
   /** Remove a single file, tolerating its absence (it may already have been moved by import). */
   rmFile(path: string): Promise<void>;
   /** Remove a directory only if empty (used to prune a candidate's emptied staging folder). */
-  rmdir(dir: string): Promise<void>;
+  rmdir(directory: string): Promise<void>;
   exists(path: string): Promise<boolean>;
 }
 
 export const nodeLibraryFileSystem: LibraryFileSystem = {
-  rename: (src, dest) => rename(src, dest),
-  copyFile: (src, dest) => copyFile(src, dest),
+  rename: (source, destination) => rename(source, destination),
+  copyFile: (source, destination) => copyFile(source, destination),
   unlink: (path) => unlink(path),
-  mkdir: (dir) => mkdir(dir, { recursive: true }).then(() => undefined),
+  mkdir: async (directory) => {
+    await mkdir(directory, { recursive: true });
+  },
   rmFile: (path) => rm(path, { force: true }),
-  rmdir: (dir) => rmdir(dir),
-  exists: (path) =>
-    access(path).then(
-      () => true,
-      () => false,
-    ),
+  rmdir: (directory) => rmdir(directory),
+  exists: async (path) => {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 export interface LibraryConfig {
@@ -72,9 +77,9 @@ export class FilesystemLibrary implements LibraryPort {
   }
 
   private async runDiscard(files: readonly DownloadedFile[]): Promise<void> {
-    const dirs = new Set(files.map((file) => dirname(file.path)));
+    const directories = new Set(files.map((file) => path.dirname(file.path)));
     for (const file of files) await this.fs.rmFile(file.path);
-    for (const dir of dirs) await this.pruneIfEmpty(dir);
+    for (const directory of directories) await this.pruneIfEmpty(directory);
   }
 
   /**
@@ -82,17 +87,17 @@ export class FilesystemLibrary implements LibraryPort {
    * candidates (still holding another's files) stays, and one already gone is fine — both are
    * expected, so only an unexpected fault propagates.
    */
-  private async pruneIfEmpty(dir: string): Promise<void> {
+  private async pruneIfEmpty(directory: string): Promise<void> {
     try {
-      await this.fs.rmdir(dir);
-    } catch (cause) {
-      const code = (cause as { code?: string }).code;
-      if (code !== 'ENOTEMPTY' && code !== 'ENOENT') throw cause;
+      await this.fs.rmdir(directory);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code !== 'ENOTEMPTY' && code !== 'ENOENT') throw error;
     }
   }
 
   private async runImport(files: readonly DownloadedFile[], target: Target): Promise<ImportResult> {
-    const location = join(this.config.libraryRoot, renderReleaseDir(target));
+    const location = path.join(this.config.libraryRoot, renderReleaseDirectory(target));
     if (await this.fs.exists(location)) {
       this.logger.warn({ location }, 'library import conflict; leaving existing release untouched');
       return { kind: 'conflict', location };
@@ -106,13 +111,13 @@ export class FilesystemLibrary implements LibraryPort {
   }
 
   private async moveInto(file: DownloadedFile, location: string): Promise<void> {
-    const dest = join(location, file.name);
+    const destination = path.join(location, file.name);
     try {
-      await this.fs.rename(file.path, dest);
-    } catch (cause) {
-      if ((cause as { code?: string }).code !== 'EXDEV') throw cause;
+      await this.fs.rename(file.path, destination);
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'EXDEV') throw error;
       // Staging and library are on different filesystems: rename can't cross the boundary.
-      await this.fs.copyFile(file.path, dest);
+      await this.fs.copyFile(file.path, destination);
       await this.fs.unlink(file.path);
     }
   }

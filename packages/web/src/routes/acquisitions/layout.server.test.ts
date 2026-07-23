@@ -27,8 +27,8 @@ function event(over: { listAcquisitions?: () => unknown; id?: string }): {
 
 describe('acquisitions layout load', () => {
   it('returns the guarded list with no selection on the index', () => {
-    const { event: e } = event({ id: undefined });
-    expect(load(e as never)).toEqual({
+    const { event: requestEvent } = event({ id: undefined });
+    expect(load(requestEvent as never)).toEqual({
       acquisitions: [{ acquisitionId: 'acq-1' }],
       listFailed: false,
       selectedId: undefined,
@@ -36,18 +36,24 @@ describe('acquisitions layout load', () => {
   });
 
   it('carries the route param as the selected id', () => {
-    const { event: e } = event({ id: 'acq-1' });
-    expect((load(e as never) as { selectedId: string | undefined }).selectedId).toBe('acq-1');
+    const { event: requestEvent } = event({ id: 'acq-1' });
+    expect((load(requestEvent as never) as { selectedId: string | undefined }).selectedId).toBe(
+      'acq-1',
+    );
   });
 
   it('degrades to an empty, flagged list and logs when the downloader read throws', () => {
     const fault = new Error('downloader store gone');
-    const { event: e, warnings } = event({
+    const { event: requestEvent, warnings } = event({
       listAcquisitions: () => {
         throw fault;
       },
     });
-    expect(load(e as never)).toEqual({ acquisitions: [], listFailed: true, selectedId: undefined });
+    expect(load(requestEvent as never)).toEqual({
+      acquisitions: [],
+      listFailed: true,
+      selectedId: undefined,
+    });
     expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });
 });

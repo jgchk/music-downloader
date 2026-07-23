@@ -18,9 +18,9 @@ const target: Target = createTarget({
   title: 'Dummy',
   year: 1994,
   tracks: [
-    { position: 1, title: 'Mysterons', durationMs: 300000 },
-    { position: 2, title: 'Sour Times', durationMs: 250000 },
-    { position: 3, title: 'Strangers', durationMs: 240000 },
+    { position: 1, title: 'Mysterons', durationMs: 300_000 },
+    { position: 2, title: 'Sour Times', durationMs: 250_000 },
+    { position: 3, title: 'Strangers', durationMs: 240_000 },
   ],
 })._unsafeUnwrap();
 
@@ -64,29 +64,29 @@ describe('candidateText', () => {
 describe('scoreMatch', () => {
   it('gives a structurally-matching candidate high confidence', () => {
     const good = candidate([
-      { name: '01.flac', sizeBytes: 1, durationMs: 300000 },
-      { name: '02.flac', sizeBytes: 1, durationMs: 250000 },
-      { name: '03.flac', sizeBytes: 1, durationMs: 240000 },
+      { name: '01.flac', sizeBytes: 1, durationMs: 300_000 },
+      { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
+      { name: '03.flac', sizeBytes: 1, durationMs: 240_000 },
     ]);
     expect(scoreMatch(target, good)).toBeGreaterThan(0.9);
   });
 
   it('ranks a full, aligned fileset above a short one (spec scenario)', () => {
     const full = candidate([
-      { name: '01.flac', sizeBytes: 1, durationMs: 300000 },
-      { name: '02.flac', sizeBytes: 1, durationMs: 250000 },
-      { name: '03.flac', sizeBytes: 1, durationMs: 240000 },
+      { name: '01.flac', sizeBytes: 1, durationMs: 300_000 },
+      { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
+      { name: '03.flac', sizeBytes: 1, durationMs: 240_000 },
     ]);
-    const short = candidate([{ name: '01.flac', sizeBytes: 1, durationMs: 300000 }]);
+    const short = candidate([{ name: '01.flac', sizeBytes: 1, durationMs: 300_000 }]);
     expect(scoreMatch(target, full)).toBeGreaterThan(scoreMatch(target, short));
   });
 
   it('skips the year signal when the target has no year', () => {
     const noYear: Target = { ...target, year: undefined };
     const c = candidate([
-      { name: '01.flac', sizeBytes: 1, durationMs: 300000 },
-      { name: '02.flac', sizeBytes: 1, durationMs: 250000 },
-      { name: '03.flac', sizeBytes: 1, durationMs: 240000 },
+      { name: '01.flac', sizeBytes: 1, durationMs: 300_000 },
+      { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
+      { name: '03.flac', sizeBytes: 1, durationMs: 240_000 },
     ]);
     expect(scoreMatch(noYear, c)).toBeGreaterThan(0.9);
   });
@@ -99,7 +99,7 @@ describe('scoreMatch', () => {
 });
 
 describe('yearSignal', () => {
-  const files = [{ name: '01.flac', sizeBytes: 1, durationMs: 300000 }];
+  const files = [{ name: '01.flac', sizeBytes: 1, durationMs: 300_000 }];
 
   it('scores 1 when the year appears in the candidate text', () => {
     expect(yearSignal.score(target, candidate(files, 'Portishead - Dummy 1994'))).toBe(1);

@@ -34,7 +34,7 @@ function artistCreditName(credits: readonly MbArtistCredit[] | undefined): strin
 
 function parseYear(date: string | null | undefined): number | undefined {
   const year = Number(date?.slice(0, 4));
-  return Number.isInteger(year) && year > 0 ? year : undefined;
+  return Number.isSafeInteger(year) && year > 0 ? year : undefined;
 }
 
 /**
@@ -86,8 +86,8 @@ export function bestMatchId(entries: readonly MbScoredEntry[] | undefined): stri
   const scored = (entries ?? []).map((entry) => ({ id: entry.id, score: entry.score ?? 0 }));
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
-  const second = scored[1];
   if (best === undefined || best.score < HIGH_CONFIDENCE) return undefined;
+  const second = scored[1];
   if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return undefined;
   return best.id;
 }
@@ -105,7 +105,7 @@ export function normalizeTitle(title: string): string {
   return title
     .normalize('NFC')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replaceAll(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }
 
@@ -132,11 +132,11 @@ interface GroupedRelease {
 const DATE_COMPONENT_SENTINEL = 99;
 function dateKey(date: string | null | undefined): number {
   const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/.exec(date ?? '');
-  if (match === null) return Number.POSITIVE_INFINITY;
+  if (match === null) return Infinity;
   const year = Number(match[1]);
-  const month = match[2] !== undefined ? Number(match[2]) : DATE_COMPONENT_SENTINEL;
-  const day = match[3] !== undefined ? Number(match[3]) : DATE_COMPONENT_SENTINEL;
-  return year * 10000 + month * 100 + day;
+  const month = match[2] === undefined ? DATE_COMPONENT_SENTINEL : Number(match[2]);
+  const day = match[3] === undefined ? DATE_COMPONENT_SENTINEL : Number(match[3]);
+  return year * 10_000 + month * 100 + day;
 }
 
 /** Chronological comparison of two MusicBrainz dates via {@link dateKey}; equal keys rank equal. */
@@ -186,7 +186,8 @@ export function releaseCandidateIds(
   requestTitle: string,
 ): readonly string[] {
   const groups = new Map<string, GroupedRelease[]>();
-  for (const release of releases ?? []) {
+  const releaseList = releases ?? [];
+  for (const release of releaseList) {
     if (release.id === undefined) continue;
     // A hit without a release-group id cannot be grouped by identity, so it forms its own singleton
     // group keyed by its release id — conservative, since it can only widen apparent ambiguity.
@@ -206,9 +207,11 @@ export function releaseCandidateIds(
     else existing.push(member);
   }
 
-  const ranked = [...groups.values()]
+  const ranked = groups
+    .values()
     .map((members) => ({ members, score: Math.max(...members.map((m) => m.score)) }))
-    .sort((a, b) => b.score - a.score);
+    .toArray()
+    .toSorted((a, b) => b.score - a.score);
 
   const wanted = normalizeTitle(requestTitle);
   const titled = ranked.filter(
@@ -220,13 +223,13 @@ export function releaseCandidateIds(
   let winner = titled.length === 1 ? titled[0] : undefined;
   if (winner === undefined) {
     const best = ranked[0];
-    const second = ranked[1];
     if (best === undefined || best.score < HIGH_CONFIDENCE) return [];
+    const second = ranked[1];
     if (second !== undefined && best.score - second.score < AMBIGUITY_MARGIN) return [];
     winner = best;
   }
 
-  return [...winner.members].sort(compareReleases(wanted)).map((m) => m.id);
+  return [...winner.members].toSorted(compareReleases(wanted)).map((m) => m.id);
 }
 
 /** One edition (release) of a known release group, reduced to the fields the picker needs. */
@@ -250,10 +253,12 @@ function modalTrackCount(counts: readonly number[]): number {
   let modal = 0;
   let modalFrequency = 0;
   for (const [count, freq] of frequency) {
-    if (freq > modalFrequency || (freq === modalFrequency && count < modal)) {
-      modal = count;
-      modalFrequency = freq;
+    if (!(freq > modalFrequency || (freq === modalFrequency && count < modal))) {
+      continue;
     }
+
+    modal = count;
+    modalFrequency = freq;
   }
   return modal;
 }
@@ -277,7 +282,7 @@ export function releaseGroupEditionIds(
   const modal = modalTrackCount(official.map((edition) => edition.trackCount));
   return official
     .filter((edition) => edition.trackCount === modal)
-    .sort((a, b) => compareDates(a.date, b.date))
+    .toSorted((a, b) => compareDates(a.date, b.date))
     .map((edition) => edition.id);
 }
 
@@ -293,7 +298,8 @@ export function releaseGroupCandidateIds(
   releases: readonly MbBrowseRelease[] | undefined,
 ): readonly string[] {
   const editions: ReleaseGroupEdition[] = [];
-  for (const release of releases ?? []) {
+  const releaseList = releases ?? [];
+  for (const release of releaseList) {
     if (release.id === undefined) continue;
     editions.push({
       id: release.id,
@@ -325,7 +331,8 @@ export function releaseGroupEditionCandidates(
   // The numeric count (0 = unknown) rides alongside each candidate purely for the picker's modal
   // ranking; it never reaches the event, where an unknown count is absent (never the sentinel 0).
   const editions: { readonly candidate: EditionCandidate; readonly count: number }[] = [];
-  for (const release of releases ?? []) {
+  const releaseList = releases ?? [];
+  for (const release of releaseList) {
     const releaseMbid = optionalMbid(release.id);
     if (releaseMbid === undefined) continue;
     const formats = [
@@ -344,14 +351,14 @@ export function releaseGroupEditionCandidates(
         date: release.date ?? undefined,
         country: release.country ?? undefined,
         format: formats.length > 0 ? formats.join(' + ') : undefined,
-        ...(count > 0 ? { trackCount: count } : {}),
+        ...(count > 0 && { trackCount: count }),
       },
     });
   }
   if (editions.length === 0) return [];
   const modal = modalTrackCount(editions.map((edition) => edition.count));
   return editions
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const modalRank = Number(a.count !== modal) - Number(b.count !== modal);
       if (modalRank !== 0) return modalRank;
       return compareDates(a.candidate.date, b.candidate.date);

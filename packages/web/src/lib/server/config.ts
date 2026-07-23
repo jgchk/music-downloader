@@ -12,7 +12,7 @@ import type { ImporterRuntimeConfig } from '@music/importer/runtime';
  * by adapter-node itself; LOG_LEVEL by the logger; everything else feeds the module runtimes.
  */
 
-const envSchema = z.object({
+const environmentSchema = z.object({
   LOG_LEVEL: z.string().min(1).default('info'),
 
   // --- downloader ------------------------------------------------------------------------------
@@ -60,9 +60,9 @@ export interface ComposedConfig {
 }
 
 export function loadComposedConfig(
-  env: Record<string, string | undefined>,
+  environment: Record<string, string | undefined>,
 ): Result<ComposedConfig, string> {
-  const parsed = envSchema.safeParse(env);
+  const parsed = environmentSchema.safeParse(environment);
   if (!parsed.success) {
     const detail = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
@@ -80,15 +80,13 @@ export function loadComposedConfig(
       slskd: { baseUrl: v.SLSKD_BASE_URL, apiKey: v.SLSKD_API_KEY },
       reactor: {
         retry: {
-          ...(v.REACTOR_RETRY_INITIAL_DELAY_MS === undefined
-            ? {}
-            : { initialDelayMs: v.REACTOR_RETRY_INITIAL_DELAY_MS }),
-          ...(v.REACTOR_RETRY_MAX_DELAY_MS === undefined
-            ? {}
-            : { maxDelayMs: v.REACTOR_RETRY_MAX_DELAY_MS }),
-          ...(v.REACTOR_RETRY_BUDGET_MS === undefined
-            ? {}
-            : { budgetMs: v.REACTOR_RETRY_BUDGET_MS }),
+          ...(v.REACTOR_RETRY_INITIAL_DELAY_MS !== undefined && {
+            initialDelayMs: v.REACTOR_RETRY_INITIAL_DELAY_MS,
+          }),
+          ...(v.REACTOR_RETRY_MAX_DELAY_MS !== undefined && {
+            maxDelayMs: v.REACTOR_RETRY_MAX_DELAY_MS,
+          }),
+          ...(v.REACTOR_RETRY_BUDGET_MS !== undefined && { budgetMs: v.REACTOR_RETRY_BUDGET_MS }),
         },
         stalledRetentionMs: v.REACTOR_STALLED_RETENTION_MS,
       },

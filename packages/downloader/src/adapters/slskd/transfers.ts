@@ -10,8 +10,6 @@ import type { SlskdTransfer, SlskdTransfersPayload } from './schemas.js';
  * (D2), so these functions consume the inferred types directly.
  */
 
-export type { SlskdTransfer };
-
 /** A transfer we own: narrowed to a known `filename` (the polls filter foreign/filenameless ones). */
 export type OwnedTransfer = SlskdTransfer & { readonly filename: string };
 
@@ -107,3 +105,5 @@ export function aggregate(transfers: readonly SlskdTransfer[]): TransferAggregat
     failureReason: failed === undefined ? 'TransferError' : reasonFromTransfer(failed),
   };
 }
+
+export { type SlskdTransfer } from './schemas.js';

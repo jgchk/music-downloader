@@ -41,7 +41,7 @@ export type ApplyOutcome =
   | { readonly kind: 'doomed'; readonly reason: string };
 
 /** The effective beets configuration, as validated and reported by the bridge at startup. */
-export interface TaggerConfiguration {
+export interface TaggerConfig {
   readonly beetsVersion: string;
   readonly libraryDatabase: string;
   readonly libraryDirectory: string;
@@ -61,7 +61,7 @@ export interface TaggerPort {
   apply(directory: string, mode: ApplyMode): ResultAsync<ApplyOutcome, InfraError>;
 
   /** Validate the beets configuration and report the effective merged view (startup gate). */
-  validate(): ResultAsync<TaggerConfiguration, InfraError>;
+  validate(): ResultAsync<TaggerConfig, InfraError>;
 }
 
 /** Intake-directory stewardship: the only filesystem writes this service performs itself (D5). */

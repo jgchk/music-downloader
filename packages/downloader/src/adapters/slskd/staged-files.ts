@@ -76,9 +76,9 @@ export class StagedFileResolver {
     if (completed.length === 0) return [];
     try {
       return await this.stagedFiles(completed, candidate);
-    } catch (err) {
+    } catch (error) {
       this.logger.warn(
-        { err, username: candidate.identity.username },
+        { err: error, username: candidate.identity.username },
         'could not resolve the abandoned candidate’s completed files',
       );
       return [];

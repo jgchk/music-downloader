@@ -29,10 +29,12 @@ export function attentionItems(
   acquisitions: readonly AcquisitionStatusResponseDto[],
 ): AttentionItem[] {
   return orderByLongestWaiting([
-    ...reviews.map(reviewItem),
+    ...reviews.map((item) => reviewItem(item)),
     // Queue membership is the badge tone's rule, not a re-derivation: whatever the acquisitions
     // list badges as action-needed is exactly what the queue lists.
-    ...acquisitions.filter((entry) => statusTone(entry.status) === 'attention').map(editionItem),
+    ...acquisitions
+      .filter((entry) => statusTone(entry.status) === 'attention')
+      .map((item) => editionItem(item)),
   ]);
 }
 
@@ -64,24 +66,28 @@ export function orderByLongestWaiting(items: readonly AttentionItem[]): Attentio
   // ISO instants in one uniform format (UTC `Z`, fixed precision) compare lexicographically —
   // keep producers uniform. '\uffff' (U+FFFF, the max BMP code unit) sorts undated items after
   // any date; the sort is stable, so the facades' given order survives among equals.
-  const key = (entry: AttentionItem): string => entry.waitingSince ?? '\uffff';
-  return [...items].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  const key = (entry: AttentionItem): string => entry.waitingSince ?? '\u{FFFF}';
+  return items.toSorted((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
 export function attentionKindLabel(kind: AttentionItem['kind']): string {
   switch (kind) {
-    case 'match-review':
+    case 'match-review': {
       return 'Match review';
-    case 'edition-selection':
+    }
+    case 'edition-selection': {
       return 'Edition selection';
+    }
   }
 }
 
 export function moduleLabel(module: AttentionItem['module']): string {
   switch (module) {
-    case 'importer':
+    case 'importer': {
       return 'Importer';
-    case 'downloader':
+    }
+    case 'downloader': {
       return 'Downloader';
+    }
   }
 }

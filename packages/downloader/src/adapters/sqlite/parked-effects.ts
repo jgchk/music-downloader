@@ -40,8 +40,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
   private readonly dueStmt: Statement;
   private readonly clearStmt: Statement;
 
-  constructor(db: EventDatabase) {
-    this.upsertStmt = db.prepare(
+  constructor(database: EventDatabase) {
+    this.upsertStmt = database.prepare(
       `INSERT INTO parked_effects (stream_id, global_seq, attempt, parked_at, next_retry_at, last_error)
        VALUES (@streamId, @globalSeq, @attempt, @parkedAt, @nextRetryAt, @lastError)
        ON CONFLICT (stream_id) DO UPDATE SET
@@ -51,11 +51,11 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
          next_retry_at = excluded.next_retry_at,
          last_error = excluded.last_error`,
     );
-    this.findStmt = db.prepare(`SELECT * FROM parked_effects WHERE stream_id = ?`);
-    this.dueStmt = db.prepare(
+    this.findStmt = database.prepare(`SELECT * FROM parked_effects WHERE stream_id = ?`);
+    this.dueStmt = database.prepare(
       `SELECT * FROM parked_effects WHERE next_retry_at <= ? ORDER BY next_retry_at ASC`,
     );
-    this.clearStmt = db.prepare(`DELETE FROM parked_effects WHERE stream_id = ?`);
+    this.clearStmt = database.prepare(`DELETE FROM parked_effects WHERE stream_id = ?`);
   }
 
   park(entry: ParkedEffect): ResultAsync<void, InfraError> {
@@ -69,8 +69,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
         lastError: entry.lastError,
       });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('parked-effects.park', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.park', String(error), error));
     }
   }
 
@@ -78,17 +78,17 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
     try {
       const row = this.findStmt.get(streamId) as ParkedRow | undefined;
       return okAsync(row === undefined ? undefined : toEntry(row));
-    } catch (err) {
-      return errAsync(infraError('parked-effects.find', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.find', String(error), error));
     }
   }
 
   due(nowIso: string): ResultAsync<readonly ParkedEffect[], InfraError> {
     try {
       const rows = this.dueStmt.all(nowIso) as ParkedRow[];
-      return okAsync<readonly ParkedEffect[], InfraError>(rows.map(toEntry));
-    } catch (err) {
-      return errAsync(infraError('parked-effects.due', String(err), err));
+      return okAsync<readonly ParkedEffect[], InfraError>(rows.map((item) => toEntry(item)));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.due', String(error), error));
     }
   }
 
@@ -96,8 +96,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
     try {
       this.clearStmt.run(streamId);
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('parked-effects.clear', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.clear', String(error), error));
     }
   }
 }

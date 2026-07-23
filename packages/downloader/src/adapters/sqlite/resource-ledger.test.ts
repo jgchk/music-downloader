@@ -7,34 +7,39 @@ import { openEventDatabase, type EventDatabase } from './schema.js';
 const transfer: SourceResource = {
   source: 'slskd',
   kind: 'transfer',
-  resourceKey: 'u1|@@a\\Album\\01.flac',
+  resourceKey: String.raw`u1|@@a\Album\01.flac`,
   acquisitionId: 'acq-1',
 };
 
 const openDbs: EventDatabase[] = [];
 
 function ledger(): { db: EventDatabase; store: SqliteResourceLedger } {
-  const db = openEventDatabase(':memory:');
-  openDbs.push(db);
-  return { db, store: new SqliteResourceLedger(db, fixedClock()) };
+  const database = openEventDatabase(':memory:');
+  openDbs.push(database);
+  return { db: database, store: new SqliteResourceLedger(database, fixedClock()) };
 }
 
 afterEach(() => {
-  for (const db of openDbs.splice(0)) if (db.open) db.close();
+  for (const database of openDbs) if (database.open) database.close();
+  openDbs.length = 0;
 });
 
 describe('SqliteResourceLedger', () => {
   it('records a created resource and lists it as live for its acquisition', async () => {
     const { store } = ledger();
-    (await store.recordCreated(transfer))._unsafeUnwrap();
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([transfer]);
+    const recordCreatedResult = await store.recordCreated(transfer);
+    recordCreatedResult._unsafeUnwrap();
+    const liveByAcquisitionResult = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult._unsafeUnwrap()).toEqual([transfer]);
   });
 
   it('records without an id, then attaches the source-assigned id', async () => {
     const { store } = ledger();
     await store.recordCreated(transfer);
-    (await store.recordId(transfer, 'guid-9'))._unsafeUnwrap();
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([
+    const recordIdResult = await store.recordId(transfer, 'guid-9');
+    recordIdResult._unsafeUnwrap();
+    const liveByAcquisitionResult2 = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult2._unsafeUnwrap()).toEqual([
       { ...transfer, resourceId: 'guid-9' },
     ]);
   });
@@ -44,7 +49,8 @@ describe('SqliteResourceLedger', () => {
     await store.recordCreated(transfer);
     await store.recordId(transfer, 'guid-9');
     await store.recordCreated(transfer); // a crash-replayed write-ahead recording
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([
+    const liveByAcquisitionResult3 = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult3._unsafeUnwrap()).toEqual([
       { ...transfer, resourceId: 'guid-9' },
     ]);
   });
@@ -59,15 +65,19 @@ describe('SqliteResourceLedger', () => {
       acquisitionId: 'acq-1',
     };
     await store.recordCreated(search);
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([search]);
+    const liveByAcquisitionResult4 = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult4._unsafeUnwrap()).toEqual([search]);
   });
 
   it('excludes a removed resource from both live queries', async () => {
     const { store } = ledger();
     await store.recordCreated(transfer);
-    (await store.markRemoved(transfer))._unsafeUnwrap();
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([]);
-    expect((await store.allLive())._unsafeUnwrap()).toEqual([]);
+    const markRemovedResult = await store.markRemoved(transfer);
+    markRemovedResult._unsafeUnwrap();
+    const liveByAcquisitionResult5 = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult5._unsafeUnwrap()).toEqual([]);
+    const allLiveResult = await store.allLive();
+    expect(allLiveResult._unsafeUnwrap()).toEqual([]);
   });
 
   it('scopes live queries by acquisition, and all-live across acquisitions', async () => {
@@ -75,8 +85,10 @@ describe('SqliteResourceLedger', () => {
     const other: SourceResource = { ...transfer, acquisitionId: 'acq-2', resourceKey: 'u2|x' };
     await store.recordCreated(transfer);
     await store.recordCreated(other);
-    expect((await store.liveByAcquisition('acq-1'))._unsafeUnwrap()).toEqual([transfer]);
-    const all = (await store.allLive())._unsafeUnwrap();
+    const liveByAcquisitionResult6 = await store.liveByAcquisition('acq-1');
+    expect(liveByAcquisitionResult6._unsafeUnwrap()).toEqual([transfer]);
+    const allLiveResult2 = await store.allLive();
+    const all = allLiveResult2._unsafeUnwrap();
     expect(all).toHaveLength(2);
     expect(all).toEqual(expect.arrayContaining([transfer, other]));
   });

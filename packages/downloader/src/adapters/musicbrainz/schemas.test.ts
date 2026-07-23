@@ -60,11 +60,11 @@ describe('MusicBrainz contract schemas', () => {
     const parsed = mbRecordingSchema.parse({
       id: 'rec-1',
       title: 'Song',
-      length: 200000,
+      length: 200_000,
       'artist-credit': [{ name: 'Artist' }],
     });
 
-    expect(parsed.length).toBe(200000);
+    expect(parsed.length).toBe(200_000);
   });
 
   it('rejects a recording whose length is not a number', () => {

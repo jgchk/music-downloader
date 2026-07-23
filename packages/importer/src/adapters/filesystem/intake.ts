@@ -1,5 +1,5 @@
 import { rm, rmdir } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import path from 'node:path';
 import { ResultAsync } from 'neverthrow';
 import type { Logger } from '../../application/logging/logger.js';
 import { infraError } from '../../application/ports/errors.js';
@@ -16,14 +16,14 @@ import type { IntakePort } from '../../application/ports/outbound-ports.js';
 /** The filesystem operations the adapter needs, as a seam so failure paths are testable. */
 export interface IntakeFileSystem {
   /** Remove a directory tree, tolerating its absence. */
-  removeTree(dir: string): Promise<void>;
+  removeTree(directory: string): Promise<void>;
   /** Remove a single directory only if empty (throws ENOTEMPTY otherwise). */
-  removeEmptyDir(dir: string): Promise<void>;
+  removeEmptyDir(directory: string): Promise<void>;
 }
 
 export const nodeIntakeFileSystem: IntakeFileSystem = {
-  removeTree: (dir) => rm(dir, { recursive: true, force: true }),
-  removeEmptyDir: (dir) => rmdir(dir),
+  removeTree: (directory) => rm(directory, { recursive: true, force: true }),
+  removeEmptyDir: (directory) => rmdir(directory),
 };
 
 export interface IntakeConfig {
@@ -38,7 +38,7 @@ export class FilesystemIntake implements IntakePort {
     private readonly logger: Logger,
     private readonly fs: IntakeFileSystem = nodeIntakeFileSystem,
   ) {
-    this.root = resolve(config.intakeRoot);
+    this.root = path.resolve(config.intakeRoot);
   }
 
   deleteRelease(directory: string): ResultAsync<void, InfraError> {
@@ -48,30 +48,30 @@ export class FilesystemIntake implements IntakePort {
   }
 
   private async runDelete(directory: string): Promise<void> {
-    const target = resolve(directory);
+    const target = path.resolve(directory);
     if (!this.isInsideRoot(target)) {
       throw new Error(`refusing to delete outside the intake root: ${target}`);
     }
     await this.fs.removeTree(target);
     this.logger.info({ directory: target }, 'deleted rejected release from intake');
-    await this.pruneEmptyParents(dirname(target));
+    await this.pruneEmptyParents(path.dirname(target));
   }
 
   /** A target must be strictly inside the root — never the root itself, never a sibling. */
   private isInsideRoot(target: string): boolean {
-    const rel = relative(this.root, target);
-    return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+    const relativePath = path.relative(this.root, target);
+    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
   }
 
   /** Prune now-empty parents up to (never including) the intake root. */
   private async pruneEmptyParents(from: string): Promise<void> {
-    for (let dir = from; this.isInsideRoot(dir); dir = dirname(dir)) {
+    for (let directory = from; this.isInsideRoot(directory); directory = path.dirname(directory)) {
       try {
-        await this.fs.removeEmptyDir(dir);
-      } catch (cause) {
-        const code = (cause as { code?: string }).code;
+        await this.fs.removeEmptyDir(directory);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
         if (code === 'ENOTEMPTY' || code === 'ENOENT') return; // still in use, or already gone
-        throw cause;
+        throw error;
       }
     }
   }

@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { errAsync, ok, okAsync } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
@@ -12,7 +12,7 @@ import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
 import { REACTOR_CONSUMER } from '../application/import/reactor.js';
-import type { TaggerConfiguration, TaggerPort } from '../application/ports/outbound-ports.js';
+import type { TaggerConfig, TaggerPort } from '../application/ports/outbound-ports.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
 import { requested } from '../domain/import/__fixtures__/import-fixtures.js';
 import { createImporterRuntime } from './runtime.js';
@@ -25,7 +25,7 @@ import type { ImporterRuntime, ImporterRuntimeConfig } from './runtime.js';
  * wiring proof, including the intake subscription consuming a downloader fulfilment end to end.
  */
 
-const BEETS_CONFIG: TaggerConfiguration = {
+const BEETS_CONFIG: TaggerConfig = {
   beetsVersion: '2.4.0',
   libraryDatabase: '/data/library.db',
   libraryDirectory: '/music',
@@ -43,7 +43,8 @@ function fakeTagger(): TaggerPort {
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups) await cleanup();
+  cleanups.length = 0;
 });
 
 function config(overrides: Partial<ImporterRuntimeConfig> = {}): ImporterRuntimeConfig {
@@ -97,29 +98,28 @@ describe('createImporterRuntime', () => {
     letterOccurredAt: string,
     overrides: Partial<ImporterRuntimeConfig> = {},
   ): Promise<ImporterRuntime> {
-    const dir = mkdtempSync(join(tmpdir(), 'importer-db-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const databaseFile = join(dir, 'events.db');
+    const directory = mkdtempSync(path.join(tmpdir(), 'importer-db-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const databaseFile = path.join(directory, 'events.db');
 
-    const db = openEventDatabase(databaseFile);
-    const store = new SqliteEventStore(db, new UpcasterRegistry(), new InProcessEventBus());
-    (
-      await store.append('imp-stalled', 0, [requested()], {
-        importId: 'imp-stalled',
-        occurredAt: '2026-07-10T12:00:00.000Z',
-      })
-    )._unsafeUnwrap();
-    (await new SqliteCheckpointStore(db).save(REACTOR_CONSUMER, 1))._unsafeUnwrap();
-    (
-      await new SqliteDeadLetterStore(db).record({
-        subscription: REACTOR_CONSUMER,
-        globalSeq: 1,
-        error: 'Propose: bridge.propose: beets down',
-        occurredAt: letterOccurredAt,
-        streamId: 'imp-stalled',
-      })
-    )._unsafeUnwrap();
-    db.close();
+    const database = openEventDatabase(databaseFile);
+    const store = new SqliteEventStore(database, new UpcasterRegistry(), new InProcessEventBus());
+    const appendResult = await store.append('imp-stalled', 0, [requested()], {
+      importId: 'imp-stalled',
+      occurredAt: '2026-07-10T12:00:00.000Z',
+    });
+    appendResult._unsafeUnwrap();
+    const saveResult = await new SqliteCheckpointStore(database).save(REACTOR_CONSUMER, 1);
+    saveResult._unsafeUnwrap();
+    const recordResult = await new SqliteDeadLetterStore(database).record({
+      subscription: REACTOR_CONSUMER,
+      globalSeq: 1,
+      error: 'Propose: bridge.propose: beets down',
+      occurredAt: letterOccurredAt,
+      streamId: 'imp-stalled',
+    });
+    recordResult._unsafeUnwrap();
+    database.close();
 
     const result = await createImporterRuntime(
       config({ databaseFile, ...overrides }),
@@ -147,7 +147,7 @@ describe('createImporterRuntime', () => {
   it('does not seed an import stalled from a dead letter older than the retention horizon', async () => {
     // A 60-day-old letter with a 30-day retention: pruned at boot before seeding, so it never stalls.
     const runtime = await bootOverDeadLetter('2026-05-19T12:00:00.000Z', {
-      stalledRetentionMs: 30 * 24 * 60 * 60 * 1_000,
+      stalledRetentionMs: 30 * 24 * 60 * 60 * 1000,
     });
 
     const view = runtime.facade.getImport({ id: 'imp-stalled' });
@@ -185,11 +185,11 @@ describe('createImporterRuntime', () => {
   });
 
   it('consumes a downloader fulfilment over the connected feed into a native import', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'intake-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    mkdirSync(join(dir, 'album'), { recursive: true });
+    const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    mkdirSync(path.join(directory, 'album'), { recursive: true });
 
-    const result = await createImporterRuntime(config({ intakeRoot: dir }), silentLogger(), {
+    const result = await createImporterRuntime(config({ intakeRoot: directory }), silentLogger(), {
       tagger: fakeTagger(),
       clock: fixedClock(),
     });
@@ -220,10 +220,10 @@ describe('createImporterRuntime', () => {
   });
 
   it('holds delivery when the re-rooted directory is not visible yet (real filesystem probe)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'intake-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
 
-    const result = await createImporterRuntime(config({ intakeRoot: dir }), silentLogger(), {
+    const result = await createImporterRuntime(config({ intakeRoot: directory }), silentLogger(), {
       tagger: fakeTagger(),
       clock: fixedClock(),
     });
@@ -297,9 +297,9 @@ describe('createImporterRuntime', () => {
   });
 
   it('refuses to boot when the projection rebuild cannot read the backlog', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'importer-runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const file = join(dir, 'events.db');
+    const directory = mkdtempSync(path.join(tmpdir(), 'importer-runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
     const seed = openEventDatabase(file);
     seed
       .prepare(
@@ -347,10 +347,10 @@ describe('createImporterRuntime', () => {
   });
 
   it('classifies a genuine probe fault as transient (not a missing directory) via the real probe', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'intake-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
 
-    const result = await createImporterRuntime(config({ intakeRoot: dir }), silentLogger(), {
+    const result = await createImporterRuntime(config({ intakeRoot: directory }), silentLogger(), {
       tagger: fakeTagger(),
       clock: fixedClock(),
     });
@@ -366,7 +366,7 @@ describe('createImporterRuntime', () => {
       timestamp: '2026-07-18T12:00:00.000Z',
       data: {
         acquisitionId: 'acq-probe',
-        location: `/staging/${String.fromCharCode(0)}bad`,
+        location: `/staging/${String.fromCodePoint(0)}bad`,
         target: { type: 'album', artist: 'Artist', title: 'Album', musicbrainzReleaseId: null },
       },
     };

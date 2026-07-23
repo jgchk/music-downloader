@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import path from 'node:path';
 import type { Target } from '../../domain/target/target.js';
 
 /**
@@ -9,16 +9,16 @@ import type { Target } from '../../domain/target/target.js';
  */
 
 // Path-hostile characters, whitespace, and control characters, each collapsed to an underscore.
-const UNSAFE = /[\\/:*?"<>|\s\x00-\x1f]/g;
+const UNSAFE = /[\\/:*?"<>|\s\u{0}-\u{1F}]/gu;
 
 /** Reduce an arbitrary string to a single safe path segment; never empty. */
 export function sanitizeSegment(raw: string): string {
-  const cleaned = raw.replace(UNSAFE, '_').trim();
+  const cleaned = raw.replaceAll(UNSAFE, '_').trim();
   return cleaned === '' ? '_' : cleaned;
 }
 
 /** Relative release directory for a target: `Artist/Title (Year)`, or `Artist/Title` without a year. */
-export function renderReleaseDir(target: Target): string {
-  const release = target.year !== undefined ? `${target.title} (${target.year})` : target.title;
-  return join(sanitizeSegment(target.artist), sanitizeSegment(release));
+export function renderReleaseDirectory(target: Target): string {
+  const release = target.year === undefined ? target.title : `${target.title} (${target.year})`;
+  return path.join(sanitizeSegment(target.artist), sanitizeSegment(release));
 }

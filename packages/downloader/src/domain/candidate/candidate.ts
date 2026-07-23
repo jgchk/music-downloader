@@ -78,14 +78,14 @@ export interface Candidate {
   readonly source: SourceReliability;
 }
 
-const KEY_SEPARATOR = '\u0000';
+const KEY_SEPARATOR = '\u{0}';
 
 /** A collision-resistant string key for a candidate identity, for use in Sets/Maps. */
 export function candidateKey(identity: CandidateIdentity): string {
   return [identity.username, identity.path, String(identity.sizeBytes)].join(KEY_SEPARATOR);
 }
 
-export function sameCandidate(a: CandidateIdentity, b: CandidateIdentity): boolean {
+export function isSameCandidate(a: CandidateIdentity, b: CandidateIdentity): boolean {
   return candidateKey(a) === candidateKey(b);
 }
 
@@ -93,18 +93,18 @@ export function sameCandidate(a: CandidateIdentity, b: CandidateIdentity): boole
  * A candidate reference as an external reporter names it: username and path are required, size is
  * corroborating detail the reporter may not have retained.
  */
-export interface CandidateRef {
+export interface CandidateReference {
   readonly username: string;
   readonly path: string;
   readonly sizeBytes?: number;
 }
 
 /** Whether an external reference names this identity: username+path must match; size when given. */
-export function refersTo(ref: CandidateRef, identity: CandidateIdentity): boolean {
+export function isReferringTo(reference: CandidateReference, identity: CandidateIdentity): boolean {
   return (
-    ref.username === identity.username &&
-    ref.path === identity.path &&
-    (ref.sizeBytes === undefined || ref.sizeBytes === identity.sizeBytes)
+    reference.username === identity.username &&
+    reference.path === identity.path &&
+    (reference.sizeBytes === undefined || reference.sizeBytes === identity.sizeBytes)
   );
 }
 

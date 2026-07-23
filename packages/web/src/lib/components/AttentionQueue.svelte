@@ -1,13 +1,13 @@
 <script lang="ts">
   import { attentionKindLabel, moduleLabel, type AttentionItem } from '$lib/attention.js';
 
-  interface Props {
+  interface Properties {
     items: readonly AttentionItem[];
     /** Per-section modeled failures — a failed module hides its items, so no empty claim then. */
     errors?: Partial<Record<AttentionItem['module'], string>>;
   }
 
-  let { items, errors = {} }: Props = $props();
+  let { items, errors = {} }: Properties = $props();
 
   const anySectionFailed = $derived(Object.values(errors).some((message) => message !== undefined));
 </script>

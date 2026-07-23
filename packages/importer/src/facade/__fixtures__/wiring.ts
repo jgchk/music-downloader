@@ -1,9 +1,9 @@
 import { okAsync } from 'neverthrow';
 import { POLICY } from '../../domain/import/__fixtures__/import-fixtures.js';
-import { FakeEventStore, fixedClock, silentLogger } from '../../application/__fixtures__/fakes.js';
+import { FakeEventStore, fixedClock } from '../../application/__fixtures__/fakes.js';
 import type { EffectPorts } from '../../application/import/interpreter.js';
 import { interpretEffect } from '../../application/import/interpreter.js';
-import type { UseCaseDeps } from '../../application/import/use-cases.js';
+import type { UseCaseDependencies } from '../../application/import/use-cases.js';
 import { createImporterFacade } from '../index.js';
 import type { ImporterFacade } from '../index.js';
 import {
@@ -20,7 +20,7 @@ import type { Effect } from '../../domain/import/import.js';
  * event through a stubbed tagger, standing in for the reactor's effect dispatch.
  */
 export interface TestWiring {
-  readonly deps: UseCaseDeps;
+  readonly deps: UseCaseDependencies;
   readonly facade: ImporterFacade;
   readonly store: FakeEventStore;
   readonly status: ImportStatusProjection;
@@ -53,7 +53,7 @@ export function testWiring(): TestWiring {
     },
     intake: { deleteRelease: () => okAsync(undefined) },
   };
-  const deps: UseCaseDeps = {
+  const dependencies: UseCaseDependencies = {
     store,
     clock: fixedClock(),
     status,
@@ -61,8 +61,8 @@ export function testWiring(): TestWiring {
     policy: POLICY,
   };
   return {
-    deps,
-    facade: createImporterFacade(deps),
+    deps: dependencies,
+    facade: createImporterFacade(dependencies),
     store,
     status,
     stalled,
@@ -78,4 +78,4 @@ export function testWiring(): TestWiring {
   };
 }
 
-export { silentLogger };
+export { silentLogger } from '../../application/__fixtures__/fakes.js';

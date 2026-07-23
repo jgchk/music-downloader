@@ -16,49 +16,66 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 {
     case 'InvalidPolicy':
     case 'InvalidResolution':
     case 'UnknownCandidate':
-    case 'UnknownEdition':
+    case 'UnknownEdition': {
       return 400;
+    }
     case 'NotFound':
-    case 'UnknownImport':
+    case 'UnknownImport': {
       return 404;
+    }
     case 'AlreadyExists':
     case 'IllegalTransition':
     case 'NoOpenReview':
     case 'NoRetainedCandidate':
-    case 'ConcurrencyConflict':
+    case 'ConcurrencyConflict': {
       return 409;
-    case 'InfraError':
+    }
+    case 'InfraError': {
       return 500;
+    }
   }
 }
 
 export function messageOf(error: FacadeError): string {
   switch (error.kind) {
-    case 'ValidationFailed':
+    case 'ValidationFailed': {
       return `Invalid input: ${error.message}`;
-    case 'InvalidPolicy':
+    }
+    case 'InvalidPolicy': {
       return 'The requested policy is invalid.';
-    case 'NotFound':
+    }
+    case 'NotFound': {
       return 'No such acquisition.';
-    case 'AlreadyExists':
+    }
+    case 'AlreadyExists': {
       return 'That acquisition already exists.';
-    case 'IllegalTransition':
+    }
+    case 'IllegalTransition': {
       return `That action is not available while the acquisition is ${error.phase}.`;
-    case 'UnknownImport':
+    }
+    case 'UnknownImport': {
       return 'No such import.';
-    case 'NoOpenReview':
+    }
+    case 'NoOpenReview': {
       return 'This review has already been settled.';
-    case 'InvalidResolution':
+    }
+    case 'InvalidResolution': {
       return `Invalid resolution: ${error.detail}`;
-    case 'UnknownCandidate':
+    }
+    case 'UnknownCandidate': {
       return `Unknown candidate: ${error.candidate}.`;
-    case 'UnknownEdition':
+    }
+    case 'UnknownEdition': {
       return `Unknown edition: ${error.releaseMbid}. It is not among the offered candidates — reload and choose from the list.`;
-    case 'NoRetainedCandidate':
+    }
+    case 'NoRetainedCandidate': {
       return 'This import did not arrive from the downloader with a retained candidate, so a download retry cannot be requested. Plain reject is still available.';
-    case 'ConcurrencyConflict':
+    }
+    case 'ConcurrencyConflict': {
       return 'The record changed while you were working - reload and try again.';
-    case 'InfraError':
+    }
+    case 'InfraError': {
       return `Something went wrong (${error.operation}). Try again.`;
+    }
   }
 }

@@ -16,7 +16,7 @@ function handoff(at: string): DownloaderHistoryEntry {
   };
 }
 
-function req(at: string): ImporterHistoryEntry {
+function request(at: string): ImporterHistoryEntry {
   return { kind: 'requested', at };
 }
 
@@ -28,7 +28,7 @@ describe('mergeTimeline', () => {
   it('orders both modules by occurrence time, preserving each entry with its module', () => {
     const merged = mergeTimeline(
       [sel('2026-01-01T00:00:00Z', '/a'), sel('2026-01-01T00:00:05Z', '/b')],
-      [req('2026-01-01T00:00:02Z'), req('2026-01-01T00:00:09Z')],
+      [request('2026-01-01T00:00:02Z'), request('2026-01-01T00:00:09Z')],
     );
     // Full-entry equality pins both the order and that each payload survives the merge intact.
     expect(merged).toEqual([
@@ -37,13 +37,13 @@ describe('mergeTimeline', () => {
         at: '2026-01-01T00:00:00Z',
         entry: sel('2026-01-01T00:00:00Z', '/a'),
       },
-      { module: 'importer', at: '2026-01-01T00:00:02Z', entry: req('2026-01-01T00:00:02Z') },
+      { module: 'importer', at: '2026-01-01T00:00:02Z', entry: request('2026-01-01T00:00:02Z') },
       {
         module: 'downloader',
         at: '2026-01-01T00:00:05Z',
         entry: sel('2026-01-01T00:00:05Z', '/b'),
       },
-      { module: 'importer', at: '2026-01-01T00:00:09Z', entry: req('2026-01-01T00:00:09Z') },
+      { module: 'importer', at: '2026-01-01T00:00:09Z', entry: request('2026-01-01T00:00:09Z') },
     ]);
   });
 
@@ -52,7 +52,7 @@ describe('mergeTimeline', () => {
     // by-module concatenation would wrongly block them apart.
     const merged = mergeTimeline(
       [sel('2026-01-01T00:00:00Z'), handoff('2026-01-01T00:00:02Z'), sel('2026-01-01T00:00:07Z')],
-      [req('2026-01-01T00:00:03Z'), rejected('2026-01-01T00:00:06Z')],
+      [request('2026-01-01T00:00:03Z'), rejected('2026-01-01T00:00:06Z')],
     );
     expect(merged.map((t) => [t.module, t.entry.kind])).toEqual([
       ['downloader', 'selected'],
@@ -66,7 +66,7 @@ describe('mergeTimeline', () => {
   it('breaks a timestamp tie with the downloader first, then keeps each module log order', () => {
     const merged = mergeTimeline(
       [sel('2026-01-01T00:00:00Z', '/first'), sel('2026-01-01T00:00:00Z', '/second')],
-      [req('2026-01-01T00:00:00Z')],
+      [request('2026-01-01T00:00:00Z')],
     );
     expect(merged.map((t) => t.module)).toEqual(['downloader', 'downloader', 'importer']);
     // Refutable log-order: the two same-time downloader entries keep their input order.

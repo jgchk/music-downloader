@@ -120,8 +120,8 @@ const ALL_PHASES = Object.keys(stateByPhase) as AcquisitionPhase[];
 describe('evolve — totality: out-of-protocol events are ignored', () => {
   for (const event of allEvents) {
     const legal = legalSources[event.type];
-    for (const phase of ALL_PHASES) {
-      if (legal.includes(phase)) continue;
+    const illegalPhases = ALL_PHASES.filter((phase) => !legal.includes(phase));
+    for (const phase of illegalPhases) {
       it(`ignores ${event.type} in phase ${phase}`, () => {
         const state = stateByPhase[phase];
         expect(evolve(state, event)).toBe(state); // unchanged, same reference

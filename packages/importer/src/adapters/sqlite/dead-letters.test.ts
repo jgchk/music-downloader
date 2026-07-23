@@ -17,7 +17,8 @@ describe('SqliteDeadLetterStore', () => {
     await store.record(LETTER);
     await store.record({ ...LETTER, subscription: 'seam:other', globalSeq: 1 });
 
-    const letters = (await store.list('seam:acquisitions'))._unsafeUnwrap();
+    const listResult = await store.list('seam:acquisitions');
+    const letters = listResult._unsafeUnwrap();
     expect(letters).toEqual([LETTER, { ...LETTER, globalSeq: 9 }]);
   });
 
@@ -28,7 +29,8 @@ describe('SqliteDeadLetterStore', () => {
     const again = await store.record({ ...LETTER, error: 'InvalidPayload (retry)' });
 
     expect(again.isOk()).toBe(true);
-    const letters = (await store.list('seam:acquisitions'))._unsafeUnwrap();
+    const listResult2 = await store.list('seam:acquisitions');
+    const letters = listResult2._unsafeUnwrap();
     expect(letters).toEqual([{ ...LETTER, error: 'InvalidPayload (retry)' }]);
   });
 
@@ -37,11 +39,15 @@ describe('SqliteDeadLetterStore', () => {
     const reactorLetter = { ...LETTER, subscription: 'import-reactor', streamId: 'imp-1' };
 
     await store.record(reactorLetter);
-    expect((await store.list('import-reactor'))._unsafeUnwrap()).toEqual([reactorLetter]);
+    const listResult3 = await store.list('import-reactor');
+    expect(listResult3._unsafeUnwrap()).toEqual([reactorLetter]);
 
-    expect((await store.clearStream('import-reactor', 'imp-1')).isOk()).toBe(true);
-    expect((await store.clearStream('import-reactor', 'imp-absent')).isOk()).toBe(true); // no-op
-    expect((await store.list('import-reactor'))._unsafeUnwrap()).toEqual([]);
+    const clearStreamResult = await store.clearStream('import-reactor', 'imp-1');
+    expect(clearStreamResult.isOk()).toBe(true);
+    const clearStreamResult2 = await store.clearStream('import-reactor', 'imp-absent');
+    expect(clearStreamResult2.isOk()).toBe(true); // no-op
+    const listResult4 = await store.list('import-reactor');
+    expect(listResult4._unsafeUnwrap()).toEqual([]);
   });
 
   it('scopes clearStream to its subscription — another subscription’s same-stream letter survives', async () => {
@@ -52,8 +58,10 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.clearStream('import-reactor', 'imp-1');
 
-    expect((await store.list('import-reactor'))._unsafeUnwrap()).toEqual([]);
-    expect((await store.list('seam:acquisitions'))._unsafeUnwrap()).toEqual([bystander]);
+    const listResult5 = await store.list('import-reactor');
+    expect(listResult5._unsafeUnwrap()).toEqual([]);
+    const listResult6 = await store.list('seam:acquisitions');
+    expect(listResult6._unsafeUnwrap()).toEqual([bystander]);
   });
 
   it('prunes letters older than the retention horizon, keeping newer ones', async () => {
@@ -63,7 +71,8 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.prune('seam:acquisitions', '2026-07-01T00:00:00.000Z');
 
-    const letters = (await store.list('seam:acquisitions'))._unsafeUnwrap();
+    const listResult7 = await store.list('seam:acquisitions');
+    const letters = listResult7._unsafeUnwrap();
     expect(letters.map((entry) => entry.globalSeq)).toEqual([2]);
   });
 
@@ -84,18 +93,24 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.prune('import-reactor', '2026-07-01T00:00:00.000Z');
 
-    expect((await store.list('import-reactor'))._unsafeUnwrap()).toEqual([]);
-    expect((await store.list('seam:acquisitions'))._unsafeUnwrap()).toEqual([seamAged]);
+    const listResult8 = await store.list('import-reactor');
+    expect(listResult8._unsafeUnwrap()).toEqual([]);
+    const listResult9 = await store.list('seam:acquisitions');
+    expect(listResult9._unsafeUnwrap()).toEqual([seamAged]);
   });
 
   it('surfaces storage faults as infra errors', async () => {
-    const db = openEventDatabase(':memory:');
-    const store = new SqliteDeadLetterStore(db);
-    db.close();
+    const database = openEventDatabase(':memory:');
+    const store = new SqliteDeadLetterStore(database);
+    database.close();
 
-    expect((await store.record(LETTER)).isErr()).toBe(true);
-    expect((await store.list('seam:acquisitions')).isErr()).toBe(true);
-    expect((await store.clearStream('import-reactor', 'imp-1')).isErr()).toBe(true);
-    expect((await store.prune('seam:acquisitions', '2026-07-01T00:00:00.000Z')).isErr()).toBe(true);
+    const recordResult = await store.record(LETTER);
+    expect(recordResult.isErr()).toBe(true);
+    const listResult10 = await store.list('seam:acquisitions');
+    expect(listResult10.isErr()).toBe(true);
+    const clearStreamResult3 = await store.clearStream('import-reactor', 'imp-1');
+    expect(clearStreamResult3.isErr()).toBe(true);
+    const pruneResult = await store.prune('seam:acquisitions', '2026-07-01T00:00:00.000Z');
+    expect(pruneResult.isErr()).toBe(true);
   });
 });

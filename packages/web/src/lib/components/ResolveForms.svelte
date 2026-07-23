@@ -1,5 +1,5 @@
 <script lang="ts">
-  interface Props {
+  interface Properties {
     supplyId?: boolean;
     refresh?: boolean;
     importAsIs?: boolean;
@@ -17,7 +17,7 @@
     rejectAndRetry = false,
     accept = false,
     retryEnrichment = false,
-  }: Props = $props();
+  }: Properties = $props();
 </script>
 
 {#if supplyId}

@@ -1,4 +1,4 @@
-import type { Candidate, CandidateRef } from '../candidate/candidate.js';
+import type { Candidate, CandidateReference } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { Mbid } from '../shared/mbid.js';
 import type { Target } from '../target/target.js';
@@ -52,7 +52,7 @@ export type AcquisitionCommand =
       // reference names, `decide` revives the retry ladder; anywhere else — stale, mismatched,
       // legacy, or redelivered — it converges to a no-op, never an error.
       readonly type: 'RecordExternalValidationFailed';
-      readonly candidate: CandidateRef;
+      readonly candidate: CandidateReference;
       readonly reasons: readonly string[];
     }
   | { readonly type: 'CancelAcquisition' };

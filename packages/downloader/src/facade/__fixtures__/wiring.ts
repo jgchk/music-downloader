@@ -4,7 +4,7 @@ import {
   ProgressReadModel,
   StalledReadModel,
 } from '../../application/projections/read-models.js';
-import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
 import { createDownloaderFacade } from '../index.js';
 import type { DownloaderFacade } from '../index.js';
 
@@ -14,7 +14,7 @@ import type { DownloaderFacade } from '../index.js';
  * reflects a just-submitted acquisition.
  */
 export interface TestWiring {
-  readonly deps: UseCaseDeps;
+  readonly deps: UseCaseDependencies;
   readonly facade: DownloaderFacade;
   readonly store: FakeEventStore;
   readonly status: AcquisitionStatusProjection;
@@ -26,7 +26,7 @@ export function testWiring(): TestWiring {
   const store = new FakeEventStore();
   const status = new AcquisitionStatusProjection();
   const progress = new ProgressReadModel();
-  const deps: UseCaseDeps = {
+  const dependencies: UseCaseDependencies = {
     store,
     clock: fixedClock(),
     ids: sequentialIds(),
@@ -35,8 +35,8 @@ export function testWiring(): TestWiring {
     stalled: new StalledReadModel(),
   };
   return {
-    deps,
-    facade: createDownloaderFacade(deps),
+    deps: dependencies,
+    facade: createDownloaderFacade(dependencies),
     store,
     status,
     progress,

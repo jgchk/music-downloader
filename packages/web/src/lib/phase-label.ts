@@ -7,13 +7,17 @@ export type BadgePhase = 'pending' | 'fulfilled' | 'failed' | 'attention';
 
 export function phaseLabel(phase: BadgePhase): string {
   switch (phase) {
-    case 'fulfilled':
+    case 'fulfilled': {
       return 'Done';
-    case 'failed':
+    }
+    case 'failed': {
       return 'Failed';
-    case 'pending':
+    }
+    case 'pending': {
       return 'Working';
-    case 'attention':
+    }
+    case 'attention': {
       return 'Action needed';
+    }
   }
 }

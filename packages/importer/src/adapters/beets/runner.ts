@@ -15,18 +15,18 @@ export interface CommandResult {
 }
 
 export interface CommandRunner {
-  run(command: string, args: readonly string[], timeoutMs: number): Promise<CommandResult>;
+  run(command: string, arguments_: readonly string[], timeoutMs: number): Promise<CommandResult>;
 }
 
 export const nodeCommandRunner: CommandRunner = {
-  run(command, args, timeoutMs) {
+  run(command, arguments_, timeoutMs) {
     return new Promise<CommandResult>((resolve, reject) => {
-      const child = spawn(command, [...args]);
+      const child = spawn(command, [...arguments_]);
       let stdout = '';
       let stderr = '';
-      let timedOut = false;
+      let isTimedOut = false;
       const timer = setTimeout(() => {
-        timedOut = true;
+        isTimedOut = true;
         child.kill('SIGKILL');
       }, timeoutMs);
       child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
@@ -37,7 +37,7 @@ export const nodeCommandRunner: CommandRunner = {
       });
       child.on('close', (code) => {
         clearTimeout(timer);
-        resolve({ code, stdout, stderr, timedOut });
+        resolve({ code, stdout, stderr, timedOut: isTimedOut });
       });
     });
   },

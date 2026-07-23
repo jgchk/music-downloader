@@ -1,8 +1,8 @@
 <script lang="ts">
   import AcquisitionDetail from '$lib/components/AcquisitionDetail.svelte';
-  import type { PageProps } from './$types';
+  import type { PageProps as PageProperties } from './$types';
 
-  let { data, form }: PageProps = $props();
+  let { data, form }: PageProperties = $props();
 </script>
 
 <AcquisitionDetail

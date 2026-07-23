@@ -5,7 +5,7 @@ import SkinSwitcher from './SkinSwitcher.svelte';
 
 describe('SkinSwitcher', () => {
   beforeEach(() => {
-    document.documentElement.removeAttribute('data-skin');
+    delete document.documentElement.dataset.skin;
     localStorage.clear();
   });
   // The storage-unavailable test stubs a browser built-in (Storage.prototype); restore in an

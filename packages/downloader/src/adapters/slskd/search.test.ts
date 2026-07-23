@@ -72,13 +72,17 @@ const albumTarget: Target = createTarget({
 })._unsafeUnwrap();
 
 const albumResponses = [
-  { username: 'u1', uploadSpeed: 900, files: [{ filename: '@@a\\Album\\01.flac', size: 100 }] },
+  {
+    username: 'u1',
+    uploadSpeed: 900,
+    files: [{ filename: String.raw`@@a\Album\01.flac`, size: 100 }],
+  },
 ];
 
 function deletedSearchIds(requests: readonly HttpRequest[]): string[] {
   return requests
     .filter((r) => r.method === 'DELETE' && r.url.includes('/api/v0/searches/'))
-    .map((r) => r.url.split('/api/v0/searches/')[1]!);
+    .map((r) => r.url.split('/api/v0/searches/', 2)[1]!);
 }
 
 describe('SlskdSearch', () => {
@@ -92,7 +96,7 @@ describe('SlskdSearch', () => {
 
     expect(result._unsafeUnwrap()).toEqual([
       {
-        identity: { username: 'u1', path: '@@a\\Album', sizeBytes: 100 },
+        identity: { username: 'u1', path: String.raw`@@a\Album`, sizeBytes: 100 },
         files: [expect.objectContaining({ name: '01.flac' })],
         source: { speedBytesPerSec: 900, freeSlots: 0, queueLength: 0 },
       },

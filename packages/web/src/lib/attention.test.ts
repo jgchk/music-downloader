@@ -81,8 +81,8 @@ describe('attentionItems', () => {
       'MetadataFailed',
       'Conflicted',
     ] as const;
-    const acquisitions = statuses.map((status, i) =>
-      acquisition({ acquisitionId: `acq-${i}`, status }),
+    const acquisitions = statuses.map((status, index) =>
+      acquisition({ acquisitionId: `acq-${index}`, status }),
     );
     expect(attentionItems([], acquisitions)).toEqual([]);
   });

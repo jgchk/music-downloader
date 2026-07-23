@@ -6,7 +6,8 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock('$app/state', () => mock);
 
-const ErrorPage = (await import('./+error.svelte')).default;
+const errorModule = await import('./+error.svelte');
+const ErrorPage = errorModule.default;
 
 describe('root error page (SSR)', () => {
   it('renders the error message and the id the user can quote', () => {
