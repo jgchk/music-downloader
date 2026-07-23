@@ -7,5 +7,5 @@ export { SqliteDeadLetterStore } from './dead-letters.js';
 export { SqliteParkedEffectStore } from './parked-effects.js';
 export { SqliteResourceLedger } from './resource-ledger.js';
 export { InProcessEventBus, pollCatchUp } from './event-bus.js';
-export { UpcasterRegistry, CURRENT_SCHEMA_VERSION } from './upcaster.js';
+export { UpcasterRegistry, CURRENT_SCHEMA_VERSION, buildUpcasterRegistry } from './upcaster.js';
 export type { Upcaster } from './upcaster.js';

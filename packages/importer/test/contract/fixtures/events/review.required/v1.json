@@ -1,0 +1,16 @@
+{
+  "provenance": {
+    "recordedAt": "2026-07-23T00:00:00.000Z",
+    "schemaVersion": 1,
+    "note": "The v1 on-disk shape of an internal ReviewRequired event with a match-review cause. The decider reaches match-review only for a non-empty candidate list (the empty case routes to no-match first), so it has ALWAYS populated `best` — no legacy history lacks it. FROZEN: this is the shape the (now-required) `best` type must keep folding forever."
+  },
+  "event": {
+    "type": "ReviewRequired",
+    "cause": {
+      "kind": "match-review",
+      "hinted": true,
+      "hintedReleaseId": "mb-release-1",
+      "best": { "dataSource": "MusicBrainz", "albumId": "album-1" }
+    }
+  }
+}

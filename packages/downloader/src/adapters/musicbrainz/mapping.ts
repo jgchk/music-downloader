@@ -242,10 +242,10 @@ export interface ReleaseGroupEdition {
  * conservative, standard-like edition). Map iteration is insertion order, so the tie rule is applied
  * explicitly rather than relying on it. Assumes a non-empty input.
  */
-function modalTrackCount(editions: ReadonlyArray<Pick<ReleaseGroupEdition, 'trackCount'>>): number {
+function modalTrackCount(counts: readonly number[]): number {
   const frequency = new Map<number, number>();
-  for (const edition of editions) {
-    frequency.set(edition.trackCount, (frequency.get(edition.trackCount) ?? 0) + 1);
+  for (const count of counts) {
+    frequency.set(count, (frequency.get(count) ?? 0) + 1);
   }
   let modal = 0;
   let modalFrequency = 0;
@@ -274,7 +274,7 @@ export function releaseGroupEditionIds(
 ): readonly string[] {
   const official = editions.filter((edition) => edition.status === 'Official');
   if (official.length === 0) return [];
-  const modal = modalTrackCount(official);
+  const modal = modalTrackCount(official.map((edition) => edition.trackCount));
   return official
     .filter((edition) => edition.trackCount === modal)
     .sort((a, b) => compareDates(a.date, b.date))
@@ -322,7 +322,9 @@ function totalTrackCount(release: MbBrowseRelease): number {
 export function releaseGroupEditionCandidates(
   releases: readonly MbBrowseRelease[] | undefined,
 ): readonly EditionCandidate[] {
-  const candidates: EditionCandidate[] = [];
+  // The numeric count (0 = unknown) rides alongside each candidate purely for the picker's modal
+  // ranking; it never reaches the event, where an unknown count is absent (never the sentinel 0).
+  const editions: { readonly candidate: EditionCandidate; readonly count: number }[] = [];
   for (const release of releases ?? []) {
     const releaseMbid = optionalMbid(release.id);
     if (releaseMbid === undefined) continue;
@@ -333,20 +335,26 @@ export function releaseGroupEditionCandidates(
           .filter((format): format is string => typeof format === 'string'),
       ),
     ];
-    candidates.push({
-      releaseMbid,
-      title: release.title ?? undefined,
-      date: release.date ?? undefined,
-      country: release.country ?? undefined,
-      format: formats.length > 0 ? formats.join(' + ') : undefined,
-      trackCount: totalTrackCount(release),
+    const count = totalTrackCount(release);
+    editions.push({
+      count,
+      candidate: {
+        releaseMbid,
+        title: release.title ?? undefined,
+        date: release.date ?? undefined,
+        country: release.country ?? undefined,
+        format: formats.length > 0 ? formats.join(' + ') : undefined,
+        ...(count > 0 ? { trackCount: count } : {}),
+      },
     });
   }
-  if (candidates.length === 0) return candidates;
-  const modal = modalTrackCount(candidates);
-  return candidates.sort((a, b) => {
-    const modalRank = Number(a.trackCount !== modal) - Number(b.trackCount !== modal);
-    if (modalRank !== 0) return modalRank;
-    return compareDates(a.date, b.date);
-  });
+  if (editions.length === 0) return [];
+  const modal = modalTrackCount(editions.map((edition) => edition.count));
+  return editions
+    .sort((a, b) => {
+      const modalRank = Number(a.count !== modal) - Number(b.count !== modal);
+      if (modalRank !== 0) return modalRank;
+      return compareDates(a.candidate.date, b.candidate.date);
+    })
+    .map((edition) => edition.candidate);
 }

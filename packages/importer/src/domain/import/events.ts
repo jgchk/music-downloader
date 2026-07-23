@@ -157,7 +157,14 @@ export type ReviewCause =
        * pre-change events, which have no id, still read as hinted.
        */
       readonly hintedReleaseId?: string;
-      readonly best?: CandidateRef;
+      /**
+       * The best (lowest-distance) candidate that fell to review. Required: the decider reaches
+       * `match-review` only for a non-empty candidate list (the empty case routes to `no-match`
+       * first), so it has always populated `best` — every stored `match-review` event carries it,
+       * and no legacy history lacks it. (The wire DTO keeps `best` optional; that is a separate,
+       * additive serialization altitude.)
+       */
+      readonly best: CandidateRef;
     }
   | { readonly kind: 'no-match' }
   | {

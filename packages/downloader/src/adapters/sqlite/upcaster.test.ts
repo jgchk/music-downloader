@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { CURRENT_SCHEMA_VERSION, UpcasterRegistry, buildUpcasterRegistry } from './upcaster.js';
 
 describe('UpcasterRegistry', () => {
   it('is pass-through when nothing is registered (the MVP)', () => {
@@ -40,6 +40,44 @@ describe('UpcasterRegistry', () => {
   });
 
   it('stamps new events at the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(1);
+    expect(CURRENT_SCHEMA_VERSION).toBe(2);
+  });
+});
+
+describe('buildUpcasterRegistry — ManualSelectionRequested v1 → v2', () => {
+  const registry = buildUpcasterRegistry();
+
+  function upcast(data: Record<string, unknown>): Record<string, unknown> {
+    return registry.upcast('ManualSelectionRequested', 1, data);
+  }
+
+  it('drops a v1 trackCount: 0 sentinel to absent and passes a real count through', () => {
+    const result = upcast({
+      type: 'ManualSelectionRequested',
+      candidates: [
+        { releaseMbid: 'a', title: 'Known', trackCount: 12 },
+        { releaseMbid: 'b', title: 'Unknown', trackCount: 0 },
+      ],
+    });
+
+    expect(result.candidates).toEqual([
+      { releaseMbid: 'a', title: 'Known', trackCount: 12 },
+      { releaseMbid: 'b', title: 'Unknown' },
+    ]);
+  });
+
+  it('tolerates an event with no candidates array', () => {
+    expect(upcast({ type: 'ManualSelectionRequested' })).toEqual({
+      type: 'ManualSelectionRequested',
+      candidates: [],
+    });
+  });
+
+  it('leaves a v2 event (stored at the current version) untouched', () => {
+    const v2 = {
+      type: 'ManualSelectionRequested',
+      candidates: [{ releaseMbid: 'b', title: 'Unknown' }],
+    };
+    expect(registry.upcast('ManualSelectionRequested', 2, v2)).toEqual(v2);
   });
 });

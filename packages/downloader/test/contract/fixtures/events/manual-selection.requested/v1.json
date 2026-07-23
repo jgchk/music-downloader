@@ -1,0 +1,25 @@
+{
+  "provenance": {
+    "recordedAt": "2026-07-23T00:00:00.000Z",
+    "schemaVersion": 1,
+    "note": "The v1 on-disk shape of an internal ManualSelectionRequested event. Under v1 an unknown EditionCandidate track count was stored as the sentinel 0 (the MusicBrainz mapping summed per-medium track-counts, an unknown medium contributing 0, so a release with no usable media summed to 0). FROZEN — never regenerate; the upcaster must fold this shape forever."
+  },
+  "event": {
+    "type": "ManualSelectionRequested",
+    "candidates": [
+      {
+        "releaseMbid": "boot-1",
+        "title": "Live at Budokan",
+        "date": "1995-05-01",
+        "country": "JP",
+        "format": "CD",
+        "trackCount": 12
+      },
+      {
+        "releaseMbid": "boot-2",
+        "title": "Promo Sampler",
+        "trackCount": 0
+      }
+    ]
+  }
+}

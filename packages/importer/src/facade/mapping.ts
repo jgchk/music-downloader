@@ -103,7 +103,9 @@ export function reviewToDto(review: OpenReview): ReviewDto {
         kind: 'match-review',
         hinted: cause.hinted,
         hintedReleaseId: cause.hintedReleaseId,
-        best: cause.best === undefined ? undefined : { ...cause.best },
+        // `best` is required in the domain; the wire DTO keeps it optional (a tolerant, additive
+        // serialization altitude), but the mapping now always carries the present candidate.
+        best: { ...cause.best },
         candidates: review.candidates.map(candidateToDto),
       };
     case 'no-match':

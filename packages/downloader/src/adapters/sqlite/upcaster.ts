@@ -8,8 +8,14 @@ import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
  * migration, exactly the ES form of the no-breaking-change policy.
  */
 
-/** The schema version stamped on every event written today. */
-export const CURRENT_SCHEMA_VERSION = 1;
+/**
+ * The schema version stamped on every event written today.
+ *
+ * v2 (schema-evolution `EditionCandidate.trackCount`): the `ManualSelectionRequested` edition menu
+ * stored an unknown track count as the sentinel `0`; v2 makes the count optional (absent = unknown)
+ * and the read-side upcaster folds the legacy `0` to absent. See {@link buildUpcasterRegistry}.
+ */
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /** Transforms one on-disk event payload from version N to version N+1. */
 export type Upcaster = (data: Record<string, unknown>) => Record<string, unknown>;
@@ -43,4 +49,36 @@ export class UpcasterRegistry {
     }
     return current as unknown as AcquisitionEvent;
   }
+}
+
+/**
+ * Lifts a v1 `ManualSelectionRequested` to v2: an `EditionCandidate` whose `trackCount` was the v1
+ * `0` sentinel (the only way a count of 0 could arise — the MusicBrainz mapping summed per-medium
+ * `track-count`s and a music release always has ≥1 track, so 0 meant "no usable media", i.e.
+ * unknown) drops the field entirely, matching the v2 "absent = unknown" shape. A real count (`> 0`)
+ * passes through unchanged.
+ */
+const manualSelectionRequestedV1ToV2: Upcaster = (data) => {
+  const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+  return {
+    ...data,
+    candidates: candidates.map((candidate: Record<string, unknown>) => {
+      if (candidate.trackCount !== 0) return candidate;
+      const { trackCount: _unknown, ...rest } = candidate;
+      return rest;
+    }),
+  };
+};
+
+/**
+ * The downloader's read-side upcaster registry: the single place every known schema-evolution
+ * transform is registered, wired into the {@link SqliteEventStore} in composition. An empty
+ * registry would silently skip every upcast, so production and tests must build it here.
+ */
+export function buildUpcasterRegistry(): UpcasterRegistry {
+  return new UpcasterRegistry().register(
+    'ManualSelectionRequested',
+    1,
+    manualSelectionRequestedV1ToV2,
+  );
 }

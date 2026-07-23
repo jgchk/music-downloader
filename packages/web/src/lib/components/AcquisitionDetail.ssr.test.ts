@@ -165,7 +165,7 @@ describe('AcquisitionDetail (SSR)', () => {
               format: 'CD',
               trackCount: 12,
             },
-            { releaseMbid: 'boot-2', trackCount: 10 },
+            { releaseMbid: 'boot-2' },
           ],
         },
         timeline: [],
@@ -177,6 +177,10 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('JP');
     expect(body).toContain('CD');
     expect(body).toContain('<td>12</td>');
+    // The second edition is sparse: an unknown title renders as (untitled) and an unknown (absent)
+    // track count renders as a dash, not 0.
+    expect(body).toContain('(untitled)');
+    expect(body).toContain('<td>—</td>');
     expect(body).toContain('action="?/select"');
     expect(body).toContain('value="boot-1"');
     expect(body).toContain('value="boot-2"');

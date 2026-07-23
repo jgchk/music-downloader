@@ -93,7 +93,7 @@
           <td>{candidate.date ?? '—'}</td>
           <td>{candidate.country ?? '—'}</td>
           <td>{candidate.format ?? '—'}</td>
-          <td>{candidate.trackCount}</td>
+          <td>{candidate.trackCount ?? '—'}</td>
           <td>
             <form method="POST" action="?/select">
               <input type="hidden" name="releaseMbid" value={candidate.releaseMbid} />

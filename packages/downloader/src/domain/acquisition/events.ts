@@ -45,9 +45,10 @@ export interface DownloadedFile {
  * One edition of a release group offered for manual selection — a lightweight presentation value,
  * not a {@link Target}, since presenting an edition needs no track manifest. Carried on the
  * `ManualSelectionRequested` event so the retained candidates are part of the acquisition's
- * history. Fields beyond the id and track count are optional: MusicBrainz data is sparse, and a
- * missing field degrades presentation, never the pause itself. An unknown track count arrives as
- * 0 (the mapping sums per-medium counts, unknown contributing nothing).
+ * history. Every field is optional: MusicBrainz data is sparse, and a missing field degrades
+ * presentation, never the pause itself. An unknown track count is absent (the mapping sums
+ * per-medium counts; a release with no usable media has no count to report). Legacy v1 history
+ * stored an unknown count as the sentinel `0` — the read-side upcaster folds that `0` to absent.
  */
 export interface EditionCandidate {
   readonly releaseMbid: Mbid;
@@ -55,7 +56,7 @@ export interface EditionCandidate {
   readonly date?: string;
   readonly country?: string;
   readonly format?: string;
-  readonly trackCount: number;
+  readonly trackCount?: number;
 }
 
 export type AcquisitionEvent =

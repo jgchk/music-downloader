@@ -14,7 +14,7 @@ import {
   SqliteEventStore,
   SqliteParkedEffectStore,
   SqliteResourceLedger,
-  UpcasterRegistry,
+  buildUpcasterRegistry,
   fetchHttpClient,
   openEventDatabase,
   realTimer,
@@ -115,7 +115,7 @@ export async function createDownloaderRuntime(
   mkdirSync(dirname(config.databaseFile), { recursive: true });
   const db = openEventDatabase(config.databaseFile);
   const bus = new InProcessEventBus();
-  const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
+  const store = new SqliteEventStore(db, buildUpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
   const deadLetters = overrides.deadLetters ?? new SqliteDeadLetterStore(db);
   const parkedEffects = new SqliteParkedEffectStore(db);
