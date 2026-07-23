@@ -40,16 +40,25 @@ function decideProposal(
     return ok([proposed, { type: 'ReviewRequired', cause: { kind: 'no-match' } }]);
   }
   const best = bestOf(candidates);
-  const hinted =
-    pinnedId !== undefined ||
-    (state.phase === 'proposing' && state.pinnedId !== undefined) ||
-    state.hints?.mbReleaseId !== undefined;
+  // The release id in play for this proposal, if any: the just-supplied pin, the one folded from a
+  // prior supply-id re-propose, or the original submission hint. `hinted` stays exactly its old
+  // boolean (an id was in play); the id itself rides along so a reader can tell a contradicted hint
+  // (best candidate's album id differs) from a merely-weak match on the pinned release.
+  const hintedReleaseId =
+    pinnedId ??
+    (state.phase === 'proposing' ? state.pinnedId : undefined) ??
+    state.hints?.mbReleaseId;
+  const hinted = hintedReleaseId !== undefined;
   if (best.distance > state.policy.autoApplyThreshold) {
-    // A weak — or hint-contradicted — match goes to a human with the evidence (D4): the candidate
-    // list rides on `CandidatesProposed`, the mismatch detail on the best candidate's penalties.
+    // A weak — or hint-contradicted — match goes to a human with the evidence: the candidate list
+    // rides on `CandidatesProposed`, each candidate carrying its field-level diff (current-vs-proposed
+    // tags, extra/missing tracks, album fields), with the distance penalties kept as a summary.
     return ok([
       proposed,
-      { type: 'ReviewRequired', cause: { kind: 'match-review', hinted, best: best.ref } },
+      {
+        type: 'ReviewRequired',
+        cause: { kind: 'match-review', hinted, hintedReleaseId, best: best.ref },
+      },
     ]);
   }
   if (duplicates.length > 0) {

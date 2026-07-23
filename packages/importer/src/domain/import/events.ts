@@ -61,14 +61,58 @@ export interface CandidatePenalty {
   readonly amount: Distance;
 }
 
-/** One entry of the item-to-track mapping beets computed for a candidate. */
+/** A mapped file's current embedded tags — the before-side of a per-track retag diff. */
+export interface TrackCurrentTags {
+  readonly title: string;
+  readonly artist: string;
+  readonly track: number;
+  /** Duration in seconds; absent when the file's duration could not be read (never a false 0). */
+  readonly length?: number;
+}
+
+/**
+ * One entry of the item-to-track mapping beets computed for a candidate. `title`/`index` are the
+ * candidate's *proposed* values; `current`/`distance` (additive, optional — absent on events
+ * recorded before diff evidence was captured) carry the file's current tags and how far this
+ * mapped pair is from a clean match.
+ */
 export interface TrackMapping {
   readonly path: string;
   readonly title: string;
   readonly index: number;
+  readonly current?: TrackCurrentTags;
+  readonly distance?: number;
 }
 
-/** A proposed candidate: identity, headline naming, and the evidence behind its distance. */
+/** A downloaded file the candidate placed against no track (the `unmatched_tracks` penalty). */
+export interface UnmatchedFile {
+  readonly path: string;
+  readonly title: string;
+  readonly track: number;
+}
+
+/** A candidate track no downloaded file supplied (the `missing_tracks` penalty). */
+export interface MissingTrack {
+  readonly title: string;
+  readonly index: number;
+}
+
+/** The candidate's album-level fields, for the album-field diff against the files' current tags. */
+export interface CandidateAlbumFields {
+  readonly year: number;
+  readonly media: string;
+  readonly label: string;
+  readonly catalognum: string;
+  readonly country: string;
+  readonly albumDisambig: string;
+}
+
+/**
+ * A proposed candidate: identity, headline naming, and the evidence behind its distance. The diff
+ * evidence is additive and optional — a candidate on a `CandidatesProposed` recorded before this
+ * capability carries none of it: the per-track before/after rides on `tracks[].current`/`distance`
+ * (see {@link TrackMapping}), and `extraItems`/`missingTracks`/`albumFields` are the new top-level fields.
+ */
 export interface ProposedCandidate {
   readonly ref: CandidateRef;
   readonly artist: string;
@@ -76,6 +120,9 @@ export interface ProposedCandidate {
   readonly distance: Distance;
   readonly penalties: readonly CandidatePenalty[];
   readonly tracks: readonly TrackMapping[];
+  readonly extraItems?: readonly UnmatchedFile[];
+  readonly missingTracks?: readonly MissingTrack[];
+  readonly albumFields?: CandidateAlbumFields;
 }
 
 /** An album already in the library that a candidate would duplicate. */
@@ -93,7 +140,22 @@ export interface ApplyFailure {
 
 /** Why an import waits in review, with the kind-specific context a human needs to decide. */
 export type ReviewCause =
-  | { readonly kind: 'match-review'; readonly hinted: boolean; readonly best?: CandidateRef }
+  | {
+      readonly kind: 'match-review';
+      readonly hinted: boolean;
+      /**
+       * The release id pinned/hinted for this proposal (mb release id or a supplied search id),
+       * when one was in play. Additive/optional — absent on pre-change events and when no id was
+       * hinted. Lets a reader tell "the pinned release wasn't the best match" (best candidate's
+       * album id differs) from "the pinned release matched, but weakly" (they agree).
+       *
+       * For events written from this version `hinted === (hintedReleaseId !== undefined)` (the
+       * decider derives one from the other); `hinted` is authoritative and retained only so
+       * pre-change events, which have no id, still read as hinted.
+       */
+      readonly hintedReleaseId?: string;
+      readonly best?: CandidateRef;
+    }
   | { readonly kind: 'no-match' }
   | {
       readonly kind: 'duplicate-review';

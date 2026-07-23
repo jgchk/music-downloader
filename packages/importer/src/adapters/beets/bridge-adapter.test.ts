@@ -87,6 +87,72 @@ describe('propose', () => {
     });
   });
 
+  it('carries the field-level diff evidence into the domain candidate (snake→camel)', async () => {
+    const enriched = JSON.stringify({
+      status: 'proposal',
+      candidates: [
+        {
+          data_source: 'MusicBrainz',
+          album_id: 'mb-album-1',
+          artist: 'The Beatles',
+          album: 'Love Me Do',
+          distance: 0.2,
+          penalties: [{ name: 'tracks', amount: 0.1 }],
+          tracks: [
+            {
+              path: '/intake/a/01.mp3',
+              title: 'Love Me Do',
+              index: 1,
+              current: { title: 'Luv Me Do', artist: 'Beatles', track: 1, length: 143.1 },
+              distance: 0.125,
+            },
+          ],
+          extra_items: [{ path: '/intake/a/99.mp3', title: 'Bonus Beatz', track: 9 }],
+          extra_tracks: [{ title: 'P.S. I Love You', index: 2 }],
+          album_fields: {
+            year: 1988,
+            media: '8cm CD',
+            label: 'Parlophone',
+            catalognum: 'CD3R 4949',
+            country: 'XE',
+            albumdisambig: 'mini CD',
+          },
+        },
+      ],
+      duplicates: [],
+    });
+    const outcome = (
+      await bridge(runnerReturning(completed(enriched))).propose('/intake/a', {})
+    )._unsafeUnwrap();
+    expect(outcome).toMatchObject({
+      kind: 'proposal',
+      candidates: [
+        {
+          ref: { dataSource: 'MusicBrainz', albumId: 'mb-album-1' },
+          tracks: [
+            {
+              path: '/intake/a/01.mp3',
+              title: 'Love Me Do',
+              index: 1,
+              current: { title: 'Luv Me Do', artist: 'Beatles', track: 1, length: 143.1 },
+              distance: 0.125,
+            },
+          ],
+          extraItems: [{ path: '/intake/a/99.mp3', title: 'Bonus Beatz', track: 9 }],
+          missingTracks: [{ title: 'P.S. I Love You', index: 2 }],
+          albumFields: {
+            year: 1988,
+            media: '8cm CD',
+            label: 'Parlophone',
+            catalognum: 'CD3R 4949',
+            country: 'XE',
+            albumDisambig: 'mini CD',
+          },
+        },
+      ],
+    });
+  });
+
   it('omits pin flags when no hints were supplied', async () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'proposal', candidates: [], duplicates: [] })),

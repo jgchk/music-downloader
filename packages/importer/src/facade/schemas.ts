@@ -52,10 +52,45 @@ export const candidatePenaltySchema = z.object({
   amount: z.number(),
 });
 
+/** The staged file's current embedded tags for a mapped track — the before-side of a retag diff. */
+export const trackCurrentTagsSchema = z.object({
+  title: z.string(),
+  artist: z.string(),
+  track: z.number().int(),
+  // Absent when the file's duration could not be read (never a false 0).
+  length: z.number().optional(),
+});
+
 export const trackMappingSchema = z.object({
   path: z.string(),
   title: z.string(),
   index: z.number().int(),
+  // Additive diff evidence: the file's current tags and how far this mapped pair is from clean.
+  current: trackCurrentTagsSchema.optional(),
+  distance: z.number().optional(),
+});
+
+/** A downloaded file the candidate placed against no track (the `unmatched_tracks` penalty). */
+export const unmatchedFileSchema = z.object({
+  path: z.string(),
+  title: z.string(),
+  track: z.number().int(),
+});
+
+/** A candidate track no downloaded file supplied (the `missing_tracks` penalty). */
+export const missingTrackSchema = z.object({
+  title: z.string(),
+  index: z.number().int(),
+});
+
+/** The candidate's album-level fields, for the album-field diff against the files' current tags. */
+export const candidateAlbumFieldsSchema = z.object({
+  year: z.number().int(),
+  media: z.string(),
+  label: z.string(),
+  catalognum: z.string(),
+  country: z.string(),
+  albumDisambig: z.string(),
 });
 
 export const candidateSchema = z.object({
@@ -65,6 +100,10 @@ export const candidateSchema = z.object({
   distance: z.number(),
   penalties: z.array(candidatePenaltySchema),
   tracks: z.array(trackMappingSchema),
+  // Additive field-level diff evidence; optional so pre-change reviews still project.
+  extraItems: z.array(unmatchedFileSchema).optional(),
+  missingTracks: z.array(missingTrackSchema).optional(),
+  albumFields: candidateAlbumFieldsSchema.optional(),
 });
 
 export const incumbentSchema = z.object({
@@ -102,6 +141,9 @@ export const reviewSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('match-review'),
     hinted: z.boolean(),
+    // The pinned/hinted release id when one was in play (additive), so a consumer can word the
+    // hint outcome truthfully: contradicted iff it differs from `best.albumId`.
+    hintedReleaseId: z.string().optional(),
     best: candidateRefSchema.optional(),
     candidates: z.array(candidateSchema),
   }),

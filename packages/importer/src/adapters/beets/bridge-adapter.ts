@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import type { z } from 'zod';
-import type { ApplyMode } from '../../domain/import/events.js';
+import type { ApplyMode, ProposedCandidate } from '../../domain/import/events.js';
 import { branded } from '../../domain/shared/brand.js';
 import type { Distance } from '../../domain/shared/distance.js';
 import type { Logger } from '../../application/logging/logger.js';
@@ -21,6 +21,7 @@ import {
   bridgeProposeOutputSchema,
   bridgeValidateOutputSchema,
 } from './schemas.js';
+import type { BridgeCandidate } from './schemas.js';
 
 /**
  * The `TaggerPort` adapter (design D2): spawn the stateless Python bridge, validate its JSON
@@ -63,6 +64,38 @@ function applyArgs(mode: ApplyMode): readonly string[] {
   }
 }
 
+/** Translate one validated bridge candidate to the domain shape (anti-corruption, snake→camel). */
+function candidateToDomain(candidate: BridgeCandidate): ProposedCandidate {
+  const fields = candidate.album_fields;
+  return {
+    ref: { dataSource: candidate.data_source, albumId: candidate.album_id },
+    artist: candidate.artist,
+    album: candidate.album,
+    // The schema's [0, 1] bound is the parse edge; brand the validated numbers as Distance.
+    distance: branded<Distance>(candidate.distance),
+    penalties: candidate.penalties.map((penalty) => ({
+      name: penalty.name,
+      amount: branded<Distance>(penalty.amount),
+    })),
+    // `current`/per-track `distance` and the extra/missing lists carry through as-is (shapes match
+    // the domain interfaces); only the album fields need a key rename (`albumdisambig`).
+    tracks: candidate.tracks,
+    extraItems: candidate.extra_items,
+    missingTracks: candidate.extra_tracks,
+    albumFields:
+      fields === undefined
+        ? undefined
+        : {
+            year: fields.year,
+            media: fields.media,
+            label: fields.label,
+            catalognum: fields.catalognum,
+            country: fields.country,
+            albumDisambig: fields.albumdisambig,
+          },
+  };
+}
+
 export class BeetsBridge implements TaggerPort {
   private readonly script: string;
   private queue: Promise<unknown> = Promise.resolve();
@@ -87,18 +120,7 @@ export class BeetsBridge implements TaggerPort {
       if (output.status === 'doomed') return { kind: 'doomed', reason: output.reason };
       return {
         kind: 'proposal',
-        candidates: output.candidates.map((candidate) => ({
-          ref: { dataSource: candidate.data_source, albumId: candidate.album_id },
-          artist: candidate.artist,
-          album: candidate.album,
-          // The schema's [0, 1] bound is the parse edge; brand the validated numbers as Distance.
-          distance: branded<Distance>(candidate.distance),
-          penalties: candidate.penalties.map((penalty) => ({
-            name: penalty.name,
-            amount: branded<Distance>(penalty.amount),
-          })),
-          tracks: candidate.tracks,
-        })),
+        candidates: output.candidates.map(candidateToDomain),
         duplicates: output.duplicates,
       };
     });

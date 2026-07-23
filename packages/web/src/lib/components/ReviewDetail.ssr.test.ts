@@ -1,5 +1,6 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
+import type { PendingReviewDto } from '@music/importer';
 import ReviewDetail from './ReviewDetail.svelte';
 
 const candidate = {
@@ -11,8 +12,10 @@ const candidate = {
   tracks: [],
 };
 
-function pending(review: unknown) {
-  return { importId: 'imp-1', path: '/intake/x', review } as never;
+// Typed so a wire-contract rename fails these at compile time; the one intentionally-unknown kind
+// passes its own `as never` at the call site (the tolerant-reader forward-compat test).
+function pending(review: PendingReviewDto['review']): PendingReviewDto {
+  return { importId: 'imp-1', path: '/intake/x', review };
 }
 
 describe('ReviewDetail (SSR)', () => {
@@ -37,6 +40,37 @@ describe('ReviewDetail (SSR)', () => {
     });
     expect(body).not.toContain('data-testid="hinted"');
     expect(body).not.toContain('data-testid="action-error"');
+  });
+
+  it('words a contradicted hint honestly when the best candidate is a different release', () => {
+    const { body } = render(ReviewDetail, {
+      props: {
+        pending: pending({
+          kind: 'match-review',
+          hinted: true,
+          hintedReleaseId: 'other',
+          best: candidate.ref,
+          candidates: [candidate],
+        }),
+      },
+    });
+    expect(body).toContain('data-testid="hinted"');
+    expect(body).toContain('was not the best match');
+  });
+
+  it('does not call a weak match on the pinned release a contradiction', () => {
+    const { body } = render(ReviewDetail, {
+      props: {
+        pending: pending({
+          kind: 'match-review',
+          hinted: true,
+          hintedReleaseId: candidate.ref.albumId,
+          best: candidate.ref,
+          candidates: [candidate],
+        }),
+      },
+    });
+    expect(body).toContain('matched your pinned release');
   });
 
   it('renders no-match as an absence, with manual and pinned paths out', () => {
@@ -65,7 +99,7 @@ describe('ReviewDetail (SSR)', () => {
 
   it('renders an unknown review kind through a generic fallback instead of assuming remediation', () => {
     const { body } = render(ReviewDetail, {
-      props: { pending: pending({ kind: 'quarantine-review' }) },
+      props: { pending: pending({ kind: 'quarantine-review' } as never) },
     });
     expect(body).toContain('data-testid="unknown-review"');
     expect(body).not.toContain('data-testid="failures"');

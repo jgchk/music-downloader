@@ -14,10 +14,46 @@ export const bridgePenaltySchema = z.object({
   amount: z.number().min(0).max(1),
 });
 
+/** The staged file's current embedded tags for a mapped track — the before-side of a retag diff. */
+export const bridgeTrackCurrentSchema = z.object({
+  title: z.string(),
+  artist: z.string(),
+  track: z.number().int(),
+  // Optional: an unreadable file duration is omitted rather than recorded as a false 0-second fact.
+  length: z.number().min(0).optional(),
+});
+
 export const bridgeTrackSchema = z.object({
   path: z.string(),
   title: z.string(),
   index: z.number().int(),
+  // Additive: older recorded bridge output omits these, so a tolerant reader still validates it.
+  current: bridgeTrackCurrentSchema.optional(),
+  // Bounded like the other distances so a drifted value is rejected at the parse edge, not rendered.
+  distance: z.number().min(0).max(1).optional(),
+});
+
+/** A downloaded file the candidate placed against no track (the `unmatched_tracks` penalty). */
+export const bridgeExtraItemSchema = z.object({
+  path: z.string(),
+  title: z.string(),
+  track: z.number().int(),
+});
+
+/** A candidate track no downloaded file supplied (the `missing_tracks` penalty). */
+export const bridgeExtraTrackSchema = z.object({
+  title: z.string(),
+  index: z.number().int(),
+});
+
+/** The candidate's album-level fields, for the album-field diff against the files' current tags. */
+export const bridgeAlbumFieldsSchema = z.object({
+  year: z.number().int(),
+  media: z.string(),
+  label: z.string(),
+  catalognum: z.string(),
+  country: z.string(),
+  albumdisambig: z.string(),
 });
 
 export const bridgeCandidateSchema = z.object({
@@ -30,6 +66,10 @@ export const bridgeCandidateSchema = z.object({
   distance: z.number().min(0).max(1),
   penalties: z.array(bridgePenaltySchema),
   tracks: z.array(bridgeTrackSchema),
+  // Additive field-level diff evidence; optional so older recorded bridge output still validates.
+  extra_items: z.array(bridgeExtraItemSchema).optional(),
+  extra_tracks: z.array(bridgeExtraTrackSchema).optional(),
+  album_fields: bridgeAlbumFieldsSchema.optional(),
 });
 
 export const bridgeIncumbentSchema = z.object({
@@ -78,6 +118,7 @@ export const bridgeValidateOutputSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('invalid'), kind: z.string(), reason: z.string() }),
 ]);
 
+export type BridgeCandidate = z.infer<typeof bridgeCandidateSchema>;
 export type BridgeProposeOutput = z.infer<typeof bridgeProposeOutputSchema>;
 export type BridgeApplyOutput = z.infer<typeof bridgeApplyOutputSchema>;
 export type BridgeValidateOutput = z.infer<typeof bridgeValidateOutputSchema>;

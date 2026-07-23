@@ -86,6 +86,46 @@ describe('reviewToDto', () => {
     ).toEqual({ kind: 'duplicate-review', incumbents: [INCUMBENT], candidates: [candidate()] });
   });
 
+  it('carries the pinned/hinted release id and each candidate’s field-level diff evidence', () => {
+    const enriched = candidate({
+      tracks: [
+        {
+          path: `${DIRECTORY}/01 Track.flac`,
+          title: 'Track',
+          index: 1,
+          current: { title: 'Trakk', artist: 'Artist', track: 1, length: 200 },
+          distance: 0.2,
+        },
+      ],
+      extraItems: [{ path: `${DIRECTORY}/99 Extra.flac`, title: 'Extra', track: 9 }],
+      missingTracks: [{ title: 'Absent', index: 2 }],
+      albumFields: {
+        year: 2020,
+        media: 'CD',
+        label: 'Label',
+        catalognum: 'CAT1',
+        country: 'US',
+        albumDisambig: 'deluxe',
+      },
+    });
+    const dto = reviewToDto({
+      cause: {
+        kind: 'match-review',
+        hinted: true,
+        hintedReleaseId: 'mb-release-1',
+        best: enriched.ref,
+      },
+      candidates: [enriched],
+    });
+    expect(dto).toEqual({
+      kind: 'match-review',
+      hinted: true,
+      hintedReleaseId: 'mb-release-1',
+      best: enriched.ref,
+      candidates: [enriched],
+    });
+  });
+
   it('maps a best-less match review, no-match, and remediation', () => {
     expect(reviewToDto({ cause: { kind: 'match-review', hinted: false }, candidates: [] })).toEqual(
       { kind: 'match-review', hinted: false, best: undefined, candidates: [] },

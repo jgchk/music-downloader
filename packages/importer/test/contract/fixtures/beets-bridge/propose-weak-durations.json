@@ -4,10 +4,20 @@
     "candidates": [
       {
         "album": "Love Me Do",
+        "album_fields": {
+          "albumdisambig": "mini CD",
+          "catalognum": "CD3R 4949",
+          "country": "XE",
+          "label": "Parlophone",
+          "media": "8cm CD",
+          "year": 1988
+        },
         "album_id": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f",
         "artist": "The Beatles",
         "data_source": "MusicBrainz",
         "distance": 0.0606060606060606,
+        "extra_items": [],
+        "extra_tracks": [],
         "penalties": [
           {
             "amount": 0.0606060606060606,
@@ -16,13 +26,27 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "The Beatles",
+              "length": 30.066938775510206,
+              "title": "Love Me Do",
+              "track": 1
+            },
+            "distance": 0.3333333333333333,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/weak/01 Love Me Do.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/weak/01 Love Me Do.mp3",
             "title": "Love Me Do"
           },
           {
+            "current": {
+              "artist": "The Beatles",
+              "length": 123.06285714285714,
+              "title": "P.S. I Love You",
+              "track": 2
+            },
+            "distance": 0.0,
             "index": 2,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/weak/02 P.S. I Love You.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/weak/02 P.S. I Love You.mp3",
             "title": "P.S. I Love You"
           }
         ]
@@ -33,7 +57,7 @@
   },
   "provenance": {
     "beets": "2.12.0",
-    "capturedAt": "2026-07-19",
+    "capturedAt": "2026-07-23",
     "recorder": "test/contract/record-bridge-fixtures.sh",
     "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
   },

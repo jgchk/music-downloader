@@ -23,7 +23,10 @@
 {#if supplyId}
   <form method="POST" action="?/resolve" data-testid="supply-id">
     <input type="hidden" name="verb" value="supply-id" />
-    <label>MusicBrainz release ID <input name="mbReleaseId" required /></label>
+    <label>
+      Release ID
+      <input name="mbReleaseId" required placeholder="any source beets can resolve" />
+    </label>
     <button type="submit">Re-propose with this release</button>
   </form>
 {/if}
