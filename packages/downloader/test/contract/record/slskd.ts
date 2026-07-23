@@ -12,7 +12,11 @@ import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.
  *
  * Everything captured is passed through {@link sanitize} before writing: real Soulseek usernames
  * become peerN and the per-peer share-alias prefix (`@@xxxx\`) becomes `@@share\`, leaving only the
- * public music metadata (artist / album / filename). Review the printed summary before committing.
+ * public music metadata (artist / album / filename). The two metadata endpoints are additionally
+ * projected to just their consumed fields — {@link projectOptions} drops the Soulseek credentials and
+ * the rest of slskd's config; {@link projectEvents} trims each event's JSON-encoded `data` (which
+ * sanitize cannot reach into) to `localFilename` + `transfer.id`. Review the printed summary before
+ * committing.
  */
 
 const BASE_URL = process.env.SLSKD_BASE_URL;
@@ -24,6 +28,9 @@ const SEARCH_TEXT = 'Pink Floyd Dark Side of the Moon';
 const PEER_CAP = 5;
 // One page of the newest-first events log — enough to capture a recent DownloadFileComplete.
 const EVENTS_LIMIT = 100;
+// How many DownloadFileComplete events to keep in the fixture — a handful pins the decode/re-root
+// contract without bloating the committed file.
+const EVENTS_KEPT = 3;
 
 if (BASE_URL === undefined || API_KEY === undefined) {
   throw new Error('SLSKD_BASE_URL and SLSKD_API_KEY must be set');
@@ -58,6 +65,49 @@ function sanitize(value: unknown): unknown {
   }
   if (typeof value === 'string') return value.replace(/^@@[^\\]+\\/, '@@share\\');
   return value;
+}
+
+/**
+ * Keep only the one consumed subtree — `directories` — so the Soulseek account credentials, listen
+ * ports, blacklist, integrations, and the rest of slskd's effective config never reach the committed
+ * (public-repo) fixture. Only `directories.downloads` is actually read by the adapter.
+ */
+function projectOptions(body: unknown): unknown {
+  const dirs = (body as { directories?: { incomplete?: string; downloads?: string } }).directories;
+  return { directories: { incomplete: dirs?.incomplete, downloads: dirs?.downloads } };
+}
+
+/**
+ * Keep only `DownloadFileComplete` events, each trimmed to the fields the staged-path resolver
+ * consumes — `localFilename` + `transfer.id` — dropping the peer `username`, the `remoteFilename`
+ * share token, and the rest of the transfer object. The event `data` is a JSON-encoded string, so
+ * {@link sanitize} cannot reach inside it; this projection is what keeps third-party PII out of the
+ * committed fixture. The event id is normalized to a non-identifying `evt-<prefix>`.
+ *
+ * Note the coupling: events.json is not independently re-recordable. The staged-path resolver matches
+ * a `DownloadFileComplete` to the polled transfer by `transfer.id`, so a re-record must capture the
+ * events log AFTER the enqueued transfer from this same session has completed (its completion event
+ * present), or the transfers contract test can't resolve a staged path. Refresh the whole coupled set
+ * (search → transfer → events) together, not events alone.
+ */
+function projectEvents(body: unknown): unknown {
+  const events = Array.isArray(body) ? body : [];
+  const kept: unknown[] = [];
+  for (const raw of events) {
+    const event = raw as { timestamp?: string; type?: string; data?: string };
+    if (event.type !== 'DownloadFileComplete' || typeof event.data !== 'string') continue;
+    const data = JSON.parse(event.data) as { localFilename?: string; transfer?: { id?: string } };
+    const id = data.transfer?.id;
+    if (data.localFilename === undefined || id === undefined) continue;
+    kept.push({
+      timestamp: event.timestamp,
+      type: event.type,
+      id: `evt-${id.slice(0, 8)}`,
+      data: JSON.stringify({ localFilename: data.localFilename, transfer: { id } }),
+    });
+    if (kept.length >= EVENTS_KEPT) break;
+  }
+  return kept;
 }
 
 async function call(
@@ -176,13 +226,14 @@ async function main(): Promise<void> {
   );
 
   // The effective configuration: only directories.downloads (the downloads root) is consumed, used
-  // to re-root slskd's container-side localFilename onto our shared staging volume.
+  // to re-root slskd's container-side localFilename onto our shared staging volume. Projected to just
+  // `directories` so the Soulseek credentials and the rest of the config never reach the fixture.
   const options = await call('GET', '/api/v0/options');
   write(
     'options.json',
     fixture(
       { method: 'GET', path: '/api/v0/options' },
-      options,
+      { status: options.status, body: projectOptions(options.body) },
       'GET /api/v0/options — only directories.downloads is consumed (the downloads root)',
     ),
   );
@@ -190,12 +241,9 @@ async function main(): Promise<void> {
   // The newest-first, paged activity log with its real offset/limit query. Each record's `data` is a
   // JSON-encoded string; a `DownloadFileComplete` carries the authoritative localFilename + transfer
   // id the staged-path resolver decodes. A completion only appears once a download has finished, so
-  // run this recorder against an instance that has completed at least one download for full coverage.
-  // NOTE: the committed events.json/options.json fixtures predate this recorder capture (they were
-  // hand-maintained), so their `request` blocks lack the `query` recorded here. Re-record both against
-  // a live slskd instance on the next slskd pin bump to make the recorder byte-faithful to them; the
-  // decode/request-shape tests are unaffected in the meantime (the fixture server captures the real
-  // outbound request, not the fixture file).
+  // run against an instance that has completed the enqueued transfer above. `projectEvents` trims each
+  // event to the consumed fields (a JSON string sanitize cannot reach into), keeping peer PII out —
+  // and see its note on the events↔transfers-poll coupling before re-recording.
   const events = await call('GET', `/api/v0/events?offset=0&limit=${EVENTS_LIMIT}`);
   write(
     'events.json',
@@ -205,7 +253,7 @@ async function main(): Promise<void> {
         path: '/api/v0/events',
         query: { offset: '0', limit: String(EVENTS_LIMIT) },
       },
-      events,
+      { status: events.status, body: projectEvents(events.body) },
       'GET /api/v0/events — newest-first paged log; DownloadFileComplete.data is a JSON-encoded string',
     ),
   );
