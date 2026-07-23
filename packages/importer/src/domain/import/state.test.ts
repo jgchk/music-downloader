@@ -5,6 +5,7 @@ import {
   DELIVERED_CANDIDATE,
   DIRECTORY,
   FAILURE,
+  INCUMBENT,
   MANUAL_TAGS,
   MATCH_REVIEW,
   POLICY,
@@ -20,6 +21,7 @@ import {
   resolved,
 } from './__fixtures__/import-fixtures.js';
 import { asDistance } from '../shared/__fixtures__/distance.js';
+import { toAcquisitionId } from '../shared/acquisition-id.js';
 import type { ImportEvent } from './events.js';
 import { candidateRefKey } from './events.js';
 import { evolve, foldEvents, initialState, isTerminal } from './state.js';
@@ -92,7 +94,7 @@ describe('evolve — the tolerant, total fold', () => {
       requested(),
       proposed([candidate()]),
       AUTO_APPLIED,
-      { type: 'ReviewRequired', cause: { kind: 'duplicate-review', incumbents: [] } },
+      { type: 'ReviewRequired', cause: { kind: 'duplicate-review', incumbents: [INCUMBENT] } },
     ]);
     expect(state).toMatchObject({ phase: 'awaiting-review', cause: { kind: 'duplicate-review' } });
   });
@@ -265,7 +267,7 @@ describe('evolve — the tolerant, total fold', () => {
   it('ignores ReleaseVerdictRecorded — a record-only fact — in any phase', () => {
     const verdict: ImportEvent = {
       type: 'ReleaseVerdictRecorded',
-      acquisitionId: 'acq-1',
+      acquisitionId: toAcquisitionId('acq-1'),
       candidate: DELIVERED_CANDIDATE,
       reasons: ['corrupt rip'],
     };

@@ -1,4 +1,7 @@
+import type { AcquisitionId } from '../shared/acquisition-id.js';
 import type { Distance } from '../shared/distance.js';
+import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
+import type { PositiveInt } from '../shared/positive-int.js';
 
 /**
  * Domain events — the facts that make up an import's history (event-sourcing). They narrate the
@@ -37,7 +40,7 @@ export interface DeliveredCandidate {
  * cannot emit a release verdict.
  */
 export interface ImportSource {
-  readonly acquisitionId: string;
+  readonly acquisitionId: AcquisitionId;
   readonly candidate?: DeliveredCandidate;
 }
 
@@ -159,9 +162,9 @@ export type ReviewCause =
   | { readonly kind: 'no-match' }
   | {
       readonly kind: 'duplicate-review';
-      readonly incumbents: readonly DuplicateIncumbent[];
+      readonly incumbents: NonEmptyReadonlyArray<DuplicateIncumbent>;
     }
-  | { readonly kind: 'remediation-review'; readonly failures: readonly ApplyFailure[] };
+  | { readonly kind: 'remediation-review'; readonly failures: NonEmptyReadonlyArray<ApplyFailure> };
 
 export type ReviewKind = ReviewCause['kind'];
 
@@ -170,8 +173,8 @@ export interface ManualTrackTags {
   readonly path: string;
   readonly title: string;
   readonly artist?: string;
-  readonly trackNumber: number;
-  readonly discNumber?: number;
+  readonly trackNumber: PositiveInt;
+  readonly discNumber?: PositiveInt;
 }
 
 /** A full manual tag payload with an explicit track mapping. */
@@ -179,7 +182,7 @@ export interface ManualTags {
   readonly albumArtist: string;
   readonly album: string;
   readonly year?: number;
-  readonly tracks: readonly ManualTrackTags[];
+  readonly tracks: NonEmptyReadonlyArray<ManualTrackTags>;
 }
 
 /** How to settle a duplicate: replace the incumbent, or keep both. */
@@ -231,7 +234,7 @@ export type ImportEvent =
   | { readonly type: 'ReviewRequired'; readonly cause: ReviewCause }
   | { readonly type: 'ReviewResolved'; readonly resolution: Resolution }
   | { readonly type: 'ImportApplied'; readonly location: string }
-  | { readonly type: 'RemediationRequired'; readonly failures: readonly ApplyFailure[] }
+  | { readonly type: 'RemediationRequired'; readonly failures: NonEmptyReadonlyArray<ApplyFailure> }
   | { readonly type: 'ImportRejected'; readonly reason: string; readonly filesDeleted: boolean }
   | {
       /**
@@ -240,7 +243,7 @@ export type ImportEvent =
        * decision as the rejection's `ReviewResolved`; drives no effect and no state change.
        */
       readonly type: 'ReleaseVerdictRecorded';
-      readonly acquisitionId: string;
+      readonly acquisitionId: AcquisitionId;
       readonly candidate: DeliveredCandidate;
       readonly reasons: readonly string[];
     };

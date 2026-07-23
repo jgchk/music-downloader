@@ -1,4 +1,6 @@
 import type { MatchPolicy } from '../policy/policies.js';
+import { clampUnit } from '../shared/unit.js';
+import type { Unit } from '../shared/unit.js';
 
 /**
  * The composable validation verdict (D5). Validators each produce an outcome; the pipeline
@@ -13,13 +15,13 @@ export type ValidationReason =
   | 'QualityNotAuthentic'; // transcode tier — seam only
 
 export interface ValidationVerdict {
-  readonly confidence: number;
+  readonly confidence: Unit;
   readonly reasons: readonly ValidationReason[];
 }
 
 export interface ValidatorOutcome {
   readonly name: string;
-  readonly score: number; // this validator's confidence in [0, 1]
+  readonly score: Unit; // this validator's confidence in [0, 1]
   readonly reason?: ValidationReason; // present when the validator objects
 }
 
@@ -30,8 +32,8 @@ export interface ValidatorOutcome {
  * vouch for anything, so it yields zero confidence.
  */
 export function combineVerdict(outcomes: readonly ValidatorOutcome[]): ValidationVerdict {
-  if (outcomes.length === 0) return { confidence: 0, reasons: [] };
-  const confidence = Math.min(...outcomes.map((outcome) => outcome.score));
+  if (outcomes.length === 0) return { confidence: clampUnit(0), reasons: [] };
+  const confidence = clampUnit(Math.min(...outcomes.map((outcome) => outcome.score)));
   const reasons = outcomes.flatMap((outcome) =>
     outcome.reason !== undefined ? [outcome.reason] : [],
   );

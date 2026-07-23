@@ -9,6 +9,7 @@ import {
   resolveQualityBucket,
 } from '../policy/quality-policy.js';
 import type { QualityAttributes, QualityBucket, QualityPolicy } from '../policy/quality-policy.js';
+import type { Unit } from '../shared/unit.js';
 import type { Target } from '../target/target.js';
 
 /**
@@ -17,7 +18,7 @@ import type { Target } from '../target/target.js';
  */
 export interface RankedCandidate {
   readonly candidate: Candidate;
-  readonly matchConfidence: number;
+  readonly matchConfidence: Unit;
   readonly qualityBucket: QualityBucket;
 }
 

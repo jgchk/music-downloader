@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AcquisitionEvent } from './events.js';
 import { evolve, foldEvents } from './state.js';
 import { asMbid } from '../shared/__fixtures__/mbid.js';
+import { asUnit } from '../shared/__fixtures__/unit.js';
 import type { AcquisitionPhase, AcquisitionState } from './state.js';
 import {
   awaitingSelectionHistory,
@@ -61,8 +62,16 @@ const allEvents: AcquisitionEvent[] = [
   { type: 'DownloadCompleted', candidate: a.identity, files: [] },
   { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
   { type: 'CandidateRejected', candidate: a.identity },
-  { type: 'ValidationPassed', candidate: a.identity, verdict: { confidence: 1, reasons: [] } },
-  { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
+  {
+    type: 'ValidationPassed',
+    candidate: a.identity,
+    verdict: { confidence: asUnit(1), reasons: [] },
+  },
+  {
+    type: 'ValidationFailed',
+    candidate: a.identity,
+    verdict: { confidence: asUnit(0), reasons: [] },
+  },
   { type: 'Imported', candidate: a.identity, location: '/x' },
   { type: 'AcquisitionFulfilled', location: '/x' },
   { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
@@ -125,7 +134,11 @@ describe('evolve — cleanup events carry inert staged files (D3, additive/optio
   it('folds a rejection identically whether or not it carries staged files', () => {
     const base: AcquisitionEvent[] = [
       ...validatingHistory([a, b]),
-      { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
+      {
+        type: 'ValidationFailed',
+        candidate: a.identity,
+        verdict: { confidence: asUnit(0), reasons: [] },
+      },
     ];
     const withFiles = foldEvents([
       ...base,

@@ -3,6 +3,8 @@ import { err, ok } from 'neverthrow';
 import type { ImportCommand } from './commands.js';
 import { candidateRefKey } from './events.js';
 import type { DuplicateIncumbent, ImportEvent, ProposedCandidate, Resolution } from './events.js';
+import { isNonEmpty } from '../shared/non-empty-array.js';
+import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
 import { isTerminal } from './state.js';
 import type { AppliedState, AwaitingReviewState, ImportState } from './state.js';
 
@@ -24,7 +26,7 @@ type Decision = Result<readonly ImportEvent[], DomainError>;
 const NOTHING: Decision = ok([]);
 
 /** The lowest-distance candidate — beets' ordering, re-derived so `decide` never trusts input order. */
-function bestOf(candidates: readonly ProposedCandidate[]): ProposedCandidate {
+function bestOf(candidates: NonEmptyReadonlyArray<ProposedCandidate>): ProposedCandidate {
   return candidates.reduce((best, next) => (next.distance < best.distance ? next : best));
 }
 
@@ -36,7 +38,7 @@ function decideProposal(
 ): Decision {
   if (state.phase !== 'requested' && state.phase !== 'proposing') return NOTHING; // stale outcome
   const proposed: ImportEvent = { type: 'CandidatesProposed', candidates, duplicates, pinnedId };
-  if (candidates.length === 0) {
+  if (!isNonEmpty(candidates)) {
     return ok([proposed, { type: 'ReviewRequired', cause: { kind: 'no-match' } }]);
   }
   const best = bestOf(candidates);
@@ -61,7 +63,7 @@ function decideProposal(
       },
     ]);
   }
-  if (duplicates.length > 0) {
+  if (isNonEmpty(duplicates)) {
     // Strong match, but the library already has it: never auto-replace in this change (D5).
     return ok([
       proposed,
@@ -158,14 +160,14 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
       const retrying = state.phase === 'applied' && state.remediation?.status === 'retrying';
       if (state.phase !== 'applying' && !retrying) return NOTHING; // stale outcome
       const applied: ImportEvent = { type: 'ImportApplied', location: command.location };
-      return command.failures.length === 0
-        ? ok([applied])
-        : ok([applied, { type: 'RemediationRequired', failures: command.failures }]);
+      return isNonEmpty(command.failures)
+        ? ok([applied, { type: 'RemediationRequired', failures: command.failures }])
+        : ok([applied]);
     }
     case 'RecordApplySkippedDuplicate':
       // Beets refused to import over an incumbent it only saw at apply time: route to review.
       if (state.phase !== 'applying') return NOTHING;
-      if (command.incumbents.length === 0) {
+      if (!isNonEmpty(command.incumbents)) {
         // A skipped-duplicate with no incumbent is contradictory: there is nothing to compare in a
         // duplicate review, and the import must not strand in `applying`. Doom it (terminal, files
         // untouched) so the deposited directory can be investigated and resubmitted.

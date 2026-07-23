@@ -6,6 +6,10 @@ import type {
   ImportSource,
   Resolution,
 } from '../../domain/import/events.js';
+import { toImportId } from '../../domain/shared/import-id.js';
+import type { ImportId } from '../../domain/shared/import-id.js';
+import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import type { AcquisitionId } from '../../domain/shared/acquisition-id.js';
 import type {
   ImportStatusProjection,
   ImportStatusView,
@@ -32,9 +36,9 @@ function normalizeDirectory(directory: string): string {
 }
 
 /** The deterministic stream id for a directory: stable, URL-safe, collision-resistant. */
-export function importIdFor(directory: string): string {
+export function importIdFor(directory: string): ImportId {
   const digest = createHash('sha256').update(normalizeDirectory(directory)).digest('hex');
-  return `imp-${digest.slice(0, 24)}`;
+  return toImportId(`imp-${digest.slice(0, 24)}`);
 }
 
 export interface SubmitImportInput {
@@ -47,7 +51,7 @@ export interface SubmitImportInput {
 export function submitImport(
   deps: UseCaseDeps,
   input: SubmitImportInput,
-): ResultAsync<{ readonly importId: string }, CommandError> {
+): ResultAsync<{ readonly importId: ImportId }, CommandError> {
   const directory = normalizeDirectory(input.directory);
   const importId = importIdFor(directory);
   return applyCommand(deps, importId, {
@@ -62,20 +66,20 @@ export function submitImport(
 /** The import an acquisition already submitted, if any — the intake consumer's convergence check. */
 export function findAcquisitionImport(
   deps: UseCaseDeps,
-  acquisitionId: string,
-): string | undefined {
+  acquisitionId: AcquisitionId,
+): ImportId | undefined {
   return deps.status.importIdForAcquisition(acquisitionId);
 }
 
 export function resolveReview(
   deps: UseCaseDeps,
-  importId: string,
+  importId: ImportId,
   resolution: Resolution,
 ): ResultAsync<void, CommandError> {
   return applyCommand(deps, importId, { type: 'ResolveReview', resolution }).map(() => undefined);
 }
 
-export function getImport(deps: UseCaseDeps, importId: string): ImportStatusView | undefined {
+export function getImport(deps: UseCaseDeps, importId: ImportId): ImportStatusView | undefined {
   return deps.status.get(importId);
 }
 
@@ -88,7 +92,7 @@ export function getImportForAcquisition(
   deps: UseCaseDeps,
   acquisitionId: string,
 ): ImportStatusView | undefined {
-  const importId = deps.status.importIdForAcquisition(acquisitionId);
+  const importId = deps.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
   return importId === undefined ? undefined : deps.status.get(importId);
 }
 

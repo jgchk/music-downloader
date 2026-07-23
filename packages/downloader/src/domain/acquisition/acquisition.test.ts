@@ -5,6 +5,7 @@ import type { AcquisitionCommand } from './commands.js';
 import type { AcquisitionEvent, AcquisitionRequest } from './events.js';
 import { createRetryPolicy } from '../policy/policies.js';
 import { asMbid } from '../shared/__fixtures__/mbid.js';
+import { asUnit } from '../shared/__fixtures__/unit.js';
 import {
   awaitingSelectionHistory,
   defaultPolicies,
@@ -69,7 +70,11 @@ const rejectedThenSelecting: AcquisitionEvent[] = [
 ];
 const validationFailedThenSelecting: AcquisitionEvent[] = [
   ...validatingHistory([a, matchingCandidate('b')]),
-  { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
+  {
+    type: 'ValidationFailed',
+    candidate: a.identity,
+    verdict: { confidence: asUnit(0), reasons: [] },
+  },
   { type: 'CandidateRejected', candidate: a.identity },
 ];
 
@@ -185,7 +190,10 @@ describe('Acquisition.execute — happy path', () => {
     expect(
       types(
         Acquisition.fromHistory(validatingHistory([a]))
-          .execute({ type: 'RecordValidationPassed', verdict: { confidence: 1, reasons: [] } })
+          .execute({
+            type: 'RecordValidationPassed',
+            verdict: { confidence: asUnit(1), reasons: [] },
+          })
           ._unsafeUnwrap(),
       ),
     ).toEqual(['ValidationPassed']);
@@ -225,7 +233,7 @@ describe('Acquisition.execute — retry loop', () => {
     )
       .execute({
         type: 'RecordValidationFailed',
-        verdict: { confidence: 0, reasons: ['DurationMismatch'] },
+        verdict: { confidence: asUnit(0), reasons: ['DurationMismatch'] },
       })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['ValidationFailed', 'CandidateRejected', 'CandidateSelected']);
@@ -410,7 +418,11 @@ describe('Acquisition.execute — an external validation failure revives fulfilm
       { type: 'CandidateRejected', candidate: a.identity, files: [] },
       { type: 'CandidateSelected', candidate: b },
       { type: 'DownloadCompleted', candidate: b.identity, files: sampleFiles },
-      { type: 'ValidationPassed', candidate: b.identity, verdict: { confidence: 1, reasons: [] } },
+      {
+        type: 'ValidationPassed',
+        candidate: b.identity,
+        verdict: { confidence: asUnit(1), reasons: [] },
+      },
       { type: 'Imported', candidate: b.identity, location: '/library/x' },
       { type: 'AcquisitionFulfilled', location: '/library/x', candidate: b.identity },
     ]);
@@ -442,8 +454,8 @@ describe('Acquisition.execute — cancellation and guards', () => {
     { type: 'RecordSearchResults', candidates: [] },
     { type: 'RecordDownloadCompleted', files: [] },
     { type: 'RecordDownloadFailed', reason: 'Stalled' },
-    { type: 'RecordValidationPassed', verdict: { confidence: 1, reasons: [] } },
-    { type: 'RecordValidationFailed', verdict: { confidence: 0, reasons: [] } },
+    { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
+    { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
     { type: 'RecordImportConflict', location: '/x' },
     { type: 'CancelAcquisition' },
@@ -458,8 +470,8 @@ describe('Acquisition.execute — cancellation and guards', () => {
     { type: 'RecordSearchResults', candidates: [] },
     { type: 'RecordDownloadCompleted', files: [] },
     { type: 'RecordDownloadFailed', reason: 'Stalled' },
-    { type: 'RecordValidationPassed', verdict: { confidence: 1, reasons: [] } },
-    { type: 'RecordValidationFailed', verdict: { confidence: 0, reasons: [] } },
+    { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
+    { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
     { type: 'RecordImportConflict', location: '/x' },
   ];
@@ -518,7 +530,7 @@ describe('Acquisition.execute — cleanup events carry the staged files (D3)', (
 
   it('stamps the validating candidate’s staged files onto its rejection', () => {
     const events = Acquisition.fromHistory(validatingHistory([a, matchingCandidate('b')]))
-      .execute({ type: 'RecordValidationFailed', verdict: { confidence: 0, reasons: [] } })
+      .execute({ type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
   });
@@ -637,7 +649,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     const effects = Acquisition.fromHistory(importingHistory([a])).reactTo({
       type: 'ValidationPassed',
       candidate: a.identity,
-      verdict: { confidence: 1, reasons: [] },
+      verdict: { confidence: asUnit(1), reasons: [] },
     });
     expect(effectTypes(effects)).toEqual(['Import']);
   });
@@ -647,7 +659,11 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     { type: 'SearchCompleted', round: 1, candidates: [] },
     { type: 'CandidatesRanked', ranked: [] },
     { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
-    { type: 'ValidationFailed', candidate: a.identity, verdict: { confidence: 0, reasons: [] } },
+    {
+      type: 'ValidationFailed',
+      candidate: a.identity,
+      verdict: { confidence: asUnit(0), reasons: [] },
+    },
     { type: 'AcquisitionFulfilled', location: '/x' },
     // A revival needs no effect of its own: the co-emitted CandidateRejected drives cleanup, and
     // CandidateSelected/SearchRequested drive the revival's work.
@@ -775,7 +791,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
       empty.reactTo({
         type: 'ValidationPassed',
         candidate: a.identity,
-        verdict: { confidence: 1, reasons: [] },
+        verdict: { confidence: asUnit(1), reasons: [] },
       }),
     ).toEqual([]);
     expect(empty.reactTo({ type: 'ImportConflicted', location: '/x' })).toEqual([]);

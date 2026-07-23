@@ -1,6 +1,8 @@
 import type { Candidate, CandidateFile } from '../candidate/candidate.js';
 import type { Target } from '../target/target.js';
 import { alignmentScore } from '../shared/duration.js';
+import { clampUnit } from '../shared/unit.js';
+import type { Unit } from '../shared/unit.js';
 import { containmentScore, normalizeText, tokenize } from './text.js';
 
 /**
@@ -11,9 +13,10 @@ import { containmentScore, normalizeText, tokenize } from './text.js';
  */
 export interface MatchSignal {
   readonly name: string;
-  readonly weight: number;
+  /** The signal's relative pull on the weighted mean, in [0, 1] (mint via `clampUnit`/`parseUnit`). */
+  readonly weight: Unit;
   /** A score in [0, 1], or `null` when the signal cannot be evaluated for this candidate. */
-  readonly score: (target: Target, candidate: Candidate) => number | null;
+  readonly score: (target: Target, candidate: Candidate) => Unit | null;
 }
 
 const AUDIO_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -62,11 +65,11 @@ export function candidateText(candidate: Candidate): string {
   return normalizeText(`${basename(candidate.identity.path)} ${names}`);
 }
 
-const TRACK_COUNT_WEIGHT = 0.35;
-const DURATION_WEIGHT = 0.35;
-const TITLE_WEIGHT = 0.15;
-const ARTIST_WEIGHT = 0.1;
-const YEAR_WEIGHT = 0.05;
+const TRACK_COUNT_WEIGHT = clampUnit(0.35);
+const DURATION_WEIGHT = clampUnit(0.35);
+const TITLE_WEIGHT = clampUnit(0.15);
+const ARTIST_WEIGHT = clampUnit(0.1);
+const YEAR_WEIGHT = clampUnit(0.05);
 
 export const trackCountSignal: MatchSignal = {
   name: 'trackCount',
@@ -74,7 +77,7 @@ export const trackCountSignal: MatchSignal = {
   score: (target, candidate) => {
     const actual = audioFiles(candidate).length;
     const expected = target.tracks.length;
-    return Math.max(0, 1 - Math.abs(actual - expected) / expected);
+    return clampUnit(Math.max(0, 1 - Math.abs(actual - expected) / expected));
   },
 };
 
@@ -86,9 +89,11 @@ export const durationSignal: MatchSignal = {
       .map((file) => file.durationMs)
       .filter((duration): duration is number => duration !== undefined);
     if (durations.length === 0) return null;
-    return alignmentScore(
-      target.tracks.map((track) => track.durationMs),
-      durations,
+    return clampUnit(
+      alignmentScore(
+        target.tracks.map((track) => track.durationMs),
+        durations,
+      ),
     );
   },
 };
@@ -97,14 +102,14 @@ export const titleSignal: MatchSignal = {
   name: 'title',
   weight: TITLE_WEIGHT,
   score: (target, candidate) =>
-    containmentScore(tokenize(target.title), tokenize(candidateText(candidate))),
+    clampUnit(containmentScore(tokenize(target.title), tokenize(candidateText(candidate)))),
 };
 
 export const artistSignal: MatchSignal = {
   name: 'artist',
   weight: ARTIST_WEIGHT,
   score: (target, candidate) =>
-    containmentScore(tokenize(target.artist), tokenize(candidateText(candidate))),
+    clampUnit(containmentScore(tokenize(target.artist), tokenize(candidateText(candidate)))),
 };
 
 export const yearSignal: MatchSignal = {
@@ -112,7 +117,7 @@ export const yearSignal: MatchSignal = {
   weight: YEAR_WEIGHT,
   score: (target, candidate) => {
     if (target.year === undefined) return null;
-    return candidateText(candidate).includes(String(target.year)) ? 1 : 0;
+    return clampUnit(candidateText(candidate).includes(String(target.year)) ? 1 : 0);
   },
 };
 
@@ -129,7 +134,7 @@ export function scoreMatch(
   target: Target,
   candidate: Candidate,
   signals: readonly MatchSignal[] = DEFAULT_MATCH_SIGNALS,
-): number {
+): Unit {
   let weighted = 0;
   let totalWeight = 0;
   for (const signal of signals) {
@@ -138,5 +143,5 @@ export function scoreMatch(
     weighted += score * signal.weight;
     totalWeight += signal.weight;
   }
-  return totalWeight === 0 ? 0 : weighted / totalWeight;
+  return clampUnit(totalWeight === 0 ? 0 : weighted / totalWeight);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { importIdFor, submitImport } from '../application/import/use-cases.js';
+import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
@@ -165,7 +166,10 @@ describe('createImporterFacade', () => {
   describe('getImportForAcquisition', () => {
     it('returns the view for the acquisition that submitted it, carrying the acquisition id', async () => {
       const wiring = testWiring();
-      await submitImport(wiring.deps, { directory: INTAKE, source: { acquisitionId: 'acq-9' } });
+      await submitImport(wiring.deps, {
+        directory: INTAKE,
+        source: { acquisitionId: toAcquisitionId('acq-9') },
+      });
       wiring.sync();
 
       const result = wiring.facade.getImportForAcquisition({ acquisitionId: 'acq-9' });
