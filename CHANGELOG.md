@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.6.0](https://github.com/jgchk/music-downloader/compare/v3.5.4...v3.6.0) (2026-07-23)
+
+### Features
+
+* **web:** master-detail acquisitions view + panel/title-bar chrome ([26f683a](https://github.com/jgchk/music-downloader/commit/26f683aa1cad74eae92fa36959a0d2f7d6190f0d))
+* **web:** swappable-skin theming — semantic shell, token layer, 3 skins, switcher ([cfb2ce1](https://github.com/jgchk/music-downloader/commit/cfb2ce1b4cc42eb28c811c0ae9ab3d09d2f0cb27))
+
+### Bug Fixes
+
+* **web:** address review — guard list read, wire active nav, dedupe skin list ([368497b](https://github.com/jgchk/music-downloader/commit/368497b0dff0ab8d637494640ce4d2002e9c61de))
 ## [3.5.4](https://github.com/jgchk/music-downloader/compare/v3.5.3...v3.5.4) (2026-07-23)
 
 ### Bug Fixes
