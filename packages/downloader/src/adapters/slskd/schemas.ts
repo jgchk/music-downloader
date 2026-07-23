@@ -9,10 +9,17 @@ import { z } from 'zod';
  * compile-time view of the payloads cannot diverge.
  */
 
-/** `POST /api/v0/searches` and `GET /api/v0/searches/{id}`. */
+/**
+ * `POST /api/v0/searches` and `GET /api/v0/searches/{id}`. `state`/`responseCount` describe the
+ * search's own bookkeeping: slskd counts responses as they arrive but persists them only at
+ * finalization, so the harvest is trusted only when `isComplete` and consistent with
+ * `responseCount` (harvest integrity).
+ */
 export const slskdSearchStateSchema = z.object({
   id: z.string().optional(),
   isComplete: z.boolean().optional(),
+  state: z.string().optional(),
+  responseCount: z.number().optional(),
 });
 
 const slskdSearchFileSchema = z.object({

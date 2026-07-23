@@ -10,15 +10,23 @@ import {
 
 describe('slskd contract schemas', () => {
   it('accepts a search state and tolerates a bare create response', () => {
-    expect(slskdSearchStateSchema.parse({ id: 's1', isComplete: true })).toEqual({
-      id: 's1',
-      isComplete: true,
-    });
+    expect(
+      slskdSearchStateSchema.parse({
+        id: 's1',
+        isComplete: true,
+        state: 'Completed, TimedOut',
+        responseCount: 180,
+      }),
+    ).toEqual({ id: 's1', isComplete: true, state: 'Completed, TimedOut', responseCount: 180 });
     expect(slskdSearchStateSchema.parse({})).toEqual({});
   });
 
   it('rejects a search state whose isComplete is not a boolean', () => {
     expect(slskdSearchStateSchema.safeParse({ isComplete: 'yes' }).success).toBe(false);
+  });
+
+  it('rejects a search state whose responseCount is not a number', () => {
+    expect(slskdSearchStateSchema.safeParse({ responseCount: 'many' }).success).toBe(false);
   });
 
   it('accepts search responses with all consumed file attributes, stripping unknown fields', () => {

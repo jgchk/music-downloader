@@ -13,24 +13,29 @@ import { SlskdClient } from './client.js';
 import type { SlskdConfig } from './client.js';
 import { mapSearchResponses } from './mapping.js';
 import { slskdSearchResponsesSchema, slskdSearchStateSchema } from './schemas.js';
+import type { SlskdSearchState } from './schemas.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
 
 /**
- * The slskd `SearchPort` adapter (D11). A search is created, polled until slskd reports it complete
- * or a timeout elapses, and its responses are grouped into source-agnostic candidates at the
- * target's granularity. An empty result is a valid `Ok` (a business fact, not an infra fault); only
- * transport faults, unexpected HTTP statuses, or contract-violating bodies surface as an
- * `InfraError` (D2 — responses are validated against the contract schema before mapping).
+ * The slskd `SearchPort` adapter (D11). A search is created, polled until slskd confirms it
+ * complete, and its responses are grouped into source-agnostic candidates at the target's
+ * granularity. Only a *confirmed-complete, self-consistent* harvest is trusted: slskd persists
+ * responses at finalization, so a search still in progress at the deadline — or a harvest that
+ * contradicts the search's own `responseCount` — is a truncated read and surfaces as a retryable
+ * `InfraError`, never as an empty result (harvest integrity). An empty harvest from a
+ * confirmed-complete search remains a valid `Ok` business fact. The deadline sits well above
+ * slskd's own default search duration (~15s), so the fault path is the exception.
  *
- * The search is recorded in the ownership ledger and deleted from slskd once harvested — on both the
- * completed and timed-out exits (a timed-out search would otherwise keep running server-side). Ledger
- * bookkeeping and the delete are best-effort: a failure is logged, never fails a working search, and
- * a still-live ledger row is retired by the startup sweep (D: source-resource stewardship).
+ * The search is recorded in the ownership ledger and deleted from slskd once harvested. A faulted
+ * search is deliberately *not* deleted mid-flight (that corrupts slskd's running search task); its
+ * live ledger row leaves the finished search to the startup sweep (D: source-resource
+ * stewardship). Ledger bookkeeping and the delete are best-effort: a failure is logged and never
+ * fails a working search.
  */
 
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
-const DEFAULT_SEARCH_TIMEOUT_MS = 15_000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 60_000;
 const SLSKD_SOURCE = 'slskd';
 
 export class SlskdSearch implements SearchPort {
@@ -78,10 +83,29 @@ export class SlskdSearch implements SearchPort {
       acquisitionId,
     };
     await this.bestEffort(this.ledger.recordCreated({ ...key, resourceId: id }), 'record search');
-    await this.awaitCompletion(id);
+    const state = await this.awaitCompletion(id);
+    if (state.isComplete !== true) {
+      this.logger.warn(
+        { id, round, state: state.state, responseCount: state.responseCount },
+        'slskd search still incomplete at deadline; faulting and leaving it for the sweep',
+      );
+      throw new Error(
+        `slskd search ${id} incomplete after ${String(this.searchTimeoutMs)}ms ` +
+          `(state=${state.state ?? 'unknown'}, responseCount=${String(state.responseCount ?? 'unknown')})`,
+      );
+    }
     const responses = slskdSearchResponsesSchema.parse(
       await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}/responses`),
     );
+    if ((state.responseCount ?? 0) > 0 && responses.length === 0) {
+      this.logger.warn(
+        { id, round, responseCount: state.responseCount },
+        'slskd harvest contradicts the search state; faulting and leaving it for the sweep',
+      );
+      throw new Error(
+        `slskd search ${id} reported ${String(state.responseCount)} responses but the harvest returned none`,
+      );
+    }
     const candidates = mapSearchResponses(responses, target.type);
     await this.deleteSearch(id, key);
     this.logger.debug({ round, candidateCount: candidates.length }, 'slskd search complete');
@@ -105,14 +129,15 @@ export class SlskdSearch implements SearchPort {
     if (result.isErr()) this.logger.warn({ err: result.error }, `ledger: ${what} failed`);
   }
 
-  private async awaitCompletion(id: string): Promise<void> {
+  /** Poll until slskd confirms completion or the deadline passes; returns the last observed state. */
+  private async awaitCompletion(id: string): Promise<SlskdSearchState> {
     const deadline = this.timer.now() + this.searchTimeoutMs;
     for (;;) {
       const state = slskdSearchStateSchema.parse(
         await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}`),
       );
-      if (state.isComplete === true) return;
-      if (this.timer.now() >= deadline) return;
+      if (state.isComplete === true) return state;
+      if (this.timer.now() >= deadline) return state;
       await this.timer.sleep(this.pollIntervalMs);
     }
   }

@@ -9,12 +9,12 @@
 
 ## 2. Adapter: completion-gated harvest and fault paths
 
-- [ ] 2.1 Add `responseCount` (optional) to `slskdSearchStateSchema` with schema unit tests
-- [ ] 2.2 Red: `SlskdSearch` test — deadline elapses while the search state is still incomplete → `InfraError` (kind `slskd.search`), carrying last observed state; no responses fetched, no delete issued
-- [ ] 2.3 Red: `SlskdSearch` test — completed search whose state reports `responseCount > 0` but whose responses harvest is empty → `InfraError`; no delete issued
-- [ ] 2.4 Red: `SlskdSearch` tests — completed search with `responseCount: 0` or absent `responseCount` and an empty harvest → `Ok([])`; completed search with responses → candidates mapped and search deleted, ledger row marked removed
-- [ ] 2.5 Green: rework `awaitCompletion`/`doSearch` — poll until `isComplete`, fault on deadline, self-consistency guard, delete only on the harvest path; raise `DEFAULT_SEARCH_TIMEOUT_MS` to 60_000
-- [ ] 2.6 Ledger behavior test: a faulted search leaves its ledger row live (recorded, never marked removed) so the startup sweep retires it; warn-level log carries the observed state
+- [x] 2.1 Add `responseCount` (optional) to `slskdSearchStateSchema` with schema unit tests
+- [x] 2.2 Red: `SlskdSearch` test — deadline elapses while the search state is still incomplete → `InfraError` (kind `slskd.search`), carrying last observed state; no responses fetched, no delete issued
+- [x] 2.3 Red: `SlskdSearch` test — completed search whose state reports `responseCount > 0` but whose responses harvest is empty → `InfraError`; no delete issued
+- [x] 2.4 Red: `SlskdSearch` tests — completed search with `responseCount: 0` or absent `responseCount` and an empty harvest → `Ok([])`; completed search with responses → candidates mapped and search deleted, ledger row marked removed
+- [x] 2.5 Green: rework `awaitCompletion`/`doSearch` — poll until `isComplete`, fault on deadline, self-consistency guard, delete only on the harvest path; raise `DEFAULT_SEARCH_TIMEOUT_MS` to 60_000
+- [x] 2.6 Ledger behavior test: a faulted search leaves its ledger row live (recorded, never marked removed) so the startup sweep retires it; warn-level log carries the observed state
 
 ## 3. Contract tier: witness the newly-consumed field
 
