@@ -125,18 +125,73 @@ describe('SlskdSearch', () => {
     expect(result._unsafeUnwrap()).toHaveLength(1);
   });
 
-  it('stops polling on timeout, still harvesting and deleting the still-running search', async () => {
+  it('faults when the deadline elapses with the search still in progress', async () => {
     const { adapter, ledger, requests } = searcher(
-      { state: () => json({ isComplete: false }), responses: json([]) },
+      { state: () => json({ isComplete: false, state: 'InProgress', responseCount: 180 }) },
       0,
     );
 
     const result = await adapter.search(ACQ, albumTarget, 1);
 
+    // An unconfirmed search is a truncated read, not an empty result: slskd persists responses
+    // only at finalization, so harvesting now would report "nothing exists" for a running search.
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
+    expect(error.message).toContain('incomplete');
+    // No harvest, no mid-flight delete (deleting a running search corrupts slskd's search task);
+    // the live ledger row leaves the search to the startup sweep.
+    expect(requests.some((r) => r.url.endsWith('/responses'))).toBe(false);
+    expect(deletedSearchIds(requests)).toEqual([]);
+    expect(ledger.created).toHaveLength(1);
+    expect(ledger.removed).toEqual([]);
+  });
+
+  it('reports unknown state details when the incomplete search omits them', async () => {
+    const result = await searcher({ state: () => json({ isComplete: false }) }, 0).adapter.search(
+      ACQ,
+      albumTarget,
+      1,
+    );
+
+    expect(result._unsafeUnwrapErr().message).toContain('state=unknown, responseCount=unknown');
+  });
+
+  it('faults when the harvest contradicts the search state', async () => {
+    const { adapter, ledger, requests } = searcher({
+      state: () => json({ isComplete: true, responseCount: 3 }),
+      responses: json([]),
+    });
+
+    const result = await adapter.search(ACQ, albumTarget, 1);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.search',
+    });
+    expect(deletedSearchIds(requests)).toEqual([]);
+    expect(ledger.removed).toEqual([]);
+  });
+
+  it('accepts a confirmed-complete search that genuinely found nothing', async () => {
+    const { adapter, requests } = searcher({
+      state: () => json({ isComplete: true, responseCount: 0 }),
+      responses: json([]),
+    });
+
+    const result = await adapter.search(ACQ, albumTarget, 1);
+
     expect(result._unsafeUnwrap()).toEqual([]);
-    // A timed-out search is still deleted (it would otherwise keep running server-side).
     expect(deletedSearchIds(requests)).toEqual(['s1']);
-    expect(ledger.removed).toHaveLength(1);
+  });
+
+  it('harvests a completed search whose state omits the response count', async () => {
+    // Tolerant reader: an absent responseCount cannot contradict the harvest.
+    const result = await searcher({
+      state: () => json({ isComplete: true }),
+      responses: json(albumResponses),
+    }).adapter.search(ACQ, albumTarget, 1);
+
+    expect(result._unsafeUnwrap()).toHaveLength(1);
   });
 
   it('tolerates a create response without a search id', async () => {
