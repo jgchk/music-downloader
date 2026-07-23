@@ -45,7 +45,7 @@ const conflictedHistory: AcquisitionEvent[] = [
   ...importingHistory([a]),
   { type: 'ImportConflicted', location: '/library/x' },
 ];
-// Cancelled mid-download: the folded Cancelled state retains `a` as `pending` (abort-then-settle).
+// Cancelled mid-download: the folded Cancelled state retains `a` as `in-flight` staging (abort-then-settle).
 const cancelledHistory: AcquisitionEvent[] = [
   ...selectedHistory([a]),
   { type: 'AcquisitionCancelled' },
@@ -708,7 +708,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
   });
 
   it('emits no effect when cancelling with no candidate in flight', () => {
-    // Cancelled from Searching: neither a settled `current` nor a mid-download `pending` is kept.
+    // Cancelled from Searching: staging is `none` — neither a settled nor a mid-download candidate is kept.
     expect(
       Acquisition.fromHistory(cancelledNoPending).reactTo({ type: 'AcquisitionCancelled' }),
     ).toEqual([]);

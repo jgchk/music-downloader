@@ -59,7 +59,7 @@ export function submitImport(
   }).map(() => ({ importId }));
 }
 
-/** The import an acquisition already submitted, if any — the webhook receiver's convergence check. */
+/** The import an acquisition already submitted, if any — the intake consumer's convergence check. */
 export function findAcquisitionImport(
   deps: UseCaseDeps,
   acquisitionId: string,

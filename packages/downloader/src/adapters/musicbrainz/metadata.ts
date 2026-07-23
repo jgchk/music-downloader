@@ -96,6 +96,7 @@ export class MusicBrainzMetadata implements MetadataPort {
     const json = await this.getJson(
       `${this.baseUrl}/release/${encodeURIComponent(mbid)}?inc=recordings+artist-credits&fmt=json`,
       mbReleaseSchema,
+      true, // by-id: a 400 is an invalid mbid — a permanent business "no match"
     );
     if (json === undefined) return UNRESOLVED;
     const target = releaseToTarget(json);
@@ -106,6 +107,7 @@ export class MusicBrainzMetadata implements MetadataPort {
     const json = await this.getJson(
       `${this.baseUrl}/recording/${encodeURIComponent(mbid)}?inc=artist-credits&fmt=json`,
       mbRecordingSchema,
+      true, // by-id: a 400 is an invalid mbid — a permanent business "no match"
     );
     if (json === undefined) return UNRESOLVED;
     const target = recordingToTarget(json);
@@ -114,7 +116,8 @@ export class MusicBrainzMetadata implements MetadataPort {
 
   private async resolveReleaseByReleaseGroup(mbid: string): Promise<MetadataResolution> {
     const url = `${this.baseUrl}/release?release-group=${encodeURIComponent(mbid)}&inc=media&fmt=json&limit=${RELEASE_SEARCH_LIMIT}`;
-    const json = await this.getJson(url, mbReleaseGroupBrowseSchema);
+    // Browsing by release-group mbid: a 400 is an invalid mbid — a permanent business "no match".
+    const json = await this.getJson(url, mbReleaseGroupBrowseSchema, true);
     const officialIds = releaseGroupCandidateIds(json?.releases);
     for (const id of officialIds) {
       const resolution = await this.resolveReleaseById(id);
@@ -142,7 +145,9 @@ export class MusicBrainzMetadata implements MetadataPort {
   ): Promise<MetadataResolution> {
     const query = `release:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
     const url = this.searchUrl('release', query, RELEASE_SEARCH_LIMIT);
-    const json = await this.getJson(url, mbReleaseSearchSchema);
+    // Search: a 400 means MusicBrainz rejected the Lucene query we built — an adapter defect that
+    // must surface as an InfraError, not be swallowed as unresolved.
+    const json = await this.getJson(url, mbReleaseSearchSchema, false);
     for (const id of releaseCandidateIds(json?.releases, title)) {
       const resolution = await this.resolveReleaseById(id);
       if (resolution.kind === 'resolved') return resolution;
@@ -156,7 +161,9 @@ export class MusicBrainzMetadata implements MetadataPort {
   ): Promise<MetadataResolution> {
     const query = `recording:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
     const url = this.searchUrl('recording', query, this.searchLimit);
-    const json = await this.getJson(url, mbRecordingSearchSchema);
+    // Search: a 400 means MusicBrainz rejected the Lucene query we built — an adapter defect that
+    // must surface as an InfraError, not be swallowed as unresolved.
+    const json = await this.getJson(url, mbRecordingSearchSchema, false);
     const id = bestMatchId(json?.recordings);
     return id === undefined ? UNRESOLVED : this.resolveRecordingById(id);
   }
@@ -167,21 +174,28 @@ export class MusicBrainzMetadata implements MetadataPort {
 
   /**
    * GET and validate the body against the endpoint's contract schema; `undefined` for 404 (not
-   * found) and 400 (invalid identifier), both of which map to the business outcome *unresolved*;
-   * throw for other non-2xx. MusicBrainz answers a malformed/invalid mbid with `400 {"error":
-   * "Invalid mbid."}` — a *permanent* condition that never succeeds on retry, so it must NOT become
-   * an `InfraError` (which the reactor retries forever, wedging resolution); it is logged and
-   * treated as unresolved. A body that violates the contract makes `schema.parse` throw, which the
-   * `resolve` wrapper maps to an `InfraError` — provider drift surfaces as an attributable boundary
-   * fault, never as malformed data reaching the mapping (D2).
+   * found); throw for other non-2xx. A 400 is *unresolved* only when `treat400AsUnresolved` — the
+   * identifier-lookup call sites, where MusicBrainz answers a malformed/invalid mbid with `400
+   * {"error": "Invalid mbid."}`, a *permanent* condition that never succeeds on retry, so it must
+   * NOT become an `InfraError` (which the reactor retries forever, wedging resolution). On a
+   * *search* URL a 400 instead means MusicBrainz rejected a Lucene query WE built — an adapter
+   * defect, not "no result" — so it falls through to the `throw` and surfaces as an attributable
+   * `InfraError` rather than being silently swallowed as unresolved. A body that violates the
+   * contract makes `schema.parse` throw, which the `resolve` wrapper maps to an `InfraError` —
+   * provider drift surfaces as an attributable boundary fault, never as malformed data reaching the
+   * mapping (D2).
    */
-  private async getJson<T>(url: string, schema: ZodType<T>): Promise<T | undefined> {
+  private async getJson<T>(
+    url: string,
+    schema: ZodType<T>,
+    treat400AsUnresolved: boolean,
+  ): Promise<T | undefined> {
     const response = await this.http.send({
       url,
       headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
     });
     if (response.status === 404) return undefined;
-    if (response.status === 400) {
+    if (response.status === 400 && treat400AsUnresolved) {
       this.logger.warn({ url }, 'musicbrainz rejected the request (400); treating as unresolved');
       return undefined;
     }

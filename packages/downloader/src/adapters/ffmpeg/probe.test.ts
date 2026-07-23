@@ -121,6 +121,24 @@ describe('FfmpegAudioProbe', () => {
     expect(result.bitrate).toBeUndefined();
   });
 
+  it('degrades to no audio metadata when ffprobe exits 0 with non-JSON output', async () => {
+    // A successful exit with garbage stdout is a deterministic bad-file business outcome, not a
+    // retryable infra fault — an unguarded JSON.parse would throw and be retried forever.
+    const garbage = { code: 0, stdout: 'not json at all', stderr: '' };
+
+    const result = (await probeWith(runner(garbage, OK)).probe('/x.flac'))._unsafeUnwrap();
+
+    expect(result).toEqual({
+      decodedCleanly: false,
+      codec: '',
+      durationMs: 0,
+      sampleRate: undefined,
+      bitDepth: undefined,
+      bitrate: undefined,
+      channels: undefined,
+    });
+  });
+
   it('surfaces a failure to spawn the binaries as an InfraError', async () => {
     const missing: CommandRunner = {
       run: () =>

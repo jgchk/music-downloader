@@ -99,11 +99,25 @@ export class CatchUpSubscription {
     this.cursor = checkpoint.unwrapOr(0);
     await this.poll();
     this.stopWakeups = this.deps.wakeups?.subscribe(() => {
-      void this.poll();
+      this.schedulePoll();
     });
     this.stopInterval = (this.deps.interval ?? defaultInterval)(() => {
-      void this.poll();
+      this.schedulePoll();
     }, this.deps.pollIntervalMs);
+  }
+
+  /**
+   * Fire-and-forget a poll from a wakeup or the fallback timer. `poll` handles modeled failures as
+   * values; an actual throw (a defect in the feed or handler) is a bug, caught and logged here so a
+   * lone bad cycle can never surface as an unhandled process rejection from a durable subscription.
+   */
+  private schedulePoll(): void {
+    void this.poll().catch((err: unknown) => {
+      this.deps.logger.error(
+        { subscription: this.deps.name, err },
+        'seam subscription poll failed unexpectedly',
+      );
+    });
   }
 
   stop(): void {

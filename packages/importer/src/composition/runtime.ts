@@ -93,16 +93,25 @@ export interface ImporterRuntime {
   stop(): Promise<void>;
 }
 
-export type ImporterStartupError = {
-  readonly kind: 'BeetsConfigUnusable';
-  readonly detail: string;
-};
+export type ImporterStartupError =
+  | { readonly kind: 'BeetsConfigUnusable'; readonly detail: string }
+  | { readonly kind: 'ProjectionRebuildFailed'; readonly detail: string };
+
+/** True only for the "the directory is not there (yet)" errnos — everything else is a real fault. */
+function isDirectoryAbsent(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
 
 async function realDirectoryExists(directory: string): Promise<boolean> {
   try {
     return (await stat(directory)).isDirectory();
-  } catch {
-    return false;
+  } catch (error) {
+    // Only "not there (yet)" is a plain `false` — the directory the delivered files will land in.
+    // Any other errno (EACCES / EIO / ELOOP …) is a genuine infra fault, not a missing directory:
+    // rethrow it so the consumer classifies it distinctly instead of looping forever as if absent.
+    if (isDirectoryAbsent(error)) return false;
+    throw error;
   }
 }
 
@@ -139,11 +148,16 @@ export async function createImporterRuntime(
 
   const status = new ImportStatusProjection();
   const backlog = await store.readAll(0);
-  if (backlog.isOk()) {
-    status.rebuild(backlog.value);
-  } else {
-    logger.error({ err: backlog.error }, 'projection rebuild failed');
+  if (backlog.isErr()) {
+    // A projection rebuilt from a partial read boots half-blind: the durable acquisition-idempotency
+    // index is incomplete (redelivered fulfillments re-import already-imported releases) and every
+    // query returns nothing while readiness still says `up`. Fail the boot loudly, exactly as an
+    // unusable beets config does — never boot on a projection we could not fully rebuild.
+    logger.error({ err: backlog.error }, 'projection rebuild failed; refusing to boot');
+    db.close();
+    return err({ kind: 'ProjectionRebuildFailed', detail: backlog.error.message });
   }
+  status.rebuild(backlog.value);
   bus.subscribe((stored) => {
     status.apply(stored);
   });
@@ -155,6 +169,8 @@ export async function createImporterRuntime(
     store,
     checkpoints,
     bus,
+    deadLetters,
+    clock,
     logger,
     interpret: (importId, effect) => interpretEffect(interpreter, importId, effect),
   });
@@ -208,6 +224,10 @@ export async function createImporterRuntime(
     },
     stop() {
       reactor.stop();
+      // Stop the inbound acquisition subscription before closing the DB: its fallback poll would
+      // otherwise keep firing `feed.read`/`store.readAll` against a closed handle (error loop that
+      // also keeps the event loop alive).
+      acquisitions?.stop();
       db.close();
       return Promise.resolve();
     },

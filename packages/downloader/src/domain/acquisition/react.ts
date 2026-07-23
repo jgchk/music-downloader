@@ -97,13 +97,14 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
       // The downloaded release will never be imported (the location is occupied) — discard staging.
       return state.phase === 'Conflicted' ? [{ type: 'Cleanup', files: event.files ?? [] }] : [];
     case 'AcquisitionCancelled':
-      // A settled transfer (folded to `current`) is discarded straight away, from the files carried
-      // on the event (D3). A mid-download transfer (folded to `pending`) is aborted at the source
+      // A settled transfer (staging `settled`) is discarded straight away, from the files carried
+      // on the event (D3). A mid-download transfer (staging `in-flight`) is aborted at the source
       // first; its staging is cleaned up later, when the resulting settlement rejects the candidate.
-      // Once `pending` is cleared by that rejection, a re-reacted cancellation emits nothing.
+      // Once that rejection clears the staging to `none`, a re-reacted cancellation emits nothing.
       if (state.phase !== 'Cancelled') return [];
-      if (state.current !== undefined) return [{ type: 'Cleanup', files: event.files ?? [] }];
-      if (state.pending !== undefined) return [{ type: 'AbortDownload', candidate: state.pending }];
+      if (state.staging.kind === 'settled') return [{ type: 'Cleanup', files: event.files ?? [] }];
+      if (state.staging.kind === 'in-flight')
+        return [{ type: 'AbortDownload', candidate: state.staging.pending }];
       return [];
     case 'MetadataResolutionFailed':
     // The pause itself: an acquisition awaiting a human's edition choice does nothing — no search,

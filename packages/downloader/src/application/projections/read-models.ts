@@ -214,7 +214,11 @@ export class LibraryViewProjection {
     if (event.type === 'TargetResolved') {
       this.targets.set(stored.streamId, { artist: event.target.artist, title: event.target.title });
     } else if (event.type === 'Imported') {
-      const target = this.targets.get(stored.streamId)!;
+      // An import is only ever emitted after its target resolved, so the lookup holds in practice;
+      // guard it anyway rather than assert, so a future ordering change degrades to a skipped entry
+      // instead of a crash.
+      const target = this.targets.get(stored.streamId);
+      if (target === undefined) return;
       this.entries.push({
         acquisitionId: stored.streamId,
         artist: target.artist,

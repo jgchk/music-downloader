@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * The consumer-owned tolerant reader for music-downloader's webhook events (design D1). These
+ * The consumer-owned tolerant reader for music-downloader's outbound seam events (design D1). These
  * schemas read ONLY what the importer uses and ignore unknown fields at every level (zod objects
  * strip unrecognized keys), so the sender can evolve its payload additively without breaking this
  * receiver. Nothing here is imported from the sender's codebase — conformance against its frozen

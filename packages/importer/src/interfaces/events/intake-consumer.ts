@@ -53,7 +53,15 @@ export function intakeEventConsumer(
       return err({ kind: 'Permanent' as const, reason: rerooted.error });
     }
     const directory = rerooted.value;
-    if (!(await options.directoryExists(directory))) {
+    let visible: boolean;
+    try {
+      visible = await options.directoryExists(directory);
+    } catch {
+      // The probe itself faulted (EACCES/EIO/…) rather than reporting "absent": a genuine infra
+      // fault, held and redelivered under a distinct reason instead of masquerading as missing.
+      return err({ kind: 'Transient' as const, reason: 'IntakeProbeFailed' });
+    }
+    if (!visible) {
       // Not visible (yet): transient, so the subscription holds and redelivers — a silent
       // acknowledgement here would drop the release on the floor.
       return err({ kind: 'Transient' as const, reason: 'IntakeDirectoryMissing' });

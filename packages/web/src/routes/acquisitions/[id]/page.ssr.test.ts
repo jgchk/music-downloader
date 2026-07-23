@@ -16,6 +16,7 @@ describe('acquisition detail page (SSR)', () => {
             history: [],
           },
           progress: undefined,
+          progressUnavailable: false,
         },
         params: { id: 'acq-1' },
         form: { message: 'The record changed while you were working - reload and try again.' },

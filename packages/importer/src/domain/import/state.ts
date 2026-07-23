@@ -53,12 +53,22 @@ export interface ProposingState extends Requested {
   readonly pinnedId?: string;
   readonly candidates: readonly ProposedCandidate[];
 }
+/**
+ * The only resolutions that leave the review `awaiting-review` with work still owed: both reject
+ * verbs settle the review but hold the phase until `ImportRejected` records the intake deletion.
+ * Every other verb transitions the import away, so `settled` can only ever hold one of these two.
+ */
+export type PendingRejection = Extract<
+  Resolution,
+  { kind: 'reject' } | { kind: 'reject-and-retry-download' }
+>;
+
 export interface AwaitingReviewState extends Requested {
   readonly phase: 'awaiting-review';
   readonly cause: ReviewCause;
   readonly candidates: readonly ProposedCandidate[];
-  /** Set once a resolution is recorded; further resolutions are tolerated no-ops. */
-  readonly settled?: Resolution;
+  /** Set once a rejection is recorded; the deletion is still owed. Further resolutions are no-ops. */
+  readonly settled?: PendingRejection;
 }
 export interface ApplyingState extends Requested {
   readonly phase: 'applying';
@@ -102,49 +112,49 @@ function requestedOf(state: Exclude<ImportState, EmptyState>): Requested {
   };
 }
 
-/** The apply mode a resolution implies, or undefined for the verbs that do not apply. */
-function modeOfResolution(resolution: Resolution): ApplyMode | undefined {
+/**
+ * Fold a review resolution into the next phase. An exhaustive `switch` over the resolution verb
+ * (with a total, non-optional return): a new verb is a compile error here — `noImplicitReturns`
+ * refuses the silent fall-through that would otherwise strand the import in `awaiting-review`.
+ */
+function evolveResolved(state: AwaitingReviewState, resolution: Resolution): ImportState {
+  const applying = (mode: ApplyMode): ImportState => ({
+    phase: 'applying',
+    ...requestedOf(state),
+    mode,
+    candidates: state.candidates,
+  });
   switch (resolution.kind) {
     case 'apply-candidate':
-      return {
+      return applying({
         kind: 'candidate',
         ref: resolution.ref,
         duplicateAction: resolution.duplicateAction,
-      };
+      });
     case 'import-as-is':
-      return { kind: 'as-is' };
+      return applying({ kind: 'as-is' });
     case 'manual-tags':
-      return { kind: 'manual-tags', tags: resolution.tags };
+      return applying({ kind: 'manual-tags', tags: resolution.tags });
     case 'supply-id':
+      return {
+        phase: 'proposing',
+        ...requestedOf(state),
+        pinnedId: resolution.mbReleaseId,
+        candidates: state.candidates,
+      };
     case 'refresh-candidates':
+      return { phase: 'proposing', ...requestedOf(state), candidates: state.candidates };
     case 'reject':
     case 'reject-and-retry-download':
+      // The review is settled; the intake deletion is still owed, so the phase holds until
+      // `ImportRejected` records the outcome.
+      return { ...state, settled: resolution };
     case 'accept':
     case 'retry-enrichment':
-      return undefined;
+      // Never reached: `decide` refuses these outside an open remediation. Fold to a defensive
+      // no-op rather than an illegal `settled`.
+      return state;
   }
-}
-
-function evolveResolved(state: AwaitingReviewState, resolution: Resolution): ImportState {
-  const mode = modeOfResolution(resolution);
-  if (mode !== undefined) {
-    return { phase: 'applying', ...requestedOf(state), mode, candidates: state.candidates };
-  }
-  if (resolution.kind === 'supply-id') {
-    return {
-      phase: 'proposing',
-      ...requestedOf(state),
-      pinnedId: resolution.mbReleaseId,
-      candidates: state.candidates,
-    };
-  }
-  if (resolution.kind === 'refresh-candidates') {
-    return { phase: 'proposing', ...requestedOf(state), candidates: state.candidates };
-  }
-  // Reject / reject-and-retry-download: the review is settled; the intake deletion is still owed,
-  // so the phase holds until `ImportRejected` records the outcome. (`accept`/`retry-enrichment`
-  // never reach here — `decide` refuses them outside an open remediation.)
-  return { ...state, settled: resolution };
 }
 
 export function evolve(state: ImportState, event: ImportEvent): ImportState {

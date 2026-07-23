@@ -47,7 +47,7 @@
   </ul>
   <CandidateTable candidates={review.candidates} withDuplicateAction />
   <ResolveForms reject rejectAndRetry />
-{:else}
+{:else if review.kind === 'remediation-review'}
   <h2>The import applied, but enrichment failed</h2>
   <ul data-testid="failures">
     {#each review.failures as failure (failure.stage)}
@@ -55,6 +55,10 @@
     {/each}
   </ul>
   <ResolveForms accept retryEnrichment />
+{:else}
+  <!-- Tolerant reader: a review kind the importer adds later lands here rather than mislabeling as
+       remediation-review and dereferencing a `failures` field it may not carry. -->
+  <p data-testid="unknown-review">This review needs attention, but its type is unrecognized.</p>
 {/if}
 
 <p><a href="/reviews">Back to reviews</a></p>

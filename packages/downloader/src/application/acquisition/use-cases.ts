@@ -72,7 +72,8 @@ export interface ExternalValidationFailureInput {
 /**
  * Record an external validation failure against an acquisition. `decide` is the single guard: a
  * matching verdict on a revivable fulfilment revives the retry ladder; anything stale, mismatched,
- * or redelivered converges to a no-op — never an error — so webhook redelivery is safe end-to-end.
+ * or redelivered converges to a no-op — never an error — so redelivery over the verdict catch-up
+ * subscription is safe end-to-end.
  */
 export function recordExternalValidationFailure(
   deps: CommandDeps,

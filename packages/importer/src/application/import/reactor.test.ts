@@ -10,6 +10,7 @@ import type { ImportEvent } from '../../domain/import/events.js';
 import { infraError } from '../ports/errors.js';
 import {
   FakeCheckpointStore,
+  FakeDeadLetterStore,
   FakeEventBus,
   FakeEventStore,
   fixedClock,
@@ -24,11 +25,13 @@ import type { EffectInterpreter } from './reactor.js';
 let store: FakeEventStore;
 let checkpoints: FakeCheckpointStore;
 let bus: FakeEventBus;
+let deadLetters: FakeDeadLetterStore;
 
 beforeEach(() => {
   store = new FakeEventStore();
   checkpoints = new FakeCheckpointStore();
   bus = new FakeEventBus();
+  deadLetters = new FakeDeadLetterStore();
   store.bus = bus;
 });
 
@@ -39,16 +42,22 @@ function realInterpret(ports: EffectPorts): EffectInterpreter {
 
 function reactor(
   interpret: EffectInterpreter,
-  overrides: { interval?: (fn: () => void, ms: number) => () => void } = {},
+  overrides: {
+    interval?: (fn: () => void, ms: number) => () => void;
+    retryBudget?: number;
+  } = {},
 ): Reactor {
   return new Reactor({
     store,
     checkpoints,
     bus,
+    deadLetters,
+    clock: fixedClock(),
     logger: silentLogger(),
     interpret,
     // Tests drive drains explicitly; the default real interval is covered by its own test below.
     interval: overrides.interval ?? (() => () => {}),
+    retryBudget: overrides.retryBudget,
   });
 }
 
@@ -251,7 +260,15 @@ describe('Reactor', () => {
     vi.useFakeTimers();
     try {
       const interpret = vi.fn(() => okAsync([]));
-      const r = new Reactor({ store, checkpoints, bus, logger: silentLogger(), interpret });
+      const r = new Reactor({
+        store,
+        checkpoints,
+        bus,
+        deadLetters,
+        clock: fixedClock(),
+        logger: silentLogger(),
+        interpret,
+      });
       await r.start();
 
       await seed([requested()]); // appended with the bus detached: only the poll can find it
@@ -308,5 +325,86 @@ describe('Reactor', () => {
     // Propose fires once (for ImportRequested); the record-only events just advance the checkpoint.
     expect(interpret).toHaveBeenCalledTimes(1);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(3);
+  });
+
+  it('holds the position for redelivery when the durable checkpoint save fails', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() => okAsync([]));
+    checkpoints.failSaves = true;
+    const r = reactor(interpret);
+    await r.start();
+
+    // The effect fired but its checkpoint write failed: the position is NOT advanced in memory, so
+    // the event redelivers instead of being silently dropped.
+    expect(interpret).toHaveBeenCalledTimes(1);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+
+    checkpoints.failSaves = false;
+    await r.drain();
+    expect(interpret).toHaveBeenCalledTimes(2); // held event re-dispatched on the next drain
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('dead-letters an effect that exhausts its retry budget and advances past it', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'beets always fails')));
+    const r = reactor(interpret, { retryBudget: 2 });
+
+    await r.start(); // attempt 1 (< budget): held, nothing dead-lettered
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+    expect(deadLetters.letters).toHaveLength(0);
+
+    await r.drain(); // attempt 2 hits the budget: dead-lettered and advanced past
+    expect(deadLetters.letters).toHaveLength(1);
+    const [letter] = deadLetters.letters;
+    expect(letter).toMatchObject({ subscription: REACTOR_CONSUMER, globalSeq: 1 });
+    expect(letter?.error).toContain('bridge.propose');
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // the queue is not wedged behind the poison
+  });
+
+  it('dead-letters a concurrency conflict that exhausts its budget, rendering its detail', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() =>
+      errAsync({ kind: 'ConcurrencyConflict' as const, streamId: 'imp-1', expectedVersion: 0 }),
+    );
+    const r = reactor(interpret, { retryBudget: 1 });
+
+    await r.start();
+
+    expect(deadLetters.letters).toHaveLength(1);
+    expect(deadLetters.letters[0]?.error).toContain('ConcurrencyConflict');
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('holds the checkpoint when the exhausted effect cannot even be dead-lettered', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'beets always fails')));
+    deadLetters.failRecord = true;
+    const r = reactor(interpret, { retryBudget: 1 });
+
+    await r.start(); // budget of 1: the first failure tries to dead-letter, which itself fails
+    expect(deadLetters.letters).toHaveLength(0);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+  });
+
+  it('reacts against the stream prefix as of the event, not a whole-stream fold', async () => {
+    const ref = candidate().ref;
+    await seed([
+      requested(),
+      { type: 'CandidatesProposed', candidates: [candidate({ distance: 0.01 })], duplicates: [] },
+      { type: 'AutoApplySelected', ref, distance: 0.01 },
+      { type: 'ImportApplied', location: '/library/Artist/Album' },
+    ]);
+    const interpret = vi.fn(() => okAsync([]));
+    const autoApply = store.all().find((entry) => entry.type === 'AutoApplySelected')!;
+
+    await reactor(interpret).process(autoApply);
+
+    // Folded over the prefix up to and including AutoApplySelected the phase is `applying`, so Apply
+    // fires exactly once; a whole-stream fold would see the trailing ImportApplied (`applied`) and
+    // never react. The checkpoint advances precisely to that event.
+    expect(interpret).toHaveBeenCalledTimes(1);
+    expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Apply' }));
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(autoApply.globalSeq);
   });
 });

@@ -74,8 +74,6 @@ export function enqueueRejectionReason(body: string): DownloadFailureReason {
 
 export interface TransferAggregate {
   readonly progress: DownloadProgress;
-  /** Every transfer has reached a terminal state (there is at least one transfer). */
-  readonly settled: boolean;
   /** Every transfer succeeded. */
   readonly succeeded: boolean;
   /** Every transfer is still queued (nothing has started). */
@@ -103,7 +101,6 @@ export function aggregate(transfers: readonly SlskdTransfer[]): TransferAggregat
       bytesTotal,
       queuePosition,
     },
-    settled: statuses.length > 0 && statuses.every((s) => s === 'succeeded' || s === 'failed'),
     succeeded: statuses.length > 0 && statuses.every((s) => s === 'succeeded'),
     allQueued: statuses.length > 0 && statuses.every((s) => s === 'queued'),
     hasFailure: failed !== undefined,

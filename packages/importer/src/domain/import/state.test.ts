@@ -156,9 +156,13 @@ describe('evolve — the tolerant, total fold', () => {
       });
     });
 
-    it('tolerates a remediation verb folded into a match review as a settlement', () => {
+    it('tolerates a remediation verb folded into a match review as a no-op (never a settlement)', () => {
+      // `decide` refuses accept/retry-enrichment outside an open remediation, so this pairing is
+      // only reachable by a corrupt/externally-edited history: the fold degrades to the unchanged
+      // review rather than storing an illegal `settled` (only the two reject verbs can settle).
       const state = foldEvents([...awaitingMatchReview(), resolved({ kind: 'accept' })]);
-      expect(state).toMatchObject({ phase: 'awaiting-review', settled: { kind: 'accept' } });
+      expect(state).toMatchObject({ phase: 'awaiting-review' });
+      expect((state as { settled?: unknown }).settled).toBeUndefined();
     });
 
     it('ignores a resolution once the review is settled', () => {

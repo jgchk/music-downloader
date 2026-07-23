@@ -11,15 +11,24 @@ export const load: PageServerLoad = ({ locals, params }) => {
   const status = locals.facades.downloader.getAcquisition({ id: params.id });
   if (!status.ok) error(statusOf(status.error), messageOf(status.error));
 
-  const progress =
-    status.value.status === 'Downloading'
-      ? locals.facades.downloader.getAcquisitionProgress({ id: params.id })
-      : undefined;
+  if (status.value.status !== 'Downloading') {
+    return { acquisition: status.value, progress: undefined, progressUnavailable: false };
+  }
 
-  return {
-    acquisition: status.value,
-    progress: progress?.ok === true ? progress.value : undefined,
-  };
+  const progress = locals.facades.downloader.getAcquisitionProgress({ id: params.id });
+  if (!progress.ok) {
+    // Don't collapse a failed progress read to the same `undefined` as "not downloading": while
+    // Downloading the reachable error is a cross-projection inconsistency (the "pending forever"
+    // family), not a just-started download. Log it with the id, and tell the view the bar is
+    // unavailable so it can say so instead of rendering an indistinguishable blank.
+    locals.logger.warn(
+      { acquisitionId: params.id, err: progress.error },
+      'progress unavailable for a downloading acquisition',
+    );
+    return { acquisition: status.value, progress: undefined, progressUnavailable: true };
+  }
+
+  return { acquisition: status.value, progress: progress.value, progressUnavailable: false };
 };
 
 export const actions: Actions = {

@@ -10,7 +10,7 @@ import type { StoredEvent } from './event-store-port.js';
  * this port and the dependency rule holds.
  */
 
-/** A rendered outbound event; the payload deliberately keeps the Standard Webhooks `{type, timestamp, data}` shape. */
+/** A rendered outbound event on the pull feed; the payload keeps a self-contained `{type, timestamp, data}` envelope. */
 export interface PublishedEvent {
   readonly type: string; // e.g. 'release.verdict'; a breaking change is a NEW type, never a mutation
   readonly timestamp: string; // ISO-8601 — when the domain event occurred (stable across redeliveries)

@@ -2,6 +2,7 @@ import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import { createLogger } from '../logging/logger.js';
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
   CatchUpSubscriptionDeps,
@@ -348,6 +349,42 @@ describe('CatchUpSubscription', () => {
 
     expect(wakeListeners).toHaveLength(0);
     expect(intervals[0]!.stopped).toBe(true);
+  });
+
+  it('catches and logs an unexpected throw from a fire-and-forget poll, surviving the cycle', async () => {
+    // A defective feed/handler that THROWS (rather than returning a modeled failure) is a bug; a
+    // wakeup- or timer-driven poll must not let it escape as an unhandled process rejection from a
+    // subscription that "must survive crashes". It is caught at the boundary, logged, and the loop
+    // lives on to deliver on the next healthy cycle.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    let boom = false;
+    const throwingFeed = {
+      read: (from: number, limit: number) => {
+        if (boom) throw new Error('feed adapter bug');
+        return feed.read(from, limit);
+      },
+    };
+    const sub = subscription({ feed: throwingFeed, logger });
+    await sub.start(); // the initial (awaited) poll drains cleanly
+
+    boom = true;
+    wakeListeners.forEach((listener) => {
+      listener(); // fires `void this.poll()` under the hood — the throw must be contained
+    });
+    await vi.waitFor(() => {
+      expect(lines.join('')).toContain('seam subscription poll failed unexpectedly');
+    });
+
+    // The subscription survived: a later healthy poll still delivers.
+    boom = false;
+    feed.events = [seamEvent(1)];
+    await sub.poll();
+    expect(handled).toEqual([1]);
+    sub.stop();
   });
 
   it('uses a real interval by default and stops it cleanly', async () => {

@@ -45,7 +45,8 @@ export interface AcquisitionSnapshot {
  * settled) — so a cancelled-in-flight or exhausted acquisition reports none.
  */
 function currentIdentityOf(state: AcquisitionState): CandidateIdentity | undefined {
-  if (state.phase === 'Cancelled') return state.current?.identity;
+  if (state.phase === 'Cancelled')
+    return state.staging.kind === 'settled' ? state.staging.current.identity : undefined;
   return 'current' in state ? state.current.identity : undefined;
 }
 

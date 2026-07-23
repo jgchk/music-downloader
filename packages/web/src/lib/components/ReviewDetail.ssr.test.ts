@@ -63,6 +63,14 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).not.toContain('data-testid="manual-tags"');
   });
 
+  it('renders an unknown review kind through a generic fallback instead of assuming remediation', () => {
+    const { body } = render(ReviewDetail, {
+      props: { pending: pending({ kind: 'quarantine-review' }) },
+    });
+    expect(body).toContain('data-testid="unknown-review"');
+    expect(body).not.toContain('data-testid="failures"');
+  });
+
   it('renders a remediation review with failures and accept/retry only', () => {
     const { body } = render(ReviewDetail, {
       props: {

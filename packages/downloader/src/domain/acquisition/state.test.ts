@@ -209,11 +209,13 @@ describe('evolve — fulfilment retains the ladder-resume context (defeasible Fu
 
 describe('evolve — cancellation edge cases', () => {
   it('cancels an empty acquisition into a terminal cancelled state with zeroed progress', () => {
-    const cancelled = foldEvents([{ type: 'AcquisitionCancelled' }]);
+    const cancelled = foldEvents([{ type: 'AcquisitionCancelled' }]) as Extract<
+      AcquisitionState,
+      { phase: 'Cancelled' }
+    >;
     expect(cancelled.phase).toBe('Cancelled');
     expect(cancelled).toMatchObject({ rejected: [], searchRounds: 0, attempts: 0 });
-    expect('current' in cancelled).toBe(false);
-    expect('pending' in cancelled).toBe(false);
+    expect(cancelled.staging).toEqual({ kind: 'none' });
   });
 });
 
@@ -223,28 +225,29 @@ describe('evolve — cancellation retains and settles the mid-download candidate
     { type: 'AcquisitionCancelled' },
   ]) as Extract<AcquisitionState, { phase: 'Cancelled' }>;
 
-  it('retains the in-flight candidate as `pending`, not `current`', () => {
+  it('retains the in-flight candidate as `in-flight` staging, never `settled`', () => {
     expect(cancelledInFlight.phase).toBe('Cancelled');
-    expect(cancelledInFlight.pending).toEqual(a);
-    expect(cancelledInFlight.current).toBeUndefined();
+    expect(cancelledInFlight.staging).toEqual({ kind: 'in-flight', pending: a });
   });
 
-  it('retains a settled candidate as `current`, not `pending`', () => {
+  it('retains a settled candidate as `settled` staging, never `in-flight`', () => {
     const cancelledSettled = foldEvents([
       ...validatingHistory([a]),
       { type: 'AcquisitionCancelled' },
     ]) as Extract<AcquisitionState, { phase: 'Cancelled' }>;
-    expect(cancelledSettled.current).toEqual(a);
-    expect(cancelledSettled.pending).toBeUndefined();
+    expect(cancelledSettled.staging).toEqual({ kind: 'settled', current: a });
   });
 
-  it('clears `pending` when the aborted candidate settles and is rejected, staying Cancelled', () => {
-    const settled = evolve(cancelledInFlight, { type: 'CandidateRejected', candidate: a.identity });
+  it('clears staging to `none` when the aborted candidate settles and is rejected, staying Cancelled', () => {
+    const settled = evolve(cancelledInFlight, {
+      type: 'CandidateRejected',
+      candidate: a.identity,
+    }) as Extract<AcquisitionState, { phase: 'Cancelled' }>;
     expect(settled.phase).toBe('Cancelled');
-    expect('pending' in settled).toBe(false);
+    expect(settled.staging).toEqual({ kind: 'none' });
   });
 
-  it('ignores a further rejection once `pending` is already cleared', () => {
+  it('ignores a further rejection once staging is already `none`', () => {
     const cleared = evolve(cancelledInFlight, { type: 'CandidateRejected', candidate: a.identity });
     expect(evolve(cleared, { type: 'CandidateRejected', candidate: a.identity })).toBe(cleared);
   });
@@ -280,8 +283,6 @@ describe('evolve — manual edition selection pauses and resumes', () => {
 
   it('cancelling while awaiting selection folds through the existing cancel path', () => {
     const state = foldEvents([...awaitingSelectionHistory(), { type: 'AcquisitionCancelled' }]);
-    expect(state).toMatchObject({ phase: 'Cancelled' });
-    expect('current' in state).toBe(false);
-    expect('pending' in state).toBe(false);
+    expect(state).toMatchObject({ phase: 'Cancelled', staging: { kind: 'none' } });
   });
 });

@@ -122,8 +122,16 @@ export class SlskdDownload implements DownloadPort {
     if (!attached) {
       this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
       const enqueue = await this.client.postRaw(downloadsPath(username), requests);
+      if (enqueue.status >= 500 || [429, 401, 403].includes(enqueue.status)) {
+        // A 5xx/429/401/403 is slskd itself faulting, throttling, or refusing auth — transient or
+        // operational infrastructure, not this candidate's defeat. Throw so `ResultAsync.fromPromise`
+        // maps it to a retryable InfraError (the reactor holds and retries), matching every other
+        // GET/POST path in this adapter. Marking it a candidate failure would manufacture
+        // AcquisitionExhausted from a transient slskd overload.
+        throw new Error(`slskd responded ${enqueue.status} for POST ${downloadsPath(username)}`);
+      }
       if (enqueue.status < 200 || enqueue.status >= 300) {
-        // slskd answered, so the infrastructure is up: it refused THIS candidate's enqueue
+        // A 4xx (other than 401/403) means slskd answered and refused THIS candidate's enqueue
         // (typically an unreachable peer). That is a business failure for the retry ladder — reject
         // the candidate and advance to the next-best — never an InfraError, which would retry the
         // same dead peer forever (prod 2026-07-22). The write-ahead rows are released: nothing was

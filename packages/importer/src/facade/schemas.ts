@@ -202,8 +202,11 @@ export const importStatusResponseSchema = z.object({
   importId: z.string(),
   path: z.string().optional(),
   status: importPhaseSchema,
+  // Present only once the import has a library location — the terminal `applied` phase (additive).
   location: z.string().optional(),
+  // Present only while status is `awaiting-review` — the open review item (additive).
   review: reviewSchema.optional(),
+  // Present only when the import terminated in `rejected` (additive).
   rejection: z.object({ reason: z.string(), filesDeleted: z.boolean() }).optional(),
   history: z.array(historyEntrySchema),
 });

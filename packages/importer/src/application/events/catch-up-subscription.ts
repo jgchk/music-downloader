@@ -142,8 +142,23 @@ export class CatchUpSubscription {
     for (;;) {
       const batch = await this.deps.feed.read(this.cursor, this.deps.batchSize);
       if (batch.isErr()) {
-        // Feed faults (producer store read, payload rendering) hold the checkpoint; the fallback
-        // poll retries — a defective payload is never exposed downstream, never skipped.
+        if (batch.error.kind === 'RenderError') {
+          // A permanent payload-rendering defect at the producer (a mapping bug, or an event that
+          // cannot satisfy its schema): retrying can never resolve it, so a plain hold would block
+          // this position — and every verdict behind it — forever while readiness still read `up`.
+          // Halt loudly: the checkpoint is held (never skipped) and readiness reports `down`,
+          // surfacing it for the code fix a render defect actually needs. (Precise per-event
+          // dead-lettering for a `park` consumer would need the feed to carry the failing global
+          // position; the seam error only exposes `kind`, so that is deferred.)
+          this.halted = true;
+          this.deps.logger.error(
+            { subscription: this.deps.name, cursor: this.cursor, err: batch.error },
+            'seam feed render defect (permanent); subscription halted, checkpoint held',
+          );
+          return;
+        }
+        // A transient store-read fault holds the checkpoint; the fallback poll retries — a
+        // defective batch is never exposed downstream, never skipped.
         this.deps.logger.error(
           { subscription: this.deps.name, cursor: this.cursor, err: batch.error },
           'seam feed read failed; holding checkpoint',

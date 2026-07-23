@@ -206,7 +206,7 @@ describe('createImporterRuntime', () => {
     expect(runtime.facade.listImports()).toEqual({ imports: [] });
   });
 
-  it('logs and continues when the projection rebuild cannot read the backlog', async () => {
+  it('refuses to boot when the projection rebuild cannot read the backlog', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'importer-runtime-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
     const file = join(dir, 'events.db');
@@ -228,8 +228,67 @@ describe('createImporterRuntime', () => {
       tagger: fakeTagger(),
       clock: fixedClock(),
     });
+
+    // A half-rebuilt projection would boot half-blind (broken idempotency index, empty queries)
+    // with readiness still `up`: fail the boot loudly instead, as an unusable beets config does.
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().kind).toBe('ProjectionRebuildFailed');
+    expect(errors.join('')).toContain('projection rebuild failed');
+  });
+
+  it('stops the connected acquisition subscription on shutdown (no leaked poll)', async () => {
+    const result = await createImporterRuntime(config(), silentLogger(), {
+      tagger: fakeTagger(),
+      intake: { deleteRelease: () => okAsync<void>(undefined) },
+    });
+    const runtime = result._unsafeUnwrap();
+    const feed: SeamFeed = {
+      read: (from) => Promise.resolve(ok({ events: [], scannedTo: from })),
+    };
+    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+    const stopSpy = vi.spyOn(subscription, 'stop');
+    await subscription.start();
+
+    await runtime.stop();
+
+    // stop() must tear down the subscription too — otherwise its fallback poll keeps hitting a
+    // closed DB handle and holds the event loop open.
+    expect(stopSpy).toHaveBeenCalled();
+  });
+
+  it('classifies a genuine probe fault as transient (not a missing directory) via the real probe', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'intake-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+
+    const result = await createImporterRuntime(config({ intakeRoot: dir }), silentLogger(), {
+      tagger: fakeTagger(),
+      clock: fixedClock(),
+    });
     const runtime = result._unsafeUnwrap();
     cleanups.push(() => runtime.stop());
-    expect(errors.join('')).toContain('projection rebuild failed');
+
+    // A NUL in the delivered location makes the real `stat` throw a non-ENOENT fault: the probe
+    // rethrows it (rather than reporting "absent") and the consumer holds it as a transient fault,
+    // so no import is created and the subscription is not halted.
+    const faulting: SeamEvent = {
+      globalSeq: 1,
+      type: 'acquisition.fulfilled',
+      timestamp: '2026-07-18T12:00:00.000Z',
+      data: {
+        acquisitionId: 'acq-probe',
+        location: `/staging/${String.fromCharCode(0)}bad`,
+        target: { type: 'album', artist: 'Artist', title: 'Album', musicbrainzReleaseId: null },
+      },
+    };
+    const feed: SeamFeed = {
+      read: (from) =>
+        Promise.resolve(ok({ events: from < 1 ? [faulting] : [], scannedTo: Math.max(from, 1) })),
+    };
+    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+    await subscription.start();
+    cleanups.push(() => subscription.stop());
+
+    expect(runtime.facade.listImports().imports).toHaveLength(0);
+    expect(subscription.isHalted).toBe(false);
   });
 });

@@ -91,7 +91,13 @@ export class SlskdResourceRemover implements SourceResourceRemover {
     filename: string,
     capturedId: string | undefined,
   ): Promise<SlskdTransfer | undefined> {
-    const payload = slskdTransfersSchema.parse(await this.client.get(downloadsPath(username)));
+    // slskd 404s the downloads collection for a user with no transfers — a *state*, not a fault. A
+    // swept transfer that is already gone must fold to an empty listing (transfer not found →
+    // confirmed gone → ledger row retired), never a retryable fault that leaves the row live forever
+    // (prod 2026-07-22, mirroring the download poll's `getOr`).
+    const payload = slskdTransfersSchema.parse(
+      await this.client.getOr(downloadsPath(username), {}),
+    );
     return flattenDownloads(payload).find(
       (transfer) =>
         transfer.filename === filename || (capturedId !== undefined && transfer.id === capturedId),

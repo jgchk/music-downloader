@@ -52,7 +52,15 @@ function parseNumber(value: string | undefined): number | undefined {
 
 /** Extract the first audio stream's metadata, or `undefined` when the file has no audio. */
 function parseAudioMetadata(stdout: string): AudioMetadata | undefined {
-  const output = JSON.parse(stdout) as FfprobeOutput;
+  // A successful ffprobe exit with non-JSON stdout is a deterministic bad-file *business* outcome
+  // (no readable audio), not a retryable infra fault — an unguarded parse would throw and be retried
+  // forever on a permanent condition. Degrade to `undefined` (audio absent) instead.
+  let output: FfprobeOutput;
+  try {
+    output = JSON.parse(stdout) as FfprobeOutput;
+  } catch {
+    return undefined;
+  }
   const audio = output.streams?.find((stream) => stream.codec_type === 'audio');
   if (audio === undefined) return undefined;
 

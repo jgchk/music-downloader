@@ -12,11 +12,18 @@
   interface Props {
     acquisition: AcquisitionStatusResponseDto;
     progress?: ProgressResponseDto;
+    /** Downloading, but the progress read failed — say so rather than render a blank bar. */
+    progressUnavailable?: boolean;
     /** Cancel-action failure to surface. */
     error?: string;
   }
 
-  let { acquisition, progress = undefined, error = undefined }: Props = $props();
+  let {
+    acquisition,
+    progress = undefined,
+    progressUnavailable = false,
+    error = undefined,
+  }: Props = $props();
 </script>
 
 <h1>{targetDescription(acquisition)}</h1>
@@ -33,6 +40,10 @@
 
 {#if progress}
   <ProgressBar {progress} />
+{:else if progressUnavailable}
+  <p data-testid="progress-unavailable">
+    This download is in progress, but its live progress is momentarily unavailable.
+  </p>
 {/if}
 
 {#if outcomeSummary(acquisition) !== undefined}
@@ -110,8 +121,12 @@
           Validation failed ({entry.reasons.join(', ')}) — {entry.candidate.path}
         {:else if entry.kind === 'imported'}
           Deposited at {entry.location}
-        {:else}
+        {:else if entry.kind === 'fulfillment-rejected'}
           Rejected after delivery ({entry.reasons.join(', ')})
+        {:else}
+          <!-- Tolerant reader: a history kind the downloader adds later lands here rather than
+               mislabeling as fulfillment-rejected and dereferencing a field it may not carry. -->
+          Something happened in this acquisition.
         {/if}
       </li>
     {/each}
