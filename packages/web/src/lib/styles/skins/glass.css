@@ -1,0 +1,63 @@
+/* ============================================================================
+   SKIN: glass — spacious sidebar, cool light ground, translucent surfaces,
+   deep-teal accent, serif headings. Activate with <html data-skin="glass">.
+   Note the layout inversion vs forum/terminal: nav becomes a left rail.
+   ============================================================================ */
+
+:root[data-skin="glass"] {
+  color-scheme: light;
+
+  --bg: #e8edf1;
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-2: rgba(255, 255, 255, 0.42);
+  --border: rgba(16, 46, 56, 0.12);
+  --text: #14262d;
+  --text-muted: #5c6f77;
+  --accent: #0e7c72;
+  --accent-contrast: #ffffff;
+  --focus: #0e7c72;
+
+  --ok: #16855f;  --warn: #a86a13;  --danger: #bb3f38;  --info: #256f92;
+
+  --font-body: var(--font-sans);
+  --font-head: var(--font-serif);
+  --fw-head: 600;
+  --fs-root: 15.5px;
+  --fs-h1: 1.9rem;
+  --fs-h2: 1.2rem;
+  --lh: 1.55;
+  --tracking-label: 0.06em;
+  --tt-label: uppercase;
+
+  --page-pad: var(--step-5);
+  --region-gap: var(--step-5);
+  --stack-gap: var(--step-4);
+  --inline-gap: var(--step-2);
+  --cell-pad-y: var(--step-3);
+  --cell-pad-x: var(--step-4);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(15, 40, 50, 0.05), 0 14px 40px rgba(15, 40, 50, 0.10);
+  --surface-blur: 16px;
+
+  --nav-dir: column;
+  --shell-cols: 15rem 1fr;
+  --shell-rows: auto 1fr auto;
+  --shell-areas:
+    "masthead masthead"
+    "nav      main"
+    "status   status";
+}
+:root[data-skin="glass"] body {
+  background:
+    radial-gradient(120% 80% at 12% -10%, rgba(14, 124, 114, 0.14), transparent 55%),
+    radial-gradient(90% 70% at 110% 0%, rgba(43, 122, 155, 0.12), transparent 50%),
+    var(--bg);
+}
+
+/* Frosted surfaces */
+:root[data-skin="glass"] nav.primary ul,
+:root[data-skin="glass"] .statusbar,
+:root[data-skin="glass"] details,
+:root[data-skin="glass"] dl.stats > div { backdrop-filter: blur(var(--surface-blur)); }

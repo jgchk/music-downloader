@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-skin="forum">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- No-flash skin resolution: apply a stored skin preference before first paint.
+         The `data-skin` above is the server-rendered default; this only overrides it. -->
+    <script>
+      try {
+        var s = localStorage.getItem('skin');
+        if (s === 'forum' || s === 'glass' || s === 'terminal')
+          document.documentElement.dataset.skin = s;
+      } catch (e) {
+        /* storage unavailable — the server-rendered default stands */
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

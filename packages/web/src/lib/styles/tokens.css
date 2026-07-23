@@ -1,0 +1,74 @@
+/* ============================================================================
+   Design tokens — the theming switchboard.
+
+   Two tiers:
+   - PRIMITIVES: raw, context-free scales. Never referenced by components.
+   - SEMANTIC: intent-named tokens that components read. A skin is nothing but
+     a remap of this layer (see lib/styles/skins/*). Swapping the skin swaps the
+     whole look — and, via the --shell-* tokens, the whole layout — with no DOM
+     change. Keep component CSS reading ONLY the semantic tokens below.
+   ============================================================================ */
+
+:root {
+  /* -- Primitives: spacing + type families ---------------------------------- */
+  --step-0: 0.25rem;  --step-1: 0.5rem;   --step-2: 0.75rem;
+  --step-3: 1rem;     --step-4: 1.5rem;   --step-5: 2rem;    --step-6: 3rem;
+
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+}
+
+:root {
+  /* -- Semantic defaults (unskinned fallback: a neutral light theme) -------- */
+  color-scheme: light;
+
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --surface-2: #f6f8fa;
+  --border: rgba(15, 40, 50, 0.12);
+  --text: #16242a;
+  --text-muted: #5a6b72;
+  --accent: #0e7c72;
+  --accent-contrast: #ffffff;
+  --focus: #0e7c72;
+
+  --ok: #2f9e6b;
+  --warn: #b8791f;
+  --danger: #c0463c;
+  --info: #2b7a9b;
+
+  --font-body: var(--font-sans);
+  --font-head: var(--font-sans);
+  --fw-head: 700;
+  --fs-root: 15px;
+  --fs-h1: 1.6rem;
+  --fs-h2: 1.15rem;
+  --fs-small: 0.82rem;
+  --lh: 1.5;
+  --tracking-label: 0.02em;
+  --tt-label: none;
+
+  --page-pad: var(--step-4);
+  --region-gap: var(--step-4);
+  --stack-gap: var(--step-3);
+  --inline-gap: var(--step-2);
+  --cell-pad-y: var(--step-2);
+  --cell-pad-x: var(--step-3);
+
+  --radius: 14px;
+  --radius-sm: 8px;
+  --border-width: 1px;
+  --shadow: 0 1px 2px rgba(15, 40, 50, 0.06), 0 8px 24px rgba(15, 40, 50, 0.08);
+  --surface-blur: 0px;
+
+  /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
+  --nav-dir: row;                    /* row = topbar, column = sidebar */
+  --shell-cols: 1fr;
+  --shell-rows: auto auto 1fr auto;
+  --shell-areas:
+    "masthead"
+    "nav"
+    "main"
+    "status";
+}
