@@ -39,11 +39,11 @@
 - [x] 6.1 SSR test for `+layout.svelte`: asserts the landmark skeleton (single `main`, `header`, `footer`, labelled `nav`) and the attention-count badge branches
 - [x] 6.2 Client tests for the skin switcher: sets `data-skin`, persists, mirrors the resolved skin (valid + invalid), and degrades when storage is unavailable
 - [x] 6.3 The default `data-skin="forum"` is server-rendered on `<html>` in `app.html`; verified in the running app (Playwright) and confirmed live post-deploy
-- [~] 6.4 Skin swap verified live via Playwright (data-skin toggle re-skins AND re-lays-out the same DOM, all three skins); an automated e2e spec for tab-order/CSS-off is a follow-up in the advisory e2e tier
+- [x] 6.4 Skin swap verified live via Playwright (data-skin toggle re-skins AND re-lays-out the same DOM, all three skins) and by the user exploring the running app; an automated e2e spec for tab-order/CSS-off is a follow-up in the advisory e2e tier
 - [x] 6.5 Web package is at 100% merged coverage (server + ssr + client); full `pnpm check` gate green with no new carve-outs
 
 ## 7. Validate & wrap up
 
-- [ ] 7.1 `openspec validate` the change and run the full gate (`pnpm check`)
-- [ ] 7.2 `/verify` the swap end-to-end in the running app (all skins, key routes)
-- [ ] 7.3 Commit on a branch and open the PR per the workflow (no self-merge)
+- [x] 7.1 `openspec validate` clean; full `pnpm check` gate green (rebased onto trunk 3.5.4)
+- [x] 7.2 Verified the swap end-to-end in the running app — all three skins across the dashboard, acquisitions master-detail, and reviews
+- [x] 7.3 Shipped via the /ship lifecycle: bookmarked, PR opened, merged after green checks (no self-merge before the pre-merge checkpoint)
