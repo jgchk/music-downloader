@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.11.0](https://github.com/jgchk/music-downloader/compare/v3.10.1...v3.11.0) (2026-07-23)
+
+### Features
+
+* **importer:** speak the importer's own resolution vocabulary ([76f90ae](https://github.com/jgchk/music-downloader/commit/76f90ae9e8a7ca92a0489145acef47ecf7ba9258))
+
+### Bug Fixes
+
+* **importer:** tighten verdict-vocabulary review findings ([e0845e2](https://github.com/jgchk/music-downloader/commit/e0845e2838ea87e2f890229d8225f788eedc1786))
 ## [3.10.1](https://github.com/jgchk/music-downloader/compare/v3.10.0...v3.10.1) (2026-07-23)
 
 ### Bug Fixes
