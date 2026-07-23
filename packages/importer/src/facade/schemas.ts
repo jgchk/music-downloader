@@ -278,6 +278,9 @@ export const importStatusResponseSchema = z.object({
   review: reviewSchema.optional(),
   // Present only when the import terminated in `rejected` (additive).
   rejection: z.object({ reason: z.string(), filesDeleted: z.boolean() }).optional(),
+  // Present (true) only when the import's effect dead-lettered and it awaits an operator (additive,
+  // tag-or-omit: only ever `true` or absent).
+  stalled: z.literal(true).optional(),
   history: z.array(historyEntrySchema),
 });
 

@@ -14,9 +14,11 @@ import {
   FakeDeadLetterStore,
   FakeEventBus,
   FakeEventStore,
+  FakeParkedEffectStore,
   fixedClock,
   silentLogger,
 } from '../__fixtures__/fakes.js';
+import { StalledReadModel } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
 import type { EffectPorts } from './interpreter.js';
 import { interpretEffect } from './interpreter.js';
@@ -27,12 +29,16 @@ let store: FakeEventStore;
 let checkpoints: FakeCheckpointStore;
 let bus: FakeEventBus;
 let deadLetters: FakeDeadLetterStore;
+let parked: FakeParkedEffectStore;
+let stalled: StalledReadModel;
 
 beforeEach(() => {
   store = new FakeEventStore();
   checkpoints = new FakeCheckpointStore();
   bus = new FakeEventBus();
   deadLetters = new FakeDeadLetterStore();
+  parked = new FakeParkedEffectStore();
+  stalled = new StalledReadModel();
   store.bus = bus;
 });
 
@@ -53,6 +59,8 @@ function reactor(
     checkpoints,
     bus,
     deadLetters,
+    parked,
+    stalled,
     clock: fixedClock(),
     logger: silentLogger(),
     interpret,
@@ -160,12 +168,15 @@ describe('Reactor', () => {
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
   });
 
-  it('advances past a follow-on the domain rejected as stale/illegal', async () => {
+  it('advances past a follow-on the domain rejected as stale/illegal, never parking or dead-lettering', async () => {
     await seed([requested()]);
     const interpret = vi.fn(() => errAsync({ kind: 'NoOpenReview' as const }));
     await reactor(interpret).start();
 
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    // A domain rejection is settled, not retryable: it must not touch the durable budget stores.
+    expect(parked.count()).toBe(0);
+    expect(deadLetters.letters).toHaveLength(0);
   });
 
   it('treats a concurrency conflict as retryable', async () => {
@@ -266,6 +277,8 @@ describe('Reactor', () => {
         checkpoints,
         bus,
         deadLetters,
+        parked,
+        stalled,
         clock: fixedClock(),
         logger: silentLogger(),
         interpret,
@@ -411,5 +424,93 @@ describe('Reactor', () => {
     expect(interpret).toHaveBeenCalledTimes(1);
     expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Apply' }));
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(autoApply.globalSeq);
+  });
+});
+
+describe('Reactor — durable retry budget & stalled exposure', () => {
+  it('resumes the retry tally across restarts instead of re-retrying from zero', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'beets always fails')));
+    // Each boot is a fresh reactor instance over the SAME durable stores — a process restart.
+    const boot = async (): Promise<void> => {
+      const r = reactor(interpret, { retryBudget: 3 });
+      await r.start();
+      r.stop();
+    };
+
+    await boot(); // attempt 1: parked, held
+    expect(parked.peek(1)?.attempt).toBe(1);
+    expect(deadLetters.letters).toHaveLength(0);
+
+    await boot(); // attempt 2: resumes the durable tally (would be 1 again if it were in memory)
+    expect(parked.peek(1)?.attempt).toBe(2);
+    expect(deadLetters.letters).toHaveLength(0);
+
+    await boot(); // attempt 3 hits the budget: dead-lettered and advanced past
+    expect(deadLetters.letters).toHaveLength(1);
+    expect(deadLetters.letters[0]?.streamId).toBe('imp-1'); // the letter names its owning import
+    expect(parked.peek(1)).toBeUndefined(); // the tally is cleared once dead-lettered
+    expect(stalled.isStalled('imp-1')).toBe(true); // the import is exposed as stalled
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // the queue is not wedged behind the poison
+  });
+
+  it('holds the checkpoint when the durable retry tally cannot be written', async () => {
+    await seed([requested()]);
+    parked.failPark = true;
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'spawn failed')));
+    await reactor(interpret).start();
+
+    expect(interpret).toHaveBeenCalled(); // the hold came from the park-write fault, not an early return
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+    expect(deadLetters.letters).toHaveLength(0);
+  });
+
+  it('holds the checkpoint when the durable retry tally cannot be read', async () => {
+    await seed([requested()]);
+    parked.failFind = true;
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'spawn failed')));
+    await reactor(interpret).start();
+
+    expect(interpret).toHaveBeenCalled(); // the hold came from the find fault, not an early return
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+  });
+
+  it('advances even when clearing the resolved retry tally fails (harmless leftover)', async () => {
+    await seed([requested()]);
+    parked.failClear = true;
+    const interpret = vi.fn(() => okAsync([]));
+    await reactor(interpret).start();
+
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('clears the stalled exposure and its dead letters once the stream drives again', async () => {
+    await seed([requested()]);
+    // A prior boot dead-lettered this import; the durable letter and the stalled mark are present.
+    stalled.mark('imp-1');
+    await deadLetters.record({
+      subscription: REACTOR_CONSUMER,
+      globalSeq: 0,
+      error: 'Propose: bridge.propose: was down',
+      occurredAt: 't',
+      streamId: 'imp-1',
+    });
+    const interpret = vi.fn(() => okAsync([]));
+    await reactor(interpret).start();
+
+    expect(stalled.isStalled('imp-1')).toBe(false);
+    expect(deadLetters.letters).toHaveLength(0);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('leaves the import stalled when clearing its resolved dead letters fails', async () => {
+    await seed([requested()]);
+    stalled.mark('imp-1');
+    deadLetters.failClearStream = true;
+    const interpret = vi.fn(() => okAsync([]));
+    await reactor(interpret).start();
+
+    expect(stalled.isStalled('imp-1')).toBe(true); // stays marked — the letters still exist
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // but the stream still advances
   });
 });

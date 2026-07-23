@@ -32,7 +32,16 @@ CREATE TABLE IF NOT EXISTS dead_letters (
   global_seq   INTEGER NOT NULL,
   error        TEXT    NOT NULL,
   occurred_at  TEXT    NOT NULL,
+  stream_id    TEXT,
   PRIMARY KEY (subscription, global_seq)
+);
+
+CREATE TABLE IF NOT EXISTS parked_effects (
+  global_seq INTEGER PRIMARY KEY,
+  stream_id  TEXT    NOT NULL,
+  attempt    INTEGER NOT NULL,
+  parked_at  TEXT    NOT NULL,
+  last_error TEXT    NOT NULL
 );
 `;
 
@@ -41,5 +50,14 @@ export function openEventDatabase(filename: string): EventDatabase {
   const db = new Database(filename);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/** Additive in-place migrations for databases created before a column existed. */
+function migrate(db: EventDatabase): void {
+  const deadLetterColumns = db.pragma('table_info(dead_letters)') as { name: string }[];
+  if (!deadLetterColumns.some((column) => column.name === 'stream_id')) {
+    db.exec('ALTER TABLE dead_letters ADD COLUMN stream_id TEXT');
+  }
 }

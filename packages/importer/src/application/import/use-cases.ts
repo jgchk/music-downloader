@@ -14,6 +14,7 @@ import type {
   ImportStatusProjection,
   ImportStatusView,
   PendingReviewView,
+  StalledReadModel,
 } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDeps, CommandError } from './command-handler.js';
@@ -26,7 +27,13 @@ import type { CommandDeps, CommandError } from './command-handler.js';
  */
 export interface UseCaseDeps extends CommandDeps {
   readonly status: ImportStatusProjection;
+  readonly stalled: StalledReadModel;
   readonly policy: ImportPolicy;
+}
+
+/** Join the stalled exposure onto a projected view — additive, absent unless dead-lettered. */
+function withStalled(deps: UseCaseDeps, view: ImportStatusView): ImportStatusView {
+  return deps.stalled.isStalled(view.importId) ? { ...view, stalled: true } : view;
 }
 
 /** Normalize a submitted path (collapse trailing slashes) so cosmetic variants share a stream. */
@@ -80,7 +87,8 @@ export function resolveReview(
 }
 
 export function getImport(deps: UseCaseDeps, importId: ImportId): ImportStatusView | undefined {
-  return deps.status.get(importId);
+  const view = deps.status.get(importId);
+  return view === undefined ? undefined : withStalled(deps, view);
 }
 
 /**
@@ -93,11 +101,11 @@ export function getImportForAcquisition(
   acquisitionId: string,
 ): ImportStatusView | undefined {
   const importId = deps.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
-  return importId === undefined ? undefined : deps.status.get(importId);
+  return importId === undefined ? undefined : getImport(deps, importId);
 }
 
 export function listImports(deps: UseCaseDeps): readonly ImportStatusView[] {
-  return deps.status.list();
+  return deps.status.list().map((view) => withStalled(deps, view));
 }
 
 export function listPendingReviews(deps: UseCaseDeps): readonly PendingReviewView[] {

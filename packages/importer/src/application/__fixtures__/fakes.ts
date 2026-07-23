@@ -1,5 +1,6 @@
 import { errAsync, okAsync } from 'neverthrow';
 import type { DeadLetter, DeadLetterStore } from '../ports/dead-letter-port.js';
+import type { ParkedEffect, ParkedEffectStore } from '../ports/parked-effect-port.js';
 import type { ResultAsync } from 'neverthrow';
 import type { ImportEvent } from '../../domain/import/events.js';
 import { createLogger } from '../logging/logger.js';
@@ -118,10 +119,13 @@ export function fixedClock(iso = '2026-07-18T12:00:00.000Z'): Clock {
   return { now: () => date };
 }
 
-/** An in-memory {@link DeadLetterStore} for subscription tests. */
+/** An in-memory {@link DeadLetterStore} for subscription and reactor tests. */
 export class FakeDeadLetterStore implements DeadLetterStore {
-  public readonly letters: DeadLetter[] = [];
+  public letters: DeadLetter[] = [];
   public failRecord = false;
+  public failList = false;
+  public failClearStream = false;
+  public failPrune = false;
 
   record(letter: DeadLetter): ResultAsync<void, InfraError> {
     if (this.failRecord) return errAsync(infraError('dead-letters.record', 'boom'));
@@ -130,6 +134,56 @@ export class FakeDeadLetterStore implements DeadLetterStore {
   }
 
   list(subscription: string): ResultAsync<readonly DeadLetter[], InfraError> {
+    if (this.failList) return errAsync(infraError('dead-letters.list', 'boom'));
     return okAsync(this.letters.filter((entry) => entry.subscription === subscription));
+  }
+
+  clearStream(subscription: string, streamId: string): ResultAsync<void, InfraError> {
+    if (this.failClearStream) return errAsync(infraError('dead-letters.clearStream', 'boom'));
+    this.letters = this.letters.filter(
+      (entry) => entry.subscription !== subscription || entry.streamId !== streamId,
+    );
+    return okAsync(undefined);
+  }
+
+  prune(subscription: string, olderThanIso: string): ResultAsync<void, InfraError> {
+    if (this.failPrune) return errAsync(infraError('dead-letters.prune', 'boom'));
+    this.letters = this.letters.filter(
+      (entry) => entry.subscription !== subscription || entry.occurredAt >= olderThanIso,
+    );
+    return okAsync(undefined);
+  }
+}
+
+/** An in-memory {@link ParkedEffectStore} for reactor tests. */
+export class FakeParkedEffectStore implements ParkedEffectStore {
+  private readonly entries = new Map<number, ParkedEffect>();
+  public failPark = false;
+  public failFind = false;
+  public failClear = false;
+
+  park(entry: ParkedEffect): ResultAsync<void, InfraError> {
+    if (this.failPark) return errAsync(infraError('parked-effects.park', 'boom'));
+    this.entries.set(entry.globalSeq, entry);
+    return okAsync(undefined);
+  }
+
+  find(globalSeq: number): ResultAsync<ParkedEffect | undefined, InfraError> {
+    if (this.failFind) return errAsync(infraError('parked-effects.find', 'boom'));
+    return okAsync(this.entries.get(globalSeq));
+  }
+
+  clear(globalSeq: number): ResultAsync<void, InfraError> {
+    if (this.failClear) return errAsync(infraError('parked-effects.clear', 'boom'));
+    this.entries.delete(globalSeq);
+    return okAsync(undefined);
+  }
+
+  peek(globalSeq: number): ParkedEffect | undefined {
+    return this.entries.get(globalSeq);
+  }
+
+  count(): number {
+    return this.entries.size;
   }
 }
