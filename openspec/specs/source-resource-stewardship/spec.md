@@ -36,16 +36,20 @@ The system SHALL scope all observation and mutation of source resources — tran
 - **THEN** those resources are untouched
 
 ### Requirement: A search is deleted from the source once harvested
-The system SHALL delete its search from the source after collecting responses, both when the source reports the search complete and when the system abandons polling at its timeout (which also stops a search still running on the source). The ledger entry SHALL be marked removed on success; a failed deletion SHALL leave the entry live for later convergence and SHALL NOT fail the search outcome.
+
+The system SHALL delete its search from the source only after harvesting a search the source has confirmed complete. A search the system abandons — because the polling deadline elapsed while the search was still in progress, or because the harvest was contradicted by the source's bookkeeping — SHALL NOT be deleted mid-flight (deleting a running search corrupts the source's own search task); it is left to finish on the source, and its live ledger entry is retired by the startup sweep. The ledger entry SHALL be marked removed on a successful deletion; a failed deletion SHALL leave the entry live for later convergence and SHALL NOT fail the search outcome.
 
 #### Scenario: A completed search is deleted after harvest
+
 - **WHEN** a search completes and its responses are collected
 - **THEN** the search is deleted from the source and its ledger entry is marked removed
 
-#### Scenario: A timed-out search is deleted and stopped
-- **GIVEN** a search still running when the polling timeout elapses
-- **WHEN** the system harvests the partial responses
-- **THEN** the search is deleted from the source, stopping it, and the harvested candidates are still returned
+#### Scenario: An abandoned in-progress search is left for the sweep
+
+- **GIVEN** a search still running on the source when the polling deadline elapses
+- **WHEN** the system abandons the search with an infrastructure fault
+- **THEN** no delete is issued against the running search
+- **AND** its ledger entry stays live, so the startup sweep later removes the (by then finished) search from the source
 
 ### Requirement: Transfer records are removed from the source once settled
 The system SHALL remove its transfers' tracked records from the source after the transfers settle, on every settlement path — completion, failure, policy abandonment, and cancellation — marking the ledger entries removed, so records from a previous attempt can never contaminate a later attempt's outcome. When a transfer is still in flight at teardown, cancelling it MAY leave a terminal-but-still-tracked record at the source; the system SHALL confirm the record is actually gone — removing the now-terminal record if it persists — before marking its ledger entry removed. A ledger entry whose record cannot be confirmed removed SHALL be left live so the startup sweep converges it, rather than marked removed. Removal of an already-absent record SHALL be a tolerated no-op.
