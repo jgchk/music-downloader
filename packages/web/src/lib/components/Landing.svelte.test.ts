@@ -5,7 +5,7 @@ import Landing from './Landing.svelte';
 
 describe('Landing', () => {
   it('shows both module counts', async () => {
-    render(Landing, { counts: { acquisitions: 5, pendingReviews: 2 } });
+    await render(Landing, { counts: { acquisitions: 5, pendingReviews: 2 } });
     await expect.element(page.getByTestId('acquisition-count')).toHaveTextContent('5');
     await expect.element(page.getByTestId('review-count')).toHaveTextContent('2');
   });

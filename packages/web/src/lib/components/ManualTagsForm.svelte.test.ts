@@ -7,7 +7,7 @@ const row = { path: '/in/01.flac', title: 'One', artist: '', trackNumber: '1', d
 
 describe('ManualTagsForm', () => {
   it('adds and removes track rows', async () => {
-    render(ManualTagsForm, {});
+    await render(ManualTagsForm, {});
     await page.getByText('Import with manual tags').click();
     expect(page.getByTestId('track-row').elements()).toHaveLength(1);
     expect(page.getByTestId('remove-track').query()).toBeNull();
@@ -19,8 +19,8 @@ describe('ManualTagsForm', () => {
     expect(page.getByTestId('track-row').elements()).toHaveLength(1);
   });
 
-  it('renders provided initial rows', () => {
-    render(ManualTagsForm, { initialRows: [row, { ...row, path: '/in/02.flac' }] });
+  it('renders provided initial rows', async () => {
+    await render(ManualTagsForm, { initialRows: [row, { ...row, path: '/in/02.flac' }] });
     expect(page.getByTestId('track-row').elements()).toHaveLength(2);
   });
 });

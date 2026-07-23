@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.5.2](https://github.com/jgchk/music-downloader/compare/v3.5.1...v3.5.2) (2026-07-23)
+
+### Bug Fixes
+
+* **deps:** update dependency better-sqlite3 to v13 ([c7c26b0](https://github.com/jgchk/music-downloader/commit/c7c26b00ae542f05ccb824684d0f1d78e8ed0c06)), references [#88](https://github.com/jgchk/music-downloader/issues/88) [#83](https://github.com/jgchk/music-downloader/issues/83) [#84](https://github.com/jgchk/music-downloader/issues/84) [#85](https://github.com/jgchk/music-downloader/issues/85) [#87](https://github.com/jgchk/music-downloader/issues/87)
 ## [3.5.1](https://github.com/jgchk/music-downloader/compare/v3.5.0...v3.5.1) (2026-07-23)
 
 
