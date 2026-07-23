@@ -184,10 +184,15 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
         { type: 'SearchCompleted', round: state.searchRounds + 1, candidates: command.candidates },
         { type: 'CandidatesRanked', ranked },
       ];
+      // The ladder decides even here: an empty round spends its round and re-searches while
+      // budget remains — a dry result is not proof of absence (peers come and go).
       events.push(
-        ranked.length > 0
-          ? { type: 'CandidateSelected', candidate: ranked[0]!.candidate }
-          : { type: 'AcquisitionExhausted' },
+        selectNext({
+          policies: state.policies,
+          working: ranked,
+          attempts: state.attempts,
+          searchRounds: state.searchRounds + 1,
+        }),
       );
       return ok(events);
     }
