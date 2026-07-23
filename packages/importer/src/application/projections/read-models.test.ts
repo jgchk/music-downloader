@@ -22,7 +22,14 @@ import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
-import { ImportStatusProjection, projectStatus } from './read-models.js';
+import { REACTOR_CONSUMER } from '../import/reactor.js';
+import { FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import {
+  ImportStatusProjection,
+  StalledReadModel,
+  projectStatus,
+  seedStalledReadModel,
+} from './read-models.js';
 
 function storedAll(
   streamId: string,
@@ -205,5 +212,84 @@ describe('ImportStatusProjection', () => {
     // A corrupt stream: a review event with no request before it folds to empty (no directory).
     projection.apply(storedAll('imp-x', [MATCH_REVIEW])[0]!);
     expect(projection.pendingReviews()).toEqual([]);
+  });
+});
+
+describe('StalledReadModel', () => {
+  it('marks, reads, and clears stalled imports', () => {
+    const model = new StalledReadModel();
+    expect(model.isStalled('imp-1')).toBe(false);
+
+    model.mark('imp-1');
+    expect(model.isStalled('imp-1')).toBe(true);
+    expect(model.isStalled('imp-2')).toBe(false);
+
+    model.clear('imp-1');
+    expect(model.isStalled('imp-1')).toBe(false);
+  });
+
+  it('clearing an unknown import is a no-op', () => {
+    const model = new StalledReadModel();
+    expect(() => {
+      model.clear('never-marked');
+    }).not.toThrow();
+  });
+});
+
+describe('seedStalledReadModel', () => {
+  const HORIZON = '2026-07-01T00:00:00.000Z';
+  let seq = 0;
+  const letter = (streamId: string | undefined, occurredAt: string) => ({
+    subscription: REACTOR_CONSUMER,
+    globalSeq: (seq += 1),
+    error: 'boom',
+    occurredAt,
+    ...(streamId === undefined ? {} : { streamId }),
+  });
+
+  it('prunes aged letters then marks the surviving letters’ streams as stalled', async () => {
+    const deadLetters = new FakeDeadLetterStore();
+    await deadLetters.record(letter('imp-old', '2026-06-01T00:00:00.000Z'));
+    await deadLetters.record(letter('imp-live', '2026-07-21T12:00:00.000Z'));
+    const stalled = new StalledReadModel();
+
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+
+    expect(stalled.isStalled('imp-live')).toBe(true);
+    expect(stalled.isStalled('imp-old')).toBe(false); // pruned before seeding
+  });
+
+  it('marks only letters that carry an owning stream (seam letters never stall an import)', async () => {
+    const deadLetters = new FakeDeadLetterStore();
+    await deadLetters.record(letter('imp-streamed', '2026-07-21T12:00:00.000Z'));
+    await deadLetters.record(letter(undefined, '2026-07-21T12:00:00.000Z')); // a seam letter, no stream
+    const stalled = new StalledReadModel();
+
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+
+    expect(stalled.isStalled('imp-streamed')).toBe(true); // the streamed letter marks its import
+    expect(stalled.isStalled('undefined')).toBe(false); // the streamless letter marks nothing
+  });
+
+  it('logs and serves the boot unmarked when the letter list read fails', async () => {
+    const deadLetters = new FakeDeadLetterStore();
+    await deadLetters.record(letter('imp-live', '2026-07-21T12:00:00.000Z'));
+    deadLetters.failList = true;
+    const stalled = new StalledReadModel();
+
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+
+    expect(stalled.isStalled('imp-live')).toBe(false);
+  });
+
+  it('over-retains (keeps marking) when the retention prune fails', async () => {
+    const deadLetters = new FakeDeadLetterStore();
+    await deadLetters.record(letter('imp-live', '2026-07-21T12:00:00.000Z'));
+    deadLetters.failPrune = true;
+    const stalled = new StalledReadModel();
+
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+
+    expect(stalled.isStalled('imp-live')).toBe(true);
   });
 });

@@ -147,6 +147,21 @@ describe('createImporterFacade', () => {
       }
     });
 
+    it('surfaces a dead-lettered import as stalled through the DTO', async () => {
+      const wiring = testWiring();
+      const facade = createImporterFacade(wiring.deps);
+      const importId = await submitAndPropose(wiring, facade);
+
+      wiring.stalled.mark(importId); // the reactor dead-lettered this import's effect
+
+      const result = facade.getImport({ id: importId });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.stalled).toBe(true);
+        expect(importStatusResultSchema.parse(roundTrip(result.value))).toEqual(result.value);
+      }
+    });
+
     it('returns NotFound for an unknown import', () => {
       const facade = createImporterFacade(testWiring().deps);
       const result = facade.getImport({ id: 'imp-unknown' });

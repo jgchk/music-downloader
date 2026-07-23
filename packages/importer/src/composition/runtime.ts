@@ -8,12 +8,13 @@ import { FilesystemIntake } from '../adapters/filesystem/intake.js';
 import { InProcessEventBus } from '../adapters/sqlite/event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from '../adapters/sqlite/event-store.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
+import { SqliteParkedEffectStore } from '../adapters/sqlite/parked-effects.js';
 import { parseDistance } from '../domain/shared/distance.js';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
 import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { interpretEffect } from '../application/import/interpreter.js';
 import type { InterpreterDeps } from '../application/import/interpreter.js';
-import { Reactor } from '../application/import/reactor.js';
+import { REACTOR_CONSUMER, Reactor } from '../application/import/reactor.js';
 import type { UseCaseDeps } from '../application/import/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
 import type { Clock } from '../application/ports/system-ports.js';
@@ -22,7 +23,11 @@ import type {
   TaggerConfiguration,
   TaggerPort,
 } from '../application/ports/outbound-ports.js';
-import { ImportStatusProjection } from '../application/projections/read-models.js';
+import {
+  ImportStatusProjection,
+  StalledReadModel,
+  seedStalledReadModel,
+} from '../application/projections/read-models.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
@@ -50,7 +55,12 @@ export interface ImporterRuntimeConfig {
   /** Override for bundled deployments where the packaged default beside this module is wrong. */
   readonly bridgeScript?: string;
   readonly autoApplyThreshold: number;
+  /** How long dead-lettered (stalled) entries are retained before pruning at boot (default 30d). */
+  readonly stalledRetentionMs?: number;
 }
+
+/** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
+const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export interface ImporterRuntimeOverrides {
   readonly tagger?: TaggerPort;
@@ -157,6 +167,14 @@ export async function createImporterRuntime(
   const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(db);
   const deadLetters = new SqliteDeadLetterStore(db);
+  const parkedEffects = new SqliteParkedEffectStore(db);
+
+  // The stalled read model (reactor-durability parity): seed it from the dead-letter store at boot,
+  // pruning aged letters first, so an import dead-lettered before a restart reads stalled again.
+  const stalledModel = new StalledReadModel();
+  const retentionMs = config.stalledRetentionMs ?? DEFAULT_STALLED_RETENTION_MS;
+  const horizon = new Date(clock.now().getTime() - retentionMs).toISOString();
+  await seedStalledReadModel(deadLetters, stalledModel, REACTOR_CONSUMER, horizon, logger);
 
   const status = new ImportStatusProjection();
   const backlog = await store.readAll(0);
@@ -182,6 +200,8 @@ export async function createImporterRuntime(
     checkpoints,
     bus,
     deadLetters,
+    parked: parkedEffects,
+    stalled: stalledModel,
     clock,
     logger,
     interpret: (importId, effect) => interpretEffect(interpreter, importId, effect),
@@ -192,6 +212,7 @@ export async function createImporterRuntime(
     store,
     clock,
     status,
+    stalled: stalledModel,
     policy: { autoApplyThreshold: autoApplyThreshold.value },
   };
   const facade = createImporterFacade(deps);

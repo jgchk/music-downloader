@@ -6,7 +6,10 @@ import { interpretEffect } from '../../application/import/interpreter.js';
 import type { UseCaseDeps } from '../../application/import/use-cases.js';
 import { createImporterFacade } from '../index.js';
 import type { ImporterFacade } from '../index.js';
-import { ImportStatusProjection } from '../../application/projections/read-models.js';
+import {
+  ImportStatusProjection,
+  StalledReadModel,
+} from '../../application/projections/read-models.js';
 import type { ProposeOutcome } from '../../application/ports/outbound-ports.js';
 import type { Effect } from '../../domain/import/import.js';
 
@@ -21,6 +24,8 @@ export interface TestWiring {
   readonly facade: ImporterFacade;
   readonly store: FakeEventStore;
   readonly status: ImportStatusProjection;
+  /** The stalled read model behind the facade — mark a stream to simulate a dead-lettered import. */
+  readonly stalled: StalledReadModel;
   readonly sync: () => void;
   readonly dispatch: (importId: string, effect: Effect) => Promise<void>;
   readonly ports: EffectPorts;
@@ -31,6 +36,7 @@ export interface TestWiring {
 export function testWiring(): TestWiring {
   const store = new FakeEventStore();
   const status = new ImportStatusProjection();
+  const stalled = new StalledReadModel();
   let proposal: ProposeOutcome = { kind: 'proposal', candidates: [], duplicates: [] };
   const ports: EffectPorts = {
     tagger: {
@@ -51,6 +57,7 @@ export function testWiring(): TestWiring {
     store,
     clock: fixedClock(),
     status,
+    stalled,
     policy: POLICY,
   };
   return {
@@ -58,6 +65,7 @@ export function testWiring(): TestWiring {
     facade: createImporterFacade(deps),
     store,
     status,
+    stalled,
     ports,
     sync: () => status.rebuild(store.all()),
     dispatch: async (importId, effect) => {

@@ -4,11 +4,17 @@ import { join } from 'node:path';
 import { errAsync, ok, okAsync } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
+import { InProcessEventBus } from '../adapters/sqlite/event-bus.js';
+import { SqliteCheckpointStore, SqliteEventStore } from '../adapters/sqlite/event-store.js';
+import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
+import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
+import { REACTOR_CONSUMER } from '../application/import/reactor.js';
 import type { TaggerConfiguration, TaggerPort } from '../application/ports/outbound-ports.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
+import { requested } from '../domain/import/__fixtures__/import-fixtures.js';
 import { createImporterRuntime } from './runtime.js';
 import type { ImporterRuntime, ImporterRuntimeConfig } from './runtime.js';
 
@@ -79,6 +85,74 @@ describe('createImporterRuntime', () => {
       expect(runtime.facade.listPendingReviews().reviews).toHaveLength(1);
     });
     expect(wokeUp).toHaveBeenCalled();
+  });
+
+  /**
+   * Seed a legacy on-disk DB: the import exists, its effect was dead-lettered (the reactor
+   * checkpoint already advanced past it), and a dead letter naming the import stream is on record
+   * with `letterOccurredAt`. Boot the runtime over it with a fixed clock, so the retention horizon
+   * (clock.now − retention) is deterministic, and return the runtime for a facade query.
+   */
+  async function bootOverDeadLetter(
+    letterOccurredAt: string,
+    overrides: Partial<ImporterRuntimeConfig> = {},
+  ): Promise<ImporterRuntime> {
+    const dir = mkdtempSync(join(tmpdir(), 'importer-db-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const databaseFile = join(dir, 'events.db');
+
+    const db = openEventDatabase(databaseFile);
+    const store = new SqliteEventStore(db, new UpcasterRegistry(), new InProcessEventBus());
+    (
+      await store.append('imp-stalled', 0, [requested()], {
+        importId: 'imp-stalled',
+        occurredAt: '2026-07-10T12:00:00.000Z',
+      })
+    )._unsafeUnwrap();
+    (await new SqliteCheckpointStore(db).save(REACTOR_CONSUMER, 1))._unsafeUnwrap();
+    (
+      await new SqliteDeadLetterStore(db).record({
+        subscription: REACTOR_CONSUMER,
+        globalSeq: 1,
+        error: 'Propose: bridge.propose: beets down',
+        occurredAt: letterOccurredAt,
+        streamId: 'imp-stalled',
+      })
+    )._unsafeUnwrap();
+    db.close();
+
+    const result = await createImporterRuntime(
+      config({ databaseFile, ...overrides }),
+      silentLogger(),
+      {
+        tagger: fakeTagger(),
+        intake: { deleteRelease: () => okAsync<void>(undefined) },
+        clock: fixedClock(), // 2026-07-18T12:00:00Z — retention horizon is now deterministic
+      },
+    );
+    const runtime = result._unsafeUnwrap();
+    cleanups.push(() => runtime.stop());
+    return runtime;
+  }
+
+  it('seeds a dead-lettered import as stalled from the store at boot (reactor-durability parity)', async () => {
+    // A dead letter within the retention window survives the boot prune and seeds the stalled flag.
+    const runtime = await bootOverDeadLetter('2026-07-15T12:00:00.000Z');
+
+    const view = runtime.facade.getImport({ id: 'imp-stalled' });
+    expect(view.ok).toBe(true);
+    if (view.ok) expect(view.value.stalled).toBe(true);
+  });
+
+  it('does not seed an import stalled from a dead letter older than the retention horizon', async () => {
+    // A 60-day-old letter with a 30-day retention: pruned at boot before seeding, so it never stalls.
+    const runtime = await bootOverDeadLetter('2026-05-19T12:00:00.000Z', {
+      stalledRetentionMs: 30 * 24 * 60 * 60 * 1_000,
+    });
+
+    const view = runtime.facade.getImport({ id: 'imp-stalled' });
+    expect(view.ok).toBe(true);
+    if (view.ok) expect(view.value.stalled).toBeUndefined();
   });
 
   it('returns the startup error as a value when the beets config is unusable', async () => {

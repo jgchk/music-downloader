@@ -11,7 +11,7 @@ import type { ImportEvent } from '../../domain/import/events.js';
 import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
-import { ImportStatusProjection } from '../projections/read-models.js';
+import { ImportStatusProjection, StalledReadModel } from '../projections/read-models.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import type { UseCaseDeps } from './use-cases.js';
 import {
@@ -25,11 +25,16 @@ import {
   submitImport,
 } from './use-cases.js';
 
-function deps(): UseCaseDeps & { store: FakeEventStore; status: ImportStatusProjection } {
+function deps(): UseCaseDeps & {
+  store: FakeEventStore;
+  status: ImportStatusProjection;
+  stalled: StalledReadModel;
+} {
   return {
     store: new FakeEventStore(),
     clock: fixedClock(),
     status: new ImportStatusProjection(),
+    stalled: new StalledReadModel(),
     policy: POLICY,
   };
 }
@@ -125,6 +130,17 @@ describe('queries', () => {
     const importId = await seed(d, awaitingReviewWithCandidate());
     expect(getImportForAcquisition(d, 'acq-1')?.importId).toBe(importId);
     expect(getImportForAcquisition(d, 'acq-unknown')).toBeUndefined();
+  });
+
+  it('joins the stalled flag onto the reads for a dead-lettered import, absent otherwise', async () => {
+    const d = deps();
+    const importId = await seed(d, awaitingReviewWithCandidate());
+    expect(getImport(d, importId)?.stalled).toBeUndefined(); // not stalled while progressing
+
+    d.stalled.mark(importId);
+    expect(getImport(d, importId)?.stalled).toBe(true);
+    expect(getImportForAcquisition(d, 'acq-1')?.stalled).toBe(true);
+    expect(listImports(d)[0]?.stalled).toBe(true);
   });
 
   it('lists pending reviews including remediation items', async () => {

@@ -13,6 +13,8 @@ import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
 import type { AcquisitionId } from '../../domain/shared/acquisition-id.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
+import type { DeadLetterStore } from '../ports/dead-letter-port.js';
+import type { Logger } from '../logging/logger.js';
 
 /**
  * Read-model projections: each is a fold over the log and therefore rebuildable from it. The
@@ -60,6 +62,12 @@ export interface ImportStatusView {
   readonly openReview?: OpenReview;
   readonly rejection?: { readonly reason: string; readonly filesDeleted: boolean };
   readonly history: readonly StatusHistoryEntry[];
+  /**
+   * Present (`true`) when the import's current effect dead-lettered — its retry budget spent — and
+   * it awaits an operator (reactor-durability parity). Additive and tag-or-omit: only ever `true` or
+   * absent (never `false`), joined onto the view from the stalled read model, not folded from the log.
+   */
+  readonly stalled?: true;
 }
 
 /** One resolvable item of the pending-review queue, with its kind-specific carried context. */
@@ -173,5 +181,54 @@ export class ImportStatusProjection {
     this.streams.clear();
     this.acquisitions.clear();
     for (const entry of stored) this.apply(entry);
+  }
+}
+
+// --- Stalled imports (reactor-durability parity) -----------------------------------------------
+
+/**
+ * The in-memory face of the reactor's dead-lettered effects: seeded from the dead-letter store at
+ * boot, marked/cleared by the reactor as effects dead-letter or their streams resume. In-memory
+ * because the facade's queries are synchronous; the durable truth stays in the dead-letter store.
+ */
+export class StalledReadModel {
+  private readonly stalled = new Set<string>();
+
+  mark(importId: string): void {
+    this.stalled.add(importId);
+  }
+
+  clear(importId: string): void {
+    this.stalled.delete(importId);
+  }
+
+  isStalled(importId: string): boolean {
+    return this.stalled.has(importId);
+  }
+}
+
+/**
+ * Boot-time retention + seeding (reactor-durability parity): prune dead letters older than the
+ * horizon, then load the survivors' stream ids into the in-memory exposure. Either store fault is
+ * logged, never fatal: a failed prune over-retains (aged letters stay marked), a failed list serves
+ * the boot unmarked — the truth stays in the store and the next boot retries.
+ */
+export async function seedStalledReadModel(
+  deadLetters: DeadLetterStore,
+  stalled: StalledReadModel,
+  subscription: string,
+  horizonIso: string,
+  logger: Logger,
+): Promise<void> {
+  const pruned = await deadLetters.prune(subscription, horizonIso);
+  if (pruned.isErr())
+    logger.warn({ subscription, err: pruned.error }, 'stalled retention prune failed');
+  const letters = await deadLetters.list(subscription);
+  if (letters.isErr()) {
+    logger.error({ subscription, err: letters.error }, 'stalled read-model seed failed');
+    return;
+  }
+  for (const letter of letters.value) {
+    if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }
