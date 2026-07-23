@@ -1,0 +1,15 @@
+# Coverage gate for the beets bridge's Python unit tests — the Python peer of the TS `test:cov`
+# 100% gate. Branch coverage, measuring only bridge.py (the tests fake beets, so nothing else runs).
+[run]
+branch = True
+source =
+    ../../src/adapters/beets/bridge
+
+[report]
+fail_under = 100
+show_missing = True
+precision = 1
+# The CLI entrypoint guard never runs under unittest (the module is imported, not executed as
+# __main__). Any other exclusion must be justified in-line like a TS `v8 ignore` waiver.
+exclude_also =
+    if __name__ == .__main__.:

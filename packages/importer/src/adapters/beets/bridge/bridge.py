@@ -234,7 +234,7 @@ def serialize_match(match):
 def serialize_album(album):
     try:
         path = os.fsdecode(album.path) if album.path else ""
-    except Exception:
+    except Exception:  # pragma: no cover — os.fsdecode never raises on the bytes/str/None beets produces; defensive crash-barrier only
         path = ""
     return {
         "artist": album.albumartist or "",

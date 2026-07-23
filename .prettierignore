@@ -24,3 +24,6 @@ packages/web/.svelte-kit/
 packages/web/build/
 packages/web/test-results/
 packages/web/playwright-report/
+
+# Python hermetic venvs
+**/.venv/

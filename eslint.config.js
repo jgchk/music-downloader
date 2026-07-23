@@ -128,6 +128,8 @@ export default tseslint.config(
       'test/e2e/**',
       'test/boundaries/**',
       'packages/*/test/contract/**',
+      'packages/*/test/bridge/**',
+      '**/.venv/**',
       'scripts/**',
       'packages/*/scripts/**',
       '**/*.config.ts',

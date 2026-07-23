@@ -19,10 +19,11 @@
     "test:cov": "vitest run --coverage",
     "test:contract": "vitest run --config packages/downloader/test/contract/vitest.config.ts && vitest run --config packages/importer/test/contract/vitest.config.ts",
     "test:release": "vitest run --config scripts/release/vitest.config.ts",
+    "test:bridge": "bash packages/importer/test/bridge/run.sh",
     "test:e2e": "bash test/e2e/run.sh",
     "contracts:events": "tsx packages/downloader/scripts/contracts/generate-event-schemas.ts && tsx packages/importer/scripts/contracts/generate-event-schemas.ts",
     "version:prep": "tsx scripts/release/version-prep.ts",
-    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release",
+    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release && pnpm run test:bridge",
     "test:e2e:web": "pnpm --dir packages/web exec playwright test",
     "dev": "pnpm --dir packages/web dev"
   },
