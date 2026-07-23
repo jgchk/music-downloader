@@ -5,5 +5,7 @@
   let { data }: PageProps = $props();
 </script>
 
-<h1>Needs attention</h1>
-<AttentionQueue items={data.items} errors={data.errors} />
+<section class="panel">
+  <div class="region-head"><h1>Needs attention</h1></div>
+  <AttentionQueue items={data.items} errors={data.errors} />
+</section>

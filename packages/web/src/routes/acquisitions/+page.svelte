@@ -1,9 +1,9 @@
 <script lang="ts">
-  import AcquisitionList from '$lib/components/AcquisitionList.svelte';
-  import type { PageProps } from './$types';
-
-  let { data }: PageProps = $props();
+  // The detail pane's empty state: with no acquisition selected, the master list beside this is
+  // the whole view. Selecting a row navigates to /acquisitions/[id], which renders here.
 </script>
 
 <h1>Acquisitions</h1>
-<AcquisitionList acquisitions={data.list.acquisitions} />
+<p data-testid="detail-empty">
+  Select an acquisition from the queue to see its progress, history, and actions.
+</p>
