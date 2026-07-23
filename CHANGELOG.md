@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.5.3](https://github.com/jgchk/music-downloader/compare/v3.5.2...v3.5.3) (2026-07-23)
+
+### Bug Fixes
+
+* **review:** address whole-codebase review findings across downloader/importer/web ([c6671a0](https://github.com/jgchk/music-downloader/commit/c6671a08df46f67caad360eaebf08ae184e5143e))
 ## [3.5.2](https://github.com/jgchk/music-downloader/compare/v3.5.1...v3.5.2) (2026-07-23)
 
 ### Bug Fixes
