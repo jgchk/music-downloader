@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.5.1](https://github.com/jgchk/music-downloader/compare/v3.5.0...v3.5.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **downloader:** review hardening — fault on id-less create, witness integrity fields, close test gaps ([1a0c440](https://github.com/jgchk/music-downloader/commit/1a0c44091aa26ebb16dc6fe90f098b3989d76618))
+* **downloader:** spend the retry ladder on an empty search round instead of exhausting ([c281512](https://github.com/jgchk/music-downloader/commit/c28151200801b6c5af0bfc284dbedf1b0b8bce52))
+* **downloader:** trust only a confirmed-complete, self-consistent slskd search harvest ([91beec7](https://github.com/jgchk/music-downloader/commit/91beec79144e43818411020f22cc0c4d4622a262))
+
 ## [3.5.0](https://github.com/jgchk/music-downloader/compare/v3.4.0...v3.5.0) (2026-07-22)
 
 
