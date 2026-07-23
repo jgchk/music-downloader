@@ -128,23 +128,62 @@ describe('FfmpegAudioProbe', () => {
     expect(result.bitrate).toBeUndefined();
   });
 
-  it('degrades to no audio metadata when ffprobe exits 0 with non-JSON output', async () => {
-    // A successful exit with garbage stdout is a deterministic bad-file business outcome, not a
-    // retryable infra fault — an unguarded JSON.parse would throw and be retried forever.
+  it('reads bit depth from bits_per_sample when bits_per_raw_sample is absent', async () => {
+    const meta = ffprobeJson([
+      { codec_type: 'audio', codec_name: 'alac', duration: '10', bits_per_sample: 24 },
+    ]);
+
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.m4a');
+    const result = probeResult._unsafeUnwrap();
+
+    expect(result.bitDepth).toBe(24);
+  });
+
+  it('treats a bits_per_sample of 0 (not applicable) as an unknown bit depth', async () => {
+    const meta = ffprobeJson([
+      { codec_type: 'audio', codec_name: 'mp3', duration: '10', bits_per_sample: 0 },
+    ]);
+
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.mp3');
+    const result = probeResult._unsafeUnwrap();
+
+    expect(result.bitDepth).toBeUndefined();
+  });
+
+  it('reads an empty-string numeric field as absent rather than zero', async () => {
+    const meta = ffprobeJson([
+      { codec_type: 'audio', codec_name: 'flac', duration: '10', sample_rate: '' },
+    ]);
+
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.flac');
+    const result = probeResult._unsafeUnwrap();
+
+    expect(result.sampleRate).toBeUndefined();
+  });
+
+  it('surfaces an InfraError naming ffprobe when it exits 0 with non-JSON output', async () => {
+    // A successful exit that is not JSON is a broken/incompatible ffprobe (a `-print_format json`
+    // run always emits JSON) — a boundary fault to surface, not a bad-file business outcome.
     const garbage = { code: 0, stdout: 'not json at all', stderr: '' };
 
-    const probeResult8 = await probeWith(runner(garbage, OK)).probe('/x.flac');
-    const result = probeResult8._unsafeUnwrap();
+    const result = await probeWith(runner(garbage, OK)).probe('/x.flac');
 
-    expect(result).toEqual({
-      decodedCleanly: false,
-      codec: '',
-      durationMs: 0,
-      sampleRate: undefined,
-      bitDepth: undefined,
-      bitrate: undefined,
-      channels: undefined,
-    });
+    const error = result._unsafeUnwrapErr();
+    expect(error.kind).toBe('InfraError');
+    expect(error.operation).toBe('ffmpeg.probe');
+    expect(error.message).toContain('ffprobe');
+  });
+
+  it('surfaces an InfraError when ffprobe JSON violates the consumed contract shape', async () => {
+    // Exit 0, valid JSON, but `streams` is not an array — a consumed field changed type, which the
+    // tolerant schema rejects rather than silently degrading to all-undefined metadata.
+    const drifted = { code: 0, stdout: JSON.stringify({ streams: 'not-an-array' }), stderr: '' };
+
+    const result = await probeWith(runner(drifted, OK)).probe('/x.flac');
+
+    const error = result._unsafeUnwrapErr();
+    expect(error.kind).toBe('InfraError');
+    expect(error.message).toContain('ffprobe');
   });
 
   it('surfaces a failure to spawn the binaries as an InfraError', async () => {

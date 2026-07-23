@@ -28,8 +28,6 @@ function levelOf(message: string): BumpLevel | null {
     if (bang === '!' || BREAKING_FOOTER.test(message)) return 'major';
     if (type === 'feat') return 'minor';
     if (RELEASABLE_TYPES.has(type!)) return 'patch';
-    // A non-releasable type can still carry a breaking footer.
-    if (BREAKING_FOOTER.test(message)) return 'major';
     return null;
   }
   return BREAKING_FOOTER.test(message) ? 'major' : null;

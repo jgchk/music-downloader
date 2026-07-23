@@ -84,7 +84,9 @@ export interface TrackMapping {
   readonly title: string;
   readonly index: number;
   readonly current?: TrackCurrentTags;
-  readonly distance?: number;
+  /** How far this mapped pair is from a clean match — the same branded {@link Distance} as
+   * everywhere else (the beets ACL proves the schema's [0, 1] bound before branding it). */
+  readonly distance?: Distance;
 }
 
 /** A downloaded file the candidate placed against no track (the `unmatched_tracks` penalty). */

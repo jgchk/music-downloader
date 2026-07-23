@@ -4,7 +4,13 @@ import { SlskdClient } from '../../src/adapters/slskd/client.js';
 import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
 import { baseName } from '../../src/adapters/slskd/mapping.js';
-import { slskdTransfersSchema } from '../../src/adapters/slskd/schemas.js';
+import {
+  slskdDownloadFileCompleteSchema,
+  slskdEventsSchema,
+  slskdOptionsSchema,
+  slskdTransfersSchema,
+} from '../../src/adapters/slskd/schemas.js';
+import { resolveStagedPaths } from '../../src/adapters/slskd/staged-location.js';
 import { flattenDownloads } from '../../src/adapters/slskd/transfers.js';
 import type { Candidate } from '../../src/domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../src/domain/policy/policies.js';
@@ -119,5 +125,39 @@ describe('slskd contract (tier 1)', () => {
     // The recorded transfers-poll fixture is a Completed, Succeeded transfer, so the adapter —
     // fed the identical bytes over the wire — must interpret it as a completed download.
     expect(result.kind).toBe('completed');
+  });
+
+  it('pages the events log with the offset/limit query and decodes each DownloadFileComplete', async () => {
+    const c = client();
+
+    const rawEvents = await c.events(0, 100);
+    const rawOptions = await c.options();
+
+    const events = slskdEventsSchema.parse(rawEvents);
+    const { directories } = slskdOptionsSchema.parse(rawOptions);
+
+    // Every recorded completion must decode through the nested `data` schema — a capture that lost
+    // `localFilename` or the transfer id throws here and fails the tier, rather than passing as the
+    // opaque string the top-level events schema alone would accept.
+    const completions = events.filter((event) => event.type === 'DownloadFileComplete');
+    expect(completions.length).toBeGreaterThan(0);
+    const wantedIds = new Set(
+      completions.map(
+        (event) => slskdDownloadFileCompleteSchema.parse(JSON.parse(event.data)).transfer.id,
+      ),
+    );
+
+    // Drive the real re-rooting: the decoded localFilename under the options downloads root maps
+    // onto our staging root. Proves the consumed fields survive the wire end to end.
+    const staged = resolveStagedPaths(wantedIds, events, directories.downloads, '/staging');
+    expect(staged.size).toBe(wantedIds.size);
+    for (const stagedPath of staged.values()) expect(stagedPath.startsWith('/staging/')).toBe(true);
+
+    // The adapter must page the events endpoint with the real offset/limit query params (authed).
+    const eventsRequest = server.requests.find(
+      (r) => r.method === 'GET' && r.path === '/api/v0/events',
+    )!;
+    expect(eventsRequest.query).toEqual({ offset: '0', limit: '100' });
+    expect(eventsRequest.headers['x-api-key']).toBe(API_KEY);
   });
 });

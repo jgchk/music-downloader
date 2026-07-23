@@ -5,6 +5,7 @@ import {
   isCancellable,
   isTerminal,
   outcomeSummary,
+  parseAcquisitionView,
   statusTone,
   targetDescription,
 } from './acquisitions.js';
@@ -22,10 +23,14 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
 
 describe('statusTone / isTerminal / isCancellable', () => {
   it.each([
+    ['Empty', 'pending', false],
     ['Pending', 'pending', false],
     ['AwaitingManualSelection', 'attention', false],
     ['Searching', 'pending', false],
+    ['Selecting', 'pending', false],
     ['Downloading', 'pending', false],
+    ['Validating', 'pending', false],
+    ['Importing', 'pending', false],
     ['Fulfilled', 'fulfilled', true],
     ['Exhausted', 'failed', true],
     ['Cancelled', 'failed', true],
@@ -124,12 +129,39 @@ describe('outcomeSummary', () => {
   });
 });
 
+describe('parseAcquisitionView', () => {
+  it('lifts awaiting-selection with candidates into an editions view that carries them', () => {
+    const candidates = [{ releaseMbid: 'r1', title: 'OK Computer', trackCount: 12 }];
+    expect(
+      parseAcquisitionView(acquisition({ status: 'AwaitingManualSelection', candidates })),
+    ).toEqual({ kind: 'editions', candidates });
+  });
+
+  it('lifts awaiting-selection without candidates into the no-editions degradation', () => {
+    expect(parseAcquisitionView(acquisition({ status: 'AwaitingManualSelection' }))).toEqual({
+      kind: 'no-editions',
+    });
+  });
+
+  it('is not-awaiting for any other status, even one carrying candidates', () => {
+    expect(
+      parseAcquisitionView(
+        acquisition({ status: 'Downloading', candidates: [{ releaseMbid: 'r1' }] }),
+      ),
+    ).toEqual({ kind: 'not-awaiting' });
+  });
+});
+
 describe('formatBytes', () => {
   it.each([
     [512, '512 B'],
+    // The exact 1024 boundary crosses from bytes into the first divided unit.
+    [1024, '1.0 KiB'],
     [2048, '2.0 KiB'],
     [5 * 1024 * 1024, '5.0 MiB'],
     [3 * 1024 * 1024 * 1024, '3.0 GiB'],
+    // GiB is the largest unit: a TiB-scale value stays in GiB rather than inventing a bigger one.
+    [1024 ** 4, '1024.0 GiB'],
   ])('%d -> %s', (bytes, label) => {
     expect(formatBytes(bytes)).toBe(label);
   });

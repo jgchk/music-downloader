@@ -9,6 +9,7 @@ import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   ApplyOutcome,
+  ConfigInvalid,
   ProposeOutcome,
   ProposePins,
   TaggerConfig,
@@ -81,9 +82,13 @@ function candidateToDomain(candidate: BridgeCandidate): ProposedCandidate {
       name: penalty.name,
       amount: branded<Distance>(penalty.amount),
     })),
-    // `current`/per-track `distance` and the extra/missing lists carry through as-is (shapes match
-    // the domain interfaces); only the album fields need a key rename (`albumdisambig`).
-    tracks: candidate.tracks,
+    // `current` and the extra/missing lists carry through as-is (shapes match the domain interfaces);
+    // the per-track `distance` is branded at the same [0, 1] parse edge as the overall distance, and
+    // only the album fields need a key rename (`albumdisambig`).
+    tracks: candidate.tracks.map((track) => ({
+      ...track,
+      distance: track.distance === undefined ? undefined : branded<Distance>(track.distance),
+    })),
     extraItems: candidate.extra_items,
     missingTracks: candidate.extra_tracks,
     albumFields:
@@ -150,20 +155,23 @@ export class BeetsBridge implements TaggerPort {
     });
   }
 
-  validate(): ResultAsync<TaggerConfig, InfraError> {
-    return this.invoke('validate', ['validate'], bridgeValidateOutputSchema).andThen((output) => {
-      if (output.status === 'invalid') {
-        // An unusable beets config can only be fixed by an operator: fail the boot loudly (D3).
-        return errAsync(infraError('bridge.validate', `${output.kind}: ${output.reason}`));
-      }
-      return okAsync({
-        beetsVersion: output.beets_version,
-        libraryDatabase: output.library_database,
-        libraryDirectory: output.library_directory,
-        plugins: output.plugins,
-        overlay: output.overlay,
-      });
-    });
+  validate(): ResultAsync<TaggerConfig, InfraError | ConfigInvalid> {
+    return this.invoke('validate', ['validate'], bridgeValidateOutputSchema).andThen(
+      (output): ResultAsync<TaggerConfig, InfraError | ConfigInvalid> => {
+        if (output.status === 'invalid') {
+          // An unusable beets config is operator-fixable, not a transient fault: surface it as the
+          // non-retryable ConfigInvalid so the boot fails loudly instead of retrying forever (D3).
+          return errAsync({ kind: 'ConfigInvalid', detail: `${output.kind}: ${output.reason}` });
+        }
+        return okAsync({
+          beetsVersion: output.beets_version,
+          libraryDatabase: output.library_database,
+          libraryDirectory: output.library_directory,
+          plugins: output.plugins,
+          overlay: output.overlay,
+        });
+      },
+    );
   }
 
   /** Run one bridge invocation through the serialization queue and validate its output. */

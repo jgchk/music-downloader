@@ -148,8 +148,13 @@ def collect_items(directory):
             path = os.path.join(root, name)
             try:
                 items.append(library.Item.from_path(os.fsencode(path)))
+            except OSError:
+                # A real I/O fault (EACCES/EIO/a vanished file …) is NOT "not an audio file": let it
+                # propagate so the crash surfaces as a retryable infrastructure error, never silently
+                # dropping a file that beets could have read once the fault clears.
+                raise
             except Exception:
-                continue  # not an audio file beets can read
+                continue  # not an audio file beets can read (unreadable/unsupported format)
     if not items:
         raise BridgeRefusal("no-audio-files", f"no readable audio files under: {directory}")
     return items

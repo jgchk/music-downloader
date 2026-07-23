@@ -3,6 +3,8 @@ import type { Result } from 'neverthrow';
 import { branded } from '../shared/brand.js';
 import type { Brand } from '../shared/brand.js';
 import type { Mbid } from '../shared/mbid.js';
+import { assertNonEmpty } from '../shared/non-empty-array.js';
+import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
 
 /**
  * The normalized, source-agnostic description of what a caller wants to acquire (D11).
@@ -27,7 +29,7 @@ export type Target = Brand<
     readonly type: TargetType;
     readonly artist: string;
     readonly title: string;
-    readonly tracks: readonly TrackMetadata[];
+    readonly tracks: NonEmptyReadonlyArray<TrackMetadata>;
     readonly year?: number;
     readonly mbid?: Mbid;
   },
@@ -48,6 +50,7 @@ export type TargetError =
   | { readonly kind: 'EmptyArtist' }
   | { readonly kind: 'EmptyTitle' }
   | { readonly kind: 'NoTracks' }
+  | { readonly kind: 'InvalidTrackPosition'; readonly position: number }
   | { readonly kind: 'InvalidTrackDuration'; readonly position: number };
 
 /** Smart constructor: enforces the Target invariants, returning errors as values (D3). */
@@ -61,6 +64,9 @@ export function createTarget(input: TargetInput): Result<Target, TargetError> {
   if (input.tracks.length === 0) return err({ kind: 'NoTracks' });
 
   for (const track of input.tracks) {
+    if (!Number.isSafeInteger(track.position) || track.position <= 0) {
+      return err({ kind: 'InvalidTrackPosition', position: track.position });
+    }
     if (track.durationMs <= 0) {
       return err({ kind: 'InvalidTrackDuration', position: track.position });
     }
@@ -71,7 +77,8 @@ export function createTarget(input: TargetInput): Result<Target, TargetError> {
       type: input.type,
       artist,
       title,
-      tracks: input.tracks,
+      // Non-empty by construction: the `NoTracks` guard above has proven `length > 0`.
+      tracks: assertNonEmpty(input.tracks),
       year: input.year,
       mbid: input.mbid,
     }),

@@ -1,8 +1,22 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
+import type { DestinationStream } from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
+
+/** A pino destination that collects each emitted NDJSON line for assertions. */
+function collectingDestination(): { stream: DestinationStream; lines: string[] } {
+  const lines: string[] = [];
+  return {
+    lines,
+    stream: {
+      write(chunk: string): void {
+        lines.push(chunk);
+      },
+    },
+  };
+}
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
   CatchUpSubscriptionDependencies,
@@ -114,6 +128,19 @@ describe('CatchUpSubscription', () => {
     await sub.start();
 
     expect(handled).toEqual([3]);
+  });
+
+  it('surfaces a faulted checkpoint read instead of silently replaying from zero unremarked', async () => {
+    const { stream, lines } = collectingDestination();
+    feed.events = [seamEvent(1), seamEvent(2)];
+    checkpoints.failLoad = true;
+    const sub = subscription({ logger: createLogger({ destination: stream }) });
+
+    await sub.start();
+
+    expect(lines.some((line) => line.includes('checkpoint load failed'))).toBe(true);
+    expect(lines.some((line) => line.includes('seam:test'))).toBe(true);
+    expect(handled).toEqual([1, 2]); // still resumes safely from the log start
   });
 
   it('a wakeup is only a hint — the fallback poll alone still delivers', async () => {

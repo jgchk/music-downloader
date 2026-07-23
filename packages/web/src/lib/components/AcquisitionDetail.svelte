@@ -3,6 +3,7 @@
   import {
     isCancellable,
     outcomeSummary,
+    parseAcquisitionView,
     statusTone,
     targetDescription,
   } from '$lib/acquisitions.js';
@@ -37,6 +38,11 @@
     progressUnavailable = false,
     error,
   }: Properties = $props();
+
+  // Parse the status DTO into a discriminated view at the boundary, so the template branches on a
+  // view variant (whose `editions` case carries candidates) instead of re-deriving the impossible
+  // "awaiting but candidates undefined" combo inline.
+  const view = $derived(parseAcquisitionView(acquisition));
 </script>
 
 <h1>{targetDescription(acquisition)}</h1>
@@ -69,7 +75,7 @@
   </p>
 {/if}
 
-{#if acquisition.status === 'AwaitingManualSelection' && acquisition.candidates !== undefined}
+{#if view.kind === 'editions'}
   <h2>Choose an edition</h2>
   <p>
     This release group has no official edition, so nothing was picked automatically. Choose the
@@ -87,7 +93,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each acquisition.candidates as candidate (candidate.releaseMbid)}
+      {#each view.candidates as candidate (candidate.releaseMbid)}
         <tr>
           <td>{candidate.title ?? '(untitled)'}</td>
           <td>{candidate.date ?? '—'}</td>
@@ -104,7 +110,7 @@
       {/each}
     </tbody>
   </table>
-{:else if acquisition.status === 'AwaitingManualSelection'}
+{:else if view.kind === 'no-editions'}
   <!-- Defensive: the projection always carries candidates in this phase; if a stale or drifted
        reader ever sees none, say so instead of presenting a silent dead end. -->
   <p data-testid="no-candidates">

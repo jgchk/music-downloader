@@ -96,6 +96,14 @@ export class CatchUpSubscription {
   /** Resume from the checkpoint, drain the backlog, then follow wakeups + the fallback poll. */
   async start(): Promise<void> {
     const checkpoint = await this.dependencies.checkpoints.load(this.dependencies.name);
+    if (checkpoint.isErr()) {
+      // Collapsing a faulted read into "fresh consumer at 0" would silently replay the whole feed;
+      // the operator must be able to tell a real fresh start apart from a checkpoint-store fault.
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, err: checkpoint.error },
+        'checkpoint load failed; resuming from the log start',
+      );
+    }
     this.cursor = checkpoint.unwrapOr(0);
     await this.poll();
     this.stopWakeups = this.dependencies.wakeups?.subscribe(() => {

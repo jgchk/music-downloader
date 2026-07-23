@@ -1,8 +1,24 @@
 import { errAsync, okAsync } from 'neverthrow';
+import type { DestinationStream } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
+import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { createLogger } from '../../application/logging/logger.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { StoredEvent } from '../../application/ports/event-store-port.js';
 import { InProcessEventBus, pollCatchUp } from './event-bus.js';
+
+/** A pino destination that collects each emitted NDJSON line for assertions. */
+function collectingDestination(): { stream: DestinationStream; lines: string[] } {
+  const lines: string[] = [];
+  return {
+    lines,
+    stream: {
+      write(chunk: string): void {
+        lines.push(chunk);
+      },
+    },
+  };
+}
 
 function storedAt(globalSeq: number): StoredEvent {
   return {
@@ -17,7 +33,7 @@ function storedAt(globalSeq: number): StoredEvent {
 
 describe('InProcessEventBus', () => {
   it('fans committed events out to every subscriber', () => {
-    const bus = new InProcessEventBus();
+    const bus = new InProcessEventBus(silentLogger());
     const seen: number[] = [];
     bus.subscribe((event) => {
       seen.push(event.globalSeq);
@@ -32,7 +48,7 @@ describe('InProcessEventBus', () => {
   });
 
   it('stops delivering once a subscriber unsubscribes', () => {
-    const bus = new InProcessEventBus();
+    const bus = new InProcessEventBus(silentLogger());
     const seen: number[] = [];
     const unsubscribe = bus.subscribe((event) => {
       seen.push(event.globalSeq);
@@ -43,6 +59,26 @@ describe('InProcessEventBus', () => {
     bus.publish([storedAt(2)]);
 
     expect(seen).toEqual([1]);
+  });
+
+  it('isolates a throwing subscriber so the rest still receive the event, logging the fault', () => {
+    const { stream, lines } = collectingDestination();
+    const bus = new InProcessEventBus(createLogger({ destination: stream }));
+    const seen: number[] = [];
+    bus.subscribe(() => {
+      throw new Error('subscriber boom');
+    });
+    bus.subscribe((event) => {
+      seen.push(event.globalSeq);
+    });
+
+    expect(() => bus.publish([storedAt(7)])).not.toThrow();
+
+    expect(seen).toEqual([7]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('subscriber boom');
+    expect(lines[0]).toContain('"globalSeq":7');
+    expect(lines[0]).toContain('AcquisitionExhausted');
   });
 });
 

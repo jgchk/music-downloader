@@ -3,12 +3,13 @@ import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
 import { InProcessEventBus } from './event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from './event-store.js';
 import { openEventDatabase, type EventDatabase } from './schema.js';
-import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 const META: EventMetadata = { acquisitionId: 'acq-1', occurredAt: '2026-07-03T12:00:00.000Z' };
 
@@ -101,7 +102,7 @@ describe('SqliteEventStore', () => {
   });
 
   it('publishes committed events to the bus (publish-after-commit)', async () => {
-    const bus = new InProcessEventBus();
+    const bus = new InProcessEventBus(silentLogger());
     const store = new SqliteEventStore(freshDatabase(), new UpcasterRegistry(), bus);
     const seen: StoredEvent[] = [];
     bus.subscribe((event) => {
@@ -112,6 +113,49 @@ describe('SqliteEventStore', () => {
 
     expect(seen.map((event) => event.type)).toEqual(['Imported']);
     expect(seen[0]!.globalSeq).toBe(1);
+  });
+
+  it('stamps every appended event at the current schema version', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+
+    await store.append('acq-1', 0, [IMPORTED], META);
+
+    const row = database
+      .prepare('SELECT schema_version AS schemaVersion FROM events WHERE stream_id = ?')
+      .get('acq-1') as { schemaVersion: number };
+    expect(row.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
+  it('upcasts a legacy row forward through the real registry on read', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database, buildUpcasterRegistry());
+    // A v1 ManualSelectionRequested row written before EditionCandidate.trackCount became optional:
+    // an unknown count was stored as the sentinel 0. The real registry must fold it to absent.
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'acq-1',
+        0,
+        'ManualSelectionRequested',
+        1,
+        JSON.stringify({
+          type: 'ManualSelectionRequested',
+          candidates: [{ releaseMbid: 'b', title: 'Unknown', trackCount: 0 }],
+        }),
+        '{}',
+      );
+
+    const readResult = await store.readStream('acq-1');
+    const read = readResult._unsafeUnwrap();
+
+    expect(read[0]!.event).toEqual({
+      type: 'ManualSelectionRequested',
+      candidates: [{ releaseMbid: 'b', title: 'Unknown' }],
+    });
   });
 
   it('upcasts stored events on read', async () => {

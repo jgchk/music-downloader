@@ -20,7 +20,24 @@ import type { CommandError } from './command-handler.js';
  * settled), which retrying can never resolve. Only the former is retryable.
  */
 function isRetryable(error: CommandError): boolean {
-  return error.kind === 'InfraError' || error.kind === 'ConcurrencyConflict';
+  // Exhaustive over the closed `CommandError` union (no `default`) so a future error variant is a
+  // compile-time decision here, not a silent collapse to `false` that would drop a retryable fault.
+  switch (error.kind) {
+    case 'InfraError':
+    case 'ConcurrencyConflict': {
+      // A transient infrastructure fault or an optimistic-concurrency race: retrying can resolve it.
+      return true;
+    }
+    case 'UnknownImport':
+    case 'NoOpenReview':
+    case 'InvalidResolution':
+    case 'UnknownCandidate':
+    case 'NoRetainedCandidate': {
+      // A domain rejection — the stream has already settled this outcome. Retrying would only
+      // re-fire the same rejection forever, so advance past it instead.
+      return false;
+    }
+  }
 }
 
 /** A one-line rendering of a failed effect's error for a dead-letter or park entry. */
@@ -107,6 +124,14 @@ export class Reactor {
    */
   async start(): Promise<void> {
     const checkpoint = await this.dependencies.checkpoints.load(REACTOR_CONSUMER);
+    if (checkpoint.isErr()) {
+      // Replaying from the log start is safe (idempotent effects + decide's stale guards) but noisy
+      // and slow — the operator must be able to tell it apart from a genuinely fresh consumer.
+      this.dependencies.logger.error(
+        { err: checkpoint.error },
+        'checkpoint load failed; replaying from the log start',
+      );
+    }
     this.lastProcessed = checkpoint.unwrapOr(0);
 
     this.unsubscribe = this.dependencies.bus.subscribe(() => {

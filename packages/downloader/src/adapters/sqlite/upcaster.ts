@@ -3,9 +3,10 @@ import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 /**
  * Event versioning / upcasting seam (D8): persisted events are immutable facts that live forever,
  * so every stored event carries a schema version, and read-side upcasters transform an old shape
- * forward (`v1 → v2 → …`) before `evolve` ever sees it. The MVP registry is pass-through — the
- * seam exists so the first real schema change is a localized, tested upcaster rather than a
- * migration, exactly the ES form of the no-breaking-change policy.
+ * forward (`v1 → v2 → …`) before `evolve` ever sees it. The registry is active — the
+ * `ManualSelectionRequested` v1→v2 transform is registered in {@link buildUpcasterRegistry} — so a
+ * schema change is a localized, tested upcaster rather than a migration, exactly the ES form of the
+ * no-breaking-change policy.
  */
 
 /**
@@ -34,7 +35,7 @@ export class UpcasterRegistry {
 
   /**
    * Apply the chain of registered upcasters from `schemaVersion` up to the latest known shape.
-   * With nothing registered (the MVP), this is a pass-through: the stored payload is already
+   * With no upcaster registered for the type, this is a pass-through: the stored payload is already
    * current and is returned untouched.
    */
   upcast(type: string, schemaVersion: number, data: Record<string, unknown>): AcquisitionEvent {

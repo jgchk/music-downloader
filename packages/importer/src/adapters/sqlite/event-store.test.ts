@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
 import { InProcessEventBus } from './event-bus.js';
@@ -109,8 +110,24 @@ describe('SqliteEventStore', () => {
     expect(tail.map((event) => event.streamId)).toEqual(['imp-2']);
   });
 
+  it('bounds a readAll batch by `limit`, windowing the global order for a checkpointed consumer', async () => {
+    const store = new SqliteEventStore(freshDatabase());
+    await store.append('imp-1', 0, [APPLIED, REJECTED], META);
+    await store.append('imp-2', 0, [APPLIED], { ...META, importId: 'imp-2' });
+
+    // A limited read returns only the first window after the cursor…
+    const firstResult = await store.readAll(0, 2);
+    const firstWindow = firstResult._unsafeUnwrap();
+    expect(firstWindow.map((event) => event.globalSeq)).toEqual([1, 2]);
+
+    // …and resuming from that window's end yields the next one, so a stepped drain covers all three.
+    const nextResult = await store.readAll(2, 2);
+    const nextWindow = nextResult._unsafeUnwrap();
+    expect(nextWindow.map((event) => event.globalSeq)).toEqual([3]);
+  });
+
   it('publishes committed events to the bus (publish-after-commit)', async () => {
-    const bus = new InProcessEventBus();
+    const bus = new InProcessEventBus(silentLogger());
     const store = new SqliteEventStore(freshDatabase(), new UpcasterRegistry(), bus);
     const seen: StoredEvent[] = [];
     bus.subscribe((event) => {
@@ -121,6 +138,22 @@ describe('SqliteEventStore', () => {
 
     expect(seen.map((event) => event.type)).toEqual(['ImportApplied']);
     expect(seen[0]!.globalSeq).toBe(1);
+  });
+
+  it('still commits (returns ok) when a publish-after-commit subscriber throws', async () => {
+    // publish() runs AFTER the append transaction commits: a subscriber that throws must never
+    // turn an already-durable append into a failure. The bus isolates the throw; append stays ok.
+    const bus = new InProcessEventBus(silentLogger());
+    const store = new SqliteEventStore(freshDatabase(), new UpcasterRegistry(), bus);
+    bus.subscribe(() => {
+      throw new Error('projection boom');
+    });
+
+    const result = await store.append('imp-1', 0, [APPLIED], META);
+
+    expect(result.isOk()).toBe(true);
+    const readBack = await store.readStream('imp-1');
+    expect(readBack._unsafeUnwrap()).toHaveLength(1);
   });
 
   it('upcasts stored events on read', async () => {

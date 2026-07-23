@@ -19,8 +19,14 @@ describe('ManualTagsForm', () => {
     expect(page.getByTestId('track-row').elements()).toHaveLength(1);
   });
 
-  it('renders provided initial rows', async () => {
-    await render(ManualTagsForm, { initialRows: [row, { ...row, path: '/in/02.flac' }] });
+  it('renders provided initial rows, bound and numbered', async () => {
+    await render(ManualTagsForm, {
+      initialRows: [row, { ...row, path: '/in/02.flac', title: 'Two' }],
+    });
     expect(page.getByTestId('track-row').elements()).toHaveLength(2);
+    // The first row's title input is bound to the provided value, not just present.
+    await expect.element(page.getByLabelText('Title').first()).toHaveValue('One');
+    // Legends number the rows by position.
+    await expect.element(page.getByText('Track 2')).toBeInTheDocument();
   });
 });

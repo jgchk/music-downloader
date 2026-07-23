@@ -143,6 +143,30 @@ describe('hintNote', () => {
       }),
     ).toBe('a release was hinted');
   });
+
+  it('names a contradiction when the best candidate is a different release than the pinned one', () => {
+    expect(
+      hintNote({
+        kind: 'match-review',
+        hinted: true,
+        hintedReleaseId: 'other-release',
+        best: { dataSource: 'MusicBrainz', albumId: 'r-1' },
+        candidates: [],
+      }),
+    ).toBe('the release you pinned was not the best match');
+  });
+
+  it('confirms-but-uncertain when the best candidate is the pinned release itself', () => {
+    expect(
+      hintNote({
+        kind: 'match-review',
+        hinted: true,
+        hintedReleaseId: 'r-1',
+        best: { dataSource: 'MusicBrainz', albumId: 'r-1' },
+        candidates: [],
+      }),
+    ).toBe('matched your pinned release, but low confidence');
+  });
 });
 
 describe('penaltyLabel', () => {

@@ -1,4 +1,4 @@
-import { branded } from '../../domain/shared/brand.js';
+import { parseMbid } from '../../domain/shared/mbid.js';
 import type { Mbid } from '../../domain/shared/mbid.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
@@ -38,12 +38,15 @@ function parseYear(date: string | null | undefined): number | undefined {
 }
 
 /**
- * Brand a MusicBrainz id as an {@link Mbid} at this ACL edge. MusicBrainz is the *authoritative
- * issuer* of mbids, so its ids are trusted and branded directly — unlike a user-supplied id, which
- * the facade validates with `parseMbid` before it ever reaches the domain.
+ * Parse a MusicBrainz id into an {@link Mbid} at this ACL edge. MusicBrainz issues mbids as UUIDs,
+ * so the id runs through the same `parseMbid` UUID guard the facade applies to user-supplied ids —
+ * a malformed value (a garbled payload) reads as absent rather than being branded through blindly,
+ * so it drops a target's mbid or skips an unidentifiable edition instead of forging a bad brand.
  */
 function optionalMbid(id: string | undefined): Mbid | undefined {
-  return id === undefined ? undefined : branded<Mbid>(id);
+  if (id === undefined) return undefined;
+  const parsed = parseMbid(id);
+  return parsed.isOk() ? parsed.value : undefined;
 }
 
 export function releaseToTarget(release: MbRelease): Target | undefined {

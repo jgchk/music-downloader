@@ -40,6 +40,15 @@ export type ApplyOutcome =
   | { readonly kind: 'skipped-duplicate'; readonly incumbents: readonly DuplicateIncumbent[] }
   | { readonly kind: 'doomed'; readonly reason: string };
 
+/**
+ * An unusable beets configuration reported by `validate` (D3): operator-fixable, so it is a business
+ * outcome, NOT a retryable `InfraError`. The startup gate fails loudly on it — no retry can help.
+ */
+export interface ConfigInvalid {
+  readonly kind: 'ConfigInvalid';
+  readonly detail: string;
+}
+
 /** The effective beets configuration, as validated and reported by the bridge at startup. */
 export interface TaggerConfig {
   readonly beetsVersion: string;
@@ -60,8 +69,12 @@ export interface TaggerPort {
   /** Perform the import for a chosen outcome, firing beets' full pipeline. */
   apply(directory: string, mode: ApplyMode): ResultAsync<ApplyOutcome, InfraError>;
 
-  /** Validate the beets configuration and report the effective merged view (startup gate). */
-  validate(): ResultAsync<TaggerConfig, InfraError>;
+  /**
+   * Validate the beets configuration and report the effective merged view (startup gate). An
+   * unusable config comes back as the non-retryable {@link ConfigInvalid}; only genuine faults
+   * (spawn failures, timeouts, contract drift) are the retry-worthy `InfraError`.
+   */
+  validate(): ResultAsync<TaggerConfig, InfraError | ConfigInvalid>;
 }
 
 /** Intake-directory stewardship: the only filesystem writes this service performs itself (D5). */

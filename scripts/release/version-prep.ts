@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { applyBump, bumpLevel } from './bump.ts';
 import { latestReleaseVersion } from './tags.ts';
 import { extractChangelogSection } from './changelog.ts';
@@ -38,7 +39,7 @@ function versionOf(packageJson: string): string {
 }
 
 /** Reassemble CHANGELOG.md from its base content with `section` prepended — catv's exact logic. */
-function assembleChangelog(baseChangelog: string, section: string): string {
+export function assembleChangelog(baseChangelog: string, section: string): string {
   const frontMatter = baseChangelog.substring(0, baseChangelog.indexOf('# Changelog'));
   const bodyStart = baseChangelog.search(START_OF_LAST_RELEASE);
   const oldBody = bodyStart !== -1 ? baseChangelog.substring(bodyStart) : baseChangelog;
@@ -52,7 +53,17 @@ interface Computed {
   section: string | null;
 }
 
-async function compute(reader: ReleaseReader): Promise<Computed> {
+/**
+ * Whether a release tag for `version` already exists — the concurrent-branch collision guard. Two
+ * branches forked off the same tag compute the same next version; the second to reach `--check`
+ * must fail loudly rather than silently overwrite the first branch's release (the past incident).
+ * A newly-computed bump has no tag yet, so the normal flow reads `false`.
+ */
+export function isReleaseTagTaken(version: string, tags: readonly string[]): boolean {
+  return tags.includes(`v${version}`);
+}
+
+export async function compute(reader: ReleaseReader): Promise<Computed> {
   // Anchor on the released mainline's tags, not `git describe` from HEAD: the merged importer
   // lineage carries its own v0.1.x tags at a competitive commit distance, and describe would pick by
   // distance. Released state is whatever main has shipped (tags.ts picks the highest semver).
@@ -110,6 +121,18 @@ async function main(): Promise<void> {
 
   // --check: verify the committed tree already carries the computed state, entirely in memory (no
   // disk writes, no checkout/restore — the tree is never touched).
+
+  // Collision guard: a freshly-computed bump whose tag already exists means a concurrent branch
+  // forked off the same tag has already shipped this version. Fail loudly so it is rebased rather
+  // than silently overwriting that release. Only a real bump can collide (an unbumped range stays
+  // at the last released version, which of course still has its tag).
+  if (bumped && isReleaseTagTaken(version, reader.releaseTags())) {
+    fail(
+      `version:prep --check: v${version} is already a release tag — a concurrent branch shipped it ` +
+        `while this one was open.\nRebase onto origin/main and re-run \`pnpm version:prep\`.`,
+    );
+  }
+
   const committedVersion = versionOf(reader.committedPackageJson());
   if (committedVersion !== version) {
     fail(
@@ -132,6 +155,9 @@ async function main(): Promise<void> {
   process.stdout.write(`version:prep --check: branch is prepped for ${version}\n`);
 }
 
-void main().catch((error: unknown) => {
-  fail(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
-});
+// Run only as the CLI entry point; importing the module (the unit tests) must not touch the tree.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  void main().catch((error: unknown) => {
+    fail(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
+  });
+}

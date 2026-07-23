@@ -60,6 +60,22 @@ describe('createLogger', () => {
     expect(lines[0]).not.toContain('sk-secret');
   });
 
+  it('redacts fileContents at the top level and nested (the named privacy guarantee)', () => {
+    const { stream, lines } = collectingDestination();
+    const logger = createLogger({ destination: stream });
+
+    logger.info(
+      { fileContents: 'TOP-SECRET-BYTES', staged: { fileContents: 'NESTED-SECRET-BYTES' } },
+      'staging a file',
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain('TOP-SECRET-BYTES');
+    expect(lines[0]).not.toContain('NESTED-SECRET-BYTES');
+    // Both positions are censored — `fileContents` and `*.fileContents` each replace with the marker.
+    expect(lines[0]!.match(/\[REDACTED\]/gu)).toHaveLength(2);
+  });
+
   it('honours custom redaction paths', () => {
     const { stream, lines } = collectingDestination();
     const logger = createLogger({ destination: stream, redactPaths: ['secretField'] });

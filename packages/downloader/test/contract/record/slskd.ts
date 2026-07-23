@@ -22,6 +22,8 @@ const SEARCH_TEXT = 'Pink Floyd Dark Side of the Moon';
 // A live search returns hundreds of peers (~MBs). Keep a handful of real, unaltered peer objects —
 // enough to pin the contract shape without bloating the repo. The drop is logged, never silent.
 const PEER_CAP = 5;
+// One page of the newest-first events log — enough to capture a recent DownloadFileComplete.
+const EVENTS_LIMIT = 100;
 
 if (BASE_URL === undefined || API_KEY === undefined) {
   throw new Error('SLSKD_BASE_URL and SLSKD_API_KEY must be set');
@@ -170,6 +172,36 @@ async function main(): Promise<void> {
       { method: 'GET', path: `/api/v0/transfers/downloads/${alias(realUser)}` },
       poll,
       'per-user download transfers (nested directories[].files[])',
+    ),
+  );
+
+  // The effective configuration: only directories.downloads (the downloads root) is consumed, used
+  // to re-root slskd's container-side localFilename onto our shared staging volume.
+  const options = await call('GET', '/api/v0/options');
+  write(
+    'options.json',
+    fixture(
+      { method: 'GET', path: '/api/v0/options' },
+      options,
+      'GET /api/v0/options — only directories.downloads is consumed (the downloads root)',
+    ),
+  );
+
+  // The newest-first, paged activity log with its real offset/limit query. Each record's `data` is a
+  // JSON-encoded string; a `DownloadFileComplete` carries the authoritative localFilename + transfer
+  // id the staged-path resolver decodes. A completion only appears once a download has finished, so
+  // run this recorder against an instance that has completed at least one download for full coverage.
+  const events = await call('GET', `/api/v0/events?offset=0&limit=${EVENTS_LIMIT}`);
+  write(
+    'events.json',
+    fixture(
+      {
+        method: 'GET',
+        path: '/api/v0/events',
+        query: { offset: '0', limit: String(EVENTS_LIMIT) },
+      },
+      events,
+      'GET /api/v0/events — newest-first paged log; DownloadFileComplete.data is a JSON-encoded string',
     ),
   );
 

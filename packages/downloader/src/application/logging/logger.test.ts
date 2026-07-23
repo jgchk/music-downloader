@@ -60,6 +60,28 @@ describe('createLogger', () => {
     expect(lines[0]).not.toContain('sk-secret');
   });
 
+  it('redacts a top-level token so the secret never reaches the stream', () => {
+    const { stream, lines } = collectingDestination();
+    const logger = createLogger({ destination: stream });
+
+    logger.info({ token: 'top-secret-token' }, 'authenticating');
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('[REDACTED]');
+    expect(lines[0]).not.toContain('top-secret-token');
+  });
+
+  it('redacts a nested *.token so the secret never reaches the stream', () => {
+    const { stream, lines } = collectingDestination();
+    const logger = createLogger({ destination: stream });
+
+    logger.info({ slskd: { token: 'nested-secret-token' } }, 'connecting');
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('[REDACTED]');
+    expect(lines[0]).not.toContain('nested-secret-token');
+  });
+
   it('honours custom redaction paths', () => {
     const { stream, lines } = collectingDestination();
     const logger = createLogger({ destination: stream, redactPaths: ['secretField'] });

@@ -87,6 +87,28 @@ describe('OutboundFeed', () => {
     expect(tail.scannedTo).toBe(full.events[0]!.globalSeq);
   });
 
+  it('renders a published event against only the prefix as of it, excluding later trailing events', async () => {
+    // The published verdict is NOT the last event in its stream: a later ImportRejected follows it.
+    await store.append(
+      'imp-2',
+      0,
+      [...verdictHistory(), { type: 'ImportRejected', reason: 'gone', filesDeleted: true }],
+      { importId: 'imp-2', occurredAt: 'T0' },
+    );
+    const feed = new OutboundFeed(store, mapping);
+
+    const trailingResult = await feed.read(0, 100);
+    const batch = trailingResult._unsafeUnwrap();
+
+    expect(batch.events).toHaveLength(1);
+    // The prefix stops at the verdict (`version <= stored.version`): the trailing event is excluded,
+    // so the rendered prefix length is the history up to and including the verdict, not the whole stream.
+    expect(batch.events[0]!.data).toEqual({
+      streamId: 'imp-2',
+      prefixLength: verdictHistory().length,
+    });
+  });
+
   it('surfaces store read failures instead of exposing partial results', async () => {
     await seed('imp-1');
     store.failReadAll = true;

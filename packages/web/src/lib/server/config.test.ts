@@ -16,7 +16,15 @@ describe('loadComposedConfig', () => {
     expect(config.downloader.stagingRoot).toBe('/staging');
     expect(config.importer.intakeRoot).toBe('/intake');
     expect(config.importer.bridgeTimeoutMs).toBe(600_000);
+    expect(config.importer.autoApplyThreshold).toBe(0.04);
     expect(config.logLevel).toBe('info');
+  });
+
+  it('rejects an auto-apply threshold outside the 0..1 distance range, naming the setting', () => {
+    const low = loadComposedConfig({ ...VALID, AUTO_APPLY_THRESHOLD: '-0.1' })._unsafeUnwrapErr();
+    expect(low).toContain('AUTO_APPLY_THRESHOLD');
+    const high = loadComposedConfig({ ...VALID, AUTO_APPLY_THRESHOLD: '1.5' })._unsafeUnwrapErr();
+    expect(high).toContain('AUTO_APPLY_THRESHOLD');
   });
 
   it('ignores webhook-era settings entirely (runtime-baseline: inert, never read)', () => {

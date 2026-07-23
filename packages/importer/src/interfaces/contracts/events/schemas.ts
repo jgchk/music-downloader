@@ -7,22 +7,24 @@ import { z } from 'zod';
  * JSON Schema artifacts from them, and the contract-test tier enforces the evolution rule —
  * **additive-only within an event type; a breaking change is a new `type`**.
  *
- * The payload shape is chosen to satisfy music-downloader's published tolerant-reader needs
- * (acquisition id, candidate `{username, path, sizeBytes?}`, verdict `rejected`, reasons):
- * `sizeBytes` is OMITTED when unknown — never null — because the receiver reads it as an optional
- * number. The vocabulary stays this tool's own; consumers translate at their anti-corruption
- * layers.
+ * The payload is this tool's own self-contained "release rejected" notification: the originating
+ * acquisition id, the delivered candidate's identity `{username, path, sizeBytes?}`, the verdict
+ * (`rejected`), and the reviewer's reasons — everything the fact carries, in our vocabulary, with no
+ * shared kernel. Our serialization convention keeps every field either present-and-typed or absent:
+ * an unknown `sizeBytes` is OMITTED entirely (never null). Consumers translate at their own
+ * anti-corruption layers; we do not model how they parse it.
  */
 
 export const RELEASE_VERDICT_TYPE = 'release.verdict';
 
 export const releaseVerdictDataSchema = z.object({
-  /** The originating acquisition — the receiver's revival key. */
+  /** The originating acquisition this verdict is about. */
   acquisitionId: z.string().min(1),
-  /** The delivered candidate's identity, echoed for the receiver's stale-guard. */
+  /** The delivered candidate's identity, as we recorded it on the acquisition's import. */
   candidate: z.object({
     username: z.string(),
     path: z.string(),
+    // Our convention omits an unknown size entirely rather than emitting null.
     sizeBytes: z.number().optional(),
   }),
   /** The adjudication. Only `rejected` exists today; new verdicts are additive later. */

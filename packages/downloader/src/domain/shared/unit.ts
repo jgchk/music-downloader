@@ -30,8 +30,10 @@ export function parseUnit(value: number): Result<Unit, OutOfUnitRange> {
  * Mint a {@link Unit} from a value the domain computed and already bounds to [0, 1] by construction
  * (a weighted mean of Units, a `Math.min` of Units), pinning any floating-point overshoot to the
  * nearest bound. Use this — not {@link parseUnit} — where a range violation would be a domain bug,
- * not authored input to reject.
+ * not authored input to reject. An uncomputable `NaN` (a `0/0` mean) collapses to 0 rather than
+ * escaping as an out-of-range brand that would misroute the walk or the auto-apply gate.
  */
 export function clampUnit(value: number): Unit {
+  if (Number.isNaN(value)) return branded<Unit>(0);
   return branded<Unit>(Math.min(1, Math.max(0, value)));
 }

@@ -1,5 +1,6 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
+import type { Logger } from '../../application/logging/logger.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   EventBus,
@@ -12,13 +13,28 @@ import type {
  * here, and the reactor and projections subscribe to follow them live within the single process.
  * Fan-out is synchronous. The durable recovery path — after a restart, or for a subscriber that
  * missed live events — is {@link pollCatchUp} over the store's global order, not this bus.
+ *
+ * Each handler dispatch is isolated: a synchronous throw from one subscriber is caught and logged
+ * (never rethrown), so one buggy follower can neither drop the event for the others nor propagate
+ * back into the store's committed `append`.
  */
 export class InProcessEventBus implements EventBus {
   private readonly handlers = new Set<(event: StoredEvent) => void>();
 
+  constructor(private readonly logger: Logger) {}
+
   publish(events: readonly StoredEvent[]): void {
     for (const event of events) {
-      for (const handler of this.handlers) handler(event);
+      for (const handler of this.handlers) {
+        try {
+          handler(event);
+        } catch (error) {
+          this.logger.error(
+            { err: error, type: event.type, globalSeq: event.globalSeq },
+            'event-bus subscriber threw; continuing fan-out to the rest',
+          );
+        }
+      }
     }
   }
 

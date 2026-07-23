@@ -2,6 +2,7 @@ import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import { infraError } from '../ports/errors.js';
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
   CatchUpSubscriptionDependencies,
@@ -265,6 +266,23 @@ describe('CatchUpSubscription', () => {
 
     expect(sub.isHalted).toBe(true);
     expect(await checkpointOf()).toBe(0); // held, never skipped
+  });
+
+  it('replays from the log start and surfaces the fault when the checkpoint load fails', async () => {
+    feed.events = [seamEvent(1)];
+    checkpoints.failLoad = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const sub = subscription({ logger });
+
+    await sub.start();
+
+    // Fell back to cursor 0 and drained from the log start — loudly, never a silent skip.
+    expect(handled).toEqual([1]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      { subscription: 'seam:test', err: infraError('checkpoint.load', 'boom') },
+      'checkpoint load failed; replaying from the log start',
+    );
   });
 
   it('a checkpoint save failure holds delivery rather than losing it', async () => {

@@ -5,4 +5,4 @@
   let { data }: PageProperties = $props();
 </script>
 
-<Landing counts={data.counts} />
+<Landing counts={data.counts} errors={data.errors} />

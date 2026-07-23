@@ -84,7 +84,7 @@ interface E2EOptions {
 
 function wire(options: E2EOptions) {
   const database = openEventDatabase(':memory:');
-  const bus = new InProcessEventBus();
+  const bus = new InProcessEventBus(silentLogger());
   const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(database);
   const discardStaging = vi.fn((_files) => okAsync<void>(undefined));

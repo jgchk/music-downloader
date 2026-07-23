@@ -153,7 +153,7 @@ describe('recordExternalValidationFailure', () => {
 });
 
 describe('queries', () => {
-  it('read status, list, and progress from the projections', () => {
+  function requested(): ReturnType<typeof dependencies> {
     const d = dependencies();
     d.status.apply({
       globalSeq: 1,
@@ -163,11 +163,24 @@ describe('queries', () => {
       event: { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
       metadata: { acquisitionId: 'acq-1', occurredAt: 't' },
     });
-    d.progress.update('acq-1', { percent: 10, bytesTransferred: 1, bytesTotal: 10 });
+    return d;
+  }
 
-    expect(getAcquisition(d, 'acq-1')?.status).toBe('Pending');
-    expect(getAcquisition(d, 'missing')).toBeUndefined();
-    expect(listAcquisitions(d)).toHaveLength(1);
+  it('reads the status view of an applied acquisition', () => {
+    expect(getAcquisition(requested(), 'acq-1')?.status).toBe('Pending');
+  });
+
+  it('reports nothing for an unknown acquisition id', () => {
+    expect(getAcquisition(requested(), 'missing')).toBeUndefined();
+  });
+
+  it('lists one entry per applied acquisition', () => {
+    expect(listAcquisitions(requested())).toHaveLength(1);
+  });
+
+  it('reads the latest download progress for an acquisition', () => {
+    const d = requested();
+    d.progress.update('acq-1', { percent: 10, bytesTransferred: 1, bytesTotal: 10 });
     expect(getAcquisitionProgress(d, 'acq-1')?.percent).toBe(10);
   });
 

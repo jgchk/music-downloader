@@ -36,7 +36,7 @@ function renderVerdict(
       candidate: {
         username: candidate.username,
         path: candidate.path,
-        // Omitted — never null — when unknown: the receiver reads an optional number.
+        // Omitted — never null — when unknown: our serialization convention keeps absent fields absent.
         ...(candidate.sizeBytes !== undefined && { sizeBytes: candidate.sizeBytes }),
       },
       verdict: 'rejected',
