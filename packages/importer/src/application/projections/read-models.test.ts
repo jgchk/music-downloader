@@ -22,14 +22,19 @@ import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import { ImportStatusProjection, projectStatus } from './read-models.js';
 
-function storedAll(streamId: string, events: readonly ImportEvent[], from = 0): StoredEvent[] {
+function storedAll(
+  streamId: string,
+  events: readonly ImportEvent[],
+  from = 0,
+  at: (index: number) => string = () => 't',
+): StoredEvent[] {
   return events.map((event, index) => ({
     globalSeq: from + index + 1,
     streamId,
     version: index,
     type: event.type,
     event,
-    metadata: { importId: streamId, occurredAt: 't' },
+    metadata: { importId: streamId, occurredAt: at(index) },
   }));
 }
 
@@ -41,7 +46,7 @@ describe('projectStatus', () => {
       AUTO_APPLIED,
       APPLIED,
     ];
-    const view = projectStatus('imp-1', history);
+    const view = projectStatus('imp-1', storedAll('imp-1', history));
     expect(view).toMatchObject({
       importId: 'imp-1',
       directory: DIRECTORY,
@@ -49,11 +54,40 @@ describe('projectStatus', () => {
       location: '/library/Artist/Album',
     });
     expect(view.history).toEqual([
-      { kind: 'requested', hints: HINTS },
-      { kind: 'proposed', candidateCount: 1, pinnedId: 'mb-1' },
-      { kind: 'auto-apply-selected', candidate: candidate().ref, distance: asDistance(0.05) },
-      { kind: 'applied', location: '/library/Artist/Album' },
+      { kind: 'requested', at: 't', hints: HINTS },
+      { kind: 'proposed', at: 't', candidateCount: 1, pinnedId: 'mb-1' },
+      {
+        kind: 'auto-apply-selected',
+        at: 't',
+        candidate: candidate().ref,
+        distance: asDistance(0.05),
+      },
+      { kind: 'applied', at: 't', location: '/library/Artist/Album' },
     ]);
+  });
+
+  it('stamps each history entry with its event occurrence time', () => {
+    const view = projectStatus(
+      'imp-1',
+      storedAll('imp-1', appliedHistory(), 0, (index) => `2026-01-01T00:00:0${index}Z`),
+    );
+    expect(view.history.map((entry) => entry.at)).toEqual([
+      '2026-01-01T00:00:00Z',
+      '2026-01-01T00:00:01Z',
+      '2026-01-01T00:00:02Z',
+      '2026-01-01T00:00:03Z',
+    ]);
+  });
+
+  it('carries the originating acquisition id when the import came from one', () => {
+    const withSource = projectStatus(
+      'imp-1',
+      storedAll('imp-1', [requested({ source: SOURCE }), proposed([candidate()])]),
+    );
+    expect(withSource.acquisitionId).toBe('acq-1');
+
+    const manual = projectStatus('imp-2', storedAll('imp-2', appliedHistory()));
+    expect(manual.acquisitionId).toBeUndefined();
   });
 
   it('explains why review was required and what the human chose', () => {
@@ -62,11 +96,16 @@ describe('projectStatus', () => {
       resolved({ kind: 'reject', reason: 'wrong rip' }),
       { type: 'ImportRejected', reason: 'wrong rip', filesDeleted: true } as const,
     ];
-    const view = projectStatus('imp-1', history);
-    expect(view.history).toContainEqual({ kind: 'review-required', reviewKind: 'match-review' });
-    expect(view.history).toContainEqual({ kind: 'review-resolved', resolution: 'reject' });
+    const view = projectStatus('imp-1', storedAll('imp-1', history));
+    expect(view.history).toContainEqual({
+      kind: 'review-required',
+      at: 't',
+      reviewKind: 'match-review',
+    });
+    expect(view.history).toContainEqual({ kind: 'review-resolved', at: 't', resolution: 'reject' });
     expect(view.history).toContainEqual({
       kind: 'rejected',
+      at: 't',
       reason: 'wrong rip',
       filesDeleted: true,
     });
@@ -74,8 +113,12 @@ describe('projectStatus', () => {
   });
 
   it('records remediation entries', () => {
-    const view = projectStatus('imp-1', remediationHistory());
-    expect(view.history).toContainEqual({ kind: 'remediation-required', failures: [FAILURE] });
+    const view = projectStatus('imp-1', storedAll('imp-1', remediationHistory()));
+    expect(view.history).toContainEqual({
+      kind: 'remediation-required',
+      at: 't',
+      failures: [FAILURE],
+    });
   });
 
   it('narrates a recorded release verdict beside its rejection', () => {
@@ -89,13 +132,15 @@ describe('projectStatus', () => {
         reasons: ['corrupt rip'],
       } as const,
     ];
-    const view = projectStatus('imp-1', history);
+    const view = projectStatus('imp-1', storedAll('imp-1', history));
     expect(view.history).toContainEqual({
       kind: 'review-resolved',
+      at: 't',
       resolution: 'reject-and-retry-download',
     });
     expect(view.history).toContainEqual({
       kind: 'release-verdict-recorded',
+      at: 't',
       acquisitionId: 'acq-1',
       reasons: ['corrupt rip'],
     });

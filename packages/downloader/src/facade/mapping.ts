@@ -66,17 +66,18 @@ export function resolvePolicies(
 
 function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
   const candidate = { ...entry.candidate };
+  const at = entry.at;
   switch (entry.kind) {
     case 'selected':
-      return { kind: 'selected', candidate };
+      return { kind: 'selected', at, candidate };
     case 'download-failed':
-      return { kind: 'download-failed', candidate, reason: entry.reason };
+      return { kind: 'download-failed', at, candidate, reason: entry.reason };
     case 'validation-failed':
-      return { kind: 'validation-failed', candidate, reasons: [...entry.reasons] };
+      return { kind: 'validation-failed', at, candidate, reasons: [...entry.reasons] };
     case 'imported':
-      return { kind: 'imported', candidate, location: entry.location };
+      return { kind: 'imported', at, candidate, location: entry.location };
     case 'fulfillment-rejected':
-      return { kind: 'fulfillment-rejected', candidate, reasons: [...entry.reasons] };
+      return { kind: 'fulfillment-rejected', at, candidate, reasons: [...entry.reasons] };
   }
 }
 

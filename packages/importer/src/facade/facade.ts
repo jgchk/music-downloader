@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CommandError } from '../application/import/command-handler.js';
 import {
   getImport as getImportUseCase,
+  getImportForAcquisition as getImportForAcquisitionUseCase,
   listImports as listImportsUseCase,
   listPendingReviews as listPendingReviewsUseCase,
   resolveReview as resolveReviewUseCase,
@@ -78,6 +79,8 @@ function toFacadeError(error: CommandError): ImporterFacadeError {
 
 export const importIdInputSchema = z.object({ id: z.string().min(1) });
 
+export const acquisitionIdInputSchema = z.object({ acquisitionId: z.string().min(1) });
+
 export const resolveReviewInputSchema = z.object({
   id: z.string().min(1),
   resolution: resolveReviewRequestSchema,
@@ -99,6 +102,8 @@ export interface ImporterFacade {
   submitImport(input: unknown): Promise<FacadeResult<SubmitImportResult>>;
   resolveReview(input: unknown): Promise<FacadeResult<ResolveReviewResult>>;
   getImport(input: unknown): FacadeResult<ImportStatusResponseDto>;
+  /** The import an acquisition was submitted as — the web timeline's correlation read. */
+  getImportForAcquisition(input: unknown): FacadeResult<ImportStatusResponseDto>;
   /** Infallible collection reads: return the DTO directly, no result envelope. */
   listImports(): ImportListResponseDto;
   listPendingReviews(): ReviewListResponse;
@@ -137,6 +142,14 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
       const parsed = importIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const view = getImportUseCase(deps, parsed.data.id);
+      if (view === undefined) return fail({ kind: 'NotFound' });
+      return ok(statusViewToDto(view));
+    },
+
+    getImportForAcquisition(input) {
+      const parsed = acquisitionIdInputSchema.safeParse(input);
+      if (!parsed.success) return validationFailed(parsed.error);
+      const view = getImportForAcquisitionUseCase(deps, parsed.data.acquisitionId);
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },

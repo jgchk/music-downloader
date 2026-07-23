@@ -7,6 +7,8 @@
 
 <AcquisitionDetail
   acquisition={data.acquisition}
+  timeline={data.timeline}
+  importState={data.importState}
   progress={data.progress}
   progressUnavailable={data.progressUnavailable}
   error={form?.message}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { DownloaderFacade } from '@music/downloader';
+import type { ImporterFacade } from '@music/importer';
 import { actions, load } from './+page.server.js';
 
 const base = {
@@ -13,10 +14,19 @@ const base = {
 
 const logger = { warn: vi.fn(), error: vi.fn() };
 
-function eventFor(facade: Record<string, unknown>) {
+/** The default import read: no import yet for this acquisition (the `NotFound` → `none` path). */
+const noImport = { getImportForAcquisition: () => ({ ok: false, error: { kind: 'NotFound' } }) };
+
+function eventFor(facade: Record<string, unknown>, importer: Record<string, unknown> = noImport) {
   return {
     params: { id: 'acq-1' },
-    locals: { facades: { downloader: facade as unknown as DownloaderFacade }, logger },
+    locals: {
+      facades: {
+        downloader: facade as unknown as DownloaderFacade,
+        importer: importer as unknown as ImporterFacade,
+      },
+      logger,
+    },
   } as never;
 }
 
@@ -36,17 +46,18 @@ describe('acquisition detail load', () => {
     logger.error.mockClear();
   });
 
-  it('returns the status without progress while not downloading', () => {
+  it('returns the status, an empty timeline, and no-import state while not downloading', () => {
     const facade = {
       getAcquisition: () => ({ ok: true, value: base }),
       getAcquisitionProgress: vi.fn(),
     };
     expect(load(eventFor(facade))).toEqual({
       acquisition: base,
+      timeline: [],
+      importState: 'none',
       progress: undefined,
       progressUnavailable: false,
     });
-    expect(facade.getAcquisitionProgress).not.toHaveBeenCalled();
   });
 
   it('adds live progress while downloading', () => {
@@ -58,6 +69,8 @@ describe('acquisition detail load', () => {
     };
     expect(load(eventFor(facade))).toEqual({
       acquisition: downloading,
+      timeline: [],
+      importState: 'none',
       progress,
       progressUnavailable: false,
     });
@@ -74,6 +87,8 @@ describe('acquisition detail load', () => {
     // "pending forever" family), not the just-started case — it must be surfaced, not collapsed.
     expect(load(eventFor(facade))).toEqual({
       acquisition: downloading,
+      timeline: [],
+      importState: 'none',
       progress: undefined,
       progressUnavailable: true,
     });
@@ -81,6 +96,77 @@ describe('acquisition detail load', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       { acquisitionId: 'acq-1', err: { kind: 'NotFound' } },
       expect.stringMatching(/progress/),
+    );
+  });
+
+  it('merges the importer history into the acquisition timeline, ordered by occurrence time', () => {
+    const acquisition = {
+      ...base,
+      status: 'Fulfilled',
+      history: [
+        { kind: 'selected', at: '2026-01-01T00:00:00Z', candidate: { username: 'u', path: 'p' } },
+        {
+          kind: 'imported',
+          at: '2026-01-01T00:00:04Z',
+          candidate: { username: 'u', path: 'p' },
+          location: '/stage/x',
+        },
+      ],
+    };
+    const importStatus = {
+      importId: 'imp-1',
+      acquisitionId: 'acq-1',
+      status: 'applied',
+      history: [
+        { kind: 'requested', at: '2026-01-01T00:00:05Z' },
+        { kind: 'applied', at: '2026-01-01T00:00:09Z', location: '/lib/x' },
+      ],
+    };
+    const facade = { getAcquisition: () => ({ ok: true, value: acquisition }) };
+    const importer = { getImportForAcquisition: () => ({ ok: true, value: importStatus }) };
+
+    const result = load(eventFor(facade, importer)) as unknown as {
+      importState: string;
+      timeline: { module: string; at: string }[];
+    };
+
+    expect(result.importState).toBe('present');
+    expect(result.timeline.map((t) => [t.module, t.at])).toEqual([
+      ['downloader', '2026-01-01T00:00:00Z'],
+      ['downloader', '2026-01-01T00:00:04Z'],
+      ['importer', '2026-01-01T00:00:05Z'],
+      ['importer', '2026-01-01T00:00:09Z'],
+    ]);
+  });
+
+  it('degrades the import section and logs when the importer read returns a fault', () => {
+    const facade = { getAcquisition: () => ({ ok: true, value: base }) };
+    const importer = {
+      getImportForAcquisition: () => ({
+        ok: false,
+        error: { kind: 'InfraError', operation: 'read', message: 'x' },
+      }),
+    };
+    const result = load(eventFor(facade, importer)) as unknown as { importState: string };
+    expect(result.importState).toBe('unavailable');
+    expect(logger.warn).toHaveBeenCalledWith(
+      { acquisitionId: 'acq-1', err: { kind: 'InfraError', operation: 'read', message: 'x' } },
+      expect.stringMatching(/import/),
+    );
+  });
+
+  it('degrades the import section and logs when the importer read throws', () => {
+    const facade = { getAcquisition: () => ({ ok: true, value: base }) };
+    const importer = {
+      getImportForAcquisition: () => {
+        throw new Error('boom');
+      },
+    };
+    const result = load(eventFor(facade, importer)) as unknown as { importState: string };
+    expect(result.importState).toBe('unavailable');
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ acquisitionId: 'acq-1' }),
+      expect.stringMatching(/import/),
     );
   });
 

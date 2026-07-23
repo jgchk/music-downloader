@@ -102,22 +102,28 @@ describe('reviewToDto', () => {
 describe('statusViewToDto / pendingReviewToDto', () => {
   const view: ImportStatusView = {
     importId: 'imp-1',
+    acquisitionId: 'acq-1',
     directory: DIRECTORY,
     phase: 'rejected',
     rejection: { reason: 'r', filesDeleted: true },
-    history: [{ kind: 'rejected', reason: 'r', filesDeleted: true }],
+    history: [{ kind: 'rejected', at: 't', reason: 'r', filesDeleted: true }],
   };
 
-  it('maps a status view onto the wire shape', () => {
+  it('maps a status view onto the wire shape, carrying the acquisition id and per-entry time', () => {
     expect(statusViewToDto(view)).toEqual({
       importId: 'imp-1',
+      acquisitionId: 'acq-1',
       path: DIRECTORY,
       status: 'rejected',
       location: undefined,
       review: undefined,
       rejection: { reason: 'r', filesDeleted: true },
-      history: [{ kind: 'rejected', reason: 'r', filesDeleted: true }],
+      history: [{ kind: 'rejected', at: 't', reason: 'r', filesDeleted: true }],
     });
+  });
+
+  it('omits the acquisition id for a manually-submitted import', () => {
+    expect(statusViewToDto({ ...view, acquisitionId: undefined }).acquisitionId).toBeUndefined();
   });
 
   it('maps a status view carrying an open review', () => {

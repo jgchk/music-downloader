@@ -107,12 +107,12 @@ describe('outcomeSummary', () => {
         acquisition({
           status: 'Exhausted',
           history: [
-            { kind: 'selected', candidate },
-            { kind: 'download-failed', candidate, reason: 'Stalled' },
-            { kind: 'validation-failed', candidate, reasons: ['DurationMismatch'] },
-            { kind: 'download-failed', candidate, reason: 'Stalled' },
-            { kind: 'fulfillment-rejected', candidate, reasons: ['bad rip'] },
-            { kind: 'imported', candidate, location: '/x' },
+            { kind: 'selected', at: 't', candidate },
+            { kind: 'download-failed', at: 't', candidate, reason: 'Stalled' },
+            { kind: 'validation-failed', at: 't', candidate, reasons: ['DurationMismatch'] },
+            { kind: 'download-failed', at: 't', candidate, reason: 'Stalled' },
+            { kind: 'fulfillment-rejected', at: 't', candidate, reasons: ['bad rip'] },
+            { kind: 'imported', at: 't', candidate, location: '/x' },
           ],
         }),
       ),

@@ -82,6 +82,7 @@ describe('response schemas', () => {
   it('round-trips a full status view', () => {
     const payload = {
       importId: 'imp-1',
+      acquisitionId: 'acq-1',
       path: '/intake/a',
       status: 'awaiting-review',
       review: {
@@ -100,9 +101,9 @@ describe('response schemas', () => {
         ],
       },
       history: [
-        { kind: 'requested', hints: { mbReleaseId: 'mb-1' } },
-        { kind: 'proposed', candidateCount: 1, pinnedId: 'mb-1' },
-        { kind: 'review-required', reviewKind: 'match-review' },
+        { kind: 'requested', at: '2026-01-01T00:00:00Z', hints: { mbReleaseId: 'mb-1' } },
+        { kind: 'proposed', at: '2026-01-01T00:00:01Z', candidateCount: 1, pinnedId: 'mb-1' },
+        { kind: 'review-required', at: '2026-01-01T00:00:02Z', reviewKind: 'match-review' },
       ],
     };
     expect(importStatusResponseSchema.parse(payload)).toEqual(payload);
