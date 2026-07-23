@@ -40,6 +40,22 @@ describe('UpcasterRegistry', () => {
     expect(result).toEqual({ type: 'Widened', two: true });
   });
 
+  it('passes a future/unknown schema version through untouched (forward compatibility)', () => {
+    const registry = new UpcasterRegistry().register('Widened', 1, (data) => ({
+      ...data,
+      two: true,
+    }));
+
+    // A newer writer stamped v5; this reader knows only a v1→v2 step. With no upcaster registered at
+    // or above v5, the payload is already at-or-beyond the reader's latest shape and flows through.
+    const result = registry.upcast('Widened', 5, { type: 'Widened', future: true }) as Record<
+      string,
+      unknown
+    >;
+
+    expect(result).toEqual({ type: 'Widened', future: true });
+  });
+
   it('stamps new events at the current schema version', () => {
     expect(CURRENT_SCHEMA_VERSION).toBe(1);
   });

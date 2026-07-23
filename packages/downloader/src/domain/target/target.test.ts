@@ -53,6 +53,20 @@ describe('createTarget', () => {
     );
     expect(result._unsafeUnwrapErr()).toEqual({ kind: 'InvalidTrackDuration', position: 3 });
   });
+
+  it('rejects a non-positive track position, since a position is a 1-based ordinal', () => {
+    const result = createTarget(
+      albumInput({ tracks: [{ position: 0, title: 'Prelude', durationMs: 1000 }] }),
+    );
+    expect(result._unsafeUnwrapErr()).toEqual({ kind: 'InvalidTrackPosition', position: 0 });
+  });
+
+  it('rejects a fractional track position, since a position is a whole ordinal', () => {
+    const result = createTarget(
+      albumInput({ tracks: [{ position: 1.5, title: 'Interlude', durationMs: 1000 }] }),
+    );
+    expect(result._unsafeUnwrapErr()).toEqual({ kind: 'InvalidTrackPosition', position: 1.5 });
+  });
 });
 
 describe('derived accessors', () => {

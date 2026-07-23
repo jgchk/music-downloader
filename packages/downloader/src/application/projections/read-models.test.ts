@@ -165,16 +165,27 @@ describe('projectStatus — an external fulfilment rejection', () => {
 });
 
 describe('AcquisitionStatusProjection', () => {
-  it('applies events, reads a view, lists, and rebuilds from the log', () => {
+  function applied(): AcquisitionStatusProjection {
     const projection = new AcquisitionStatusProjection();
-    const events = stored(history);
-    for (const entry of events) projection.apply(entry);
+    for (const entry of stored(history)) projection.apply(entry);
+    return projection;
+  }
 
-    expect(projection.get('acq-1')?.status).toBe('Fulfilled');
-    expect(projection.get('missing')).toBeUndefined();
-    expect(projection.list()).toHaveLength(1);
+  it('reads back the view for an acquisition it has applied', () => {
+    expect(applied().get('acq-1')?.status).toBe('Fulfilled');
+  });
 
-    projection.rebuild(events);
+  it('reports nothing for an unknown acquisition id', () => {
+    expect(applied().get('missing')).toBeUndefined();
+  });
+
+  it('lists one entry per applied acquisition', () => {
+    expect(applied().list()).toHaveLength(1);
+  });
+
+  it('rebuilds its view from the log', () => {
+    const projection = new AcquisitionStatusProjection();
+    projection.rebuild(stored(history));
     expect(projection.get('acq-1')?.attempts).toBe(3);
   });
 });

@@ -12,10 +12,24 @@ import {
 import type { ReleaseGroupEdition } from './mapping.js';
 import type { MbScoredRelease } from './schemas.js';
 
+/**
+ * A deterministic, UUID-shaped MusicBrainz id built from a readable seed — MusicBrainz issues mbids
+ * as UUIDs and the ACL now parses them as such, so a fixture id that reaches an `Mbid` must be
+ * well-formed. The seed keeps the intent legible while the value satisfies the UUID guard.
+ */
+function fakeMbid(seed: string): string {
+  const hex = [...seed]
+    .map((character) => character.codePointAt(0)!.toString(16).padStart(2, '0'))
+    .join('')
+    .padEnd(32, '0')
+    .slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 describe('releaseToTarget', () => {
   it('maps a release, joining artist credits and flattening media into tracks', () => {
     const target = releaseToTarget({
-      id: 'rel-1',
+      id: fakeMbid('rel-1'),
       title: 'Great Album',
       date: '2020-05-01',
       'artist-credit': [{ name: 'A', joinphrase: ' & ' }, { name: 'B' }, {}],
@@ -33,13 +47,25 @@ describe('releaseToTarget', () => {
       artist: 'A & B',
       title: 'Great Album',
       year: 2020,
-      mbid: 'rel-1',
+      mbid: fakeMbid('rel-1'),
       tracks: [
         { position: 1, title: 'One', durationMs: 60_000 }, // both from the track
         { position: 2, title: 'Two', durationMs: 120_000 }, // title/length fall back to the recording
         { position: 2, title: '', durationMs: 1000 }, // no position → per-medium index; no title → ''
       ],
     });
+  });
+
+  it('drops a malformed release id rather than branding it, keeping the rest of the target', () => {
+    const target = releaseToTarget({
+      id: 'not-a-uuid',
+      title: 'Great Album',
+      'artist-credit': [{ name: 'A' }],
+      media: [{ tracks: [{ position: 1, title: 'One', length: 60_000 }] }],
+    });
+
+    expect(target?.title).toBe('Great Album');
+    expect(target?.mbid).toBeUndefined();
   });
 
   it('drops a non-positive release year', () => {
@@ -99,7 +125,7 @@ describe('releaseToTarget', () => {
 describe('recordingToTarget', () => {
   it('maps a recording to a single-track target', () => {
     const target = recordingToTarget({
-      id: 'rec-1',
+      id: fakeMbid('rec-1'),
       title: 'A Song',
       length: 200_000,
       'artist-credit': [{ name: 'Solo' }],
@@ -109,7 +135,7 @@ describe('recordingToTarget', () => {
       type: 'track',
       artist: 'Solo',
       title: 'A Song',
-      mbid: 'rec-1',
+      mbid: fakeMbid('rec-1'),
       tracks: [{ position: 1, title: 'A Song', durationMs: 200_000 }],
     });
   });
@@ -661,7 +687,7 @@ describe('releaseGroupEditionCandidates', () => {
     const candidates = releaseGroupEditionCandidates([
       { status: 'Bootleg', date: '2001', media: [{ 'track-count': 9 }] }, // no id → nothing to select
       {
-        id: 'boot',
+        id: fakeMbid('boot'),
         title: 'Live at Budokan',
         status: 'Bootleg',
         date: '1995-05-01',
@@ -672,7 +698,7 @@ describe('releaseGroupEditionCandidates', () => {
 
     expect(candidates).toEqual([
       {
-        releaseMbid: 'boot',
+        releaseMbid: fakeMbid('boot'),
         title: 'Live at Budokan',
         date: '1995-05-01',
         country: 'JP',
@@ -682,10 +708,19 @@ describe('releaseGroupEditionCandidates', () => {
     ]);
   });
 
+  it('skips an edition whose id is not a well-formed mbid', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: 'not-a-uuid', title: 'Garbled', media: [{ 'track-count': 10 }] },
+      { id: fakeMbid('good'), title: 'Clean', media: [{ 'track-count': 10 }] },
+    ]);
+
+    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([fakeMbid('good')]);
+  });
+
   it('sums track counts across media and joins the distinct formats', () => {
     const candidates = releaseGroupEditionCandidates([
       {
-        id: 'double',
+        id: fakeMbid('double'),
         media: [
           { 'track-count': 8, format: 'CD' },
           { 'track-count': 5, format: 'CD' },
@@ -698,49 +733,52 @@ describe('releaseGroupEditionCandidates', () => {
   });
 
   it('leaves presentation fields absent when the browse omits them, and an unknown track count absent', () => {
-    const candidates = releaseGroupEditionCandidates([{ id: 'sparse' }]);
+    const candidates = releaseGroupEditionCandidates([{ id: fakeMbid('sparse') }]);
 
-    expect(candidates).toEqual([{ releaseMbid: 'sparse' }]);
+    expect(candidates).toEqual([{ releaseMbid: fakeMbid('sparse') }]);
     expect(candidates[0]).not.toHaveProperty('trackCount');
   });
 
   it('treats a null country and media format as absent (MusicBrainz reports unknowns as null)', () => {
     const candidates = releaseGroupEditionCandidates([
-      { id: 'nulled', country: null, media: [{ 'track-count': 3, format: null }] },
+      { id: fakeMbid('nulled'), country: null, media: [{ 'track-count': 3, format: null }] },
     ]);
 
-    expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 3 }]);
+    expect(candidates).toEqual([{ releaseMbid: fakeMbid('nulled'), trackCount: 3 }]);
   });
 
   it('treats a null title, status, and date as absent, and reports no track count', () => {
     const candidates = releaseGroupEditionCandidates([
-      { id: 'nulled', title: null, status: null, date: null },
+      { id: fakeMbid('nulled'), title: null, status: null, date: null },
     ]);
 
-    expect(candidates).toEqual([{ releaseMbid: 'nulled' }]);
+    expect(candidates).toEqual([{ releaseMbid: fakeMbid('nulled') }]);
     expect(candidates[0]).not.toHaveProperty('trackCount');
   });
 
   it('orders candidates by the picker heuristic: modal track count first, then earliest date', () => {
     const candidates = releaseGroupEditionCandidates([
-      { id: 'odd', date: '1990', media: [{ 'track-count': 20 }] },
-      { id: 'late-modal', date: '2002-06-01', media: [{ 'track-count': 12 }] },
-      { id: 'early-modal', date: '2001', media: [{ 'track-count': 12 }] },
+      { id: fakeMbid('odd'), date: '1990', media: [{ 'track-count': 20 }] },
+      { id: fakeMbid('late-modal'), date: '2002-06-01', media: [{ 'track-count': 12 }] },
+      { id: fakeMbid('early-modal'), date: '2001', media: [{ 'track-count': 12 }] },
     ]);
 
     expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([
-      'early-modal',
-      'late-modal',
-      'odd',
+      fakeMbid('early-modal'),
+      fakeMbid('late-modal'),
+      fakeMbid('odd'),
     ]);
   });
 
   it('keeps stable input order among candidates with equal rank', () => {
     const candidates = releaseGroupEditionCandidates([
-      { id: 'first', date: '2000', media: [{ 'track-count': 10 }] },
-      { id: 'second', date: '2000', media: [{ 'track-count': 10 }] },
+      { id: fakeMbid('first'), date: '2000', media: [{ 'track-count': 10 }] },
+      { id: fakeMbid('second'), date: '2000', media: [{ 'track-count': 10 }] },
     ]);
 
-    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual(['first', 'second']);
+    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([
+      fakeMbid('first'),
+      fakeMbid('second'),
+    ]);
   });
 });

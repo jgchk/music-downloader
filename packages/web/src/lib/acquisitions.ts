@@ -68,6 +68,26 @@ export function outcomeSummary(acquisition: AcquisitionStatusResponseDto): strin
   return `${acquisition.status}${detail}`;
 }
 
+/** The offered editions, non-optionally, once the DTO is known to carry them. */
+type EditionCandidates = NonNullable<AcquisitionStatusResponseDto['candidates']>;
+
+/**
+ * The awaiting-selection view, parsed at the UI edge (type-altitude: a discriminated view model, not
+ * raw-status branching). The projection always carries `candidates` in this phase, so the two legal
+ * cases — editions on offer vs. a stale/drifted reader that lost them — become distinct variants and
+ * the `editions` variant carries NON-optional candidates. Every other status is `not-awaiting`.
+ */
+export type AcquisitionView =
+  | { readonly kind: 'editions'; readonly candidates: EditionCandidates }
+  | { readonly kind: 'no-editions' }
+  | { readonly kind: 'not-awaiting' };
+
+export function parseAcquisitionView(acquisition: AcquisitionStatusResponseDto): AcquisitionView {
+  if (acquisition.status !== 'AwaitingManualSelection') return { kind: 'not-awaiting' };
+  if (acquisition.candidates === undefined) return { kind: 'no-editions' };
+  return { kind: 'editions', candidates: acquisition.candidates };
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ['KiB', 'MiB', 'GiB'];

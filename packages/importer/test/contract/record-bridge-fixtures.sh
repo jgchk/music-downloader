@@ -110,4 +110,50 @@ record apply-skipped-duplicate  apply "${CONF[@]}" apply "$WORK/intake/love-me-d
 record apply-doomed-candidate-not-found apply "${CONF[@]}" apply "$WORK/intake/love-me-do" --candidate "MusicBrainz:00000000-0000-0000-0000-000000000000"
 record apply-as-is-applied      apply "${CONF[@]}" apply "$WORK/intake/love-me-do" --duplicate-action keep-both --as-is
 
+# Applied-with-failures: an `applied` outcome that still carries a non-empty `failures[]`. The bridge
+# records a failure only when session.run() raises AFTER at least one album already imported (design
+# D7). We force that deterministically and offline: a tiny beets plugin whose `album_imported`
+# listener raises on the SECOND album, over an intake of TWO distinct as-is albums. The bridge
+# appends its own `album_imported` listener LAST, so for album 1 the plugin passes and the bridge
+# records it; for album 2 the plugin raises before the bridge appends it — so `imported` is non-empty
+# (album 1 moved) and the caught error becomes an `import-pipeline` failure entry. `--as-is` keeps it
+# network-free.
+mkdir -p "$WORK/plugins" "$WORK/intake/twins/alpha" "$WORK/intake/twins/beta"
+cat > "$WORK/plugins/failsecond.py" <<'PYEOF'
+from beets.plugins import BeetsPlugin
+
+
+class FailSecond(BeetsPlugin):
+    """Raise on the second album_imported so a first album has already moved.
+
+    The bridge's own album_imported listener (appended last) records album 1;
+    this listener (loaded first) then raises on album 2 before the bridge can
+    append it, so session.run() throws with a non-empty `imported` — which
+    run_apply records as a non-empty apply `failures[]`, not a plain retry.
+    """
+
+    seen = 0
+
+    def __init__(self):
+        super().__init__()
+        self.register_listener("album_imported", self.on_album_imported)
+
+    def on_album_imported(self, lib, album):  # noqa: ARG002 - beets event signature
+        FailSecond.seen += 1
+        if FailSecond.seen >= 2:
+            raise RuntimeError("synthetic post-import failure recorded as an apply failure")
+PYEOF
+FAIL_CONF="$WORK/beets/fail-config.yaml"
+cat > "$FAIL_CONF" <<EOF
+directory: $WORK/library
+library: $WORK/beets/library.db
+import:
+  move: yes
+pluginpath: [$WORK/plugins]
+plugins: [musicbrainz, failsecond]
+EOF
+gen "$WORK/intake/twins/alpha/01 Alpha One.mp3" 12 "Twin Alpha zz1" "Alpha Sessions zz1" "Alpha One" 1
+gen "$WORK/intake/twins/beta/01 Beta One.mp3"   12 "Twin Beta zz2"  "Beta Sessions zz2"  "Beta One"  1
+record apply-applied-with-failures apply --config "$FAIL_CONF" apply "$WORK/intake/twins" --duplicate-action keep-both --as-is
+
 echo "all fixtures recorded against beets $BEETS_VERSION"

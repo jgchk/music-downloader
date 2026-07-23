@@ -96,6 +96,14 @@ export class CatchUpSubscription {
   /** Resume from the checkpoint, drain the backlog, then follow wakeups + the fallback poll. */
   async start(): Promise<void> {
     const checkpoint = await this.dependencies.checkpoints.load(this.dependencies.name);
+    if (checkpoint.isErr()) {
+      // Replaying from the log start is safe (the consumer's idempotent decider converges) but noisy
+      // and slow — surface it so the operator can tell it apart from a genuinely fresh subscription.
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, err: checkpoint.error },
+        'checkpoint load failed; replaying from the log start',
+      );
+    }
     this.cursor = checkpoint.unwrapOr(0);
     await this.poll();
     this.stopWakeups = this.dependencies.wakeups?.subscribe(() => {

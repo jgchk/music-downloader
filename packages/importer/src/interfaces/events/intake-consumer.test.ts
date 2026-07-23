@@ -142,13 +142,27 @@ describe('the intake event consumer', () => {
     expect(wiring.store.all()).toHaveLength(0);
   });
 
-  it('an append fault is transient — redelivery heals it', async () => {
+  it('an append fault is transient, passing the append error kind through as the hold reason', async () => {
     const wiring = testWiring();
     wiring.store.failAppends = true;
     const consume = consumer(wiring);
 
     const outcome = await consume(fulfilledEvent());
 
-    expect(outcome._unsafeUnwrapErr().kind).toBe('Transient');
+    // The submission's sad path is an infra fault; its kind rides through as the transient reason.
+    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'InfraError' });
+  });
+
+  it('an append race is transient too, passing the conflict kind through as the hold reason', async () => {
+    const wiring = testWiring();
+    wiring.store.conflictOnAppend = true;
+    const consume = consumer(wiring);
+
+    const outcome = await consume(fulfilledEvent());
+
+    expect(outcome._unsafeUnwrapErr()).toEqual({
+      kind: 'Transient',
+      reason: 'ConcurrencyConflict',
+    });
   });
 });

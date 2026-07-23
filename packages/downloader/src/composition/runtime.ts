@@ -117,7 +117,7 @@ export async function createDownloaderRuntime(
 
   mkdirSync(path.dirname(config.databaseFile), { recursive: true });
   const database = openEventDatabase(config.databaseFile);
-  const bus = new InProcessEventBus();
+  const bus = new InProcessEventBus(logger);
   const store = new SqliteEventStore(database, buildUpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(database);
   const deadLetters = overrides.deadLetters ?? new SqliteDeadLetterStore(database);

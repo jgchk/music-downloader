@@ -41,6 +41,18 @@ describe('ResolveForms (SSR)', () => {
     ]) {
       expect(body).toContain(`data-testid="${id}"`);
     }
-    expect(body).toContain('value="reject-and-retry-download"');
+    // Each form carries the exact resolve verb the facade dispatches on — the testid alone would
+    // pass even if a form posted the wrong verb.
+    for (const verb of [
+      'supply-id',
+      'refresh-candidates',
+      'import-as-is',
+      'accept',
+      'retry-enrichment',
+      'reject',
+      'reject-and-retry-download',
+    ]) {
+      expect(body).toContain(`value="${verb}"`);
+    }
   });
 });

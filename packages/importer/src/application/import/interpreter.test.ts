@@ -99,7 +99,10 @@ describe('Apply', () => {
   it('records a clean apply', async () => {
     const p = ports();
     const { result } = await run(applyingHistory, APPLY, p);
-    expect(p.tagger.apply).toHaveBeenCalledWith(DIRECTORY, APPLY.type === 'Apply' && APPLY.mode);
+    expect(p.tagger.apply).toHaveBeenCalledWith(DIRECTORY, {
+      kind: 'candidate',
+      ref: candidate().ref,
+    });
     expect(result._unsafeUnwrap().map((entry) => entry.event)).toEqual([
       { type: 'ImportApplied', location: '/library/x' },
     ]);

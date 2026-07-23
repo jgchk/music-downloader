@@ -26,6 +26,11 @@ describe('ReviewDetail (SSR)', () => {
         error: 'This review has already been settled.',
       },
     });
+    // The heading is the intake path, and the chip glosses the kind in plain language.
+    expect(body).toContain('<h1>/intake/x</h1>');
+    expect(body).toContain('Match review');
+    // The context line is the composed summary, not an empty span.
+    expect(body).toContain('1 candidate — best 20.0% away (a release was hinted)');
     expect(body).toContain('data-testid="hinted"');
     expect(body).toContain('data-testid="candidates"');
     expect(body).toContain('data-testid="supply-id"');
@@ -93,6 +98,8 @@ describe('ReviewDetail (SSR)', () => {
       },
     });
     expect(body).toContain('data-testid="incumbents"');
+    // The incumbent row reads artist — album (path), the operator's disambiguation.
+    expect(body).toContain('A — L (/lib/al)');
     expect(body).toContain('data-testid="duplicate-action"');
     expect(body).not.toContain('data-testid="manual-tags"');
   });

@@ -28,7 +28,8 @@ describe('acquisition detail page (SSR)', () => {
         form: { message: 'The record changed while you were working - reload and try again.' },
       },
     });
-    expect(body).toContain('data-testid="status"');
+    expect(body).toContain('data-testid="status">Searching<');
+    expect(body).toContain('0 attempts, 0 candidates rejected');
     expect(body).toContain('data-testid="action-error"');
   });
 });

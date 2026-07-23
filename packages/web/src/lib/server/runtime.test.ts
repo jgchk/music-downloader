@@ -50,11 +50,21 @@ function fakeRuntimes(
   log: string[],
   statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {},
 ) {
+  // Each seam must be wired to the OTHER module's feed and wakeups; capturing what each connect call
+  // received lets a test catch a cross-wiring (e.g. handing the verdict seam the downloader's own
+  // feed) that mere subscription-lifecycle assertions would pass green.
+  const captured: {
+    verdict?: { feed: unknown; wakeups: unknown };
+    acquisition?: { feed: unknown; wakeups: unknown };
+  } = {};
   const downloader = {
     facade: { kind: 'downloader-facade' },
     feed: { read: vi.fn() },
     wakeups: { subscribe: () => () => {} },
-    connectVerdictFeed: () => fakeSubscription(log, 'verdicts'),
+    connectVerdictFeed: (feed: unknown, wakeups: unknown) => {
+      captured.verdict = { feed, wakeups };
+      return fakeSubscription(log, 'verdicts');
+    },
     readiness: () => ({ status: statuses.downloader ?? 'up' }),
     stop: () => {
       log.push('downloader:stop');
@@ -66,8 +76,9 @@ function fakeRuntimes(
     beetsConfig: { beetsVersion: 'x' },
     feed: { read: vi.fn() },
     wakeups: { subscribe: () => () => {} },
-    connectAcquisitionFeed: (_feed: unknown, options: { sourceRoot: string }) => {
+    connectAcquisitionFeed: (feed: unknown, options: { sourceRoot: string }, wakeups: unknown) => {
       log.push(`acquisitions:connect:${options.sourceRoot}`);
+      captured.acquisition = { feed, wakeups };
       return fakeSubscription(log, 'acquisitions');
     },
     readiness: () => ({ status: statuses.importer ?? 'up' }),
@@ -79,6 +90,7 @@ function fakeRuntimes(
   return {
     downloader,
     importer,
+    captured,
     createDownloader: vi.fn(() => {
       log.push('downloader:create');
       return Promise.resolve(downloader);
@@ -115,6 +127,12 @@ describe('bootRuntimes', () => {
     ]);
     expect(booted.facades.downloader).toBe(fakes.downloader.facade);
     expect(booted.facades.importer).toBe(fakes.importer.facade);
+    // Each seam is wired to the OTHER module's feed and wakeups: the downloader tails the importer's
+    // verdicts, the importer tails the downloader's acquisitions — never a module's own feed.
+    expect(fakes.captured.verdict?.feed).toBe(fakes.importer.feed);
+    expect(fakes.captured.verdict?.wakeups).toBe(fakes.importer.wakeups);
+    expect(fakes.captured.acquisition?.feed).toBe(fakes.downloader.feed);
+    expect(fakes.captured.acquisition?.wakeups).toBe(fakes.downloader.wakeups);
     expect(onShutdownSignal).toHaveBeenCalledOnce();
     expect(facadesOf()).toBe(booted.facades);
     // The pino root is exposed to routes so degraded reads can leave a trace.

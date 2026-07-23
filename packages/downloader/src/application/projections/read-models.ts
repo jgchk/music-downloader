@@ -94,7 +94,24 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     case 'FulfillmentRejected': {
       return { kind: 'fulfillment-rejected', candidate: event.candidate, reasons: event.reasons };
     }
-    default: {
+    // Every other event contributes no history entry. Enumerated exhaustively (no `default`) so a
+    // newly-added event variant is a compile error here — forcing a decision on whether it surfaces
+    // in the timeline — rather than silently defaulting to invisible.
+    case 'AcquisitionRequested':
+    case 'TargetResolved':
+    case 'EditionSelected':
+    case 'ManualSelectionRequested':
+    case 'MetadataResolutionFailed':
+    case 'SearchRequested':
+    case 'SearchCompleted':
+    case 'CandidatesRanked':
+    case 'CandidateRejected':
+    case 'DownloadCompleted':
+    case 'ValidationPassed':
+    case 'AcquisitionFulfilled':
+    case 'ImportConflicted':
+    case 'AcquisitionCancelled':
+    case 'AcquisitionExhausted': {
       return undefined;
     }
   }

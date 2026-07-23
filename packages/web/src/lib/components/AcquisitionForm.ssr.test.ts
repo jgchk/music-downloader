@@ -8,6 +8,9 @@ describe('AcquisitionForm (SSR)', () => {
     expect(body).toContain('name="mbid"');
     expect(body).not.toContain('name="artist"');
     expect(body).not.toContain('data-testid="form-error"');
+    // With no echoed value the target type defaults to album selected, not track.
+    expect(body).toContain('value="album" selected');
+    expect(body).not.toContain('value="track" selected');
   });
 
   it('renders the descriptor kind with echoed values and the error banner', () => {
@@ -22,6 +25,9 @@ describe('AcquisitionForm (SSR)', () => {
     expect(body).toContain('name="artist"');
     expect(body).not.toContain('name="mbid"');
     expect(body).toContain('value="T"');
+    // A track descriptor echoes its target type as the selected option, not album.
+    expect(body).toContain('value="track" selected');
+    expect(body).not.toContain('value="album" selected');
   });
 
   it('renders the release-group kind with an id field and no target-type choice', () => {
@@ -63,5 +69,9 @@ describe('AcquisitionForm (SSR)', () => {
       expect(body).toContain(`name="${name}"`);
     }
     expect(body).toContain('value="mb-7"');
+    // The seeded values actually populate their inputs, and LOSSLESS renders as the selected option.
+    expect(body).toContain('value="0.5"');
+    expect(body).toContain('value="1000"');
+    expect(body).toContain('value="LOSSLESS" selected');
   });
 });

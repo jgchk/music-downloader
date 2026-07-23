@@ -108,6 +108,19 @@ describe('recording a proposal', () => {
     expect(reversed[1]).toMatchObject({ type: 'AutoApplySelected', ref: strong.ref });
   });
 
+  it('auto-applies a candidate exactly at the threshold — the boundary is inclusive', () => {
+    // POLICY.autoApplyThreshold is 0.1; distance == threshold is NOT `> threshold`, so it auto-applies.
+    const atThreshold = candidate({ distance: asDistance(0.1) });
+    const events = given([requested()])
+      .execute(record([atThreshold]))
+      ._unsafeUnwrap();
+    expect(events[1]).toEqual({
+      type: 'AutoApplySelected',
+      ref: atThreshold.ref,
+      distance: asDistance(0.1),
+    });
+  });
+
   it('routes a weak match to review with the best candidate named', () => {
     const weak = candidate({ distance: asDistance(0.6) });
     const events = given([requested()])
@@ -677,7 +690,7 @@ describe('the snapshot projection', () => {
           title: 'Track',
           index: 1,
           current: { title: 'Trakk', artist: 'Artist', track: 1, length: 200 },
-          distance: 0.2,
+          distance: asDistance(0.2),
         },
       ],
       extraItems: [{ path: `${DIRECTORY}/99 Extra.flac`, title: 'Extra', track: 9 }],

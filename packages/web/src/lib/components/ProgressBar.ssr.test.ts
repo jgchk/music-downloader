@@ -8,6 +8,8 @@ describe('ProgressBar (SSR)', () => {
       props: { progress: { percent: 41.7, bytesTransferred: 1024, bytesTotal: 4096 } },
     });
     expect(body).toContain('42%');
+    // The <progress> element's rounded value is the a11y contract, not just the text.
+    expect(body).toContain('<progress max="100" value="42">');
     expect(body).toContain('1.0 KiB');
     expect(body).toContain('4.0 KiB');
     expect(body).not.toContain('queue position');

@@ -16,6 +16,11 @@ describe('ManualTagsForm (SSR)', () => {
       props: { initialRows: [row, { ...row, path: '/in/02.flac', title: 'Two' }] },
     });
     expect(body).toContain('name="tracks.1.path"');
+    // The rows are bound to the provided values and numbered by position.
+    expect(body).toContain('value="One"');
+    expect(body).toContain('value="Two"');
+    expect(body).toContain('<legend>Track 1</legend>');
+    expect(body).toContain('<legend>Track 2</legend>');
     expect(body).toContain('data-testid="remove-track"');
     expect(body).toContain('value="manual-tags"');
   });

@@ -151,7 +151,12 @@ export async function createImporterRuntime(
     });
   const beetsConfig = await tagger.validate();
   if (beetsConfig.isErr()) {
-    return err({ kind: 'BeetsConfigUnusable', detail: beetsConfig.error.message });
+    // Both an unusable config (ConfigInvalid) and a genuine validate fault (InfraError) fail the boot
+    // loudly; only their rendered detail differs. Neither is retried — startup never limps on.
+    const validateError = beetsConfig.error;
+    const detail =
+      validateError.kind === 'ConfigInvalid' ? validateError.detail : validateError.message;
+    return err({ kind: 'BeetsConfigUnusable', detail });
   }
   logger.info(
     { beetsVersion: beetsConfig.value.beetsVersion, plugins: beetsConfig.value.plugins },
@@ -160,7 +165,7 @@ export async function createImporterRuntime(
 
   mkdirSync(path.dirname(config.databaseFile), { recursive: true });
   const database = openEventDatabase(config.databaseFile);
-  const bus = new InProcessEventBus();
+  const bus = new InProcessEventBus(logger);
   const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(database);
   const deadLetters = new SqliteDeadLetterStore(database);

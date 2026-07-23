@@ -36,4 +36,8 @@ describe('clampUnit', () => {
     expect(clampUnit(-0.3)).toBe(0);
     expect(clampUnit(1.2)).toBe(1);
   });
+
+  it('collapses NaN to 0 so an uncomputable score can never leak out of range', () => {
+    expect(clampUnit(NaN)).toBe(0);
+  });
 });

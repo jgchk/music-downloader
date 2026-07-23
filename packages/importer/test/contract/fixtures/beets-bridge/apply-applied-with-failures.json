@@ -1,0 +1,20 @@
+{
+  "name": "apply-applied-with-failures",
+  "output": {
+    "failures": [
+      {
+        "message": "synthetic post-import failure recorded as an apply failure",
+        "stage": "import-pipeline"
+      }
+    ],
+    "location": "/tmp/tmp.O9luAHKFGr/library/Twin Alpha zz1/Alpha Sessions zz1",
+    "status": "applied"
+  },
+  "provenance": {
+    "beets": "2.12.0",
+    "capturedAt": "2026-07-23",
+    "recorder": "test/contract/record-bridge-fixtures.sh",
+    "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
+  },
+  "verb": "apply"
+}

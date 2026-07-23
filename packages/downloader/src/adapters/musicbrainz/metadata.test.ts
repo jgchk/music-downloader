@@ -30,6 +30,21 @@ const releaseFixture = (id: string): HttpResponse =>
 const recordingFixture = (id: string): HttpResponse =>
   ok({ id, title: 'Song', length: 1000, 'artist-credit': [{ name: 'Artist' }] });
 
+/**
+ * A deterministic, UUID-shaped MusicBrainz id from a readable seed. The ACL now parses MB ids as
+ * UUIDs, so a *fetched* release/recording body's `id` (the value that becomes the target's `mbid`)
+ * must be well-formed; request mbids, search-hit selection ids, and route keys are unvalidated and
+ * stay plain. The seed keeps intent legible.
+ */
+function uuid(seed: string): string {
+  const hex = [...seed]
+    .map((character) => character.codePointAt(0)!.toString(16).padStart(2, '0'))
+    .join('')
+    .padEnd(32, '0')
+    .slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 function resolver(routes: Array<[string, HttpResponse]>): MusicBrainzMetadata {
   return new MusicBrainzMetadata(silentLogger(), http(routes));
 }
@@ -47,12 +62,15 @@ const trackById: AcquisitionRequest = {
 
 describe('MusicBrainzMetadata', () => {
   it('resolves a release by MBID into a canonical target', async () => {
-    const resolveResult = await resolver([['/release/rel-1', releaseFixture('rel-1')]]).resolve(
-      albumById,
-    );
+    const resolveResult = await resolver([
+      ['/release/rel-1', releaseFixture(uuid('rel-1'))],
+    ]).resolve(albumById);
     const result = resolveResult._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'rel-1', type: 'album' } });
+    expect(result).toMatchObject({
+      kind: 'resolved',
+      target: { mbid: uuid('rel-1'), type: 'album' },
+    });
   });
 
   it('reports unresolved when the release MBID is not found', async () => {
@@ -73,11 +91,11 @@ describe('MusicBrainzMetadata', () => {
   it('resolves an album descriptor by searching then fetching the best release', async () => {
     const resolveResult4 = await resolver([
       ['/release?query=', ok({ releases: [{ id: 'rel-2', score: 95 }] })],
-      ['/release/rel-2', releaseFixture('rel-2')],
+      ['/release/rel-2', releaseFixture(uuid('rel-2'))],
     ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
     const result = resolveResult4._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'rel-2' } });
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('rel-2') } });
   });
 
   it('reports unresolved when an album search has no confident match', async () => {
@@ -132,7 +150,7 @@ describe('MusicBrainzMetadata', () => {
     });
     const resolveResult7 = await resolver([
       ['/release?query=', search],
-      ['/release/deluxe', releaseFixture('deluxe')],
+      ['/release/deluxe', releaseFixture(uuid('deluxe'))],
     ]).resolve({
       kind: 'descriptor',
       targetType: 'album',
@@ -141,7 +159,7 @@ describe('MusicBrainzMetadata', () => {
     });
     const result = resolveResult7._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'deluxe' } });
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('deluxe') } });
   });
 
   it('falls through to the next release when the canonical pick has unusable data', async () => {
@@ -169,11 +187,11 @@ describe('MusicBrainzMetadata', () => {
     const resolveResult8 = await resolver([
       ['/release?query=', search],
       ['/release/early', sparse], // earliest official, but no tracks → no valid target
-      ['/release/late', releaseFixture('late')],
+      ['/release/late', releaseFixture(uuid('late'))],
     ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
     const result = resolveResult8._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'late' } });
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('late') } });
   });
 
   it('reports unresolved when no release in the group yields a valid target', async () => {
@@ -214,11 +232,14 @@ describe('MusicBrainzMetadata', () => {
           { id: 'std2', status: 'Official', date: '2015-01-01', media: [{ 'track-count': 13 }] },
         ]),
       ],
-      ['/release/std', releaseFixture('std')],
+      ['/release/std', releaseFixture(uuid('std'))],
     ]).resolve(byReleaseGroup('rg-1'));
     const result = resolveResult10._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'std', type: 'album' } });
+    expect(result).toMatchObject({
+      kind: 'resolved',
+      target: { mbid: uuid('std'), type: 'album' },
+    });
   });
 
   it('requests the recorded browse path with inc=media for a release-group request', async () => {
@@ -255,7 +276,7 @@ describe('MusicBrainzMetadata', () => {
         '/release?release-group=rg-2',
         browse([
           {
-            id: 'boot',
+            id: uuid('boot'),
             title: 'Live Bootleg',
             status: 'Bootleg',
             date: '2001',
@@ -271,7 +292,7 @@ describe('MusicBrainzMetadata', () => {
       kind: 'needsSelection',
       candidates: [
         {
-          releaseMbid: 'boot',
+          releaseMbid: uuid('boot'),
           title: 'Live Bootleg',
           date: '2001',
           country: 'JP',
@@ -314,11 +335,11 @@ describe('MusicBrainzMetadata', () => {
           },
         ]),
       ],
-      ['/release/official', releaseFixture('official')],
+      ['/release/official', releaseFixture(uuid('official'))],
     ]).resolve(byReleaseGroup('rg-null'));
     const result = resolveResult14._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'official' } });
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('official') } });
   });
 
   it('reports unresolved when the release group is empty', async () => {
@@ -341,30 +362,36 @@ describe('MusicBrainzMetadata', () => {
         ]),
       ],
       ['/release/edition-a', sparse], // earliest modal edition, but no tracks → no valid target
-      ['/release/edition-b', releaseFixture('edition-b')],
+      ['/release/edition-b', releaseFixture(uuid('edition-b'))],
     ]).resolve(byReleaseGroup('rg-4'));
     const result = resolveResult16._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'edition-b' } });
+    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('edition-b') } });
   });
 
   it('resolves a recording by MBID into a single-track target', async () => {
     const resolveResult17 = await resolver([
-      ['/recording/rec-1', recordingFixture('rec-1')],
+      ['/recording/rec-1', recordingFixture(uuid('rec-1'))],
     ]).resolve(trackById);
     const result = resolveResult17._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'rec-1', type: 'track' } });
+    expect(result).toMatchObject({
+      kind: 'resolved',
+      target: { mbid: uuid('rec-1'), type: 'track' },
+    });
   });
 
   it('resolves a track descriptor by searching then fetching the best recording', async () => {
     const resolveResult18 = await resolver([
       ['/recording?query=', ok({ recordings: [{ id: 'rec-2', score: 97 }] })],
-      ['/recording/rec-2', recordingFixture('rec-2')],
+      ['/recording/rec-2', recordingFixture(uuid('rec-2'))],
     ]).resolve({ kind: 'descriptor', targetType: 'track', artist: 'Artist', title: 'Song' });
     const result = resolveResult18._unsafeUnwrap();
 
-    expect(result).toMatchObject({ kind: 'resolved', target: { mbid: 'rec-2', type: 'track' } });
+    expect(result).toMatchObject({
+      kind: 'resolved',
+      target: { mbid: uuid('rec-2'), type: 'track' },
+    });
   });
 
   it('reports unresolved when the recording MBID is not found', async () => {

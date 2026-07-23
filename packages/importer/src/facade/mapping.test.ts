@@ -6,6 +6,7 @@ import {
   candidate,
 } from '../domain/import/__fixtures__/import-fixtures.js';
 import type { ImportStatusView } from '../application/projections/read-models.js';
+import { asDistance } from '../domain/shared/__fixtures__/distance.js';
 import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
@@ -98,7 +99,7 @@ describe('reviewToDto', () => {
           title: 'Track',
           index: 1,
           current: { title: 'Trakk', artist: 'Artist', track: 1, length: 200 },
-          distance: 0.2,
+          distance: asDistance(0.2),
         },
       ],
       extraItems: [{ path: `${DIRECTORY}/99 Extra.flac`, title: 'Extra', track: 9 }],

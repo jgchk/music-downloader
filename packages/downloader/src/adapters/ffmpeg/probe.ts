@@ -6,6 +6,8 @@ import type { ProbedAudio } from '../../domain/validation/validators.js';
 import type { Logger } from '../../application/logging/logger.js';
 import { nodeCommandRunner } from './runner.js';
 import type { CommandRunner } from './runner.js';
+import { ffprobeOutputSchema } from './schemas.js';
+import type { FfprobeOutput, FfprobeStream } from './schemas.js';
 
 /**
  * The ffmpeg `AudioProbePort` adapter (D5). Playability comes from a full **decode-to-null** pass
@@ -14,21 +16,6 @@ import type { CommandRunner } from './runner.js';
  * comes from `ffprobe`. A bad/unreadable file is a *business* outcome (`decodedCleanly: false`),
  * not an infra fault — only a failure to spawn the binaries surfaces as an `InfraError`.
  */
-
-interface FfprobeStream {
-  readonly codec_type?: string;
-  readonly codec_name?: string;
-  readonly sample_rate?: string;
-  readonly channels?: number;
-  readonly bits_per_raw_sample?: string;
-  readonly bit_rate?: string;
-  readonly duration?: string;
-}
-
-interface FfprobeOutput {
-  readonly streams?: readonly FfprobeStream[];
-  readonly format?: { readonly duration?: string; readonly bit_rate?: string };
-}
 
 interface AudioMetadata {
   readonly codec: string;
@@ -44,23 +31,49 @@ export interface FfmpegConfig {
   readonly ffmpegPath?: string;
 }
 
-/** Parse a numeric ffprobe field, tolerating absence and the literal `N/A` ffprobe emits. */
+/**
+ * Parse a numeric ffprobe field, tolerating absence, an empty string, and the literal `N/A` ffprobe
+ * emits — each reads as *absent*. `Number('')` is `0`, not `NaN`, so an empty read is guarded
+ * explicitly rather than silently becoming a real zero.
+ */
 function parseNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-/** Extract the first audio stream's metadata, or `undefined` when the file has no audio. */
-function parseAudioMetadata(stdout: string): AudioMetadata | undefined {
-  // A successful ffprobe exit with non-JSON stdout is a deterministic bad-file *business* outcome
-  // (no readable audio), not a retryable infra fault — an unguarded parse would throw and be retried
-  // forever on a permanent condition. Degrade to `undefined` (audio absent) instead.
-  let output: FfprobeOutput;
+/**
+ * Bit depth from `bits_per_raw_sample` (a string) when present, else `bits_per_sample` (a number).
+ * ffprobe reports `0` for "not applicable", which reads as unknown rather than a real 0-bit depth.
+ */
+function parseBitDepth(stream: FfprobeStream): number | undefined {
+  const depth = parseNumber(stream.bits_per_raw_sample) ?? stream.bits_per_sample;
+  return depth === undefined || depth === 0 ? undefined : depth;
+}
+
+/**
+ * Parse and validate ffprobe's JSON stdout against the consumer contract. A successful ffprobe exit
+ * that is non-JSON, or whose JSON violates the tolerant schema (a consumed field changed type), is a
+ * broken/incompatible ffprobe — a boundary failure, surfaced by throwing so the caller's
+ * `ResultAsync.fromPromise` maps it to a modeled `InfraError` naming ffprobe rather than degrading
+ * silently to all-`undefined` metadata.
+ */
+function parseFfprobeOutput(stdout: string): FfprobeOutput {
+  let json: unknown;
   try {
-    output = JSON.parse(stdout) as FfprobeOutput;
-  } catch {
-    return undefined;
+    json = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error('ffprobe emitted non-JSON output', { cause: error });
   }
+  const parsed = ffprobeOutputSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(`ffprobe output failed contract validation: ${parsed.error.message}`);
+  }
+  return parsed.data;
+}
+
+/** Extract the first audio stream's metadata, or `undefined` when the file has no audio. */
+function parseAudioMetadata(output: FfprobeOutput): AudioMetadata | undefined {
   const audio = output.streams?.find((stream) => stream.codec_type === 'audio');
   if (audio === undefined) return undefined;
 
@@ -69,7 +82,7 @@ function parseAudioMetadata(stdout: string): AudioMetadata | undefined {
     codec: audio.codec_name ?? '',
     durationMs: durationSec === undefined ? 0 : Math.round(durationSec * 1000),
     sampleRate: parseNumber(audio.sample_rate),
-    bitDepth: parseNumber(audio.bits_per_raw_sample),
+    bitDepth: parseBitDepth(audio),
     bitrate: parseNumber(audio.bit_rate) ?? parseNumber(output.format?.bit_rate),
     channels: audio.channels,
   };
@@ -109,7 +122,7 @@ export class FfmpegAudioProbe implements AudioProbePort {
       this.runner.run(this.ffmpeg, ['-v', 'error', '-i', filePath, '-f', 'null', '-']),
     ]);
 
-    const audio = meta.code === 0 ? parseAudioMetadata(meta.stdout) : undefined;
+    const audio = meta.code === 0 ? parseAudioMetadata(parseFfprobeOutput(meta.stdout)) : undefined;
     return {
       decodedCleanly: decode.code === 0 && audio !== undefined,
       codec: audio?.codec ?? '',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importIdFor, submitImport } from '../application/import/use-cases.js';
+import { submitImport } from '../application/import/use-cases.js';
 import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
@@ -21,6 +21,9 @@ import type { ImporterFacade } from './facade.js';
  */
 
 const INTAKE = '/intake/Artist - Album';
+// The deterministic id `importIdFor(INTAKE)` mints, pinned as a golden literal so the test proves
+// the actual derivation rather than re-deriving the expected value with the code under test.
+const GOLDEN_IMPORT_ID = 'imp-ab1aa9bf67fc1a5beafaf243';
 
 /** Round-trip a value through JSON and assert nothing was lost. */
 function roundTrip<T>(value: T): T {
@@ -50,7 +53,7 @@ describe('createImporterFacade', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(submitImportResultSchema.parse(roundTrip(result.value))).toEqual({
-          importId: importIdFor(INTAKE),
+          importId: GOLDEN_IMPORT_ID,
         });
       }
     });
@@ -196,7 +199,7 @@ describe('createImporterFacade', () => {
       if (result.ok) {
         expect(importStatusResultSchema.parse(roundTrip(result.value))).toEqual(result.value);
         expect(result.value.acquisitionId).toBe('acq-9');
-        expect(result.value.importId).toBe(importIdFor(INTAKE));
+        expect(result.value.importId).toBe(GOLDEN_IMPORT_ID);
       }
     });
 

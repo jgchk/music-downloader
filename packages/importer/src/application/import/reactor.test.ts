@@ -20,6 +20,7 @@ import {
 } from '../__fixtures__/fakes.js';
 import { StalledReadModel } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
+import type { CommandError } from './command-handler.js';
 import type { EffectPorts } from './interpreter.js';
 import { interpretEffect } from './interpreter.js';
 import { REACTOR_CONSUMER, Reactor } from './reactor.js';
@@ -168,13 +169,20 @@ describe('Reactor', () => {
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
   });
 
-  it('advances past a follow-on the domain rejected as stale/illegal, never parking or dead-lettering', async () => {
+  // Every domain-rejection kind of the closed `CommandError` union is settled, not retryable: the
+  // reactor advances past it without ever touching the durable retry-budget stores.
+  it.each<CommandError>([
+    { kind: 'UnknownImport' },
+    { kind: 'NoOpenReview' },
+    { kind: 'InvalidResolution', detail: 'a remediation verb on a match review' },
+    { kind: 'UnknownCandidate', candidate: 'Discogs:nope' },
+    { kind: 'NoRetainedCandidate' },
+  ])('advances past a $kind follow-on, never parking or dead-lettering', async (error) => {
     await seed([requested()]);
-    const interpret = vi.fn(() => errAsync({ kind: 'NoOpenReview' as const }));
+    const interpret = vi.fn(() => errAsync(error));
     await reactor(interpret).start();
 
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
-    // A domain rejection is settled, not retryable: it must not touch the durable budget stores.
     expect(parked.count()).toBe(0);
     expect(deadLetters.letters).toHaveLength(0);
   });
@@ -206,6 +214,36 @@ describe('Reactor', () => {
     await r.start();
 
     expect(bus.subscriberCount()).toBe(1); // still follows live events
+    r.stop();
+  });
+
+  it('replays from the log start and surfaces the fault when the checkpoint load fails', async () => {
+    await seed([requested()]);
+    checkpoints.failLoad = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const interpret = vi.fn(() => okAsync([]));
+    const r = new Reactor({
+      store,
+      checkpoints,
+      bus,
+      deadLetters,
+      parked,
+      stalled,
+      clock: fixedClock(),
+      logger,
+      interpret,
+      interval: () => () => {},
+    });
+
+    await r.start();
+
+    // Fell back to 0 and drained the backlog rather than silently skipping it — and said so loudly.
+    expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: infraError('checkpoint.load', 'boom') },
+      'checkpoint load failed; replaying from the log start',
+    );
     r.stop();
   });
 
@@ -497,6 +535,21 @@ describe('Reactor — durable retry budget & stalled exposure', () => {
 
     expect(stalled.isStalled('imp-1')).toBe(false);
     expect(deadLetters.letters).toHaveLength(0);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('keeps the stall and its fresh dead letter when an already-stalled stream dead-letters again', async () => {
+    await seed([requested()]);
+    stalled.mark('imp-1'); // already stalled from a prior boot: `wasStalled` is true for this event
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'beets always fails')));
+    const r = reactor(interpret, { retryBudget: 1 });
+
+    await r.start(); // budget of 1: this event exhausts immediately and is dead-lettered
+
+    // The `!isDeadLettered && wasStalled` guard actually decides here (wasStalled is true): a freshly
+    // dead-lettered event must NOT clear the stall it just re-raised, nor its own dead letter.
+    expect(stalled.isStalled('imp-1')).toBe(true);
+    expect(deadLetters.letters).toHaveLength(1);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
 

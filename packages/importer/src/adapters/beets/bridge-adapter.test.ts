@@ -243,6 +243,27 @@ describe('apply', () => {
     expect(outcome).toEqual({ kind: 'skipped-duplicate', incumbents: [] });
   });
 
+  it('carries a non-empty enrichment failures[] element ({stage, message}) through to the outcome', async () => {
+    // Every recorded apply fixture has `failures: []`, so the applyFailureSchema element otherwise
+    // has zero real-data coverage: a partially-failed apply carries each {stage, message} through.
+    const runner = runnerReturning(
+      completed(
+        JSON.stringify({
+          status: 'applied',
+          location: '/library/b/lmd',
+          failures: [{ stage: 'import-pipeline', message: 'fetchart timed out' }],
+        }),
+      ),
+    );
+    const applyResultFailures = await bridge(runner).apply('/intake/a', { kind: 'as-is' });
+    const outcome = applyResultFailures._unsafeUnwrap();
+    expect(outcome).toEqual({
+      kind: 'applied',
+      location: '/library/b/lmd',
+      failures: [{ stage: 'import-pipeline', message: 'fetchart timed out' }],
+    });
+  });
+
   it('translates an apply refusal to a doomed outcome', async () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'doomed', kind: 'candidate-not-found', reason: 'nope' })),
@@ -278,16 +299,22 @@ describe('validate', () => {
     });
   });
 
-  it('maps an invalid configuration to a loud infrastructure error', async () => {
+  it('maps an unusable configuration to the non-retryable ConfigInvalid, not a retryable InfraError', async () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'invalid', kind: 'config-invalid', reason: 'bad yaml' })),
     );
     const validateResult2 = await bridge(runner).validate();
     const error = validateResult2._unsafeUnwrapErr();
-    expect(error).toMatchObject({
+    // An operator-fixable config must never be classified as a retry-worthy infrastructure fault.
+    expect(error).toEqual({ kind: 'ConfigInvalid', detail: 'config-invalid: bad yaml' });
+  });
+
+  it('still maps a genuine validate fault (spawn/contract) to a retryable InfraError', async () => {
+    const runner = runnerReturning(completed('not json'));
+    const validateResult3 = await bridge(runner).validate();
+    expect(validateResult3._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'bridge.validate',
-      message: 'config-invalid: bad yaml',
     });
   });
 });
@@ -329,6 +356,62 @@ describe('failure surfaces', () => {
     expect(error.message).toContain('contract validation');
   });
 
+  it('rejects an out-of-range candidate distance at the [0, 1] parse edge (never a misroute)', async () => {
+    // The overall distance is the branded Distance the auto-apply routing turns on: a drifted
+    // 1.5 must fail contract validation as an InfraError, never brand-through as a flawless match.
+    const runner = runnerReturning(
+      completed(
+        JSON.stringify({
+          status: 'proposal',
+          candidates: [
+            {
+              data_source: 'MusicBrainz',
+              album_id: 'mb-album-1',
+              artist: 'A',
+              album: 'B',
+              distance: 1.5,
+              penalties: [],
+              tracks: [],
+            },
+          ],
+          duplicates: [],
+        }),
+      ),
+    );
+    const distanceResult = await bridge(runner).propose('/intake/a', {});
+    const error = distanceResult._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError' });
+    expect(error.message).toContain('contract validation');
+  });
+
+  it('rejects an out-of-range per-track distance at the same [0, 1] parse edge', async () => {
+    // The per-track distance is branded at the same edge (TrackMapping.distance): a drifted 1.5
+    // must fail contract validation, never brand-through into the domain.
+    const runner = runnerReturning(
+      completed(
+        JSON.stringify({
+          status: 'proposal',
+          candidates: [
+            {
+              data_source: 'MusicBrainz',
+              album_id: 'mb-album-1',
+              artist: 'A',
+              album: 'B',
+              distance: 0.1,
+              penalties: [],
+              tracks: [{ path: '/intake/a/01.mp3', title: 'T', index: 1, distance: 1.5 }],
+            },
+          ],
+          duplicates: [],
+        }),
+      ),
+    );
+    const trackDistanceResult = await bridge(runner).propose('/intake/a', {});
+    const error = trackDistanceResult._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError' });
+    expect(error.message).toContain('contract validation');
+  });
+
   it('maps a spawn rejection to an InfraError', async () => {
     const runner: CommandRunner = { run: () => Promise.reject(new Error('ENOENT')) };
     const proposeResult9 = await bridge(runner).propose('/intake/a', {});
@@ -341,22 +424,35 @@ describe('serialization (design D6)', () => {
   it('runs at most one bridge invocation at a time', async () => {
     let active = 0;
     let peak = 0;
+    // Each invocation blocks on a caller-controlled gate (no wall-clock sleep): the test releases
+    // them one at a time and observes that a second never starts while the first is in flight.
+    const gates: (() => void)[] = [];
     const runner: CommandRunner = {
       run: async () => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((tick) => setTimeout(tick, 10));
+        const { promise, resolve } = Promise.withResolvers<void>();
+        gates.push(resolve);
+        await promise;
         active -= 1;
         return completed(JSON.stringify({ status: 'proposal', candidates: [], duplicates: [] }));
       },
     };
     const adapter = bridge(runner);
-    const results = await Promise.all([
+    const results = Promise.all([
       adapter.propose('/intake/a', {}),
       adapter.propose('/intake/b', {}),
       adapter.propose('/intake/c', {}),
     ]);
-    expect(results.every((result) => result.isOk())).toBe(true);
+
+    // Only one invocation is ever in flight: each releases the queue's next only once it completes.
+    for (let index = 0; index < 3; index += 1) {
+      await vi.waitFor(() => expect(gates).toHaveLength(index + 1));
+      gates[index]!();
+    }
+
+    const settled = await results;
+    expect(settled.every((result) => result.isOk())).toBe(true);
     expect(peak).toBe(1);
   });
 

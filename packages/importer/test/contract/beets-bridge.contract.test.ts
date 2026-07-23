@@ -147,6 +147,24 @@ describe('fixture semantics the domain relies on', () => {
     expect(apply.incumbents).toHaveLength(1);
   });
 
+  it('an applied import can still carry a non-empty {stage, message} failures[]', () => {
+    // The bridge records a failure only when the pipeline raises AFTER an album already moved
+    // (design D7): the outcome is `applied` (the moved album is real) yet a failure rides along.
+    // This is the only fixture exercising the non-empty `applied.failures[]` element shape.
+    const result = bridgeApplyOutputSchema.safeParse(output('apply-applied-with-failures'));
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+    const applied = result.data as {
+      status: string;
+      failures: { stage: string; message: string }[];
+    };
+    expect(applied.status).toBe('applied');
+    expect(applied.failures.length).toBeGreaterThan(0);
+    expect(typeof applied.failures[0]!.stage).toBe('string');
+    expect(applied.failures[0]!.stage).not.toBe('');
+    expect(typeof applied.failures[0]!.message).toBe('string');
+    expect(applied.failures[0]!.message).not.toBe('');
+  });
+
   it('a vanished candidate dooms the apply instead of guessing', () => {
     expect(output('apply-doomed-candidate-not-found')).toMatchObject({
       status: 'doomed',

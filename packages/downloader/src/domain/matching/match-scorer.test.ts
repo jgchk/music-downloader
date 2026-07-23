@@ -6,6 +6,7 @@ import {
   durationSignal,
   isAudioFile,
   scoreMatch,
+  trackCountSignal,
   yearSignal,
 } from './match-scorer.js';
 import type { Candidate } from '../candidate/candidate.js';
@@ -95,6 +96,39 @@ describe('scoreMatch', () => {
     // Only the duration signal, against a candidate whose files carry no durations.
     const c = candidate([{ name: '01.flac', sizeBytes: 1 }]);
     expect(scoreMatch(target, c, [durationSignal])).toBe(0);
+  });
+
+  it('composites the weighted signal mean to its exact known value', () => {
+    // Track count (3/3 → 1), duration aligned (→ 1), title & artist contained (→ 1), year absent
+    // (→ 0): weighted mean = 0.35·1 + 0.35·1 + 0.15·1 + 0.1·1 + 0.05·0 = 0.95 over unit weights.
+    const c = candidate(
+      [
+        { name: '01.flac', sizeBytes: 1, durationMs: 300_000 },
+        { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
+        { name: '03.flac', sizeBytes: 1, durationMs: 240_000 },
+      ],
+      'Portishead - Dummy',
+    );
+    expect(scoreMatch(target, c)).toBeCloseTo(0.95, 10);
+  });
+});
+
+describe('trackCountSignal', () => {
+  it('scores the fraction of the expected count present (2 of 3 tracks → 0.667)', () => {
+    const c = candidate([
+      { name: '01.flac', sizeBytes: 1, durationMs: 300_000 },
+      { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
+    ]);
+    expect(trackCountSignal.score(target, c)).toBeCloseTo(0.667, 3);
+  });
+
+  it('floors at 0 when the candidate carries twice the expected tracks', () => {
+    const files = Array.from({ length: 6 }, (_unused, index) => ({
+      name: `0${index}.flac`,
+      sizeBytes: 1,
+      durationMs: 300_000,
+    }));
+    expect(trackCountSignal.score(target, candidate(files))).toBe(0);
   });
 });
 

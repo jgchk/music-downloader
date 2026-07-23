@@ -12,7 +12,11 @@ import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
 import { REACTOR_CONSUMER } from '../application/import/reactor.js';
-import type { TaggerConfig, TaggerPort } from '../application/ports/outbound-ports.js';
+import type {
+  ConfigInvalid,
+  TaggerConfig,
+  TaggerPort,
+} from '../application/ports/outbound-ports.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
 import { requested } from '../domain/import/__fixtures__/import-fixtures.js';
 import { createImporterRuntime } from './runtime.js';
@@ -103,7 +107,11 @@ describe('createImporterRuntime', () => {
     const databaseFile = path.join(directory, 'events.db');
 
     const database = openEventDatabase(databaseFile);
-    const store = new SqliteEventStore(database, new UpcasterRegistry(), new InProcessEventBus());
+    const store = new SqliteEventStore(
+      database,
+      new UpcasterRegistry(),
+      new InProcessEventBus(silentLogger()),
+    );
     const appendResult = await store.append('imp-stalled', 0, [requested()], {
       importId: 'imp-stalled',
       occurredAt: '2026-07-10T12:00:00.000Z',
@@ -166,6 +174,23 @@ describe('createImporterRuntime', () => {
     const startupError = result._unsafeUnwrapErr();
     expect(startupError.kind).toBe('BeetsConfigUnusable');
     expect(startupError.detail).toContain('bad yaml');
+  });
+
+  it('surfaces an operator-fixable ConfigInvalid as a BeetsConfigUnusable startup error with its detail', async () => {
+    const result = await createImporterRuntime(config(), silentLogger(), {
+      tagger: {
+        ...fakeTagger(),
+        validate: () =>
+          errAsync<TaggerConfig, ConfigInvalid>({
+            kind: 'ConfigInvalid',
+            detail: 'library-directory-missing: not a directory',
+          }),
+      },
+    });
+    expect(result.isErr()).toBe(true);
+    const startupError = result._unsafeUnwrapErr();
+    expect(startupError.kind).toBe('BeetsConfigUnusable');
+    expect(startupError.detail).toContain('library-directory-missing');
   });
 
   it('refuses to boot on an out-of-range auto-apply threshold', async () => {
@@ -326,24 +351,42 @@ describe('createImporterRuntime', () => {
     expect(errors.join('')).toContain('projection rebuild failed');
   });
 
-  it('stops the connected acquisition subscription on shutdown (no leaked poll)', async () => {
-    const result = await createImporterRuntime(config(), silentLogger(), {
-      tagger: fakeTagger(),
-      intake: { deleteRelease: () => okAsync<void>(undefined) },
-    });
-    const runtime = result._unsafeUnwrap();
-    const feed: SeamFeed = {
-      read: (from) => Promise.resolve(ok({ events: [], scannedTo: from })),
-    };
-    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
-    const stopSpy = vi.spyOn(subscription, 'stop');
-    await subscription.start();
+  it('stops the connected acquisition subscription on stop() so its poll cannot outlive the db', async () => {
+    vi.useFakeTimers();
+    try {
+      const result = await createImporterRuntime(config(), silentLogger(), {
+        tagger: fakeTagger(),
+        intake: { deleteRelease: () => okAsync<void>(undefined) },
+      });
+      const runtime = result._unsafeUnwrap();
+      let isStopped = false;
+      const stopOnce = async (): Promise<void> => {
+        if (isStopped) return;
+        isStopped = true;
+        await runtime.stop();
+      };
+      cleanups.push(stopOnce);
 
-    await runtime.stop();
+      // A state-based fake feed counting its reads — no interaction spy: the observable proof is
+      // that the feed is polled zero more times after stop(), so nothing hits the closed DB handle.
+      const reads: number[] = [];
+      const feed: SeamFeed = {
+        read: (from) => {
+          reads.push(from);
+          return Promise.resolve(ok({ events: [], scannedTo: from }));
+        },
+      };
+      const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+      await subscription.start();
+      const readsAtStop = reads.length;
 
-    // stop() must tear down the subscription too — otherwise its fallback poll keeps hitting a
-    // closed DB handle and holds the event loop open.
-    expect(stopSpy).toHaveBeenCalled();
+      await stopOnce(); // must clear the subscription's poll interval BEFORE closing the db
+      await vi.advanceTimersByTimeAsync(30_000); // several 5s poll intervals would fire if leaked
+
+      expect(reads.length).toBe(readsAtStop);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('classifies a genuine probe fault as transient (not a missing directory) via the real probe', async () => {

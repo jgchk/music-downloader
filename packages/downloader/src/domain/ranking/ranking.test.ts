@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scoreMatch } from '../matching/match-scorer.js';
 import { asCandidateIdentity } from '../shared/__fixtures__/candidate-identity.js';
 import { candidateQualityBucket, rankCandidates } from './ranking.js';
 import type { Candidate, CandidateFile } from '../candidate/candidate.js';
@@ -86,6 +87,17 @@ describe('rankCandidates', () => {
     });
     const strict = createMatchPolicy(0.9)._unsafeUnwrap();
     expect(rankCandidates([wrong], target, DEFAULT_QUALITY_POLICY, strict)).toHaveLength(0);
+  });
+
+  it('keeps a candidate whose confidence sits exactly at the threshold (the gate is inclusive)', () => {
+    // Its folder omits the year → the low-weight year signal misses, so the confidence lands below 1.
+    const c = candidate({ codec: 'flac', path: 'Radiohead - Kid A' });
+    const confidence = scoreMatch(target, c);
+    const atThreshold = createMatchPolicy(confidence)._unsafeUnwrap();
+    const justAbove = createMatchPolicy(confidence + 1e-6)._unsafeUnwrap();
+
+    expect(rankCandidates([c], target, DEFAULT_QUALITY_POLICY, atThreshold)).toHaveLength(1);
+    expect(rankCandidates([c], target, DEFAULT_QUALITY_POLICY, justAbove)).toHaveLength(0);
   });
 
   it('ranks quality above a better match (spec scenario)', () => {
