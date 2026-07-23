@@ -8,7 +8,7 @@ import type { EventMetadata, StoredEvent } from '../../application/ports/event-s
 import { InProcessEventBus } from './event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from './event-store.js';
 import { openEventDatabase, type EventDatabase } from './schema.js';
-import { UpcasterRegistry } from './upcaster.js';
+import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 const META: EventMetadata = { acquisitionId: 'acq-1', occurredAt: '2026-07-03T12:00:00.000Z' };
 
@@ -107,10 +107,13 @@ describe('SqliteEventStore', () => {
   });
 
   it('upcasts stored events on read', async () => {
-    const registry = new UpcasterRegistry().register('AcquisitionFulfilled', 1, (data) => ({
-      ...data,
-      location: '/library/renamed',
-    }));
+    // Registered at the version freshly-appended events are stamped with, so the read path applies
+    // it (real upcasters bridge old→current; this unit only exercises the toStored → upcast wiring).
+    const registry = new UpcasterRegistry().register(
+      'AcquisitionFulfilled',
+      CURRENT_SCHEMA_VERSION,
+      (data) => ({ ...data, location: '/library/renamed' }),
+    );
     const store = new SqliteEventStore(freshDb(), registry);
     await store.append('acq-1', 0, [FULFILLED], META);
 

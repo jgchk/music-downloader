@@ -130,10 +130,11 @@ describe('reviewToDto', () => {
     });
   });
 
-  it('maps a best-less match review, no-match, and remediation', () => {
-    expect(reviewToDto({ cause: { kind: 'match-review', hinted: false }, candidates: [] })).toEqual(
-      { kind: 'match-review', hinted: false, best: undefined, candidates: [] },
-    );
+  it('maps an unhinted match review, no-match, and remediation', () => {
+    const best = { dataSource: 'MusicBrainz', albumId: 'album-9' };
+    expect(
+      reviewToDto({ cause: { kind: 'match-review', hinted: false, best }, candidates: [] }),
+    ).toEqual({ kind: 'match-review', hinted: false, best, candidates: [] });
     expect(reviewToDto({ cause: { kind: 'no-match' }, candidates: [] })).toEqual({
       kind: 'no-match',
     });

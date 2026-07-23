@@ -697,10 +697,11 @@ describe('releaseGroupEditionCandidates', () => {
     expect(candidates[0]).toMatchObject({ trackCount: 14, format: 'CD + DVD-Video' });
   });
 
-  it('leaves presentation fields absent when the browse omits them', () => {
+  it('leaves presentation fields absent when the browse omits them, and an unknown track count absent', () => {
     const candidates = releaseGroupEditionCandidates([{ id: 'sparse' }]);
 
-    expect(candidates).toEqual([{ releaseMbid: 'sparse', trackCount: 0 }]);
+    expect(candidates).toEqual([{ releaseMbid: 'sparse' }]);
+    expect(candidates[0]).not.toHaveProperty('trackCount');
   });
 
   it('treats a null country and media format as absent (MusicBrainz reports unknowns as null)', () => {
@@ -711,12 +712,13 @@ describe('releaseGroupEditionCandidates', () => {
     expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 3 }]);
   });
 
-  it('treats a null title, status, and date as absent', () => {
+  it('treats a null title, status, and date as absent, and reports no track count', () => {
     const candidates = releaseGroupEditionCandidates([
       { id: 'nulled', title: null, status: null, date: null },
     ]);
 
-    expect(candidates).toEqual([{ releaseMbid: 'nulled', trackCount: 0 }]);
+    expect(candidates).toEqual([{ releaseMbid: 'nulled' }]);
+    expect(candidates[0]).not.toHaveProperty('trackCount');
   });
 
   it('orders candidates by the picker heuristic: modal track count first, then earliest date', () => {

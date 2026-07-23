@@ -160,7 +160,8 @@ export const editionCandidateSchema = z.object({
   date: z.string().optional(),
   country: z.string().optional(),
   format: z.string().optional(),
-  trackCount: z.number(),
+  // Absent when the edition's track count is unknown (v2 EditionCandidate; legacy v1 stored 0).
+  trackCount: z.number().optional(),
 });
 
 export const acquisitionStatusResponseSchema = z.object({
