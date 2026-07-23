@@ -1,18 +1,6 @@
-import { createRequire } from 'node:module';
-
-// These conventional-changelog packages are legacy CommonJS with no `main`/`exports` field, so a
-// bare ESM `import` can't resolve them; `require` falls back to their index.js. Loading them through
-// createRequire keeps the pinned specifiers version-agnostic.
-const require = createRequire(import.meta.url);
-const ccParser = require('conventional-commits-parser') as {
-  sync: (message: string, options: unknown) => Record<string, unknown>;
-};
-const writer = require('conventional-changelog-writer') as {
-  parseArray: (commits: unknown, context: unknown, options: unknown) => string;
-};
-const conventionalcommitsPreset = require('conventional-changelog-conventionalcommits') as (
-  config: unknown,
-) => Promise<{ parserOpts: unknown; writerOpts: unknown }>;
+import { CommitParser } from 'conventional-commits-parser';
+import { writeChangelogString } from 'conventional-changelog-writer';
+import createPreset from 'conventional-changelog-conventionalcommits';
 
 /**
  * Render one release's CHANGELOG.md section, byte-for-byte as commit-and-tag-version 12.7.3 did,
@@ -32,28 +20,25 @@ const conventionalcommitsPreset = require('conventional-changelog-conventionalco
  *    for a fresh release section.
  */
 
-/** The config-spec 2.1.0 default `types` — the exact array catv passes the preset (perf hidden). */
+/**
+ * The config-spec 2.1.0 default `types` — the exact array catv passes the preset (perf hidden).
+ * conventional-changelog-conventionalcommits v10 renamed the per-type `hidden: true` flag to
+ * `effect: 'hidden'` (see its `isTypeEffect`), so the hidden types are expressed that way here.
+ */
 const TYPES = [
   { type: 'feat', section: 'Features' },
   { type: 'fix', section: 'Bug Fixes' },
-  { type: 'chore', hidden: true },
-  { type: 'docs', hidden: true },
-  { type: 'style', hidden: true },
-  { type: 'refactor', hidden: true },
-  { type: 'perf', hidden: true },
-  { type: 'test', hidden: true },
+  { type: 'chore', effect: 'hidden' },
+  { type: 'docs', effect: 'hidden' },
+  { type: 'style', effect: 'hidden' },
+  { type: 'refactor', effect: 'hidden' },
+  { type: 'perf', effect: 'hidden' },
+  { type: 'test', effect: 'hidden' },
 ] as const;
 
 const HOST = 'https://github.com';
 const OWNER = 'jgchk';
 const REPOSITORY = 'music-downloader';
-
-// The conventionalcommits preset's own default URL templates, supplied explicitly (no repository
-// field in package.json means the preset can't infer them from a config file).
-const COMMIT_URL_FORMAT = '{{host}}/{{owner}}/{{repository}}/commit/{{hash}}';
-const COMPARE_URL_FORMAT =
-  '{{host}}/{{owner}}/{{repository}}/compare/{{previousTag}}...{{currentTag}}';
-const ISSUE_URL_FORMAT = '{{host}}/{{owner}}/{{repository}}/issues/{{id}}';
 
 /** A commit in the release range: its full SHA (for the [shorthash](commit-url) link) and message. */
 export interface RangeCommit {
@@ -70,15 +55,14 @@ export async function renderChangelogSection(
   commits: readonly RangeCommit[],
   opts: { version: string; previousVersion: string },
 ): Promise<string> {
-  const { parserOpts, writerOpts } = await conventionalcommitsPreset({
-    types: TYPES,
-    commitUrlFormat: COMMIT_URL_FORMAT,
-    compareUrlFormat: COMPARE_URL_FORMAT,
-    issueUrlFormat: ISSUE_URL_FORMAT,
-  });
+  // The preset's default URL format functions derive commit/compare/issue links from
+  // context.host/owner/repository (the same shapes catv's explicit templates produced), so we no
+  // longer pass URL templates — the `context` below supplies host/owner/repository directly.
+  const { parser: parserOpts, writer: writerOpts } = createPreset({ types: [...TYPES] });
 
+  const parser = new CommitParser(parserOpts);
   const parsed = commits.map((c) => {
-    const commit = ccParser.sync(c.message, parserOpts);
+    const commit = parser.parse(c.message) as Record<string, unknown>;
     commit.hash = c.hash;
     return commit;
   });
@@ -91,7 +75,10 @@ export async function renderChangelogSection(
     previousTag: `v${opts.previousVersion}`,
     currentTag: `v${opts.version}`,
     linkCompare: true,
+    // v9's writer template defaults the commit path segment to `commits` (plural); catv used the
+    // singular `commit` (matching GitHub's own /commit/<sha> URL), so pin it to preserve fidelity.
+    commit: 'commit',
   };
 
-  return writer.parseArray(parsed, context, writerOpts);
+  return writeChangelogString(parsed, context, writerOpts);
 }

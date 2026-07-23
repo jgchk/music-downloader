@@ -10,18 +10,18 @@ import AcquisitionBadge from './AcquisitionBadge.svelte';
  */
 describe('AcquisitionBadge', () => {
   it('shows the working label while pending, with no reasons affordance', async () => {
-    render(AcquisitionBadge, { phase: 'pending' });
+    await render(AcquisitionBadge, { phase: 'pending' });
     await expect.element(page.getByText('Working')).toBeInTheDocument();
     expect(page.getByRole('button').elements()).toHaveLength(0);
   });
 
   it('shows the done label when fulfilled', async () => {
-    render(AcquisitionBadge, { phase: 'fulfilled' });
+    await render(AcquisitionBadge, { phase: 'fulfilled' });
     await expect.element(page.getByText('Done')).toBeInTheDocument();
   });
 
   it('expands and collapses the failure reasons', async () => {
-    render(AcquisitionBadge, { phase: 'failed', reasons: ['no candidate', 'timeout'] });
+    await render(AcquisitionBadge, { phase: 'failed', reasons: ['no candidate', 'timeout'] });
     await expect.element(page.getByRole('button')).toHaveTextContent('Show reasons');
 
     await page.getByRole('button').click();
@@ -35,7 +35,7 @@ describe('AcquisitionBadge', () => {
   });
 
   it('falls back when a failure carries no reasons', async () => {
-    render(AcquisitionBadge, { phase: 'failed' });
+    await render(AcquisitionBadge, { phase: 'failed' });
     await page.getByRole('button').click();
     await expect.element(page.getByText('No reasons given')).toBeInTheDocument();
   });

@@ -5,7 +5,7 @@ import AcquisitionForm from './AcquisitionForm.svelte';
 
 describe('AcquisitionForm', () => {
   it('starts on musicbrainz and swaps the fields when the kind changes', async () => {
-    render(AcquisitionForm, {});
+    await render(AcquisitionForm, {});
     await expect.element(page.getByTestId('mbid')).toBeVisible();
 
     await page.getByTestId('kind').selectOptions('descriptor');
@@ -17,14 +17,14 @@ describe('AcquisitionForm', () => {
   });
 
   it('offers the release-group kind: id field shown, target type fixed to album', async () => {
-    render(AcquisitionForm, {});
+    await render(AcquisitionForm, {});
     await page.getByTestId('kind').selectOptions('release-group');
     await expect.element(page.getByTestId('mbid')).toBeVisible();
     expect(page.getByTestId('target-type').query()).toBeNull();
   });
 
   it('renders a rejected submission: error banner plus echoed values', async () => {
-    render(AcquisitionForm, {
+    await render(AcquisitionForm, {
       error: 'Invalid input: title required',
       values: { kind: 'descriptor', targetType: 'track', artist: 'A', title: 'T', album: 'L' },
     });
@@ -35,7 +35,7 @@ describe('AcquisitionForm', () => {
   });
 
   it('renders the policy fields', async () => {
-    render(AcquisitionForm, {
+    await render(AcquisitionForm, {
       values: {
         mbid: 'mb-7',
         qualityFloor: 'LOSSLESS',
