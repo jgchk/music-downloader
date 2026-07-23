@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.8.0](https://github.com/jgchk/music-downloader/compare/v3.7.0...v3.8.0) (2026-07-23)
+
+### Features
+
+* **importer,web:** show actual differences in match reviews ([5198357](https://github.com/jgchk/music-downloader/commit/51983573579938e4a36dcc567b57d5786d01b53a))
 ## [3.7.0](https://github.com/jgchk/music-downloader/compare/v3.6.0...v3.7.0) (2026-07-23)
 
 ### Features
