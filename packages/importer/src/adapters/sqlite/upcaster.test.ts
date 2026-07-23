@@ -38,7 +38,16 @@ describe('buildUpcasterRegistry', () => {
       type: 'ReviewResolved',
       resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
     };
-    expect(registry.upcast('ReviewResolved', CURRENT_SCHEMA_VERSION, v2)).toEqual(v2);
+    // Already current: returned by reference, not needlessly cloned.
+    expect(registry.upcast('ReviewResolved', CURRENT_SCHEMA_VERSION, v2)).toBe(v2);
+  });
+
+  it('lifts a v1 ReviewResolved of a non-rejection kind through the wired path untouched', () => {
+    const registry = buildUpcasterRegistry();
+    const v1 = { type: 'ReviewResolved', resolution: { kind: 'accept' } };
+
+    // The rename only touches the rejection verb; other v1 resolutions flow through the registry.
+    expect(registry.upcast('ReviewResolved', 1, v1)).toBe(v1);
   });
 
   it('leaves a non-ReviewResolved type untouched', () => {

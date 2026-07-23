@@ -70,7 +70,7 @@ describe('resolveReviewRequestSchema', () => {
     ).toBe(false);
   });
 
-  it('refuses an empty reason string on the retry verb (omit it instead)', () => {
+  it('refuses an empty reason string on the unusable-delivery verb (omit it instead)', () => {
     expect(
       resolveReviewRequestSchema.safeParse({ verb: 'reject-unusable-delivery', reasons: [''] })
         .success,

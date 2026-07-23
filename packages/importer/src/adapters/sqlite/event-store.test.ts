@@ -225,7 +225,7 @@ describe('SqliteEventStore', () => {
        VALUES (?, ?, ?, 1, ?, ?)`,
     );
     for (const [version, event] of nativeEvents.entries()) {
-      const data = version === 3 ? legacyRejectResolvedData(reasons) : event;
+      const data = event.type === 'ReviewResolved' ? legacyRejectResolvedData(reasons) : event;
       insert.run('imp-legacy', version, event.type, JSON.stringify(data), JSON.stringify(META));
     }
     const legacyStore = new SqliteEventStore(legacyDatabase, buildUpcasterRegistry());
