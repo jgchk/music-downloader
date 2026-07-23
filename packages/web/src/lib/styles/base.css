@@ -295,11 +295,14 @@ tbody tr[aria-current='true'] td {
   background: color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
-/* -- Master-detail: a list pane beside a detail pane (acquisitions) -------- */
+/* -- Master-detail: a compact list pane beside the wider detail pane ------
+   (acquisitions). The master is a FIXED width holding a compact summary list —
+   not a table — so the detail is the wider pane (Apple HIG); below ~960px the
+   two panes stack so nothing overflows on narrow viewports. */
 .master-detail {
   display: grid;
   gap: var(--region-gap);
-  grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+  grid-template-columns: 22rem minmax(0, 1fr);
   align-items: start;
 }
 .master-detail .master {
@@ -311,10 +314,62 @@ tbody tr[aria-current='true'] td {
   flex-direction: column;
   gap: var(--stack-gap);
 }
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .master-detail {
     grid-template-columns: 1fr;
   }
+}
+
+/* -- Queue: the compact master list (target + phase signal per item) ------- */
+ul.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+ul.queue > li {
+  min-width: 0;
+}
+ul.queue a {
+  display: grid;
+  gap: 2px;
+  padding: var(--cell-pad-y) var(--cell-pad-x);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+ul.queue a:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+ul.queue a[aria-current='true'] {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+ul.queue .row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--inline-gap);
+  min-width: 0;
+}
+ul.queue .target {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--fw-head);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ul.queue .badge {
+  flex: none;
+}
+ul.queue .row-sub {
+  display: flex;
+  gap: var(--inline-gap);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
 }
 
 /* -- Panels + title bars (region-head): the per-page chrome convention.

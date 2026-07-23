@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AcquisitionStatusResponseDto } from '@music/downloader';
-  import { outcomeSummary, statusTone, targetDescription } from '$lib/acquisitions.js';
+  import { statusTone, targetDescription } from '$lib/acquisitions.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
 
   interface Props {
@@ -17,26 +17,37 @@
 {#if acquisitions.length === 0}
   <p data-testid="empty">No acquisitions yet.</p>
 {:else}
-  <table>
-    <thead>
-      <tr><th>Target</th><th>Status</th><th>Attempts</th><th>Outcome</th></tr>
-    </thead>
-    <tbody>
-      {#each acquisitions as acquisition (acquisition.acquisitionId)}
-        <tr
+  <!-- A compact master list, not a table: target + a phase signal (and an attempts count). The
+       full outcome / location / failure reason lives in the detail pane, so one long value can't
+       overflow this narrow pane (see the acquisitions-list-detail-layout change). -->
+  <ul class="queue">
+    {#each acquisitions as acquisition (acquisition.acquisitionId)}
+      <li>
+        <a
+          href={`/acquisitions/${acquisition.acquisitionId}`}
           data-testid="acquisition-row"
           aria-current={acquisition.acquisitionId === selectedId ? 'true' : undefined}
         >
-          <td>
-            <a href={`/acquisitions/${acquisition.acquisitionId}`}>
+          <span class="row-main">
+            <span class="target" title={targetDescription(acquisition)}>
               {targetDescription(acquisition)}
-            </a>
-          </td>
-          <td><AcquisitionBadge phase={statusTone(acquisition.status)} /></td>
-          <td>{acquisition.attempts}</td>
-          <td>{outcomeSummary(acquisition) ?? acquisition.status}</td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+            </span>
+            <AcquisitionBadge phase={statusTone(acquisition.status)} />
+          </span>
+          {#if statusTone(acquisition.status) === 'pending' || acquisition.attempts > 0}
+            <span class="row-sub">
+              {#if statusTone(acquisition.status) === 'pending'}
+                <!-- The tone badge collapses every in-progress state to "Working"; show the
+                     granular phase so a queue you monitor still reads at a glance. -->
+                <span class="phase">{acquisition.status}</span>
+              {/if}
+              {#if acquisition.attempts > 0}
+                <span class="attempts">{acquisition.attempts} attempts</span>
+              {/if}
+            </span>
+          {/if}
+        </a>
+      </li>
+    {/each}
+  </ul>
 {/if}
