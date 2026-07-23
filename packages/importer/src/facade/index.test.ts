@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { submitImport } from '../application/import/use-cases.js';
 import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
+import { SOURCE } from '../domain/import/__fixtures__/import-fixtures.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
@@ -232,6 +233,24 @@ describe('createImporterFacade', () => {
       expect(imports.imports).toHaveLength(1);
       expect(reviewListResultSchema.parse(roundTrip(reviews))).toEqual(reviews);
       expect(reviews.reviews).toHaveLength(1);
+    });
+
+    it('exposes each pending review’s permitted verb set, gated on a retained candidate', async () => {
+      // A manually submitted import (no source, no retained candidate): the retry verb is withheld,
+      // plain reject still offered.
+      const manual = testWiring();
+      await submitAndPropose(manual, manual.facade);
+      const manualActions = manual.facade.listPendingReviews().reviews[0]?.availableActions ?? [];
+      expect(manualActions).toContain('reject');
+      expect(manualActions).not.toContain('reject-unusable-delivery');
+
+      // A downloader-delivered import that retains its candidate: the retry verb joins the set.
+      const delivered = testWiring();
+      await submitImport(delivered.deps, { directory: INTAKE, source: SOURCE });
+      await delivered.dispatch(GOLDEN_IMPORT_ID, { type: 'Propose', directory: INTAKE });
+      const deliveredActions =
+        delivered.facade.listPendingReviews().reviews[0]?.availableActions ?? [];
+      expect(deliveredActions).toContain('reject-unusable-delivery');
     });
   });
 });

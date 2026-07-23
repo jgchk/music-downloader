@@ -97,6 +97,8 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     location: view.location,
     history: view.history.map((item) => historyEntryToDto(item)),
     candidates: view.candidates?.map((candidate) => ({ ...candidate })),
+    cancellable: view.cancellable,
+    awaitingSelection: view.awaitingSelection,
     stalled: view.stalled,
   };
 }

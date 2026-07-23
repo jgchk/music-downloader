@@ -32,6 +32,7 @@ const awaitingAcquisition = {
   attempts: 0,
   rejectedCount: 0,
   history: [],
+  awaitingSelection: true,
   candidates: [{ releaseMbid: 'r1', title: 'OK Computer', trackCount: 12 }],
 };
 

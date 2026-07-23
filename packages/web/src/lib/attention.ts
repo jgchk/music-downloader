@@ -1,6 +1,6 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import type { PendingReviewDto } from '@music/importer';
-import { statusTone, targetDescription } from './acquisitions.js';
+import { targetDescription } from './acquisitions.js';
 
 /**
  * The attention queue's vocabulary (design D1): a web-owned view model composing everything that
@@ -30,10 +30,11 @@ export function attentionItems(
 ): AttentionItem[] {
   return orderByLongestWaiting([
     ...reviews.map((item) => reviewItem(item)),
-    // Queue membership is the badge tone's rule, not a re-derivation: whatever the acquisitions
-    // list badges as action-needed is exactly what the queue lists.
+    // Membership in the edition-selection arm follows the downloader's decided awaiting-selection
+    // flag, not the badge tone or the status enum: the pause is the downloader's determination, the
+    // queue merely composes it. An older producer that omits the flag simply contributes no entry.
     ...acquisitions
-      .filter((entry) => statusTone(entry.status) === 'attention')
+      .filter((entry) => entry.awaitingSelection === true)
       .map((item) => editionItem(item)),
   ]);
 }

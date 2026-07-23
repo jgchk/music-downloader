@@ -32,13 +32,24 @@ export function statusTone(status: AcquisitionStatusResponseDto['status']): Badg
   return TONE[status];
 }
 
-export function isTerminal(status: AcquisitionStatusResponseDto['status']): boolean {
-  return TONE[status] === 'fulfilled' || TONE[status] === 'failed';
+/**
+ * Cancellable per the acquisition's own decided flag — the downloader's cancel guard, rendered, not
+ * re-derived from the status enum. Absent (an older producer) degrades to not-cancellable, so the
+ * cancel affordance is withheld rather than guessed from the phase name.
+ */
+export function isCancellable(acquisition: AcquisitionStatusResponseDto): boolean {
+  return acquisition.cancellable === true;
 }
 
-/** Anything not terminal can be asked to cancel; the decider converges if the ask is stale. */
-export function isCancellable(status: AcquisitionStatusResponseDto['status']): boolean {
-  return !isTerminal(status);
+/**
+ * Terminal reads the decided flag — the cancel rule is "cancellable iff not terminal", so the BFF
+ * reads the flag rather than deciding terminality from the status enum. Deliberately NOT defined as
+ * `!isCancellable`: when the flag is absent BOTH degrade to false (no cancel affordance and no
+ * terminal outcome shown) — the safe conservative read for an older producer. Restoring the
+ * `isCancellable`/`isTerminal` inverse identity would flip that degrade and is a hazard, not a tidy-up.
+ */
+export function isTerminal(acquisition: AcquisitionStatusResponseDto): boolean {
+  return acquisition.cancellable === false;
 }
 
 export function targetDescription(acquisition: AcquisitionStatusResponseDto): string {
@@ -57,7 +68,7 @@ export function targetDescription(acquisition: AcquisitionStatusResponseDto): st
 /** The terminal outcome line: where it landed, or why it failed (web-ui spec). */
 export function outcomeSummary(acquisition: AcquisitionStatusResponseDto): string | undefined {
   if (acquisition.status === 'Fulfilled') return acquisition.location ?? 'Fulfilled';
-  if (!isTerminal(acquisition.status)) return undefined;
+  if (!isTerminal(acquisition)) return undefined;
   const failures = acquisition.history.flatMap((entry) => {
     if (entry.kind === 'download-failed') return [entry.reason];
     if (entry.kind === 'validation-failed') return entry.reasons;

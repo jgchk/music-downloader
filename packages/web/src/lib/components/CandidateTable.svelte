@@ -8,9 +8,14 @@
     candidates: readonly Candidate[];
     /** Offer a replace/keep-both choice on apply (duplicate reviews). */
     withDuplicateAction?: boolean;
+    /**
+     * Render the per-row apply affordance. Gated by the caller from the review's decided
+     * `availableActions` (whether `apply-candidate` is a permitted verb); defaults to shown.
+     */
+    canApply?: boolean;
   }
 
-  let { candidates, withDuplicateAction = false }: Properties = $props();
+  let { candidates, withDuplicateAction = false, canApply = true }: Properties = $props();
 
   // Branchless: strip everything up to the last slash (a leaf path stays whole).
   const basename = (path: string): string => path.replace(/^.*\//u, '');
@@ -84,18 +89,20 @@
         {/each}
       </p>
 
-      <form method="POST" action="?/resolve">
-        <input type="hidden" name="verb" value="apply-candidate" />
-        <input type="hidden" name="dataSource" value={candidate.ref.dataSource} />
-        <input type="hidden" name="albumId" value={candidate.ref.albumId} />
-        {#if withDuplicateAction}
-          <select name="duplicateAction" data-testid="duplicate-action">
-            <option value="replace">Replace existing</option>
-            <option value="keep-both">Keep both</option>
-          </select>
-        {/if}
-        <button type="submit" data-testid="apply">Apply this candidate</button>
-      </form>
+      {#if canApply}
+        <form method="POST" action="?/resolve">
+          <input type="hidden" name="verb" value="apply-candidate" />
+          <input type="hidden" name="dataSource" value={candidate.ref.dataSource} />
+          <input type="hidden" name="albumId" value={candidate.ref.albumId} />
+          {#if withDuplicateAction}
+            <select name="duplicateAction" data-testid="duplicate-action">
+              <option value="replace">Replace existing</option>
+              <option value="keep-both">Keep both</option>
+            </select>
+          {/if}
+          <button type="submit" data-testid="apply">Apply this candidate</button>
+        </form>
+      {/if}
     </li>
   {/each}
 </ul>

@@ -2,7 +2,13 @@ import type { Result } from 'neverthrow';
 import type { ImportCommand } from './commands.js';
 import { decide } from './decide.js';
 import type { DomainError } from './decide.js';
-import type { ImportEvent, ProposedCandidate, ReviewCause } from './events.js';
+import type {
+  ImportEvent,
+  ProposedCandidate,
+  ResolutionKind,
+  ReviewCause,
+  ReviewKind,
+} from './events.js';
 import { react } from './react.js';
 import type { Effect } from './react.js';
 import { foldEvents, isTerminal } from './state.js';
@@ -27,6 +33,60 @@ export type { ImportPhase } from './state.js';
 export interface OpenReview {
   readonly cause: ReviewCause;
   readonly candidates: readonly ProposedCandidate[];
+  /**
+   * The resolution verbs a human may take on this review — the importer's own curation, exposed so a
+   * consumer offers exactly the legal verbs rather than re-deriving per-kind legality. Always at
+   * least as strict as {@link decide}: it never lists a verb `decide` would refuse (see
+   * {@link permittedActionsFor}).
+   */
+  readonly availableActions: readonly ResolutionKind[];
+}
+
+/**
+ * The resolution verbs permitted for an open review — the importer's authoritative, curated set. A
+ * remediation review resolves only through accept/retry-enrichment; the review kinds offer their
+ * curated verb set, with `apply-candidate` present only when candidates exist and
+ * `reject-unusable-delivery` only when a delivered candidate is retained (the `NoRetainedCandidate`
+ * precondition `decide` enforces). The curation is narrower than the raw `decide`-legal set on
+ * purpose (e.g. a duplicate review offers no manual re-tag), and never wider — every verb it lists is
+ * one `decide` would accept for that review.
+ */
+function permittedActionsFor(
+  kind: ReviewKind,
+  // An options object, not two positional booleans: the two gate different verbs, so a transposed
+  // pair would be a behavioural bug the compiler cannot catch.
+  {
+    hasCandidates,
+    hasRetainedCandidate,
+  }: { hasCandidates: boolean; hasRetainedCandidate: boolean },
+): readonly ResolutionKind[] {
+  const isAllowed = (verb: ResolutionKind): boolean =>
+    (verb !== 'apply-candidate' || hasCandidates) &&
+    (verb !== 'reject-unusable-delivery' || hasRetainedCandidate);
+  switch (kind) {
+    case 'match-review':
+    case 'no-match': {
+      return (
+        [
+          'apply-candidate',
+          'supply-id',
+          'refresh-candidates',
+          'manual-tags',
+          'import-as-is',
+          'reject',
+          'reject-unusable-delivery',
+        ] as const
+      ).filter((verb) => isAllowed(verb));
+    }
+    case 'duplicate-review': {
+      return (['apply-candidate', 'reject', 'reject-unusable-delivery'] as const).filter((verb) =>
+        isAllowed(verb),
+      );
+    }
+    case 'remediation-review': {
+      return ['accept', 'retry-enrichment'];
+    }
+  }
 }
 
 /**
@@ -44,12 +104,23 @@ export interface ImportSnapshot {
 
 function openReviewOf(state: ImportState): OpenReview | undefined {
   if (state.phase === 'awaiting-review' && state.settled === undefined) {
-    return { cause: state.cause, candidates: state.candidates };
+    return {
+      cause: state.cause,
+      candidates: state.candidates,
+      availableActions: permittedActionsFor(state.cause.kind, {
+        hasCandidates: state.candidates.length > 0,
+        hasRetainedCandidate: state.source?.candidate !== undefined,
+      }),
+    };
   }
   if (state.phase === 'applied' && state.remediation?.status === 'open') {
     return {
       cause: { kind: 'remediation-review', failures: state.remediation.failures },
       candidates: [],
+      availableActions: permittedActionsFor('remediation-review', {
+        hasCandidates: false,
+        hasRetainedCandidate: false,
+      }),
     };
   }
   return undefined;

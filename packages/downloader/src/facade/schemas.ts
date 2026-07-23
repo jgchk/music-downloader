@@ -178,6 +178,11 @@ export const acquisitionStatusResponseSchema = z.object({
   history: z.array(historyEntrySchema),
   // Present only while status is AwaitingManualSelection (additive).
   candidates: z.array(editionCandidateSchema).optional(),
+  // The acquisition's decided lifecycle flags (additive/optional so an older producer omitting them,
+  // and a legacy consumer ignoring them, both keep working): whether a cancel would still act
+  // (`!isTerminal`) and whether it is paused for a human's edition choice.
+  cancellable: z.boolean().optional(),
+  awaitingSelection: z.boolean().optional(),
   // Present (true) only when the acquisition dead-lettered awaiting an operator (additive).
   stalled: z.boolean().optional(),
 });
