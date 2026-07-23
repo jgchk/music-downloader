@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.7.0](https://github.com/jgchk/music-downloader/compare/v3.6.0...v3.7.0) (2026-07-23)
+
+### Features
+
+* **review:** add bounded-context reviewer agent ([26f4901](https://github.com/jgchk/music-downloader/commit/26f4901ffc23acc7378a6d05c966bb77a1dc895d))
+* **web:** show the full download-through-import history on the acquisition page ([c103c3e](https://github.com/jgchk/music-downloader/commit/c103c3e1e3fe8c8bc1b6b229c023e31b5e393be6))
 ## [3.6.0](https://github.com/jgchk/music-downloader/compare/v3.5.4...v3.6.0) (2026-07-23)
 
 ### Features
