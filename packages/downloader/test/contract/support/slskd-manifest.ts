@@ -39,7 +39,7 @@ export const SLSKD_CONSUMED_OPERATIONS: readonly SlskdOperation[] = [
     method: 'get',
     path: '/api/v0/searches/{id}',
     pathParams: ['id'],
-    usedBy: 'SlskdSearch — poll completion (isComplete)',
+    usedBy: 'SlskdSearch — poll completion (isComplete, state, responseCount)',
   },
   {
     method: 'get',
