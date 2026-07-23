@@ -13,14 +13,14 @@ const target: Target = createTarget({
   title: 'Kid A',
   year: 2000,
   tracks: [
-    { position: 1, title: 'Everything in Its Right Place', durationMs: 251000 },
-    { position: 2, title: 'Kid A', durationMs: 264000 },
+    { position: 1, title: 'Everything in Its Right Place', durationMs: 251_000 },
+    { position: 2, title: 'Kid A', durationMs: 264_000 },
   ],
 })._unsafeUnwrap();
 
 const alignedFiles: CandidateFile[] = [
-  { name: '01 Everything in Its Right Place.flac', sizeBytes: 1, durationMs: 251000 },
-  { name: '02 Kid A.flac', sizeBytes: 1, durationMs: 264000 },
+  { name: '01 Everything in Its Right Place.flac', sizeBytes: 1, durationMs: 251_000 },
+  { name: '02 Kid A.flac', sizeBytes: 1, durationMs: 264_000 },
 ];
 
 function candidate(overrides: {
@@ -57,8 +57,8 @@ describe('candidateQualityBucket', () => {
   it('resolves to the worst bucket among audio files', () => {
     const mixed = candidate({
       files: [
-        { name: '01.flac', sizeBytes: 1, durationMs: 251000, codec: 'flac' },
-        { name: '02.mp3', sizeBytes: 1, durationMs: 264000, codec: 'mp3', bitrate: 192000 },
+        { name: '01.flac', sizeBytes: 1, durationMs: 251_000, codec: 'flac' },
+        { name: '02.mp3', sizeBytes: 1, durationMs: 264_000, codec: 'mp3', bitrate: 192_000 },
       ],
     });
     expect(candidateQualityBucket(mixed, DEFAULT_QUALITY_POLICY)).toBe('LOSSY_STANDARD');
@@ -76,7 +76,7 @@ describe('rankCandidates', () => {
       DEFAULT_QUALITY_POLICY.order,
       'LOSSLESS',
     )._unsafeUnwrap();
-    const lossy = candidate({ codec: 'mp3', bitrate: 320000 });
+    const lossy = candidate({ codec: 'mp3', bitrate: 320_000 });
     expect(rankCandidates([lossy], target, losslessFloor, DEFAULT_MATCH_POLICY)).toHaveLength(0);
   });
 
@@ -91,7 +91,7 @@ describe('rankCandidates', () => {
   it('ranks quality above a better match (spec scenario)', () => {
     const lossless = candidate({ username: 'a', codec: 'flac' });
     // A slightly weaker (fewer aligned) but still gate-passing lossy candidate.
-    const lossy = candidate({ username: 'b', codec: 'mp3', bitrate: 320000 });
+    const lossy = candidate({ username: 'b', codec: 'mp3', bitrate: 320_000 });
     const ranked = rankCandidates(
       [lossy, lossless],
       target,

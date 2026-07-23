@@ -1,6 +1,6 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { SqliteDeadLetterStore } from './dead-letters.js';
@@ -21,7 +21,8 @@ describe('SqliteDeadLetterStore', () => {
     await store.record(LETTER);
     await store.record({ ...LETTER, subscription: 'seam:other', globalSeq: 1 });
 
-    const letters = (await store.list('seam:verdicts'))._unsafeUnwrap();
+    const listResult = await store.list('seam:verdicts');
+    const letters = listResult._unsafeUnwrap();
     expect(letters).toEqual([LETTER, { ...LETTER, globalSeq: 9 }]);
   });
 
@@ -32,7 +33,8 @@ describe('SqliteDeadLetterStore', () => {
     const again = await store.record({ ...LETTER, error: 'InvalidPayload (retry)' });
 
     expect(again.isOk()).toBe(true);
-    const letters = (await store.list('seam:verdicts'))._unsafeUnwrap();
+    const listResult2 = await store.list('seam:verdicts');
+    const letters = listResult2._unsafeUnwrap();
     expect(letters).toEqual([{ ...LETTER, error: 'InvalidPayload (retry)' }]);
   });
 
@@ -41,14 +43,15 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.record({ ...LETTER, subscription: 'acquisition-reactor', streamId: 'acq-1' });
 
-    const letters = (await store.list('acquisition-reactor'))._unsafeUnwrap();
+    const listResult3 = await store.list('acquisition-reactor');
+    const letters = listResult3._unsafeUnwrap();
     expect(letters).toEqual([
       { ...LETTER, subscription: 'acquisition-reactor', streamId: 'acq-1' },
     ]);
   });
 
   it('adds the stream column to a database created before it existed', async () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'dead-letters-')), 'events.db');
+    const file = path.join(mkdtempSync(path.join(tmpdir(), 'dead-letters-')), 'events.db');
     const legacy = new Database(file);
     legacy.exec(
       `CREATE TABLE dead_letters (
@@ -61,7 +64,8 @@ describe('SqliteDeadLetterStore', () => {
     const store = new SqliteDeadLetterStore(openEventDatabase(file));
     await store.record({ ...LETTER, streamId: 'acq-1' });
 
-    const letters = (await store.list('seam:verdicts'))._unsafeUnwrap();
+    const listResult4 = await store.list('seam:verdicts');
+    const letters = listResult4._unsafeUnwrap();
     expect(letters).toEqual([{ ...LETTER, streamId: 'acq-1' }]);
   });
 
@@ -77,7 +81,8 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.clearStream('acquisition-reactor', 'acq-1');
 
-    const letters = (await store.list('acquisition-reactor'))._unsafeUnwrap();
+    const listResult5 = await store.list('acquisition-reactor');
+    const letters = listResult5._unsafeUnwrap();
     expect(letters.map((letter) => letter.streamId)).toEqual(['acq-2']);
   });
 
@@ -88,18 +93,23 @@ describe('SqliteDeadLetterStore', () => {
 
     await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z');
 
-    const letters = (await store.list('seam:verdicts'))._unsafeUnwrap();
+    const listResult6 = await store.list('seam:verdicts');
+    const letters = listResult6._unsafeUnwrap();
     expect(letters.map((letter) => letter.globalSeq)).toEqual([9]);
   });
 
   it('surfaces storage faults as infra errors', async () => {
-    const db = openEventDatabase(':memory:');
-    const store = new SqliteDeadLetterStore(db);
-    db.close();
+    const database = openEventDatabase(':memory:');
+    const store = new SqliteDeadLetterStore(database);
+    database.close();
 
-    expect((await store.record(LETTER)).isErr()).toBe(true);
-    expect((await store.list('seam:verdicts')).isErr()).toBe(true);
-    expect((await store.clearStream('seam:verdicts', 'acq-1')).isErr()).toBe(true);
-    expect((await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z')).isErr()).toBe(true);
+    const recordResult = await store.record(LETTER);
+    expect(recordResult.isErr()).toBe(true);
+    const listResult7 = await store.list('seam:verdicts');
+    expect(listResult7.isErr()).toBe(true);
+    const clearStreamResult = await store.clearStream('seam:verdicts', 'acq-1');
+    expect(clearStreamResult.isErr()).toBe(true);
+    const pruneResult = await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z');
+    expect(pruneResult.isErr()).toBe(true);
   });
 });

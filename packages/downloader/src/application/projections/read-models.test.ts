@@ -201,7 +201,8 @@ describe('LibraryViewProjection', () => {
     const projection = new LibraryViewProjection();
     // An Imported event whose stream never recorded a TargetResolved — an ordering invariant that
     // holds in practice; the projection degrades to skipping the entry instead of throwing.
-    for (const entry of stored([{ type: 'Imported', candidate: c.identity, location: '/lib/c' }])) {
+    const entries = stored([{ type: 'Imported', candidate: c.identity, location: '/lib/c' }]);
+    for (const entry of entries) {
       projection.apply(entry);
     }
     expect(projection.list()).toEqual([]);

@@ -54,28 +54,37 @@ function manualTagsToDomain(
 
 export function resolutionToDomain(dto: ResolveReviewRequestDto): Resolution {
   switch (dto.verb) {
-    case 'apply-candidate':
+    case 'apply-candidate': {
       return {
         kind: 'apply-candidate',
         ref: { dataSource: dto.candidate.dataSource, albumId: dto.candidate.albumId },
         duplicateAction: dto.duplicateAction,
       };
-    case 'supply-id':
+    }
+    case 'supply-id': {
       return { kind: 'supply-id', mbReleaseId: dto.mbReleaseId };
-    case 'refresh-candidates':
+    }
+    case 'refresh-candidates': {
       return { kind: 'refresh-candidates' };
-    case 'manual-tags':
+    }
+    case 'manual-tags': {
       return { kind: 'manual-tags', tags: manualTagsToDomain(dto.tags) };
-    case 'import-as-is':
+    }
+    case 'import-as-is': {
       return { kind: 'import-as-is' };
-    case 'reject':
+    }
+    case 'reject': {
       return { kind: 'reject', reason: dto.reason };
-    case 'reject-and-retry-download':
+    }
+    case 'reject-and-retry-download': {
       return { kind: 'reject-and-retry-download', reasons: dto.reasons };
-    case 'accept':
+    }
+    case 'accept': {
       return { kind: 'accept' };
-    case 'retry-enrichment':
+    }
+    case 'retry-enrichment': {
       return { kind: 'retry-enrichment' };
+    }
   }
 }
 
@@ -98,7 +107,7 @@ function candidateToDto(candidate: ProposedCandidate) {
 export function reviewToDto(review: OpenReview): ReviewDto {
   const cause = review.cause;
   switch (cause.kind) {
-    case 'match-review':
+    case 'match-review': {
       return {
         kind: 'match-review',
         hinted: cause.hinted,
@@ -106,18 +115,22 @@ export function reviewToDto(review: OpenReview): ReviewDto {
         // `best` is required in the domain; the wire DTO keeps it optional (a tolerant, additive
         // serialization altitude), but the mapping now always carries the present candidate.
         best: { ...cause.best },
-        candidates: review.candidates.map(candidateToDto),
+        candidates: review.candidates.map((item) => candidateToDto(item)),
       };
-    case 'no-match':
+    }
+    case 'no-match': {
       return { kind: 'no-match' };
-    case 'duplicate-review':
+    }
+    case 'duplicate-review': {
       return {
         kind: 'duplicate-review',
         incumbents: [...cause.incumbents],
-        candidates: review.candidates.map(candidateToDto),
+        candidates: review.candidates.map((item) => candidateToDto(item)),
       };
-    case 'remediation-review':
+    }
+    case 'remediation-review': {
       return { kind: 'remediation-review', failures: [...cause.failures] };
+    }
   }
 }
 

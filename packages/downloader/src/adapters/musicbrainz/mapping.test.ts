@@ -20,9 +20,9 @@ describe('releaseToTarget', () => {
       date: '2020-05-01',
       'artist-credit': [{ name: 'A', joinphrase: ' & ' }, { name: 'B' }, {}],
       media: [
-        { tracks: [{ position: 1, title: 'One', length: 60000 }] },
+        { tracks: [{ position: 1, title: 'One', length: 60_000 }] },
         {
-          tracks: [{ position: 2, recording: { title: 'Two', length: 120000 } }, { length: 1000 }],
+          tracks: [{ position: 2, recording: { title: 'Two', length: 120_000 } }, { length: 1000 }],
         },
         {}, // a medium with no tracks is skipped
       ],
@@ -35,8 +35,8 @@ describe('releaseToTarget', () => {
       year: 2020,
       mbid: 'rel-1',
       tracks: [
-        { position: 1, title: 'One', durationMs: 60000 }, // both from the track
-        { position: 2, title: 'Two', durationMs: 120000 }, // title/length fall back to the recording
+        { position: 1, title: 'One', durationMs: 60_000 }, // both from the track
+        { position: 2, title: 'Two', durationMs: 120_000 }, // title/length fall back to the recording
         { position: 2, title: '', durationMs: 1000 }, // no position → per-medium index; no title → ''
       ],
     });
@@ -101,7 +101,7 @@ describe('recordingToTarget', () => {
     const target = recordingToTarget({
       id: 'rec-1',
       title: 'A Song',
-      length: 200000,
+      length: 200_000,
       'artist-credit': [{ name: 'Solo' }],
     });
 
@@ -110,7 +110,7 @@ describe('recordingToTarget', () => {
       artist: 'Solo',
       title: 'A Song',
       mbid: 'rec-1',
-      tracks: [{ position: 1, title: 'A Song', durationMs: 200000 }],
+      tracks: [{ position: 1, title: 'A Song', durationMs: 200_000 }],
     });
   });
 

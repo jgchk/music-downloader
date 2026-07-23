@@ -3,7 +3,7 @@ import type { OpenReview } from '../../domain/import/import.js';
 import type { ImportPhase } from '../../domain/import/import.js';
 import type {
   ApplyFailure,
-  CandidateRef,
+  CandidateReference,
   ImportEvent,
   ImportHints,
   ResolutionKind,
@@ -31,7 +31,7 @@ type HistoryPayload =
   | { readonly kind: 'proposed'; readonly candidateCount: number; readonly pinnedId?: string }
   | {
       readonly kind: 'auto-apply-selected';
-      readonly candidate: CandidateRef;
+      readonly candidate: CandidateReference;
       readonly distance: number;
     }
   | { readonly kind: 'review-required'; readonly reviewKind: ReviewKind }
@@ -79,32 +79,41 @@ export interface PendingReviewView {
 
 function historyEntry(event: ImportEvent): HistoryPayload {
   switch (event.type) {
-    case 'ImportRequested':
+    case 'ImportRequested': {
       return { kind: 'requested', hints: event.hints };
-    case 'CandidatesProposed':
+    }
+    case 'CandidatesProposed': {
       return {
         kind: 'proposed',
         candidateCount: event.candidates.length,
         pinnedId: event.pinnedId,
       };
-    case 'AutoApplySelected':
+    }
+    case 'AutoApplySelected': {
       return { kind: 'auto-apply-selected', candidate: event.ref, distance: event.distance };
-    case 'ReviewRequired':
+    }
+    case 'ReviewRequired': {
       return { kind: 'review-required', reviewKind: event.cause.kind };
-    case 'ReviewResolved':
+    }
+    case 'ReviewResolved': {
       return { kind: 'review-resolved', resolution: event.resolution.kind };
-    case 'ImportApplied':
+    }
+    case 'ImportApplied': {
       return { kind: 'applied', location: event.location };
-    case 'RemediationRequired':
+    }
+    case 'RemediationRequired': {
       return { kind: 'remediation-required', failures: event.failures };
-    case 'ImportRejected':
+    }
+    case 'ImportRejected': {
       return { kind: 'rejected', reason: event.reason, filesDeleted: event.filesDeleted };
-    case 'ReleaseVerdictRecorded':
+    }
+    case 'ReleaseVerdictRecorded': {
       return {
         kind: 'release-verdict-recorded',
         acquisitionId: event.acquisitionId,
         reasons: event.reasons,
       };
+    }
   }
 }
 
@@ -165,7 +174,7 @@ export class ImportStatusProjection {
   }
 
   list(): readonly ImportStatusView[] {
-    return [...this.streams.entries()].map(([id, stored]) => projectStatus(id, stored));
+    return [...this.streams].map(([id, stored]) => projectStatus(id, stored));
   }
 
   /** Every import currently awaiting a human: typed review items with their carried context. */

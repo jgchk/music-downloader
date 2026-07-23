@@ -37,7 +37,7 @@ function renderVerdict(
         username: candidate.username,
         path: candidate.path,
         // Omitted — never null — when unknown: the receiver reads an optional number.
-        ...(candidate.sizeBytes === undefined ? {} : { sizeBytes: candidate.sizeBytes }),
+        ...(candidate.sizeBytes !== undefined && { sizeBytes: candidate.sizeBytes }),
       },
       verdict: 'rejected',
       reasons: [...reasons],

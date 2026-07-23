@@ -1,8 +1,8 @@
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { REACTOR_CONSUMER, Reactor } from './reactor.js';
-import type { ReactorDeps } from './reactor.js';
-import type { EffectPorts, InterpreterDeps } from './interpreter.js';
+import type { ReactorDependencies } from './reactor.js';
+import type { EffectPorts, InterpreterDependencies } from './interpreter.js';
 import {
   FakeCheckpointStore,
   FakeDeadLetterStore,
@@ -55,21 +55,21 @@ let deadLetters: FakeDeadLetterStore;
 let stalled: StalledReadModel;
 let clock: SettableClock;
 
-function interpreter(ports: EffectPorts): InterpreterDeps {
+function interpreter(ports: EffectPorts): InterpreterDependencies {
   return { store, clock, ports, onProgress: vi.fn() };
 }
 
 interface ReactorOverrides {
-  readonly interval?: (fn: () => void, ms: number) => () => void;
+  readonly interval?: (function_: () => void, ms: number) => () => void;
   readonly retryPolicy?: RetryPolicy;
   readonly random?: () => number;
-  readonly logger?: ReactorDeps['logger'];
+  readonly logger?: ReactorDependencies['logger'];
   readonly sleep?: (ms: number) => Promise<void>;
   readonly redriveGapMs?: number;
 }
 
 function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor {
-  const deps: ReactorDeps = {
+  const dependencies: ReactorDependencies = {
     store,
     checkpoints,
     bus,
@@ -88,7 +88,7 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     sleep: overrides.sleep ?? (() => Promise.resolve()),
     redriveGapMs: overrides.redriveGapMs,
   };
-  return new Reactor(deps);
+  return new Reactor(dependencies);
 }
 
 async function seed(history: readonly AcquisitionEvent[], streamId = 'acq-1'): Promise<void> {
@@ -121,7 +121,7 @@ const importedThenFulfilled = (cands: readonly ReturnType<typeof matchingCandida
 ];
 
 /** A tight budget for exhaustion specs: one 5s step, spent after a minute. */
-const TIGHT_BUDGET: RetryPolicy = { initialDelayMs: 5_000, maxDelayMs: 5_000, budgetMs: 60_000 };
+const TIGHT_BUDGET: RetryPolicy = { initialDelayMs: 5000, maxDelayMs: 5000, budgetMs: 60_000 };
 
 beforeEach(() => {
   store = new FakeEventStore();
@@ -301,8 +301,8 @@ describe('Reactor.process', () => {
       const ports = stubPorts();
       const r = reactor(ports, {
         // The same wiring composition supplies in production: a real setInterval.
-        interval: (fn, ms) => {
-          const handle = setInterval(fn, ms);
+        interval: (function_, ms) => {
+          const handle = setInterval(function_, ms);
           return () => {
             clearInterval(handle);
           };
@@ -311,7 +311,7 @@ describe('Reactor.process', () => {
       await r.start();
 
       await seed(requestedHistory()); // appended without a publish: only the poll can find it
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5000);
       expect(ports.metadata.resolve).toHaveBeenCalledOnce();
 
       r.stop();
@@ -409,7 +409,7 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
 
     // The parked download retries and settles (stale against the now-cancelled stream), then the
     // queued cancellation dispatches in order: abort → the pending candidate's rejection.
-    clock.advance(5_000);
+    clock.advance(5000);
     await r.drain();
     expect(abort).toHaveBeenCalledOnce();
     expect(streamEventTypes('acq-1')).toContain('CandidateRejected');
@@ -431,7 +431,7 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
     await seed([{ type: 'AcquisitionCancelled' }]);
     await r.drain(); // queued behind the park
 
-    clock.advance(5_000);
+    clock.advance(5000);
     await r.drain(); // download settles; catch-up hits the failing abort → fresh park at seq 6
     expect(parked.peek('acq-1')).toMatchObject({ globalSeq: 6, attempt: 1 });
     r.stop();
@@ -449,7 +449,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     await r.drain(); // not due yet — no retry
     expect(resolve).toHaveBeenCalledTimes(1);
 
-    clock.advance(5_000); // due: first backoff step
+    clock.advance(5000); // due: first backoff step
     await r.drain();
     expect(resolve).toHaveBeenCalledTimes(2);
     expect(parked.peek('acq-1')).toMatchObject({
@@ -457,7 +457,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
       nextRetryAt: '2026-07-22T12:00:15.000Z', // 5s + doubled 10s step
     });
 
-    clock.advance(5_000); // 12:00:10 — second step not due yet
+    clock.advance(5000); // 12:00:10 — second step not due yet
     await r.drain();
     expect(resolve).toHaveBeenCalledTimes(2);
     r.stop();
@@ -472,7 +472,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     const r = reactor(stubPorts({ metadata: { resolve } }));
     await r.start();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     await r.drain();
 
     expect(parked.count()).toBe(0);
@@ -489,15 +489,15 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
       .mockReturnValue(okAsync({ kind: 'unresolved' as const }));
     const ports = stubPorts({ metadata: { resolve } });
     const r = reactor(ports, {
-      interval: (fn) => {
-        ticks.push(fn);
+      interval: (function_) => {
+        ticks.push(function_);
         return () => {};
       },
     });
     await r.start();
     expect(parked.peek('acq-1')).toBeDefined();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     ticks[0]!(); // the fallback poll fires — nothing else does
     await vi.waitFor(() => {
       expect(resolve).toHaveBeenCalledTimes(2);
@@ -519,7 +519,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     parked.failClear = true;
     await r.drain(); // the retry succeeds but the park cannot be cleared
     expect(parked.peek('acq-1')).toBeDefined();
@@ -544,7 +544,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     await r.start();
     expect(parked.count()).toBe(2);
 
-    clock.advance(5_000);
+    clock.advance(5000);
     await r.drain();
 
     expect(parked.peek('acq-sick')).toMatchObject({ attempt: 2 }); // rescheduled
@@ -574,7 +574,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     const r = reactor(stubPorts({ metadata: { resolve } }));
     await r.start();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     store.failReads = true;
     await r.drain();
     expect(parked.peek('acq-1')).toMatchObject({ attempt: 1 }); // untouched — retried next tick
@@ -587,7 +587,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
     const r = reactor(stubPorts({ metadata: { resolve } }));
     await r.start();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     parked.failDue = true;
     await r.drain();
     expect(resolve).toHaveBeenCalledTimes(1);
@@ -805,7 +805,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     await seed(requestedHistory());
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
     const r = reactor(stubPorts({ metadata: { resolve } }), {
-      retryPolicy: { initialDelayMs: 5_000, maxDelayMs: 5_000, budgetMs: 0 },
+      retryPolicy: { initialDelayMs: 5000, maxDelayMs: 5000, budgetMs: 0 },
     });
     await r.start();
 
@@ -824,7 +824,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     const r = reactor(stubPorts({ metadata: { resolve } }));
     await r.start();
 
-    clock.advance(5_000); // well inside the 6h budget — the permanent fault short-circuits it
+    clock.advance(5000); // well inside the 6h budget — the permanent fault short-circuits it
     await r.drain();
 
     expect(parked.count()).toBe(0);
@@ -855,7 +855,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     const r = reactor(stubPorts({ metadata: { resolve } }));
     await r.start();
 
-    clock.advance(5_000);
+    clock.advance(5000);
     parked.failPark = true;
     await r.drain();
     expect(parked.peek('acq-1')).toMatchObject({ attempt: 1 }); // unchanged; a later tick retries
@@ -1069,11 +1069,11 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
         return Promise.resolve();
       },
       random: () => 0.5,
-      redriveGapMs: 2_000,
+      redriveGapMs: 2000,
     });
     await r.start();
 
-    expect(sleeps).toEqual([1_000, 1_000]); // one jittered gap per dispatching stream
+    expect(sleeps).toEqual([1000, 1000]); // one jittered gap per dispatching stream
     r.stop();
   });
 
@@ -1082,10 +1082,10 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
     await checkpointToHead();
     const order: string[] = [];
     let releaseRedrive!: () => void;
-    const gate = new Promise<{ kind: 'unresolved' }>((res) => {
+    const gate = new Promise<{ kind: 'unresolved' }>((resolve) => {
       releaseRedrive = () => {
         order.push('redrive:end');
-        res({ kind: 'unresolved' });
+        resolve({ kind: 'unresolved' });
       };
     });
     const resolve = vi.fn(() => {

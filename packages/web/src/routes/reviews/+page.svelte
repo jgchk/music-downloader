@@ -1,8 +1,8 @@
 <script lang="ts">
   import AttentionQueue from '$lib/components/AttentionQueue.svelte';
-  import type { PageProps } from './$types';
+  import type { PageProps as PageProperties } from './$types';
 
-  let { data }: PageProps = $props();
+  let { data }: PageProperties = $props();
 </script>
 
 <section class="panel">

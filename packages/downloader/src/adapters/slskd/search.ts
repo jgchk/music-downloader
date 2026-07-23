@@ -35,7 +35,7 @@ import type { Timer } from './timer.js';
  * best-effort: a failure is logged and never fails a working search.
  */
 
-const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 60_000;
 const SLSKD_SOURCE = 'slskd';
 
@@ -146,8 +146,11 @@ export class SlskdSearch implements SearchPort {
   private async deleteSearch(id: string, key: SourceResourceKey): Promise<void> {
     try {
       await this.client.delIfPresent(`/api/v0/searches/${encodeURIComponent(id)}`);
-    } catch (err) {
-      this.logger.warn({ err, id }, 'failed to delete slskd search; leaving it for the sweep');
+    } catch (error) {
+      this.logger.warn(
+        { err: error, id },
+        'failed to delete slskd search; leaving it for the sweep',
+      );
       return;
     }
     await this.bestEffort(this.ledger.markRemoved(key), 'mark search removed');

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import path from 'node:path';
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { BeetsBridge } from '../adapters/beets/bridge-adapter.js';
@@ -13,16 +13,12 @@ import { parseDistance } from '../domain/shared/distance.js';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
 import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { interpretEffect } from '../application/import/interpreter.js';
-import type { InterpreterDeps } from '../application/import/interpreter.js';
+import type { InterpreterDependencies } from '../application/import/interpreter.js';
 import { REACTOR_CONSUMER, Reactor } from '../application/import/reactor.js';
-import type { UseCaseDeps } from '../application/import/use-cases.js';
+import type { UseCaseDependencies } from '../application/import/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
 import type { Clock } from '../application/ports/system-ports.js';
-import type {
-  IntakePort,
-  TaggerConfiguration,
-  TaggerPort,
-} from '../application/ports/outbound-ports.js';
+import type { IntakePort, TaggerConfig, TaggerPort } from '../application/ports/outbound-ports.js';
 import {
   ImportStatusProjection,
   StalledReadModel,
@@ -60,7 +56,7 @@ export interface ImporterRuntimeConfig {
 }
 
 /** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
-const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface ImporterRuntimeOverrides {
   readonly tagger?: TaggerPort;
@@ -89,7 +85,7 @@ export interface ImporterReadiness {
 
 export interface ImporterRuntime {
   readonly facade: ImporterFacade;
-  readonly beetsConfig: TaggerConfiguration;
+  readonly beetsConfig: TaggerConfig;
   /** This module's outbound seam surface (release verdicts), consumed by the downloader. */
   readonly feed: OutboundFeed;
   readonly wakeups: SeamWakeups;
@@ -117,7 +113,8 @@ function isDirectoryAbsent(error: unknown): boolean {
 
 async function realDirectoryExists(directory: string): Promise<boolean> {
   try {
-    return (await stat(directory)).isDirectory();
+    const statResult = await stat(directory);
+    return statResult.isDirectory();
   } catch (error) {
     // Only "not there (yet)" is a plain `false` — the directory the delivered files will land in.
     // Any other errno (EACCES / EIO / ELOOP …) is a genuine infra fault, not a missing directory:
@@ -161,13 +158,13 @@ export async function createImporterRuntime(
     'beets configuration validated',
   );
 
-  mkdirSync(dirname(config.databaseFile), { recursive: true });
-  const db = openEventDatabase(config.databaseFile);
+  mkdirSync(path.dirname(config.databaseFile), { recursive: true });
+  const database = openEventDatabase(config.databaseFile);
   const bus = new InProcessEventBus();
-  const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
-  const checkpoints = new SqliteCheckpointStore(db);
-  const deadLetters = new SqliteDeadLetterStore(db);
-  const parkedEffects = new SqliteParkedEffectStore(db);
+  const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
+  const checkpoints = new SqliteCheckpointStore(database);
+  const deadLetters = new SqliteDeadLetterStore(database);
+  const parkedEffects = new SqliteParkedEffectStore(database);
 
   // The stalled read model (reactor-durability parity): seed it from the dead-letter store at boot,
   // pruning aged letters first, so an import dead-lettered before a restart reads stalled again.
@@ -184,7 +181,7 @@ export async function createImporterRuntime(
     // query returns nothing while readiness still says `up`. Fail the boot loudly, exactly as an
     // unusable beets config does — never boot on a projection we could not fully rebuild.
     logger.error({ err: backlog.error }, 'projection rebuild failed; refusing to boot');
-    db.close();
+    database.close();
     return err({ kind: 'ProjectionRebuildFailed', detail: backlog.error.message });
   }
   status.rebuild(backlog.value);
@@ -194,7 +191,7 @@ export async function createImporterRuntime(
 
   const intake =
     overrides.intake ?? new FilesystemIntake({ intakeRoot: config.intakeRoot }, logger);
-  const interpreter: InterpreterDeps = { store, clock, ports: { tagger, intake } };
+  const interpreter: InterpreterDependencies = { store, clock, ports: { tagger, intake } };
   const reactor = new Reactor({
     store,
     checkpoints,
@@ -208,14 +205,14 @@ export async function createImporterRuntime(
   });
   await reactor.start();
 
-  const deps: UseCaseDeps = {
+  const dependencies: UseCaseDependencies = {
     store,
     clock,
     status,
     stalled: stalledModel,
     policy: { autoApplyThreshold: autoApplyThreshold.value },
   };
-  const facade = createImporterFacade(deps);
+  const facade = createImporterFacade(dependencies);
   const feed = new OutboundFeed(store, publishedEventMapping);
   const wakeups: SeamWakeups = {
     subscribe: (listener) => bus.subscribe(() => listener()),
@@ -236,7 +233,7 @@ export async function createImporterRuntime(
         feed: acquisitionFeed,
         checkpoints,
         deadLetters,
-        handler: intakeEventConsumer(deps, {
+        handler: intakeEventConsumer(dependencies, {
           sourceRoot: options.sourceRoot,
           intakeRoot: config.intakeRoot,
           directoryExists: overrides.directoryExists ?? realDirectoryExists,
@@ -261,7 +258,7 @@ export async function createImporterRuntime(
       // otherwise keep firing `feed.read`/`store.readAll` against a closed handle (error loop that
       // also keeps the event loop alive).
       acquisitions?.stop();
-      db.close();
+      database.close();
       return Promise.resolve();
     },
   });

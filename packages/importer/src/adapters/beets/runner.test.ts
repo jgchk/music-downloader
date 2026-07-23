@@ -6,7 +6,7 @@ describe('nodeCommandRunner', () => {
     const result = await nodeCommandRunner.run(
       process.execPath,
       ['-e', 'console.log("out"); console.error("err"); process.exit(3)'],
-      5_000,
+      5000,
     );
     expect(result).toEqual({ code: 3, stdout: 'out\n', stderr: 'err\n', timedOut: false });
   });
@@ -22,8 +22,8 @@ describe('nodeCommandRunner', () => {
   });
 
   it('rejects when the binary cannot be spawned at all', async () => {
-    await expect(
-      nodeCommandRunner.run('/nonexistent/interpreter', [], 1_000),
-    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(nodeCommandRunner.run('/nonexistent/interpreter', [], 1000)).rejects.toMatchObject(
+      { code: 'ENOENT' },
+    );
   });
 });

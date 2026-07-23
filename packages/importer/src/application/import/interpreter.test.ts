@@ -45,8 +45,8 @@ function ports(overrides: Partial<EffectPorts> = {}): EffectPorts {
 async function run(history: readonly ImportEvent[], effect: Effect, effectPorts: EffectPorts) {
   const store = new FakeEventStore();
   await store.append('imp-1', 0, history, { importId: 'imp-1', occurredAt: 't' });
-  const deps = { store, clock: fixedClock(), ports: effectPorts };
-  const result = await interpretEffect(deps, 'imp-1', effect);
+  const dependencies = { store, clock: fixedClock(), ports: effectPorts };
+  const result = await interpretEffect(dependencies, 'imp-1', effect);
   return { result, store };
 }
 

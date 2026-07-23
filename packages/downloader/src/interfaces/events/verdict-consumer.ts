@@ -1,5 +1,5 @@
 import { err, ok } from 'neverthrow';
-import type { UseCaseDeps } from '../../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
 import { recordExternalValidationFailure } from '../../application/acquisition/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
 import { verdictToFailureInput } from '../contracts/verdicts/mapping.js';
@@ -13,7 +13,7 @@ import { externalVerdictDeliverySchema } from '../contracts/verdicts/schemas.js'
  * whose decider makes redelivery and staleness converge to no-ops. Events of other types are
  * acknowledged and ignored (the producer may add types freely).
  */
-export function verdictEventConsumer(deps: UseCaseDeps): ConsumeHandler {
+export function verdictEventConsumer(dependencies: UseCaseDependencies): ConsumeHandler {
   return async (event: SeamEvent) => {
     if (event.type !== 'release.verdict') return ok(undefined);
 
@@ -24,7 +24,7 @@ export function verdictEventConsumer(deps: UseCaseDeps): ConsumeHandler {
     }
 
     const { acquisitionId, candidate, reasons } = verdictToFailureInput(parsed.data);
-    const recorded = await recordExternalValidationFailure(deps, acquisitionId, {
+    const recorded = await recordExternalValidationFailure(dependencies, acquisitionId, {
       candidate,
       reasons,
     });

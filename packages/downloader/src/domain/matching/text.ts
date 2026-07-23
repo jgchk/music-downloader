@@ -4,9 +4,9 @@
 export function normalizeText(input: string): string {
   return input
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replaceAll(/[̀-ͯ]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 

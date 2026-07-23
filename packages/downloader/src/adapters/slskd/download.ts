@@ -47,7 +47,7 @@ import type { OwnedTransfer } from './transfers.js';
  * so the app (uid 1000) can move/unlink the files slskd wrote.
  */
 
-const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_POLL_INTERVAL_MS = 1000;
 
 export interface SlskdDownloadConfig extends SlskdConfig {
   /** Root under which each candidate's files are staged (shared with the filesystem library). */
@@ -115,11 +115,8 @@ export class SlskdDownload implements DownloadPort {
     // download the candidate a second time; if the source lost them, fall through and re-enqueue.
     const prior = await this.transferLedger.liveTransferFilenames(acquisitionId, username, wanted);
     await this.transferLedger.recordCreated(ownedKeys);
-    let attached = false;
-    if (prior.size > 0) {
-      attached = await this.reattach(username, wanted);
-    }
-    if (!attached) {
+    const isAttached = prior.size > 0 ? await this.reattach(username, wanted) : false;
+    if (!isAttached) {
       this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
       const enqueue = await this.client.postRaw(downloadsPath(username), requests);
       if (enqueue.status >= 500 || [429, 401, 403].includes(enqueue.status)) {

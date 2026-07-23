@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
@@ -15,37 +15,41 @@ const APPLIED: ImportEvent = { type: 'ImportApplied', location: '/library/album'
 const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'done', filesDeleted: true };
 
 const openDbs: EventDatabase[] = [];
-const tmpDirs: string[] = [];
+const temporaryDirectories: string[] = [];
 
-function freshDb(): EventDatabase {
-  const db = openEventDatabase(':memory:');
-  openDbs.push(db);
-  return db;
+function freshDatabase(): EventDatabase {
+  const database = openEventDatabase(':memory:');
+  openDbs.push(database);
+  return database;
 }
 
 afterEach(() => {
-  for (const db of openDbs.splice(0)) {
-    if (db.open) db.close();
+  for (const database of openDbs) {
+    if (database.open) database.close();
   }
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  openDbs.length = 0;
+  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true });
+  temporaryDirectories.length = 0;
 });
 
 describe('SqliteEventStore', () => {
   it('round-trips events and metadata through a stream', async () => {
-    const store = new SqliteEventStore(freshDb());
+    const store = new SqliteEventStore(freshDatabase());
 
-    const appended = (await store.append('imp-1', 0, [APPLIED, REJECTED], META))._unsafeUnwrap();
-    expect(appended.map((e) => e.type)).toEqual(['ImportApplied', 'ImportRejected']);
-    expect(appended.map((e) => e.version)).toEqual([0, 1]);
-    expect(appended.map((e) => e.globalSeq)).toEqual([1, 2]);
+    const appendResult = await store.append('imp-1', 0, [APPLIED, REJECTED], META);
+    const appended = appendResult._unsafeUnwrap();
+    expect(appended.map((event) => event.type)).toEqual(['ImportApplied', 'ImportRejected']);
+    expect(appended.map((event) => event.version)).toEqual([0, 1]);
+    expect(appended.map((event) => event.globalSeq)).toEqual([1, 2]);
 
-    const read = (await store.readStream('imp-1'))._unsafeUnwrap();
-    expect(read.map((e) => e.event)).toEqual([APPLIED, REJECTED]);
+    const readStreamResult = await store.readStream('imp-1');
+    const read = readStreamResult._unsafeUnwrap();
+    expect(read.map((event) => event.event)).toEqual([APPLIED, REJECTED]);
     expect(read[0]!.metadata).toEqual(META);
   });
 
   it('rejects an append whose expected version is stale (optimistic concurrency)', async () => {
-    const store = new SqliteEventStore(freshDb());
+    const store = new SqliteEventStore(freshDatabase());
     await store.append('imp-1', 0, [APPLIED], META);
 
     const conflict = await store.append('imp-1', 0, [REJECTED], META);
@@ -58,11 +62,11 @@ describe('SqliteEventStore', () => {
   });
 
   it('maps a UNIQUE(stream_id, version) collision to a ConcurrencyConflict', async () => {
-    const db = freshDb();
-    const store = new SqliteEventStore(db);
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
     // Seed a non-contiguous stream directly: versions 0 and 2 exist, so count() == 2 but
     // appending at expectedVersion 2 collides with the pre-existing version-2 row.
-    const raw = db.prepare(
+    const raw = database.prepare(
       `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
@@ -89,29 +93,33 @@ describe('SqliteEventStore', () => {
   });
 
   it('keeps streams independent and orders readAll by global sequence', async () => {
-    const store = new SqliteEventStore(freshDb());
+    const store = new SqliteEventStore(freshDatabase());
     await store.append('imp-1', 0, [APPLIED], META);
     await store.append('imp-2', 0, [REJECTED], { ...META, importId: 'imp-2' });
 
-    const all = (await store.readAll(0))._unsafeUnwrap();
-    expect(all.map((e) => [e.streamId, e.globalSeq])).toEqual([
+    const readAllResult = await store.readAll(0);
+    const all = readAllResult._unsafeUnwrap();
+    expect(all.map((event) => [event.streamId, event.globalSeq])).toEqual([
       ['imp-1', 1],
       ['imp-2', 2],
     ]);
 
-    const tail = (await store.readAll(1))._unsafeUnwrap();
-    expect(tail.map((e) => e.streamId)).toEqual(['imp-2']);
+    const readAllResult2 = await store.readAll(1);
+    const tail = readAllResult2._unsafeUnwrap();
+    expect(tail.map((event) => event.streamId)).toEqual(['imp-2']);
   });
 
   it('publishes committed events to the bus (publish-after-commit)', async () => {
     const bus = new InProcessEventBus();
-    const store = new SqliteEventStore(freshDb(), new UpcasterRegistry(), bus);
+    const store = new SqliteEventStore(freshDatabase(), new UpcasterRegistry(), bus);
     const seen: StoredEvent[] = [];
-    bus.subscribe((event) => seen.push(event));
+    bus.subscribe((event) => {
+      seen.push(event);
+    });
 
     await store.append('imp-1', 0, [APPLIED], META);
 
-    expect(seen.map((e) => e.type)).toEqual(['ImportApplied']);
+    expect(seen.map((event) => event.type)).toEqual(['ImportApplied']);
     expect(seen[0]!.globalSeq).toBe(1);
   });
 
@@ -120,18 +128,19 @@ describe('SqliteEventStore', () => {
       ...data,
       location: '/library/renamed',
     }));
-    const store = new SqliteEventStore(freshDb(), registry);
+    const store = new SqliteEventStore(freshDatabase(), registry);
     await store.append('imp-1', 0, [APPLIED], META);
 
-    const read = (await store.readStream('imp-1'))._unsafeUnwrap();
+    const readStreamResult2 = await store.readStream('imp-1');
+    const read = readStreamResult2._unsafeUnwrap();
 
     expect(read[0]!.event).toEqual({ type: 'ImportApplied', location: '/library/renamed' });
   });
 
   it('surfaces an infrastructure fault from append', async () => {
-    const db = freshDb();
-    const store = new SqliteEventStore(db);
-    db.close();
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    database.close();
 
     const result = await store.append('imp-1', 0, [APPLIED], META);
 
@@ -142,9 +151,9 @@ describe('SqliteEventStore', () => {
   });
 
   it('surfaces an infrastructure fault from readStream', async () => {
-    const db = freshDb();
-    const store = new SqliteEventStore(db);
-    db.close();
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    database.close();
 
     const result = await store.readStream('imp-1');
 
@@ -152,9 +161,9 @@ describe('SqliteEventStore', () => {
   });
 
   it('surfaces an infrastructure fault from readAll', async () => {
-    const db = freshDb();
-    const store = new SqliteEventStore(db);
-    db.close();
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    database.close();
 
     const result = await store.readAll(0);
 
@@ -162,36 +171,39 @@ describe('SqliteEventStore', () => {
   });
 
   it('enables WAL journaling on a file-backed database', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mi-events-'));
-    tmpDirs.push(dir);
-    const db = openEventDatabase(join(dir, 'events.db'));
-    openDbs.push(db);
+    const directory = mkdtempSync(path.join(tmpdir(), 'mi-events-'));
+    temporaryDirectories.push(directory);
+    const database = openEventDatabase(path.join(directory, 'events.db'));
+    openDbs.push(database);
 
-    expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
+    expect(database.pragma('journal_mode', { simple: true })).toBe('wal');
   });
 });
 
 describe('SqliteCheckpointStore', () => {
   it('returns 0 for a consumer that has never checkpointed', async () => {
-    const checkpoints = new SqliteCheckpointStore(freshDb());
+    const checkpoints = new SqliteCheckpointStore(freshDatabase());
 
-    expect((await checkpoints.load('reactor'))._unsafeUnwrap()).toBe(0);
+    const loadResult = await checkpoints.load('reactor');
+    expect(loadResult._unsafeUnwrap()).toBe(0);
   });
 
   it('persists and upserts the last processed sequence', async () => {
-    const checkpoints = new SqliteCheckpointStore(freshDb());
+    const checkpoints = new SqliteCheckpointStore(freshDatabase());
 
     await checkpoints.save('reactor', 5);
-    expect((await checkpoints.load('reactor'))._unsafeUnwrap()).toBe(5);
+    const loadResult2 = await checkpoints.load('reactor');
+    expect(loadResult2._unsafeUnwrap()).toBe(5);
 
     await checkpoints.save('reactor', 9);
-    expect((await checkpoints.load('reactor'))._unsafeUnwrap()).toBe(9);
+    const loadResult3 = await checkpoints.load('reactor');
+    expect(loadResult3._unsafeUnwrap()).toBe(9);
   });
 
   it('surfaces an infrastructure fault from load', async () => {
-    const db = freshDb();
-    const checkpoints = new SqliteCheckpointStore(db);
-    db.close();
+    const database = freshDatabase();
+    const checkpoints = new SqliteCheckpointStore(database);
+    database.close();
 
     const result = await checkpoints.load('reactor');
 
@@ -199,9 +211,9 @@ describe('SqliteCheckpointStore', () => {
   });
 
   it('surfaces an infrastructure fault from save', async () => {
-    const db = freshDb();
-    const checkpoints = new SqliteCheckpointStore(db);
-    db.close();
+    const database = freshDatabase();
+    const checkpoints = new SqliteCheckpointStore(database);
+    database.close();
 
     const result = await checkpoints.save('reactor', 1);
 

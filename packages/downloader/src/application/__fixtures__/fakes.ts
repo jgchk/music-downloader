@@ -113,8 +113,8 @@ export class FakeEventBus implements EventBus {
   }
 }
 
-function ledgerKeyStr(key: SourceResourceKey): string {
-  return [key.source, key.kind, key.resourceKey, key.acquisitionId].join('\u0000');
+function ledgerKeyString(key: SourceResourceKey): string {
+  return [key.source, key.kind, key.resourceKey, key.acquisitionId].join('\u{0}');
 }
 
 /** An in-memory {@link ResourceLedgerStore} for adapter/sweep tests; records calls for assertions. */
@@ -131,7 +131,7 @@ export class FakeResourceLedger implements ResourceLedgerStore {
 
   recordCreated(resource: SourceResource): ResultAsync<void, InfraError> {
     if (this.fail) return this.failed('recordCreated');
-    if (!this.created.some((r) => ledgerKeyStr(r) === ledgerKeyStr(resource))) {
+    if (this.created.every((r) => ledgerKeyString(r) !== ledgerKeyString(resource))) {
       this.created.push(resource);
     }
     return okAsync(undefined);
@@ -160,11 +160,11 @@ export class FakeResourceLedger implements ResourceLedgerStore {
   }
 
   private live(): SourceResource[] {
-    const removedKeys = new Set(this.removed.map(ledgerKeyStr));
+    const removedKeys = new Set(this.removed.map((item) => ledgerKeyString(item)));
     return this.created
-      .filter((r) => !removedKeys.has(ledgerKeyStr(r)))
+      .filter((r) => !removedKeys.has(ledgerKeyString(r)))
       .map((r) => {
-        const learned = this.ids.find((entry) => ledgerKeyStr(entry.key) === ledgerKeyStr(r));
+        const learned = this.ids.find((entry) => ledgerKeyString(entry.key) === ledgerKeyString(r));
         return learned ? { ...r, resourceId: learned.id } : r;
       });
   }
@@ -172,7 +172,7 @@ export class FakeResourceLedger implements ResourceLedgerStore {
 
 /** A logger that discards output — for tests that exercise logging call sites without noise. */
 export function silentLogger(): Logger {
-  return createLogger({ level: 'silent', destination: { write: () => undefined } });
+  return createLogger({ level: 'silent', destination: { write: () => {} } });
 }
 
 export function fixedClock(iso = '2026-07-03T12:00:00.000Z'): Clock {
@@ -227,9 +227,11 @@ export class FakeParkedEffectStore implements ParkedEffectStore {
   due(nowIso: string): ResultAsync<readonly ParkedEffect[], InfraError> {
     if (this.failDue) return errAsync(infraError('parked-effects.due', 'boom'));
     return okAsync(
-      [...this.entries.values()]
+      this.entries
+        .values()
         .filter((entry) => entry.nextRetryAt <= nowIso)
-        .sort((a, b) => a.nextRetryAt.localeCompare(b.nextRetryAt)),
+        .toArray()
+        .toSorted((a, b) => a.nextRetryAt.localeCompare(b.nextRetryAt)),
     );
   }
 

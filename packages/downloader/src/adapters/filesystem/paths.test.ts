@@ -1,8 +1,8 @@
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
-import { renderReleaseDir, sanitizeSegment } from './paths.js';
+import { renderReleaseDirectory, sanitizeSegment } from './paths.js';
 
 const target: Target = createTarget({
   type: 'album',
@@ -22,12 +22,14 @@ describe('sanitizeSegment', () => {
   });
 });
 
-describe('renderReleaseDir', () => {
+describe('renderReleaseDirectory', () => {
   it('includes the year when present', () => {
-    expect(renderReleaseDir(target)).toBe(join('The_Band', 'Great_Album_(2020)'));
+    expect(renderReleaseDirectory(target)).toBe(path.join('The_Band', 'Great_Album_(2020)'));
   });
 
   it('omits the year when absent', () => {
-    expect(renderReleaseDir({ ...target, year: undefined })).toBe(join('The_Band', 'Great_Album'));
+    expect(renderReleaseDirectory({ ...target, year: undefined })).toBe(
+      path.join('The_Band', 'Great_Album'),
+    );
   });
 });

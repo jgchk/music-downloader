@@ -47,7 +47,7 @@ const RELEASE_SEARCH_LIMIT = 100;
 
 /** Escape a value for interpolation inside a quoted Lucene phrase (backslash and the quote). */
 function lucenePhrase(value: string): string {
-  return `"${value.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
+  return `"${value.replaceAll(/[\\"]/g, (char) => `\\${char}`)}"`;
 }
 
 export interface MusicBrainzConfig {
@@ -148,7 +148,8 @@ export class MusicBrainzMetadata implements MetadataPort {
     // Search: a 400 means MusicBrainz rejected the Lucene query we built — an adapter defect that
     // must surface as an InfraError, not be swallowed as unresolved.
     const json = await this.getJson(url, mbReleaseSearchSchema, false);
-    for (const id of releaseCandidateIds(json?.releases, title)) {
+    const candidateIds = releaseCandidateIds(json?.releases, title);
+    for (const id of candidateIds) {
       const resolution = await this.resolveReleaseById(id);
       if (resolution.kind === 'resolved') return resolution;
     }
@@ -174,7 +175,7 @@ export class MusicBrainzMetadata implements MetadataPort {
 
   /**
    * GET and validate the body against the endpoint's contract schema; `undefined` for 404 (not
-   * found); throw for other non-2xx. A 400 is *unresolved* only when `treat400AsUnresolved` — the
+   * found); throw for other non-2xx. A 400 is *unresolved* only when `shouldTreat400AsUnresolved` — the
    * identifier-lookup call sites, where MusicBrainz answers a malformed/invalid mbid with `400
    * {"error": "Invalid mbid."}`, a *permanent* condition that never succeeds on retry, so it must
    * NOT become an `InfraError` (which the reactor retries forever, wedging resolution). On a
@@ -188,14 +189,14 @@ export class MusicBrainzMetadata implements MetadataPort {
   private async getJson<T>(
     url: string,
     schema: ZodType<T>,
-    treat400AsUnresolved: boolean,
+    shouldTreat400AsUnresolved: boolean,
   ): Promise<T | undefined> {
     const response = await this.http.send({
       url,
       headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
     });
     if (response.status === 404) return undefined;
-    if (response.status === 400 && treat400AsUnresolved) {
+    if (shouldTreat400AsUnresolved && response.status === 400) {
       this.logger.warn({ url }, 'musicbrainz rejected the request (400); treating as unresolved');
       return undefined;
     }

@@ -8,9 +8,12 @@ import {
   UpcasterRegistry,
   openEventDatabase,
 } from '../adapters/index.js';
-import type { EffectPorts, InterpreterDeps } from '../application/acquisition/interpreter.js';
+import type {
+  EffectPorts,
+  InterpreterDependencies,
+} from '../application/acquisition/interpreter.js';
 import { Reactor } from '../application/acquisition/reactor.js';
-import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import { fixedClock, sequentialIds, silentLogger } from '../application/__fixtures__/fakes.js';
 import type { DownloadResult, ImportResult } from '../application/ports/outbound-ports.js';
 import {
@@ -49,8 +52,8 @@ const DOWNLOADED_FILES = [
   { path: 'staging/02.flac', name: '02.flac' },
 ];
 const PROBES: Record<string, ProbedAudio> = {
-  'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251000 },
-  'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264000 },
+  'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251_000 },
+  'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264_000 },
 };
 const COMPLETED: DownloadResult = { kind: 'completed', files: DOWNLOADED_FILES };
 const FAILED: DownloadResult = { kind: 'failed', reason: 'Stalled' };
@@ -73,17 +76,17 @@ function candidateWithSpeed(username: string, speedBytesPerSec: number): Candida
   return { ...base, source: { ...base.source, speedBytesPerSec } };
 }
 
-interface E2eOptions {
+interface E2EOptions {
   searchByRound: (round: number) => readonly Candidate[];
   downloadByUser: Record<string, DownloadResult>;
   importResult: ImportResult;
 }
 
-function wire(opts: E2eOptions) {
-  const db = openEventDatabase(':memory:');
+function wire(options: E2EOptions) {
+  const database = openEventDatabase(':memory:');
   const bus = new InProcessEventBus();
-  const store = new SqliteEventStore(db, new UpcasterRegistry(), bus);
-  const checkpoints = new SqliteCheckpointStore(db);
+  const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
+  const checkpoints = new SqliteCheckpointStore(database);
   const discardStaging = vi.fn((_files) => okAsync<void>(undefined));
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
@@ -96,10 +99,10 @@ function wire(opts: E2eOptions) {
 
   const ports: EffectPorts = {
     metadata: { resolve: () => okAsync({ kind: 'resolved', target: sampleTarget }) },
-    search: { search: (_acquisitionId, _target, round) => okAsync(opts.searchByRound(round)) },
+    search: { search: (_acquisitionId, _target, round) => okAsync(options.searchByRound(round)) },
     download: {
       download: (_acquisitionId, candidate, _policy, onProgress) => {
-        const result = opts.downloadByUser[candidate.identity.username] ?? FAILED;
+        const result = options.downloadByUser[candidate.identity.username] ?? FAILED;
         if (result.kind === 'completed') {
           onProgress({ percent: 100, bytesTransferred: 1, bytesTotal: 1 });
         }
@@ -108,9 +111,9 @@ function wire(opts: E2eOptions) {
       abort: () => okAsync([]),
     },
     probe: { probe: (path) => okAsync(PROBES[path]!) },
-    library: { import: () => okAsync(opts.importResult), discardStaging },
+    library: { import: () => okAsync(options.importResult), discardStaging },
   };
-  const interpreter: InterpreterDeps = {
+  const interpreter: InterpreterDependencies = {
     store,
     clock: fixedClock(),
     ports,
@@ -120,14 +123,14 @@ function wire(opts: E2eOptions) {
     store,
     checkpoints,
     bus,
-    parked: new SqliteParkedEffectStore(db),
-    deadLetters: new SqliteDeadLetterStore(db),
+    parked: new SqliteParkedEffectStore(database),
+    deadLetters: new SqliteDeadLetterStore(database),
     stalled: stalledModel,
     logger: silentLogger(),
     interpreter,
     clock: fixedClock(),
-    interval: (fn, ms) => {
-      const handle = setInterval(fn, ms);
+    interval: (function_, ms) => {
+      const handle = setInterval(function_, ms);
       return () => {
         clearInterval(handle);
       };
@@ -135,7 +138,7 @@ function wire(opts: E2eOptions) {
     sleep: () => Promise.resolve(),
     random: () => 1,
   });
-  const deps: UseCaseDeps = {
+  const dependencies: UseCaseDependencies = {
     store,
     clock: fixedClock(),
     ids: sequentialIds(),
@@ -144,7 +147,7 @@ function wire(opts: E2eOptions) {
     stalled: stalledModel,
   };
   return {
-    db,
+    db: database,
     store,
     bus,
     checkpoints,
@@ -152,7 +155,7 @@ function wire(opts: E2eOptions) {
     status,
     progressModel,
     libraryView,
-    deps,
+    deps: dependencies,
     discardStaging,
   };
 }
@@ -161,11 +164,12 @@ type Wiring = ReturnType<typeof wire>;
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups) await cleanup();
+  cleanups.length = 0;
 });
 
-async function startApp(opts: E2eOptions) {
-  const w = wire(opts);
+async function startApp(options: E2EOptions) {
+  const w = wire(options);
   await w.reactor.start();
   const facade = createDownloaderFacade(w.deps);
   cleanups.push(
@@ -190,7 +194,7 @@ async function settle(w: Wiring, id: string, phase: AcquisitionPhase): Promise<v
   });
 }
 
-const happyOptions: E2eOptions = {
+const happyOptions: E2EOptions = {
   searchByRound: (round) => (round === 1 ? [candidateWithSpeed('a', 100)] : []),
   downloadByUser: { a: COMPLETED },
   importResult: IMPORTED,
@@ -276,14 +280,14 @@ describe('acquisition E2E', () => {
     const { w, facade } = await startApp(happyOptions);
 
     // A consuming module's subscription: checkpoint + dead letters in the CONSUMER's own store.
-    const consumerDb = openEventDatabase(':memory:');
+    const consumerDatabase = openEventDatabase(':memory:');
     const received: SeamEvent[] = [];
-    const subscriptionOf = (db: typeof consumerDb) =>
+    const subscriptionOf = (database: typeof consumerDatabase) =>
       new CatchUpSubscription({
         name: 'seam:acquisitions',
         feed: new OutboundFeed(w.store, publishedEventMapping),
-        checkpoints: new SqliteCheckpointStore(db),
-        deadLetters: new SqliteDeadLetterStore(db),
+        checkpoints: new SqliteCheckpointStore(database),
+        deadLetters: new SqliteDeadLetterStore(database),
         handler: (event) => {
           received.push(event);
           return Promise.resolve(ok(undefined));
@@ -296,9 +300,9 @@ describe('acquisition E2E', () => {
         pollIntervalMs: 60_000,
         sleep: () => Promise.resolve(),
         wakeups: { subscribe: (listener) => w.bus.subscribe(() => listener()) },
-        interval: () => () => undefined,
+        interval: () => () => {},
       });
-    const subscription = subscriptionOf(consumerDb);
+    const subscription = subscriptionOf(consumerDatabase);
     await subscription.start();
     cleanups.push(() => subscription.stop());
 
@@ -358,7 +362,7 @@ describe('acquisition E2E', () => {
     const feed = {
       read: (from: number) => {
         const events = verdictEvents.filter((event) => event.globalSeq > from);
-        const scannedTo = events.length > 0 ? events[events.length - 1]!.globalSeq : from;
+        const scannedTo = events.length > 0 ? events.at(-1)!.globalSeq : from;
         return Promise.resolve(ok({ events, scannedTo }));
       },
     };
@@ -375,7 +379,7 @@ describe('acquisition E2E', () => {
       batchSize: 100,
       pollIntervalMs: 60_000,
       sleep: () => Promise.resolve(),
-      interval: () => () => undefined,
+      interval: () => () => {},
     });
     await subscription.start();
     cleanups.push(() => subscription.stop());
@@ -399,13 +403,15 @@ describe('acquisition E2E', () => {
     expect(selections.at(-1)!.candidate.username).toBe('b');
 
     // Redelivery converges: reset the checkpoint and replay — the decider no-ops, nothing changes.
-    const eventCount = (await w.store.readAll(0))._unsafeUnwrap().length;
+    const readAllResult = await w.store.readAll(0);
+    const eventCount = readAllResult._unsafeUnwrap().length;
     await subscription.reset();
     await subscription.poll();
     // A late verdict naming the *first* candidate again is stale against the new fulfilment.
     verdictEvents.push({ ...verdictEvents[0]!, globalSeq: 2 });
     await subscription.poll();
-    expect((await w.store.readAll(0))._unsafeUnwrap()).toHaveLength(eventCount);
+    const readAllResult2 = await w.store.readAll(0);
+    expect(readAllResult2._unsafeUnwrap()).toHaveLength(eventCount);
     expect(w.status.get(id)!.attempts).toBe(2);
   });
 });

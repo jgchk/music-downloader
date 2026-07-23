@@ -28,8 +28,8 @@ export const sampleTarget: Target = createTarget({
   title: 'Kid A',
   year: 2000,
   tracks: [
-    { position: 1, title: 'Everything in Its Right Place', durationMs: 251000 },
-    { position: 2, title: 'Kid A', durationMs: 264000 },
+    { position: 1, title: 'Everything in Its Right Place', durationMs: 251_000 },
+    { position: 2, title: 'Kid A', durationMs: 264_000 },
   ],
 })._unsafeUnwrap();
 
@@ -67,9 +67,9 @@ export function matchingCandidate(username: string): Candidate {
         name: '01 Everything in Its Right Place.flac',
         sizeBytes: 1,
         codec: 'flac',
-        durationMs: 251000,
+        durationMs: 251_000,
       },
-      { name: '02 Kid A.flac', sizeBytes: 1, codec: 'flac', durationMs: 264000 },
+      { name: '02 Kid A.flac', sizeBytes: 1, codec: 'flac', durationMs: 264_000 },
     ],
     source: { speedBytesPerSec: 100, freeSlots: 1, queueLength: 0 },
   };

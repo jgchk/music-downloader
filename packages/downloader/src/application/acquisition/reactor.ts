@@ -15,7 +15,7 @@ import type { CommandError } from './command-handler.js';
 import { EffectLander } from './effect-lander.js';
 import { classifyCommandError, describeCommandError } from './failure-classification.js';
 import { interpretEffect } from './interpreter.js';
-import type { InterpreterDeps } from './interpreter.js';
+import type { InterpreterDependencies } from './interpreter.js';
 import { DEFAULT_RETRY_POLICY, nextRetry } from './retry-policy.js';
 import type { RetryPolicy } from './retry-policy.js';
 
@@ -38,7 +38,7 @@ type DispatchOutcome =
  */
 export const REACTOR_CONSUMER = 'acquisition-reactor';
 
-export interface ReactorDeps {
+export interface ReactorDependencies {
   readonly store: EventStorePort;
   readonly checkpoints: CheckpointStore;
   readonly bus: EventBus;
@@ -47,10 +47,10 @@ export interface ReactorDeps {
   /** The queryable face of dead-lettered effects (reactor-durability D2/D5). */
   readonly stalled: StalledReadModel;
   readonly logger: Logger;
-  readonly interpreter: InterpreterDeps;
+  readonly interpreter: InterpreterDependencies;
   readonly clock: Clock;
   /** The fallback poll timer (composition supplies the real `setInterval`); returns a stopper. */
-  readonly interval: (fn: () => void, ms: number) => () => void;
+  readonly interval: (function_: () => void, ms: number) => () => void;
   /** Sleep for the re-drive pass's jitter (composition supplies the real timeout). */
   readonly sleep: (ms: number) => Promise<void>;
   /** Jitter roll ∈ [0, 1] (composition supplies `Math.random`). */
@@ -61,8 +61,8 @@ export interface ReactorDeps {
   readonly redriveGapMs?: number;
 }
 
-const DEFAULT_POLL_INTERVAL_MS = 5_000;
-const DEFAULT_REDRIVE_GAP_MS = 1_000;
+const DEFAULT_POLL_INTERVAL_MS = 5000;
+const DEFAULT_REDRIVE_GAP_MS = 1000;
 
 export class Reactor {
   private lastProcessed = 0;
@@ -75,13 +75,13 @@ export class Reactor {
   private mutex: Promise<void> = Promise.resolve();
   private readonly lander: EffectLander;
 
-  constructor(private readonly deps: ReactorDeps) {
+  constructor(private readonly dependencies: ReactorDependencies) {
     this.lander = new EffectLander({
-      interpreter: deps.interpreter,
-      deadLetters: deps.deadLetters,
-      stalled: deps.stalled,
-      clock: deps.clock,
-      logger: deps.logger,
+      interpreter: dependencies.interpreter,
+      deadLetters: dependencies.deadLetters,
+      stalled: dependencies.stalled,
+      clock: dependencies.clock,
+      logger: dependencies.logger,
       subscription: REACTOR_CONSUMER,
     });
   }
@@ -91,19 +91,22 @@ export class Reactor {
    * logged here so one buggy pass can never poison the chain and silence the reactor for good.
    */
   private withMutex(work: () => Promise<void>): Promise<void> {
-    const run = this.mutex.then(work).catch((err: unknown) => {
-      this.deps.logger.error({ err }, 'reactor pass failed unexpectedly');
+    // Deliberate promise-chaining: `this.mutex` is reassigned to the in-flight chain BEFORE it
+    // settles, which is the mutex itself — awaiting here would defeat the serialization.
+    // eslint-disable-next-line unicorn/prefer-await
+    const run = this.mutex.then(work).catch((error: unknown) => {
+      this.dependencies.logger.error({ err: error }, 'reactor pass failed unexpectedly');
     });
     this.mutex = run;
     return run;
   }
 
   private get policy(): RetryPolicy {
-    return this.deps.retryPolicy ?? DEFAULT_RETRY_POLICY;
+    return this.dependencies.retryPolicy ?? DEFAULT_RETRY_POLICY;
   }
 
   private now(): Date {
-    return this.deps.clock.now();
+    return this.dependencies.clock.now();
   }
 
   /**
@@ -115,24 +118,24 @@ export class Reactor {
    * restart e2e). Wakeups are a lossy latency hint; the fallback poll is the delivery guarantee.
    */
   async start(): Promise<void> {
-    const checkpoint = await this.deps.checkpoints.load(REACTOR_CONSUMER);
+    const checkpoint = await this.dependencies.checkpoints.load(REACTOR_CONSUMER);
     if (this.stopped) return; // stopped while loading (a backgrounded boot torn down early)
     if (checkpoint.isErr()) {
       // Replaying from the log start is safe (idempotent effects + decide's stale guards) but
       // noisy and slow — the operator must be able to tell it apart from a fresh consumer.
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { err: checkpoint.error },
         'checkpoint load failed; replaying from the log start',
       );
     }
     this.lastProcessed = checkpoint.unwrapOr(0);
 
-    this.unsubscribe = this.deps.bus.subscribe(() => {
+    this.unsubscribe = this.dependencies.bus.subscribe(() => {
       void this.drain();
     });
-    this.stopInterval = this.deps.interval(() => {
+    this.stopInterval = this.dependencies.interval(() => {
       void this.drain();
-    }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
+    }, this.dependencies.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
 
     await this.drain();
     await this.redrive();
@@ -162,9 +165,9 @@ export class Reactor {
         do {
           this.pending = false;
           await this.retryDueParked();
-          const backlog = await this.deps.store.readAll(this.lastProcessed);
+          const backlog = await this.dependencies.store.readAll(this.lastProcessed);
           if (backlog.isErr()) {
-            this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
+            this.dependencies.logger.error({ err: backlog.error }, 'reactor catch-up failed');
             return;
           }
           for (const stored of backlog.value) {
@@ -193,9 +196,12 @@ export class Reactor {
    */
   private redrive(): Promise<void> {
     return this.withMutex(async () => {
-      const all = await this.deps.store.readAll(0);
+      const all = await this.dependencies.store.readAll(0);
       if (all.isErr()) {
-        this.deps.logger.error({ err: all.error }, 'startup re-drive could not read the log');
+        this.dependencies.logger.error(
+          { err: all.error },
+          'startup re-drive could not read the log',
+        );
         return;
       }
       const streams = new Map<string, StoredEvent[]>();
@@ -212,12 +218,12 @@ export class Reactor {
   }
 
   private async redriveStream(streamId: string, events: readonly StoredEvent[]): Promise<void> {
-    if (this.deps.stalled.isStalled(streamId)) return; // landed; awaiting an operator
-    const park = await this.deps.parked.find(streamId);
+    if (this.dependencies.stalled.isStalled(streamId)) return; // landed; awaiting an operator
+    const park = await this.dependencies.parked.find(streamId);
     if (park.isErr()) {
       // The stream may be mid-retry; re-driving blind could double-dispatch, so skip this boot —
       // but say so: an unlogged skip here is the "pending forever, nothing in the logs" class.
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: streamId, err: park.error },
         'startup re-drive park lookup failed; stream skipped this boot',
       );
@@ -226,21 +232,21 @@ export class Reactor {
     if (park.value !== undefined) return; // the retry scheduler owns it
     const acquisition = Acquisition.fromHistory(events.map((entry) => entry.event));
     if (acquisition.isTerminal) return;
-    const last = events[events.length - 1]!;
+    const last = events.at(-1)!;
     if (acquisition.reactTo(last.event).length === 0) return; // nothing pending (e.g. paused)
 
-    const gap = this.deps.redriveGapMs ?? DEFAULT_REDRIVE_GAP_MS;
-    await this.deps.sleep(gap * this.deps.random());
-    this.deps.logger.info(
+    const gap = this.dependencies.redriveGapMs ?? DEFAULT_REDRIVE_GAP_MS;
+    await this.dependencies.sleep(gap * this.dependencies.random());
+    this.dependencies.logger.info(
       { acquisitionId: streamId, phase: acquisition.phase },
       'startup re-drive dispatching the pending effect',
     );
     const outcome = await this.dispatchEvent(last, events);
     if (outcome.kind === 'retry') {
-      const parkedOk = await this.parkStream(last, outcome.effect, outcome.error);
-      if (!parkedOk) {
+      const isParkedOk = await this.parkStream(last, outcome.effect, outcome.error);
+      if (!isParkedOk) {
         // No checkpoint to hold here: an unparked re-drive failure waits for the next restart.
-        this.deps.logger.error(
+        this.dependencies.logger.error(
           { acquisitionId: streamId },
           're-driven effect failed and could not be parked; deferred to the next restart',
         );
@@ -251,9 +257,9 @@ export class Reactor {
   async process(stored: StoredEvent): Promise<void> {
     if (stored.globalSeq <= this.lastProcessed) return; // already handled (at-least-once dedupe)
 
-    const park = await this.deps.parked.find(stored.streamId);
+    const park = await this.dependencies.parked.find(stored.streamId);
     if (park.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: stored.streamId, err: park.error },
         'reactor park lookup failed',
       );
@@ -262,7 +268,7 @@ export class Reactor {
     if (park.value !== undefined) {
       // The stream is parked: this later event queues behind the parked effect (no-leapfrog, D1).
       // The checkpoint advances — the event stays reachable through the stream for catch-up.
-      this.deps.logger.debug(
+      this.dependencies.logger.debug(
         { acquisitionId: stored.streamId, globalSeq: stored.globalSeq },
         'stream parked; event queued behind the parked effect',
       );
@@ -270,9 +276,9 @@ export class Reactor {
       return;
     }
 
-    const stream = await this.deps.store.readStream(stored.streamId);
+    const stream = await this.dependencies.store.readStream(stored.streamId);
     if (stream.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: stored.streamId, err: stream.error },
         'reactor stream read failed',
       );
@@ -282,11 +288,11 @@ export class Reactor {
     // Read before dispatch: a landing inside the dispatch may mark the stream stalled, and that
     // fresh exposure must survive this very event — only a PREVIOUSLY stalled stream that now
     // drives successfully is resolved.
-    const wasStalled = this.deps.stalled.isStalled(stored.streamId);
+    const wasStalled = this.dependencies.stalled.isStalled(stored.streamId);
     const outcome = await this.dispatchEvent(stored, stream.value);
     if (outcome.kind === 'retry') {
-      const parkedOk = await this.parkStream(stored, outcome.effect, outcome.error);
-      if (!parkedOk) return; // fall back to holding the checkpoint — the poll retries in-line
+      const isParkedOk = await this.parkStream(stored, outcome.effect, outcome.error);
+      if (!isParkedOk) return; // fall back to holding the checkpoint — the poll retries in-line
     } else if (wasStalled) {
       // A stalled acquisition's stream was driven successfully again (a cancellation, an operator
       // resubmission): its dead letters are resolved — clear them and the stalled exposure.
@@ -310,33 +316,50 @@ export class Reactor {
     const prefix = stream.filter((entry) => entry.version <= stored.version);
     const acquisition = Acquisition.fromHistory(prefix.map((entry) => entry.event));
     for (const effect of acquisition.reactTo(stored.event)) {
-      const result = await interpretEffect(this.deps.interpreter, stored.streamId, effect);
+      const result = await interpretEffect(this.dependencies.interpreter, stored.streamId, effect);
       if (result.isErr()) {
-        switch (classifyCommandError(result.error)) {
-          case 'permanent': {
-            const landed = await this.lander.land(stored, effect, result.error, 1);
-            if (!landed) return { kind: 'retry', effect, error: result.error };
-            break;
-          }
-          case 'retryable':
-            return { kind: 'retry', effect, error: result.error };
-          case 'rejection':
-            // Stale/illegal outcome — the stream has already settled it. Record and advance past
-            // it; retrying would only re-fire the same rejection forever.
-            this.deps.logger.warn(
-              { acquisitionId: stored.streamId, effect: effect.type, err: result.error },
-              'effect follow-on rejected as stale; advancing past it',
-            );
-            break;
-        }
-        break;
+        const outcome = await this.handleEffectError(stored, effect, result.error);
+        if (outcome.kind === 'retry') return outcome;
+        break; // kind === 'stop': halt dispatch; the stream still advances past the event
       }
-      this.deps.logger.debug(
+      this.dependencies.logger.debug(
         { acquisitionId: stored.streamId, effect: effect.type },
         'effect dispatched',
       );
     }
     return { kind: 'ok' };
+  }
+
+  /**
+   * Classify an effect's interpretation failure and act: a retryable fault — or a permanent one
+   * whose landing itself failed on infrastructure — yields a `retry` for the caller; a permanent
+   * fault that landed, or a stale domain rejection, yields `stop`, halting dispatch while the
+   * stream still advances past the event. (Never `ok` — the caller reaches `ok` only by draining
+   * every effect without error.)
+   */
+  private async handleEffectError(
+    stored: StoredEvent,
+    effect: Effect,
+    error: CommandError,
+  ): Promise<Extract<DispatchOutcome, { kind: 'retry' }> | { readonly kind: 'stop' }> {
+    switch (classifyCommandError(error)) {
+      case 'permanent': {
+        const isLanded = await this.lander.land(stored, effect, error, 1);
+        return isLanded ? { kind: 'stop' } : { kind: 'retry', effect, error };
+      }
+      case 'retryable': {
+        return { kind: 'retry', effect, error };
+      }
+      case 'rejection': {
+        // Stale/illegal outcome — the stream has already settled it. Record and advance past it;
+        // retrying would only re-fire the same rejection forever.
+        this.dependencies.logger.warn(
+          { acquisitionId: stored.streamId, effect: effect.type, err: error },
+          'effect follow-on rejected as stale; advancing past it',
+        );
+        return { kind: 'stop' };
+      }
+    }
   }
 
   /**
@@ -350,7 +373,7 @@ export class Reactor {
     error: CommandError,
   ): Promise<boolean> {
     const now = this.now();
-    const schedule = nextRetry(this.policy, 1, now, now, this.deps.random());
+    const schedule = nextRetry(this.policy, 1, now, now, this.dependencies.random());
     if (schedule.kind === 'exhausted') {
       return this.lander.land(stored, effect, error, 1);
     }
@@ -362,15 +385,15 @@ export class Reactor {
       nextRetryAt: schedule.nextRetryAt.toISOString(),
       lastError: describeCommandError(error),
     };
-    const written = await this.deps.parked.park(entry);
+    const written = await this.dependencies.parked.park(entry);
     if (written.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: written.error },
         'failed to park effect; holding the checkpoint',
       );
       return false;
     }
-    this.deps.logger.warn(
+    this.dependencies.logger.warn(
       {
         acquisitionId: stored.streamId,
         effect: effect.type,
@@ -385,9 +408,9 @@ export class Reactor {
 
   /** The retry scheduler (D2): re-dispatch every due parked effect, then resume its stream. */
   private async retryDueParked(): Promise<void> {
-    const due = await this.deps.parked.due(this.now().toISOString());
+    const due = await this.dependencies.parked.due(this.now().toISOString());
     if (due.isErr()) {
-      this.deps.logger.error({ err: due.error }, 'parked-effect due listing failed');
+      this.dependencies.logger.error({ err: due.error }, 'parked-effect due listing failed');
       return;
     }
     for (const entry of due.value) {
@@ -396,9 +419,9 @@ export class Reactor {
   }
 
   private async retryParked(entry: ParkedEffect): Promise<void> {
-    const stream = await this.deps.store.readStream(entry.streamId);
+    const stream = await this.dependencies.store.readStream(entry.streamId);
     if (stream.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: entry.streamId, err: stream.error },
         'parked-effect retry could not read the stream',
       );
@@ -408,7 +431,7 @@ export class Reactor {
     if (stored === undefined) {
       // The parked position no longer exists (external log surgery): the park is meaningless.
       // Clear it; the startup re-drive derives pending work from state, not from this entry.
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: entry.streamId, globalSeq: entry.globalSeq },
         'parked event missing from its stream; clearing the park',
       );
@@ -418,7 +441,7 @@ export class Reactor {
 
     const outcome = await this.dispatchEvent(stored, stream.value);
     if (outcome.kind === 'ok') {
-      this.deps.logger.info(
+      this.dependencies.logger.info(
         { acquisitionId: entry.streamId, attempt: entry.attempt },
         'parked effect resolved; resuming the stream',
       );
@@ -436,27 +459,27 @@ export class Reactor {
       attempt,
       new Date(entry.parkedAt),
       now,
-      this.deps.random(),
+      this.dependencies.random(),
     );
     if (schedule.kind === 'exhausted') {
-      const landed = await this.lander.land(stored, outcome.effect, outcome.error, attempt);
-      if (landed) await this.resumeStream(entry, stream.value);
+      const isLanded = await this.lander.land(stored, outcome.effect, outcome.error, attempt);
+      if (isLanded) await this.resumeStream(entry, stream.value);
       return;
     }
-    const rescheduled = await this.deps.parked.park({
+    const rescheduled = await this.dependencies.parked.park({
       ...entry,
       attempt,
       nextRetryAt: schedule.nextRetryAt.toISOString(),
       lastError: describeCommandError(outcome.error),
     });
     if (rescheduled.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: entry.streamId, err: rescheduled.error },
         'failed to reschedule parked effect',
       );
       return;
     }
-    this.deps.logger.warn(
+    this.dependencies.logger.warn(
       {
         acquisitionId: entry.streamId,
         effect: outcome.effect.type,
@@ -490,9 +513,9 @@ export class Reactor {
 
   /** Clear a park, loudly: a lingering past-due entry re-fires its effect on every tick. */
   private async clearPark(streamId: string): Promise<void> {
-    const cleared = await this.deps.parked.clear(streamId);
+    const cleared = await this.dependencies.parked.clear(streamId);
     if (cleared.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: streamId, err: cleared.error },
         'failed to clear the resolved park; its effect will re-fire each tick until cleared',
       );
@@ -501,11 +524,11 @@ export class Reactor {
 
   private async advanceTo(globalSeq: number): Promise<void> {
     this.lastProcessed = globalSeq;
-    const saved = await this.deps.checkpoints.save(REACTOR_CONSUMER, globalSeq);
+    const saved = await this.dependencies.checkpoints.save(REACTOR_CONSUMER, globalSeq);
     if (saved.isErr()) {
       // The in-memory cursor advances regardless: at-least-once tolerates the redelivery a stale
       // durable checkpoint causes after a restart, but the operator must see it happening.
-      this.deps.logger.error({ globalSeq, err: saved.error }, 'checkpoint save failed');
+      this.dependencies.logger.error({ globalSeq, err: saved.error }, 'checkpoint save failed');
     }
   }
 }

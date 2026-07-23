@@ -37,8 +37,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
   private readonly findStmt: Statement;
   private readonly clearStmt: Statement;
 
-  constructor(db: EventDatabase) {
-    this.upsertStmt = db.prepare(
+  constructor(database: EventDatabase) {
+    this.upsertStmt = database.prepare(
       `INSERT INTO parked_effects (global_seq, stream_id, attempt, parked_at, last_error)
        VALUES (@globalSeq, @streamId, @attempt, @parkedAt, @lastError)
        ON CONFLICT (global_seq) DO UPDATE SET
@@ -47,8 +47,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
          parked_at = excluded.parked_at,
          last_error = excluded.last_error`,
     );
-    this.findStmt = db.prepare(`SELECT * FROM parked_effects WHERE global_seq = ?`);
-    this.clearStmt = db.prepare(`DELETE FROM parked_effects WHERE global_seq = ?`);
+    this.findStmt = database.prepare(`SELECT * FROM parked_effects WHERE global_seq = ?`);
+    this.clearStmt = database.prepare(`DELETE FROM parked_effects WHERE global_seq = ?`);
   }
 
   park(entry: ParkedEffect): ResultAsync<void, InfraError> {
@@ -61,8 +61,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
         lastError: entry.lastError,
       });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('parked-effects.park', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.park', String(error), error));
     }
   }
 
@@ -70,8 +70,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
     try {
       const row = this.findStmt.get(globalSeq) as ParkedRow | undefined;
       return okAsync(row === undefined ? undefined : toEntry(row));
-    } catch (err) {
-      return errAsync(infraError('parked-effects.find', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.find', String(error), error));
     }
   }
 
@@ -79,8 +79,8 @@ export class SqliteParkedEffectStore implements ParkedEffectStore {
     try {
       this.clearStmt.run(globalSeq);
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('parked-effects.clear', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('parked-effects.clear', String(error), error));
     }
   }
 }

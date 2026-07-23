@@ -13,13 +13,13 @@ export interface CommandResult {
 }
 
 export interface CommandRunner {
-  run(command: string, args: readonly string[]): Promise<CommandResult>;
+  run(command: string, arguments_: readonly string[]): Promise<CommandResult>;
 }
 
 export const nodeCommandRunner: CommandRunner = {
-  run(command, args) {
+  run(command, arguments_) {
     return new Promise<CommandResult>((resolve, reject) => {
-      const child = spawn(command, [...args]);
+      const child = spawn(command, [...arguments_]);
       let stdout = '';
       let stderr = '';
       child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));

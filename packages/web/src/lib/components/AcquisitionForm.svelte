@@ -1,12 +1,12 @@
 <script lang="ts">
-  interface Props {
+  interface Properties {
     /** Action-failure message to surface (web-ui spec: actionable, not a crash). */
     error?: string;
     /** Echo of the rejected submission for repopulation. */
     values?: Record<string, string>;
   }
 
-  let { error = undefined, values = {} }: Props = $props();
+  let { error, values = {} }: Properties = $props();
   // The prop seeds initial state only (server-renderable repopulation after a failed action).
   // svelte-ignore state_referenced_locally
   let kind = $state(values.kind ?? 'musicbrainz');

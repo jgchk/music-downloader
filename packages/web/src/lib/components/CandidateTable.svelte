@@ -4,13 +4,13 @@
 
   type Candidate = Extract<ReviewDto, { kind: 'match-review' }>['candidates'][number];
 
-  interface Props {
+  interface Properties {
     candidates: readonly Candidate[];
     /** Offer a replace/keep-both choice on apply (duplicate reviews). */
     withDuplicateAction?: boolean;
   }
 
-  let { candidates, withDuplicateAction = false }: Props = $props();
+  let { candidates, withDuplicateAction = false }: Properties = $props();
 
   // Branchless: strip everything up to the last slash (a leaf path stays whole).
   const basename = (path: string): string => path.replace(/^.*\//u, '');

@@ -5,13 +5,13 @@
   import ManualTagsForm from './ManualTagsForm.svelte';
   import ResolveForms from './ResolveForms.svelte';
 
-  interface Props {
+  interface Properties {
     pending: PendingReviewDto;
     /** Resolve-action failure to surface (incl. the stale-resolution conflict). */
     error?: string;
   }
 
-  let { pending, error = undefined }: Props = $props();
+  let { pending, error }: Properties = $props();
   const review = $derived(pending.review);
 </script>
 

@@ -13,7 +13,7 @@ import type { Timer } from './timer.js';
 import { flattenDownloads, isTransferComplete } from './transfers.js';
 import type { SlskdTransfer } from './transfers.js';
 
-const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_POLL_INTERVAL_MS = 1000;
 /** Cancel→poll→remove rounds before leaving an unconfirmed transfer to the next boot's sweep (D1). */
 const MAX_REMOVE_ROUNDS = 3;
 
@@ -72,11 +72,11 @@ export class SlskdResourceRemover implements SourceResourceRemover {
     let current = await this.findTransfer(username, filename, capturedId);
     for (let round = 1; ; round++) {
       if (current === undefined) return true; // confirmed gone
-      const terminal = isTransferComplete(current);
+      const isTerminal = isTransferComplete(current);
       const id = current.id ?? capturedId ?? '';
-      this.logger.debug({ username, id, terminal }, 'sweeping slskd transfer');
+      this.logger.debug({ username, id, terminal: isTerminal }, 'sweeping slskd transfer');
       await this.client.delIfPresent(
-        `${downloadsPath(username)}/${encodeURIComponent(id)}?remove=${terminal}`,
+        `${downloadsPath(username)}/${encodeURIComponent(id)}?remove=${isTerminal}`,
       );
       if (round >= MAX_REMOVE_ROUNDS) break;
       await this.timer.sleep(this.pollIntervalMs);

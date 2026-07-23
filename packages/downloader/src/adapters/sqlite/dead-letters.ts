@@ -17,22 +17,22 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
   private readonly clearStreamStmt: Statement;
   private readonly pruneStmt: Statement;
 
-  constructor(db: EventDatabase) {
-    this.insertStmt = db.prepare(
+  constructor(database: EventDatabase) {
+    this.insertStmt = database.prepare(
       `INSERT INTO dead_letters (subscription, global_seq, error, occurred_at, stream_id)
        VALUES (@subscription, @globalSeq, @error, @occurredAt, @streamId)
        ON CONFLICT (subscription, global_seq) DO UPDATE
          SET error = excluded.error, occurred_at = excluded.occurred_at,
              stream_id = excluded.stream_id`,
     );
-    this.listStmt = db.prepare(
+    this.listStmt = database.prepare(
       `SELECT subscription, global_seq, error, occurred_at, stream_id
        FROM dead_letters WHERE subscription = ? ORDER BY global_seq ASC`,
     );
-    this.clearStreamStmt = db.prepare(
+    this.clearStreamStmt = database.prepare(
       `DELETE FROM dead_letters WHERE subscription = ? AND stream_id = ?`,
     );
-    this.pruneStmt = db.prepare(
+    this.pruneStmt = database.prepare(
       `DELETE FROM dead_letters WHERE subscription = ? AND occurred_at < ?`,
     );
   }
@@ -41,8 +41,8 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
     try {
       this.clearStreamStmt.run(subscription, streamId);
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('dead-letters.clearStream', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('dead-letters.clearStream', String(error), error));
     }
   }
 
@@ -50,8 +50,8 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
     try {
       this.pruneStmt.run(subscription, olderThanIso);
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('dead-letters.prune', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('dead-letters.prune', String(error), error));
     }
   }
 
@@ -65,8 +65,8 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
         streamId: letter.streamId ?? null,
       });
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('dead-letters.record', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('dead-letters.record', String(error), error));
     }
   }
 
@@ -85,11 +85,11 @@ export class SqliteDeadLetterStore implements DeadLetterStore {
           globalSeq: row.global_seq,
           error: row.error,
           occurredAt: row.occurred_at,
-          ...(row.stream_id === null ? {} : { streamId: row.stream_id }),
+          ...(row.stream_id !== null && { streamId: row.stream_id }),
         })),
       );
-    } catch (err) {
-      return errAsync(infraError('dead-letters.list', String(err), err));
+    } catch (error) {
+      return errAsync(infraError('dead-letters.list', String(error), error));
     }
   }
 }

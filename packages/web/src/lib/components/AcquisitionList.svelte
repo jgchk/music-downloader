@@ -3,13 +3,13 @@
   import { statusTone, targetDescription } from '$lib/acquisitions.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
 
-  interface Props {
+  interface Properties {
     acquisitions: readonly AcquisitionStatusResponseDto[];
     /** The acquisition currently open in the detail pane, marked as the current row. */
     selectedId?: string;
   }
 
-  let { acquisitions, selectedId = undefined }: Props = $props();
+  let { acquisitions, selectedId }: Properties = $props();
 </script>
 
 <p><a href="/acquisitions/new" data-testid="new-acquisition">Request a download</a></p>

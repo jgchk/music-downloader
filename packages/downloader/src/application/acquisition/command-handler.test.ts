@@ -9,13 +9,13 @@ import {
 
 const clock = fixedClock();
 
-function deps() {
+function dependencies() {
   return { store: new FakeEventStore(), clock };
 }
 
 describe('applyCommand', () => {
   it('appends the events decided for a fresh stream', async () => {
-    const d = deps();
+    const d = dependencies();
     const result = await applyCommand(d, 'acq-1', {
       type: 'SubmitAcquisition',
       request: sampleRequest,
@@ -27,7 +27,7 @@ describe('applyCommand', () => {
   });
 
   it('surfaces a domain error for an illegal command', async () => {
-    const d = deps();
+    const d = dependencies();
     await d.store.append(
       'acq-1',
       0,
@@ -42,7 +42,7 @@ describe('applyCommand', () => {
   });
 
   it('appends nothing when decide ignores a stale command', async () => {
-    const d = deps();
+    const d = dependencies();
     await d.store.append('acq-1', 0, [...resolvedHistory(), { type: 'AcquisitionCancelled' }], {
       acquisitionId: 'acq-1',
       occurredAt: clock.now().toISOString(),
@@ -54,7 +54,7 @@ describe('applyCommand', () => {
   });
 
   it('propagates an infrastructure read failure', async () => {
-    const d = deps();
+    const d = dependencies();
     d.store.failReads = true;
     const result = await applyCommand(d, 'acq-1', { type: 'CancelAcquisition' });
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });

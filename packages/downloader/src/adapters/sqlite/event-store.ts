@@ -36,14 +36,8 @@ interface EventRow {
 /** Thrown inside the append transaction to roll it back on a version mismatch. */
 class ConcurrencyBreak extends Error {}
 
-// These run only inside the catch blocks of better-sqlite3 operations, which always throw Error
-// values (a `SqliteError` carrying a `.code`), so neither helper needs to guard the shape.
-function errorMessage(err: unknown): string {
-  return String(err);
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  return (err as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE';
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE';
 }
 
 export class SqliteEventStore implements EventStorePort {
@@ -59,21 +53,23 @@ export class SqliteEventStore implements EventStorePort {
   ) => StoredEvent[];
 
   constructor(
-    db: EventDatabase,
+    database: EventDatabase,
     private readonly upcasters: UpcasterRegistry = new UpcasterRegistry(),
     private readonly bus?: EventBus,
   ) {
-    this.insertStmt = db.prepare(
+    this.insertStmt = database.prepare(
       `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
        VALUES (@streamId, @version, @type, @schemaVersion, @data, @metadata)`,
     );
-    this.countStmt = db.prepare(`SELECT COUNT(*) AS c FROM events WHERE stream_id = ?`);
-    this.streamStmt = db.prepare(`SELECT * FROM events WHERE stream_id = ? ORDER BY version ASC`);
-    this.allStmt = db.prepare(
+    this.countStmt = database.prepare(`SELECT COUNT(*) AS c FROM events WHERE stream_id = ?`);
+    this.streamStmt = database.prepare(
+      `SELECT * FROM events WHERE stream_id = ? ORDER BY version ASC`,
+    );
+    this.allStmt = database.prepare(
       `SELECT * FROM events WHERE global_seq > ? ORDER BY global_seq ASC LIMIT ?`,
     );
 
-    this.runAppend = db.transaction(
+    this.runAppend = database.transaction(
       (
         streamId: string,
         expectedVersion: number,
@@ -116,15 +112,15 @@ export class SqliteEventStore implements EventStorePort {
     let stored: StoredEvent[];
     try {
       stored = this.runAppend(streamId, expectedVersion, events, metadata);
-    } catch (err) {
-      if (err instanceof ConcurrencyBreak || isUniqueViolation(err)) {
+    } catch (error) {
+      if (error instanceof ConcurrencyBreak || isUniqueViolation(error)) {
         return errAsync<readonly StoredEvent[], AppendError>({
           kind: 'ConcurrencyConflict',
           streamId,
           expectedVersion,
         });
       }
-      return errAsync(infraError('event-store.append', errorMessage(err), err));
+      return errAsync(infraError('event-store.append', String(error), error));
     }
     this.bus?.publish(stored);
     return okAsync(stored);
@@ -134,8 +130,8 @@ export class SqliteEventStore implements EventStorePort {
     try {
       const rows = this.streamStmt.all(streamId) as EventRow[];
       return okAsync<readonly StoredEvent[], InfraError>(rows.map((row) => this.toStored(row)));
-    } catch (err) {
-      return errAsync(infraError('event-store.readStream', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('event-store.readStream', String(error), error));
     }
   }
 
@@ -144,8 +140,8 @@ export class SqliteEventStore implements EventStorePort {
       // better-sqlite3 treats LIMIT -1 as unlimited, keeping the unbounded reactor path intact.
       const rows = this.allStmt.all(fromGlobalSeq, limit ?? -1) as EventRow[];
       return okAsync<readonly StoredEvent[], InfraError>(rows.map((row) => this.toStored(row)));
-    } catch (err) {
-      return errAsync(infraError('event-store.readAll', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('event-store.readAll', String(error), error));
     }
   }
 
@@ -170,9 +166,9 @@ export class SqliteCheckpointStore implements CheckpointStore {
   private readonly selectStmt: Statement;
   private readonly upsertStmt: Statement;
 
-  constructor(db: EventDatabase) {
-    this.selectStmt = db.prepare(`SELECT global_seq FROM checkpoints WHERE consumer = ?`);
-    this.upsertStmt = db.prepare(
+  constructor(database: EventDatabase) {
+    this.selectStmt = database.prepare(`SELECT global_seq FROM checkpoints WHERE consumer = ?`);
+    this.upsertStmt = database.prepare(
       `INSERT INTO checkpoints (consumer, global_seq) VALUES (?, ?)
        ON CONFLICT (consumer) DO UPDATE SET global_seq = excluded.global_seq`,
     );
@@ -182,8 +178,8 @@ export class SqliteCheckpointStore implements CheckpointStore {
     try {
       const row = this.selectStmt.get(consumer) as { global_seq: number } | undefined;
       return okAsync(row?.global_seq ?? 0);
-    } catch (err) {
-      return errAsync(infraError('checkpoint.load', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('checkpoint.load', String(error), error));
     }
   }
 
@@ -191,8 +187,8 @@ export class SqliteCheckpointStore implements CheckpointStore {
     try {
       this.upsertStmt.run(consumer, globalSeq);
       return okAsync(undefined);
-    } catch (err) {
-      return errAsync(infraError('checkpoint.save', errorMessage(err), err));
+    } catch (error) {
+      return errAsync(infraError('checkpoint.save', String(error), error));
     }
   }
 }

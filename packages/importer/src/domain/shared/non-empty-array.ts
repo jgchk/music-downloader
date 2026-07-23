@@ -13,8 +13,8 @@ export type NonEmptyReadonlyArray<T> = readonly [T, ...T[]];
  * Narrow a readonly array to a {@link NonEmptyReadonlyArray} — the checked construction at a branch
  * point where the empty case has its own honest handling (a no-match proposal, a doomed duplicate).
  */
-export function isNonEmpty<T>(arr: readonly T[]): arr is NonEmptyReadonlyArray<T> {
-  return arr.length > 0;
+export function isNonEmpty<T>(array: readonly T[]): array is NonEmptyReadonlyArray<T> {
+  return array.length > 0;
 }
 
 /**
@@ -22,6 +22,6 @@ export function isNonEmpty<T>(arr: readonly T[]): arr is NonEmptyReadonlyArray<T
  * already proven `length > 0` (e.g. a wire array validated `.min(1)`) — the structural analogue of a
  * brand's smart-constructor mint, doing no runtime work so it cannot mask a real empty.
  */
-export function assertNonEmpty<T>(arr: readonly T[]): NonEmptyReadonlyArray<T> {
-  return arr as NonEmptyReadonlyArray<T>;
+export function assertNonEmpty<T>(array: readonly T[]): NonEmptyReadonlyArray<T> {
+  return array as NonEmptyReadonlyArray<T>;
 }

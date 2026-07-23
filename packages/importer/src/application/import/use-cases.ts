@@ -17,7 +17,7 @@ import type {
   StalledReadModel,
 } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
-import type { CommandDeps, CommandError } from './command-handler.js';
+import type { CommandDependencies, CommandError } from './command-handler.js';
 
 /**
  * The application use-cases: the real, stable API the interfaces (HTTP, MCP) map onto. Commands
@@ -25,15 +25,15 @@ import type { CommandDeps, CommandError } from './command-handler.js';
  * its directory (D5): the stream id is derived from the normalized path, which is what makes
  * resubmission idempotent — the same directory always converges on the same stream.
  */
-export interface UseCaseDeps extends CommandDeps {
+export interface UseCaseDependencies extends CommandDependencies {
   readonly status: ImportStatusProjection;
   readonly stalled: StalledReadModel;
   readonly policy: ImportPolicy;
 }
 
 /** Join the stalled exposure onto a projected view — additive, absent unless dead-lettered. */
-function withStalled(deps: UseCaseDeps, view: ImportStatusView): ImportStatusView {
-  return deps.stalled.isStalled(view.importId) ? { ...view, stalled: true } : view;
+function withStalled(dependencies: UseCaseDependencies, view: ImportStatusView): ImportStatusView {
+  return dependencies.stalled.isStalled(view.importId) ? { ...view, stalled: true } : view;
 }
 
 /** Normalize a submitted path (collapse trailing slashes) so cosmetic variants share a stream. */
@@ -56,39 +56,42 @@ export interface SubmitImportInput {
 }
 
 export function submitImport(
-  deps: UseCaseDeps,
+  dependencies: UseCaseDependencies,
   input: SubmitImportInput,
 ): ResultAsync<{ readonly importId: ImportId }, CommandError> {
   const directory = normalizeDirectory(input.directory);
   const importId = importIdFor(directory);
-  return applyCommand(deps, importId, {
+  return applyCommand(dependencies, importId, {
     type: 'SubmitImport',
     directory,
     hints: input.hints,
-    policy: deps.policy,
+    policy: dependencies.policy,
     source: input.source,
   }).map(() => ({ importId }));
 }
 
 /** The import an acquisition already submitted, if any — the intake consumer's convergence check. */
 export function findAcquisitionImport(
-  deps: UseCaseDeps,
+  dependencies: UseCaseDependencies,
   acquisitionId: AcquisitionId,
 ): ImportId | undefined {
-  return deps.status.importIdForAcquisition(acquisitionId);
+  return dependencies.status.importIdForAcquisition(acquisitionId);
 }
 
 export function resolveReview(
-  deps: UseCaseDeps,
+  dependencies: UseCaseDependencies,
   importId: ImportId,
   resolution: Resolution,
 ): ResultAsync<void, CommandError> {
-  return applyCommand(deps, importId, { type: 'ResolveReview', resolution }).map(() => undefined);
+  return applyCommand(dependencies, importId, { type: 'ResolveReview', resolution }).map(() => {});
 }
 
-export function getImport(deps: UseCaseDeps, importId: ImportId): ImportStatusView | undefined {
-  const view = deps.status.get(importId);
-  return view === undefined ? undefined : withStalled(deps, view);
+export function getImport(
+  dependencies: UseCaseDependencies,
+  importId: ImportId,
+): ImportStatusView | undefined {
+  const view = dependencies.status.get(importId);
+  return view === undefined ? undefined : withStalled(dependencies, view);
 }
 
 /**
@@ -97,17 +100,19 @@ export function getImport(deps: UseCaseDeps, importId: ImportId): ImportStatusVi
  * (`importIdForAcquisition`), so it is an O(1) lookup, never a scan of all imports.
  */
 export function getImportForAcquisition(
-  deps: UseCaseDeps,
+  dependencies: UseCaseDependencies,
   acquisitionId: string,
 ): ImportStatusView | undefined {
-  const importId = deps.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
-  return importId === undefined ? undefined : getImport(deps, importId);
+  const importId = dependencies.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
+  return importId === undefined ? undefined : getImport(dependencies, importId);
 }
 
-export function listImports(deps: UseCaseDeps): readonly ImportStatusView[] {
-  return deps.status.list().map((view) => withStalled(deps, view));
+export function listImports(dependencies: UseCaseDependencies): readonly ImportStatusView[] {
+  return dependencies.status.list().map((view) => withStalled(dependencies, view));
 }
 
-export function listPendingReviews(deps: UseCaseDeps): readonly PendingReviewView[] {
-  return deps.status.pendingReviews();
+export function listPendingReviews(
+  dependencies: UseCaseDependencies,
+): readonly PendingReviewView[] {
+  return dependencies.status.pendingReviews();
 }

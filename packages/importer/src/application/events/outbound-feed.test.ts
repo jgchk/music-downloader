@@ -51,7 +51,8 @@ describe('OutboundFeed', () => {
     await seed('imp-1');
     const feed = new OutboundFeed(store, mapping);
 
-    const batch = (await feed.read(0, 100))._unsafeUnwrap();
+    const readResult = await feed.read(0, 100);
+    const batch = readResult._unsafeUnwrap();
 
     expect(batch.events).toHaveLength(1);
     expect(batch.events[0]).toMatchObject({
@@ -66,7 +67,8 @@ describe('OutboundFeed', () => {
     await seed('imp-1');
     const feed = new OutboundFeed(store, mapping);
 
-    const batch = (await feed.read(0, 2))._unsafeUnwrap();
+    const readResult2 = await feed.read(0, 2);
+    const batch = readResult2._unsafeUnwrap();
 
     expect(batch.events).toHaveLength(0);
     expect(batch.scannedTo).toBe(2);
@@ -75,9 +77,11 @@ describe('OutboundFeed', () => {
   it('advances the scan boundary past trailing unpublished events', async () => {
     await seed('imp-1');
     const feed = new OutboundFeed(store, mapping);
-    const full = (await feed.read(0, 100))._unsafeUnwrap();
+    const readResult3 = await feed.read(0, 100);
+    const full = readResult3._unsafeUnwrap();
 
-    const tail = (await feed.read(full.events[0]!.globalSeq, 100))._unsafeUnwrap();
+    const readResult4 = await feed.read(full.events[0]!.globalSeq, 100);
+    const tail = readResult4._unsafeUnwrap();
 
     expect(tail.events).toHaveLength(0);
     expect(tail.scannedTo).toBe(full.events[0]!.globalSeq);
@@ -88,11 +92,13 @@ describe('OutboundFeed', () => {
     store.failReadAll = true;
     const feed = new OutboundFeed(store, mapping);
 
-    expect((await feed.read(0, 100)).isErr()).toBe(true);
+    const readResult5 = await feed.read(0, 100);
+    expect(readResult5.isErr()).toBe(true);
 
     store.failReadAll = false;
     store.failReads = true;
-    expect((await feed.read(0, 100)).isErr()).toBe(true);
+    const readResult6 = await feed.read(0, 100);
+    expect(readResult6.isErr()).toBe(true);
   });
 
   it('never exposes a payload that fails outbound validation', async () => {

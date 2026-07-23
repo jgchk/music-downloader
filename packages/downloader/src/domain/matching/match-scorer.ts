@@ -51,12 +51,12 @@ export function isAudioFile(file: CandidateFile): boolean {
 }
 
 export function audioFiles(candidate: Candidate): readonly CandidateFile[] {
-  return candidate.files.filter(isAudioFile);
+  return candidate.files.filter((item) => isAudioFile(item));
 }
 
 function basename(path: string): string {
   const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1]!;
+  return parts.at(-1)!;
 }
 
 /** All the searchable text a candidate exposes: its folder name plus its file names. */

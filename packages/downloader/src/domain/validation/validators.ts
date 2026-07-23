@@ -21,8 +21,8 @@ export interface ProbedAudio {
 
 /** MVP validator 1 — playability: every file must fully decode (D5 axis 1). Codec-agnostic. */
 export function playabilityValidator(probes: readonly ProbedAudio[]): ValidatorOutcome {
-  const allPlayable = probes.length > 0 && probes.every((probe) => probe.decodedCleanly);
-  return allPlayable
+  const isAllPlayable = probes.length > 0 && probes.every((probe) => probe.decodedCleanly);
+  return isAllPlayable
     ? { name: 'playability', score: clampUnit(1) }
     : { name: 'playability', score: clampUnit(0), reason: 'Unplayable' };
 }

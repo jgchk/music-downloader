@@ -202,12 +202,12 @@ export const cancelAcquisitionResponseSchema = z.object({
   acquisitionId: z.string(),
 });
 
-export const acquisitionIdParamsSchema = z.object({
+export const acquisitionIdParametersSchema = z.object({
   id: z.string().min(1),
 });
 
 /** Arguments for the `cancel_acquisition` MCP tool (mirrors the HTTP id param). */
-export const cancelAcquisitionArgsSchema = z.object({
+export const cancelAcquisitionArgumentsSchema = z.object({
   id: z.string().min(1),
 });
 

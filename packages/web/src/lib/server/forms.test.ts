@@ -58,8 +58,8 @@ describe('submitAcquisitionForm', () => {
       request: { kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' },
       qualityPolicy: { order: ['LOSSLESS', 'LOSSY_HIGH'], floor: 'LOSSY_HIGH' },
       matchPolicy: { threshold: 0.7 },
-      retryPolicy: { maxSearchRounds: 2, maxTotalAttempts: 5, timeBudgetMs: 60000 },
-      downloadPolicy: { stallTimeoutMs: 30000, maxQueueWaitMs: 20000 },
+      retryPolicy: { maxSearchRounds: 2, maxTotalAttempts: 5, timeBudgetMs: 60_000 },
+      downloadPolicy: { stallTimeoutMs: 30_000, maxQueueWaitMs: 20_000 },
     });
   });
 

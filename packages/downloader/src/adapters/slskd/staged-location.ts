@@ -1,4 +1,4 @@
-import { join, relative } from 'node:path';
+import path from 'node:path';
 import { slskdDownloadFileCompleteSchema } from './schemas.js';
 import type { SlskdEventRecord } from './schemas.js';
 
@@ -32,7 +32,7 @@ export function resolveStagedPaths(
       JSON.parse(record.data) as unknown,
     );
     if (!wantedIds.has(transfer.id)) continue;
-    resolved.set(transfer.id, join(stagingRoot, relative(downloadsRoot, localFilename)));
+    resolved.set(transfer.id, path.join(stagingRoot, path.relative(downloadsRoot, localFilename)));
   }
   return resolved;
 }

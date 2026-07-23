@@ -66,8 +66,10 @@ export interface BootOverrides {
   readonly onShutdownSignal?: (shutdown: () => Promise<void>) => void;
 }
 
-let booted: Booted | undefined;
-let booting: Promise<Booted> | undefined;
+// Boot-once singleton state held on one object so the memoization writes are property
+// assignments (the module keeps a single lazily-initialised runtime), not reassignments of a
+// module-scoped binding from inside a function.
+const runtime: { booted?: Booted; booting?: Promise<Booted> } = {};
 
 function registerProcessShutdown(shutdown: () => Promise<void>): void {
   // adapter-node stops accepting connections on SIGINT/SIGTERM, then emits this event.
@@ -75,10 +77,10 @@ function registerProcessShutdown(shutdown: () => Promise<void>): void {
 }
 
 async function boot(
-  env: Record<string, string | undefined>,
+  environment: Record<string, string | undefined>,
   overrides: BootOverrides,
 ): Promise<Booted> {
-  const config = loadComposedConfig(env);
+  const config = loadComposedConfig(environment);
   if (config.isErr()) throw new Error(config.error);
 
   const logger = createLogger(config.value.logLevel);
@@ -111,8 +113,8 @@ async function boot(
     verdicts.stop();
     await downloader.stop();
     await importer.stop();
-    booted = undefined;
-    booting = undefined;
+    runtime.booted = undefined;
+    runtime.booting = undefined;
   };
   (overrides.onShutdownSignal ?? registerProcessShutdown)(shutdown);
 
@@ -130,30 +132,32 @@ async function boot(
 
 /** Boot once; concurrent and repeated calls share the same boot. */
 export function bootRuntimes(
-  env: Record<string, string | undefined> = process.env,
+  environment: Record<string, string | undefined> = process.env,
   overrides: BootOverrides = {},
 ): Promise<Booted> {
-  booting ??= boot(env, overrides).then((result) => {
-    booted = result;
+  // Memoize the boot *promise* (assign it, don't await it) so concurrent callers share one boot.
+  // eslint-disable-next-line unicorn/prefer-await
+  runtime.booting ??= boot(environment, overrides).then((result) => {
+    runtime.booted = result;
     return result;
   });
-  return booting;
+  return runtime.booting;
 }
 
 /** The facades for request handling; the daemon must have booted first (init hook). */
 export function facadesOf(): Facades {
-  if (booted === undefined) {
+  if (runtime.booted === undefined) {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
-  return booted.facades;
+  return runtime.booted.facades;
 }
 
 /** The structured logger for request handling; the daemon must have booted first (init hook). */
 export function loggerOf(): Logger {
-  if (booted === undefined) {
+  if (runtime.booted === undefined) {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
-  return booted.logger;
+  return runtime.booted.logger;
 }
 
 /**
@@ -162,15 +166,15 @@ export function loggerOf(): Logger {
  * Overall `ok` only when both modules are `up`, else `degraded`. The daemon must have booted first.
  */
 export function readinessOf(): Readiness {
-  if (booted === undefined) {
+  if (runtime.booted === undefined) {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
-  const downloader = booted.readiness.downloader();
-  const importer = booted.readiness.importer();
-  const healthy = downloader.status === 'up' && importer.status === 'up';
+  const downloader = runtime.booted.readiness.downloader();
+  const importer = runtime.booted.readiness.importer();
+  const isHealthy = downloader.status === 'up' && importer.status === 'up';
   return {
-    status: healthy ? 'ok' : 'degraded',
-    version: booted.version,
+    status: isHealthy ? 'ok' : 'degraded',
+    version: runtime.booted.version,
     modules: {
       downloader: { status: downloader.status },
       importer: { status: importer.status },
@@ -180,8 +184,8 @@ export function readinessOf(): Readiness {
 
 /** Test seam: tear down the module-scope singleton between specs. */
 export async function resetRuntimesForTesting(): Promise<void> {
-  const current = booted;
-  booted = undefined;
-  booting = undefined;
+  const current = runtime.booted;
+  runtime.booted = undefined;
+  runtime.booting = undefined;
   if (current !== undefined) await current.shutdown();
 }

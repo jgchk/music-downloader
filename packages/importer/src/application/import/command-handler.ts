@@ -18,25 +18,25 @@ import type { Clock } from '../ports/system-ports.js';
  */
 export type CommandError = DomainError | AppendError;
 
-export interface CommandDeps {
+export interface CommandDependencies {
   readonly store: EventStorePort;
   readonly clock: Clock;
 }
 
 export function applyCommand(
-  deps: CommandDeps,
+  dependencies: CommandDependencies,
   importId: string,
   command: ImportCommand,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
-  return deps.store.readStream(importId).andThen((stored) => {
+  return dependencies.store.readStream(importId).andThen((stored) => {
     const aggregate = Import.fromHistory(stored.map((entry) => entry.event));
     const decision = aggregate.execute(command);
     if (decision.isErr()) return errAsync(decision.error);
     if (decision.value.length === 0) return okAsync<readonly StoredEvent[], CommandError>([]);
     const metadata: EventMetadata = {
       importId,
-      occurredAt: deps.clock.now().toISOString(),
+      occurredAt: dependencies.clock.now().toISOString(),
     };
-    return deps.store.append(importId, stored.length, decision.value, metadata);
+    return dependencies.store.append(importId, stored.length, decision.value, metadata);
   });
 }

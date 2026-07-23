@@ -9,14 +9,9 @@ import {
   selectEdition as selectEditionUseCase,
   submitAcquisition as submitAcquisitionUseCase,
 } from '../application/acquisition/use-cases.js';
-import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
-import {
-  acquisitionListResponseSchema,
-  acquisitionStatusResponseSchema,
-  progressResponseSchema,
-  submitAcquisitionRequestSchema,
-} from './schemas.js';
+import { submitAcquisitionRequestSchema } from './schemas.js';
 import type {
   AcquisitionListResponseDto,
   AcquisitionStatusResponseDto,
@@ -85,9 +80,6 @@ export const selectEditionInputSchema = z.object({
 export const submitAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
 export const cancelAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
 export const selectEditionResultSchema = z.object({ acquisitionId: z.string() });
-export const acquisitionStatusResultSchema = acquisitionStatusResponseSchema;
-export const acquisitionListResultSchema = acquisitionListResponseSchema;
-export const progressResultSchema = progressResponseSchema;
 
 export type SubmitAcquisitionResult = z.infer<typeof submitAcquisitionResultSchema>;
 export type CancelAcquisitionResult = z.infer<typeof cancelAcquisitionResultSchema>;
@@ -106,7 +98,7 @@ export interface DownloaderFacade {
   getAcquisitionProgress(input: unknown): FacadeResult<ProgressResponseDto>;
 }
 
-export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
+export function createDownloaderFacade(dependencies: UseCaseDependencies): DownloaderFacade {
   return {
     async submitAcquisition(input) {
       const parsed = submitAcquisitionRequestSchema.safeParse(input);
@@ -120,7 +112,7 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
       }
       const policies = resolvePolicies(parsed.data);
       if (policies.isErr()) return fail({ kind: 'InvalidPolicy' });
-      const result = await submitAcquisitionUseCase(deps, {
+      const result = await submitAcquisitionUseCase(dependencies, {
         request: request.value,
         policies: policies.value,
       });
@@ -133,7 +125,7 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
     async cancelAcquisition(input) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await cancelAcquisitionUseCase(deps, parsed.data.id);
+      const result = await cancelAcquisitionUseCase(dependencies, parsed.data.id);
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),
@@ -150,7 +142,7 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
           message: 'releaseMbid is not a valid MusicBrainz id',
         });
       }
-      const result = await selectEditionUseCase(deps, parsed.data.id, releaseMbid.value);
+      const result = await selectEditionUseCase(dependencies, parsed.data.id, releaseMbid.value);
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),
@@ -160,21 +152,29 @@ export function createDownloaderFacade(deps: UseCaseDeps): DownloaderFacade {
     getAcquisition(input) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const view = getAcquisitionUseCase(deps, parsed.data.id);
+      const view = getAcquisitionUseCase(dependencies, parsed.data.id);
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },
 
     listAcquisitions() {
-      return { acquisitions: listAcquisitionsUseCase(deps).map(statusViewToDto) };
+      return {
+        acquisitions: listAcquisitionsUseCase(dependencies).map((item) => statusViewToDto(item)),
+      };
     },
 
     getAcquisitionProgress(input) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const progress = getProgressUseCase(deps, parsed.data.id);
+      const progress = getProgressUseCase(dependencies, parsed.data.id);
       if (progress === undefined) return fail({ kind: 'NotFound' });
       return ok(progressToDto(progress));
     },
   };
 }
+
+export {
+  acquisitionListResponseSchema as acquisitionListResultSchema,
+  acquisitionStatusResponseSchema as acquisitionStatusResultSchema,
+  progressResponseSchema as progressResultSchema,
+} from './schemas.js';

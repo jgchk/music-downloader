@@ -17,7 +17,7 @@ const search: SourceResource = {
 const transfer = (resourceId?: string): SourceResource => ({
   source: 'slskd',
   kind: 'transfer',
-  resourceKey: 'u1|@@a\\Album\\01.flac',
+  resourceKey: String.raw`u1|@@a\Album\01.flac`,
   resourceId,
   acquisitionId: 'acq-1',
 });
@@ -27,7 +27,7 @@ function payload(files: readonly unknown[]): HttpResponse {
 }
 const gone = payload([]);
 const present = (state: string, id = 'live-id'): HttpResponse =>
-  payload([{ id, filename: '@@a\\Album\\01.flac', state }]);
+  payload([{ id, filename: String.raw`@@a\Album\01.flac`, state }]);
 
 function fakeTimer(): Timer {
   let current = 0;
@@ -43,7 +43,7 @@ function fakeTimer(): Timer {
 /** A remover whose GET (transfer-poll) responses are drained in order (last one repeats). */
 function remover(
   gets: HttpResponse[],
-  deleteStatus = 204,
+  deletionStatus = 204,
 ): {
   remover: SlskdResourceRemover;
   deletes: string[];
@@ -51,14 +51,14 @@ function remover(
 } {
   const deletes: string[] = [];
   const queue = [...gets];
-  let getCount = 0;
+  let requestCount = 0;
   const http: HttpClient = {
     send: ({ method, url }) => {
       if (method === 'DELETE') {
         deletes.push(url);
-        return Promise.resolve({ status: deleteStatus, body: '' });
+        return Promise.resolve({ status: deletionStatus, body: '' });
       }
-      getCount += 1;
+      requestCount += 1;
       const next = queue.length > 1 ? queue.shift()! : (queue[0] ?? gone);
       return Promise.resolve(next);
     },
@@ -66,7 +66,7 @@ function remover(
   return {
     remover: new SlskdResourceRemover(silentLogger(), new SlskdClient(http), fakeTimer(), 10),
     deletes,
-    getCount: () => getCount,
+    getCount: () => requestCount,
   };
 }
 
@@ -74,14 +74,16 @@ describe('SlskdResourceRemover', () => {
   it('deletes a search by its id and reports it confirmed gone', async () => {
     const { remover: r, deletes } = remover([ok]);
 
-    expect((await r.remove(search))._unsafeUnwrap()).toBe(true);
+    const removalResult = await r.remove(search);
+    expect(removalResult._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual(['http://localhost:5030/api/v0/searches/s1']);
   });
 
   it('removes an already-terminal transfer on the first pass and confirms it gone', async () => {
     const { remover: r, deletes } = remover([present('Completed, Succeeded'), gone]);
 
-    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    const removalResult2 = await r.remove(transfer('live-id'));
+    expect(removalResult2._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
     ]);
@@ -94,7 +96,8 @@ describe('SlskdResourceRemover', () => {
       gone, // confirmed gone
     ]);
 
-    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    const removalResult3 = await r.remove(transfer('live-id'));
+    expect(removalResult3._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
@@ -104,7 +107,8 @@ describe('SlskdResourceRemover', () => {
   it('looks a transfer up by filename when its id was never captured', async () => {
     const { remover: r, deletes } = remover([present('Completed, Succeeded'), gone]);
 
-    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    const removalResult4 = await r.remove(transfer());
+    expect(removalResult4._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=true',
     ]);
@@ -112,31 +116,38 @@ describe('SlskdResourceRemover', () => {
 
   it('falls back to the captured GUID when the polled record omits its id', async () => {
     // The transfer is found by filename but the payload carries no id; remove by the captured GUID.
-    const noId = payload([{ filename: '@@a\\Album\\01.flac', state: 'Completed, Succeeded' }]);
+    const noId = payload([
+      { filename: String.raw`@@a\Album\01.flac`, state: 'Completed, Succeeded' },
+    ]);
     const { remover: r, deletes } = remover([noId, gone]);
 
-    expect((await r.remove(transfer('guid-9')))._unsafeUnwrap()).toBe(true);
+    const removalResult5 = await r.remove(transfer('guid-9'));
+    expect(removalResult5._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/guid-9?remove=true',
     ]);
   });
 
   it('removes an idless transfer at the bare path when no GUID was ever captured', async () => {
-    const noId = payload([{ filename: '@@a\\Album\\01.flac', state: 'Completed, Succeeded' }]);
+    const noId = payload([
+      { filename: String.raw`@@a\Album\01.flac`, state: 'Completed, Succeeded' },
+    ]);
     const { remover: r, deletes } = remover([noId, gone]);
 
-    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    const removalResult6 = await r.remove(transfer());
+    expect(removalResult6._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual(['http://localhost:5030/api/v0/transfers/downloads/u1/?remove=true']);
   });
 
   it('locates a transfer by its captured GUID when the polled filename differs', async () => {
     // slskd renamed the file on disk, so match on the captured id rather than the filename.
     const renamed = payload([
-      { id: 'guid-9', filename: '@@a\\Album\\renamed.flac', state: 'Completed, Succeeded' },
+      { id: 'guid-9', filename: String.raw`@@a\Album\renamed.flac`, state: 'Completed, Succeeded' },
     ]);
     const { remover: r, deletes } = remover([renamed, gone]);
 
-    expect((await r.remove(transfer('guid-9')))._unsafeUnwrap()).toBe(true);
+    const removalResult7 = await r.remove(transfer('guid-9'));
+    expect(removalResult7._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/guid-9?remove=true',
     ]);
@@ -144,10 +155,13 @@ describe('SlskdResourceRemover', () => {
 
   it('no-ops when only another tenant’s transfer is present', async () => {
     // A foreign transfer (different filename, no captured id to match) is left untouched.
-    const foreign = payload([{ id: 'x', filename: '@@a\\Other\\9.flac', state: 'InProgress' }]);
+    const foreign = payload([
+      { id: 'x', filename: String.raw`@@a\Other\9.flac`, state: 'InProgress' },
+    ]);
     const { remover: r, deletes, getCount } = remover([foreign]);
 
-    expect((await r.remove(transfer()))._unsafeUnwrap()).toBe(true);
+    const removalResult8 = await r.remove(transfer());
+    expect(removalResult8._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([]); // nothing of ours to remove
     expect(getCount()).toBe(1);
   });
@@ -156,7 +170,8 @@ describe('SlskdResourceRemover', () => {
     const { remover: r, deletes } = remover([present('InProgress')]); // never transitions
 
     // Cancelled each round but never terminal, so it is left for the next boot's sweep.
-    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(false);
+    const removalResult9 = await r.remove(transfer('live-id'));
+    expect(removalResult9._unsafeUnwrap()).toBe(false);
     expect(deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
@@ -170,7 +185,8 @@ describe('SlskdResourceRemover', () => {
     // ledger row live forever.
     const { remover: r, deletes } = remover([{ status: 404, body: '' }]);
 
-    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    const removalResult10 = await r.remove(transfer('live-id'));
+    expect(removalResult10._unsafeUnwrap()).toBe(true);
     expect(deletes).toEqual([]); // nothing at the source to remove
   });
 

@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { ResultAsync, okAsync, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -38,8 +38,8 @@ const FILES = [
   { path: 'staging/02.flac', name: '02.flac' },
 ];
 const PROBES: Record<string, ProbedAudio> = {
-  'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251000 },
-  'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264000 },
+  'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251_000 },
+  'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264_000 },
 };
 const COMPLETED: DownloadResult = { kind: 'completed', files: FILES };
 
@@ -72,7 +72,8 @@ const SUBMIT = {
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups) await cleanup();
+  cleanups.length = 0;
 });
 
 async function testRuntime(databaseFile = ':memory:'): Promise<DownloaderRuntime> {
@@ -131,7 +132,8 @@ describe('createDownloaderRuntime', () => {
     const id = submitted.value.acquisitionId;
     await untilFulfilled(runtime, id);
 
-    const fulfilled = (await runtime.feed.read(0, 100))._unsafeUnwrap().events.at(-1)!;
+    const readResult = await runtime.feed.read(0, 100);
+    const fulfilled = readResult._unsafeUnwrap().events.at(-1)!;
     const candidate = (fulfilled.data as { candidate: unknown }).candidate;
     const verdict: SeamEvent = {
       globalSeq: 1,
@@ -148,7 +150,7 @@ describe('createDownloaderRuntime', () => {
       read: (from) =>
         Promise.resolve(ok({ events: from < 1 ? [verdict] : [], scannedTo: Math.max(from, 1) })),
     };
-    const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => undefined });
+    const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => {} });
     await subscription.start();
     cleanups.push(() => subscription.stop());
 
@@ -173,12 +175,14 @@ describe('createDownloaderRuntime', () => {
         silentLogger(),
         { ports: fakePorts() },
       );
-      let stopped = false;
+      let isStopped = false;
       const stopOnce = async () => {
-        if (!stopped) {
-          stopped = true;
-          await runtime.stop();
+        if (isStopped) {
+          return;
         }
+
+        isStopped = true;
+        await runtime.stop();
       };
       cleanups.push(stopOnce);
 
@@ -189,7 +193,7 @@ describe('createDownloaderRuntime', () => {
           return Promise.resolve(ok({ events: [], scannedTo: from }));
         },
       };
-      const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => undefined });
+      const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => {} });
       await subscription.start();
       const readsAtStop = reads.length;
 
@@ -205,9 +209,9 @@ describe('createDownloaderRuntime', () => {
   });
 
   it('rebuilds projections from the stored backlog on a fresh boot over the same file', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const file = join(dir, 'events.db');
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
 
     const first = await testRuntime(file);
     const submitted = await first.facade.submitAcquisition(SUBMIT);
@@ -221,13 +225,13 @@ describe('createDownloaderRuntime', () => {
   });
 
   it('constructs real adapters when no overrides are given', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
     const runtime = await createDownloaderRuntime(
       {
-        databaseFile: join(dir, 'data', 'events.db'),
-        libraryRoot: join(dir, 'library'),
-        stagingRoot: join(dir, 'staging'),
+        databaseFile: path.join(directory, 'data', 'events.db'),
+        libraryRoot: path.join(directory, 'library'),
+        stagingRoot: path.join(directory, 'staging'),
         musicbrainz: {},
         slskd: {},
       },
@@ -256,7 +260,7 @@ describe('createDownloaderRuntime', () => {
       read: (from) =>
         Promise.resolve(ok({ events: from < 1 ? [poison] : [], scannedTo: Math.max(from, 1) })),
     };
-    const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => undefined });
+    const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => {} });
     await subscription.start();
     cleanups.push(() => subscription.stop());
 
@@ -273,9 +277,9 @@ describe('createDownloaderRuntime', () => {
   });
 
   it('logs and continues when the projection rebuild cannot read the backlog', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const file = join(dir, 'events.db');
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
     const seed = openEventDatabase(file);
     seed
       .prepare(
@@ -308,20 +312,19 @@ describe('createDownloaderRuntime', () => {
 
 describe('stalled exposure at boot (reactor-durability D2)', () => {
   async function seededRuntime(occurredAt: string): Promise<DownloaderRuntime> {
-    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const file = join(dir, 'events.db');
-    const db = openEventDatabase(file);
-    const store = new SqliteEventStore(db, new UpcasterRegistry());
-    (
-      await store.append('acq-stalled', 0, requestedHistory(), {
-        acquisitionId: 'acq-stalled',
-        occurredAt: 't',
-      })
-    )._unsafeUnwrap();
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+    const database = openEventDatabase(file);
+    const store = new SqliteEventStore(database, new UpcasterRegistry());
+    const appendResult = await store.append('acq-stalled', 0, requestedHistory(), {
+      acquisitionId: 'acq-stalled',
+      occurredAt: 't',
+    });
+    appendResult._unsafeUnwrap();
     // The reactor already processed the event and dead-lettered its effect before the restart.
-    await new SqliteCheckpointStore(db).save('acquisition-reactor', 1);
-    const seedLetters = new SqliteDeadLetterStore(db);
+    await new SqliteCheckpointStore(database).save('acquisition-reactor', 1);
+    const seedLetters = new SqliteDeadLetterStore(database);
     await seedLetters.record({
       subscription: 'acquisition-reactor',
       globalSeq: 1,
@@ -336,7 +339,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
       error: 'legacy',
       occurredAt,
     });
-    db.close();
+    database.close();
 
     const runtime = await createDownloaderRuntime(
       {
@@ -403,30 +406,29 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
           value: { status: 'Fulfilled' },
         });
       },
-      { timeout: 5_000 },
+      { timeout: 5000 },
     );
   });
 });
 
 describe('boot readiness (reactor-durability D4)', () => {
   it('returns ready without awaiting the backlog drain — a hanging effect cannot block boot', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const file = join(dir, 'events.db');
-    const db = openEventDatabase(file);
-    const store = new SqliteEventStore(db, new UpcasterRegistry());
-    (
-      await store.append('acq-hung', 0, requestedHistory(), {
-        acquisitionId: 'acq-hung',
-        occurredAt: 't',
-      })
-    )._unsafeUnwrap();
-    db.close();
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+    const database = openEventDatabase(file);
+    const store = new SqliteEventStore(database, new UpcasterRegistry());
+    const appendResult2 = await store.append('acq-hung', 0, requestedHistory(), {
+      acquisitionId: 'acq-hung',
+      occurredAt: 't',
+    });
+    appendResult2._unsafeUnwrap();
+    database.close();
 
     let releaseResolution!: () => void;
-    const gate = new Promise<{ kind: 'unresolved' }>((res) => {
+    const gate = new Promise<{ kind: 'unresolved' }>((resolve) => {
       releaseResolution = () => {
-        res({ kind: 'unresolved' });
+        resolve({ kind: 'unresolved' });
       };
     });
     const ports: EffectPorts = {

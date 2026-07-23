@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LayoutProps } from './$types';
+  import type { LayoutProps as LayoutProperties } from './$types';
   // Global style system, kept in tokens → base → skin order for readability. Order isn't
   // load-bearing: every skin rule is scoped under `:root[data-skin=…]` and wins by specificity.
   // The active skin is chosen by `data-skin` on <html> (see app.html) and can be swapped at
@@ -11,7 +11,7 @@
   import '$lib/styles/skins/forum.css';
   import SkinSwitcher from '$lib/components/SkinSwitcher.svelte';
 
-  let { data, children }: LayoutProps = $props();
+  let { data, children }: LayoutProperties = $props();
 
   // SvelteKit does not set `aria-current` for us; derive it from the server-provided pathname so
   // the skins' selected-tab styling (and screen-reader wayfinding) engages on first paint. Section

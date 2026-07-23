@@ -93,11 +93,13 @@ export const bridgeProposeOutputSchema = z.discriminatedUnion('status', [
   bridgeRefusalSchema,
 ]);
 
+const applyFailureSchema = z.object({ stage: z.string(), message: z.string() });
+
 export const bridgeApplyOutputSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('applied'),
     location: z.string(),
-    failures: z.array(z.object({ stage: z.string(), message: z.string() })),
+    failures: z.array(applyFailureSchema),
   }),
   z.object({
     status: z.literal('skipped-duplicate'),

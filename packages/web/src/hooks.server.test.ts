@@ -6,7 +6,7 @@ const facadesOf = vi.fn(() => ({ downloader: {}, importer: {} }));
 const logger = { warn: vi.fn(), error: vi.fn() };
 vi.mock('$env/dynamic/private', () => ({ env: { LIBRARY_ROOT: '/library' } }));
 vi.mock('$lib/server/runtime.js', () => ({
-  bootRuntimes: (...args: unknown[]) => bootRuntimes(...(args as [])),
+  bootRuntimes: (...arguments_: unknown[]) => bootRuntimes(...(arguments_ as [])),
   facadesOf: () => facadesOf(),
   loggerOf: () => logger,
 }));
@@ -24,7 +24,7 @@ describe('server hooks', () => {
   it('handle injects the facades and the logger into locals for every server route', async () => {
     const event = { locals: {} } as unknown as RequestEvent;
     const response = new Response('ok');
-    const resolve = vi.fn((_event: RequestEvent, _opts?: ResolveOptions) =>
+    const resolve = vi.fn((_event: RequestEvent, _options?: ResolveOptions) =>
       Promise.resolve(response),
     );
 

@@ -9,13 +9,13 @@ import { applyCommand } from './command-handler.js';
 
 const clock = fixedClock();
 
-function deps() {
+function dependencies() {
   return { store: new FakeEventStore(), clock };
 }
 
 describe('applyCommand', () => {
   it('appends the events decided for a fresh stream, stamped with metadata', async () => {
-    const d = deps();
+    const d = dependencies();
     const result = await applyCommand(d, 'imp-1', {
       type: 'SubmitImport',
       directory: DIRECTORY,
@@ -30,7 +30,7 @@ describe('applyCommand', () => {
   });
 
   it('surfaces a domain error for a protocol violation', async () => {
-    const d = deps();
+    const d = dependencies();
     const result = await applyCommand(d, 'imp-1', {
       type: 'ResolveReview',
       resolution: { kind: 'import-as-is' },
@@ -39,7 +39,7 @@ describe('applyCommand', () => {
   });
 
   it('appends nothing when decide ignores a stale command', async () => {
-    const d = deps();
+    const d = dependencies();
     await d.store.append('imp-1', 0, awaitingMatchReview(), {
       importId: 'imp-1',
       occurredAt: clock.now().toISOString(),
@@ -55,7 +55,7 @@ describe('applyCommand', () => {
   });
 
   it('propagates an infrastructure read failure', async () => {
-    const d = deps();
+    const d = dependencies();
     d.store.failReads = true;
     const result = await applyCommand(d, 'imp-1', {
       type: 'SubmitImport',

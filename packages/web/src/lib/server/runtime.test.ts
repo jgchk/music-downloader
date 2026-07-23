@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { err, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DownloaderRuntime } from '@music/downloader/runtime';
@@ -40,7 +40,9 @@ function fakeSubscription(log: string[], name: string) {
       log.push(`${name}:start`);
       return Promise.resolve();
     },
-    stop: () => log.push(`${name}:stop`),
+    stop: () => {
+      log.push(`${name}:stop`);
+    },
   };
 }
 
@@ -51,7 +53,7 @@ function fakeRuntimes(
   const downloader = {
     facade: { kind: 'downloader-facade' },
     feed: { read: vi.fn() },
-    wakeups: { subscribe: () => () => undefined },
+    wakeups: { subscribe: () => () => {} },
     connectVerdictFeed: () => fakeSubscription(log, 'verdicts'),
     readiness: () => ({ status: statuses.downloader ?? 'up' }),
     stop: () => {
@@ -63,7 +65,7 @@ function fakeRuntimes(
     facade: { kind: 'importer-facade' },
     beetsConfig: { beetsVersion: 'x' },
     feed: { read: vi.fn() },
-    wakeups: { subscribe: () => () => undefined },
+    wakeups: { subscribe: () => () => {} },
     connectAcquisitionFeed: (_feed: unknown, options: { sourceRoot: string }) => {
       log.push(`acquisitions:connect:${options.sourceRoot}`);
       return fakeSubscription(log, 'acquisitions');
@@ -200,14 +202,14 @@ describe('bootRuntimes', () => {
   });
 
   it('boots the real module factories when no overrides are given (importer fails on beets)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'composed-'));
+    const directory = mkdtempSync(path.join(tmpdir(), 'composed-'));
     try {
       await expect(
         bootRuntimes({
-          LIBRARY_ROOT: join(dir, 'library'),
-          STAGING_ROOT: join(dir, 'staging'),
-          INTAKE_ROOT: join(dir, 'intake'),
-          BEETS_CONFIG: join(dir, 'beets.yaml'),
+          LIBRARY_ROOT: path.join(directory, 'library'),
+          STAGING_ROOT: path.join(directory, 'staging'),
+          INTAKE_ROOT: path.join(directory, 'intake'),
+          BEETS_CONFIG: path.join(directory, 'beets.yaml'),
           DOWNLOADER_DATABASE_FILE: ':memory:',
           IMPORTER_DATABASE_FILE: ':memory:',
           BRIDGE_PYTHON: '/bin/false',
@@ -216,7 +218,7 @@ describe('bootRuntimes', () => {
         }),
       ).rejects.toThrow(/importer startup failed/);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 });

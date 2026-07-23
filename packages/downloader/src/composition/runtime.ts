@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import path from 'node:path';
 import {
   FfmpegAudioProbe,
   FilesystemLibrary,
@@ -25,8 +25,11 @@ import { Reactor } from '../application/acquisition/reactor.js';
 import { DEFAULT_RETRY_POLICY } from '../application/acquisition/retry-policy.js';
 import type { RetryPolicy } from '../application/acquisition/retry-policy.js';
 import { SourceResourceSweep } from '../application/acquisition/sweep.js';
-import type { EffectPorts, InterpreterDeps } from '../application/acquisition/interpreter.js';
-import type { UseCaseDeps } from '../application/acquisition/use-cases.js';
+import type {
+  EffectPorts,
+  InterpreterDependencies,
+} from '../application/acquisition/interpreter.js';
+import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
 import type { Clock, IdGenerator } from '../application/ports/system-ports.js';
 import {
@@ -81,7 +84,7 @@ export interface SeamWakeups {
 }
 
 /** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
-const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * This module's own readiness shape (design D4) — declared locally, no shared kernel: `up` unless
@@ -112,14 +115,14 @@ export async function createDownloaderRuntime(
   const clock = overrides.clock ?? { now: () => new Date() };
   const ids = overrides.ids ?? { next: () => randomUUID() };
 
-  mkdirSync(dirname(config.databaseFile), { recursive: true });
-  const db = openEventDatabase(config.databaseFile);
+  mkdirSync(path.dirname(config.databaseFile), { recursive: true });
+  const database = openEventDatabase(config.databaseFile);
   const bus = new InProcessEventBus();
-  const store = new SqliteEventStore(db, buildUpcasterRegistry(), bus);
-  const checkpoints = new SqliteCheckpointStore(db);
-  const deadLetters = overrides.deadLetters ?? new SqliteDeadLetterStore(db);
-  const parkedEffects = new SqliteParkedEffectStore(db);
-  const ledger = new SqliteResourceLedger(db, clock);
+  const store = new SqliteEventStore(database, buildUpcasterRegistry(), bus);
+  const checkpoints = new SqliteCheckpointStore(database);
+  const deadLetters = overrides.deadLetters ?? new SqliteDeadLetterStore(database);
+  const parkedEffects = new SqliteParkedEffectStore(database);
+  const ledger = new SqliteResourceLedger(database, clock);
 
   const status = new AcquisitionStatusProjection();
   const progressModel = new ProgressReadModel();
@@ -173,7 +176,7 @@ export async function createDownloaderRuntime(
     logger,
   }).run();
 
-  const interpreter: InterpreterDeps = {
+  const interpreter: InterpreterDependencies = {
     store,
     clock,
     ports,
@@ -192,8 +195,8 @@ export async function createDownloaderRuntime(
     interpreter,
     clock,
     // The ambient effects the reactor runs on are chosen here, not in the application layer.
-    interval: (fn, ms) => {
-      const handle = setInterval(fn, ms);
+    interval: (function_, ms) => {
+      const handle = setInterval(function_, ms);
       return () => {
         clearInterval(handle);
       };
@@ -209,7 +212,7 @@ export async function createDownloaderRuntime(
   // its awaited reads are Results and both passes run under the reactor's catching mutex.
   void reactor.start();
 
-  const deps: UseCaseDeps = {
+  const dependencies: UseCaseDependencies = {
     store,
     clock,
     ids,
@@ -217,7 +220,7 @@ export async function createDownloaderRuntime(
     progress: progressModel,
     stalled: stalledModel,
   };
-  const facade = createDownloaderFacade(deps);
+  const facade = createDownloaderFacade(dependencies);
   const feed = new OutboundFeed(store, publishedEventMapping);
   const wakeups: SeamWakeups = {
     subscribe: (listener) => bus.subscribe(() => listener()),
@@ -237,7 +240,7 @@ export async function createDownloaderRuntime(
         feed: verdictFeed,
         checkpoints,
         deadLetters,
-        handler: verdictEventConsumer(deps),
+        handler: verdictEventConsumer(dependencies),
         policy: 'halt',
         logger,
         clock,
@@ -258,7 +261,7 @@ export async function createDownloaderRuntime(
       // spins an error loop and keeps the event loop alive.
       verdicts?.stop();
       reactor.stop();
-      db.close();
+      database.close();
       return Promise.resolve();
     },
   };

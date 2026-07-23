@@ -14,13 +14,13 @@ describe('parseUnit', () => {
   });
 
   it('rejects a non-finite value so a range can never be forged from NaN', () => {
-    expect(parseUnit(Number.NaN)._unsafeUnwrapErr()).toEqual({
+    expect(parseUnit(NaN)._unsafeUnwrapErr()).toEqual({
       kind: 'OutOfUnitRange',
-      value: Number.NaN,
+      value: NaN,
     });
-    expect(parseUnit(Number.POSITIVE_INFINITY)._unsafeUnwrapErr()).toEqual({
+    expect(parseUnit(Infinity)._unsafeUnwrapErr()).toEqual({
       kind: 'OutOfUnitRange',
-      value: Number.POSITIVE_INFINITY,
+      value: Infinity,
     });
   });
 });

@@ -15,12 +15,12 @@
     discNumber: '',
   });
 
-  interface Props {
+  interface Properties {
     /** Server-renderable initial rows (spike rule: initial UI state is prop-drivable). */
     initialRows?: Row[];
   }
 
-  let { initialRows = [emptyRow()] }: Props = $props();
+  let { initialRows = [emptyRow()] }: Properties = $props();
   // The prop is deliberately an initial value only.
   // svelte-ignore state_referenced_locally
   let rows = $state<Row[]>(initialRows);
@@ -42,18 +42,24 @@
     <label>Album <input name="album" required /></label>
     <label>Year <input name="year" inputmode="numeric" /></label>
 
-    {#each rows as row, i (i)}
+    {#each rows as row, index (index)}
       <fieldset data-testid="track-row">
-        <legend>Track {i + 1}</legend>
-        <label>File path <input name={`tracks.${i}.path`} bind:value={row.path} required /></label>
-        <label>Title <input name={`tracks.${i}.title`} bind:value={row.title} required /></label>
+        <legend>Track {index + 1}</legend>
         <label
-          >Artist (optional) <input name={`tracks.${i}.artist`} bind:value={row.artist} /></label
+          >File path <input name={`tracks.${index}.path`} bind:value={row.path} required /></label
+        >
+        <label>Title <input name={`tracks.${index}.title`} bind:value={row.title} required /></label
+        >
+        <label
+          >Artist (optional) <input
+            name={`tracks.${index}.artist`}
+            bind:value={row.artist}
+          /></label
         >
         <label>
           Track #
           <input
-            name={`tracks.${i}.trackNumber`}
+            name={`tracks.${index}.trackNumber`}
             inputmode="numeric"
             bind:value={row.trackNumber}
             required
@@ -61,10 +67,14 @@
         </label>
         <label>
           Disc # (optional)
-          <input name={`tracks.${i}.discNumber`} inputmode="numeric" bind:value={row.discNumber} />
+          <input
+            name={`tracks.${index}.discNumber`}
+            inputmode="numeric"
+            bind:value={row.discNumber}
+          />
         </label>
         {#if rows.length > 1}
-          <button type="button" data-testid="remove-track" onclick={() => removeRow(i)}>
+          <button type="button" data-testid="remove-track" onclick={() => removeRow(index)}>
             Remove track
           </button>
         {/if}

@@ -1,12 +1,12 @@
 <script lang="ts">
   import AcquisitionList from '$lib/components/AcquisitionList.svelte';
-  import type { LayoutProps } from './$types';
+  import type { LayoutProps as LayoutProperties } from './$types';
 
   // Master-detail: the list is the persistent master pane; the child route ([id] detail,
   // the new-request form, or the index placeholder) renders in the detail pane and owns the
   // page's single <h1>. The `.master-detail` grid (base.css) lays the two panes out
   // side-by-side, stacking when narrow.
-  let { data, children }: LayoutProps = $props();
+  let { data, children }: LayoutProperties = $props();
 </script>
 
 <div class="master-detail">

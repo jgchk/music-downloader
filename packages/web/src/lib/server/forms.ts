@@ -1,5 +1,4 @@
 import type { SubmitAcquisitionRequestDto } from '@music/downloader';
-import type { ResolveReviewRequestDto } from '@music/importer';
 
 /**
  * Form-data translation: flat HTML form fields into the facades' nested wire DTOs. Deliberately
@@ -12,13 +11,13 @@ function text(data: FormData, name: string): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
-function num(data: FormData, name: string): number | undefined {
+function number_(data: FormData, name: string): number | undefined {
   const value = text(data, name);
   return value === undefined ? undefined : Number(value);
 }
 
-function compact<T extends Record<string, unknown>>(obj: T): T | undefined {
-  const entries = Object.entries(obj).filter(([, v]) => v !== undefined);
+function compact<T extends Record<string, unknown>>(object: T): T | undefined {
+  const entries = Object.entries(object).filter(([, v]) => v !== undefined);
   return entries.length > 0 ? (Object.fromEntries(entries) as T) : undefined;
 }
 
@@ -48,24 +47,24 @@ export function submitAcquisitionForm(data: FormData): unknown {
   const dto: SubmitAcquisitionRequestDto = {
     request: request as SubmitAcquisitionRequestDto['request'],
     qualityPolicy: compact({ order, floor: text(data, 'qualityFloor') }) as never,
-    matchPolicy: compact({ threshold: num(data, 'matchThreshold') }),
+    matchPolicy: compact({ threshold: number_(data, 'matchThreshold') }),
     retryPolicy: compact({
-      maxSearchRounds: num(data, 'maxSearchRounds'),
-      maxTotalAttempts: num(data, 'maxTotalAttempts'),
-      timeBudgetMs: num(data, 'timeBudgetMs'),
+      maxSearchRounds: number_(data, 'maxSearchRounds'),
+      maxTotalAttempts: number_(data, 'maxTotalAttempts'),
+      timeBudgetMs: number_(data, 'timeBudgetMs'),
     }),
     downloadPolicy: compact({
-      stallTimeoutMs: num(data, 'stallTimeoutMs'),
-      maxQueueWaitMs: num(data, 'maxQueueWaitMs'),
+      stallTimeoutMs: number_(data, 'stallTimeoutMs'),
+      maxQueueWaitMs: number_(data, 'maxQueueWaitMs'),
     }),
   };
-  return JSON.parse(JSON.stringify(dto));
+  return structuredClone(dto);
 }
 
 /** Repopulation echo of the submit form: what the user typed, keyed by field name. */
 export function submitFormValues(data: FormData): Record<string, string> {
   const values: Record<string, string> = {};
-  for (const [key, value] of data.entries()) {
+  for (const [key, value] of data) {
     if (typeof value === 'string') values[key] = value;
   }
   return values;
@@ -75,26 +74,30 @@ export function submitFormValues(data: FormData): Record<string, string> {
 export function resolveReviewForm(data: FormData): unknown {
   const verb = text(data, 'verb');
   switch (verb) {
-    case 'apply-candidate':
+    case 'apply-candidate': {
       return compactResolution({
         verb,
         candidate: { dataSource: text(data, 'dataSource'), albumId: text(data, 'albumId') },
         duplicateAction: text(data, 'duplicateAction'),
       });
-    case 'supply-id':
+    }
+    case 'supply-id': {
       return compactResolution({ verb, mbReleaseId: text(data, 'mbReleaseId') });
-    case 'manual-tags':
+    }
+    case 'manual-tags': {
       return compactResolution({
         verb,
         tags: {
           albumArtist: text(data, 'albumArtist'),
           album: text(data, 'album'),
-          year: num(data, 'year'),
+          year: number_(data, 'year'),
           tracks: manualTracks(data),
         },
       });
-    case 'reject':
+    }
+    case 'reject': {
       return compactResolution({ verb, reason: text(data, 'reason') });
+    }
     case 'reject-and-retry-download': {
       const reasons = text(data, 'reasons')
         ?.split('\n')
@@ -103,25 +106,26 @@ export function resolveReviewForm(data: FormData): unknown {
       return compactResolution({ verb, reasons });
     }
     // The remaining verbs carry no payload; unknown verbs pass through for the facade to refuse.
-    default:
+    default: {
       return { verb };
+    }
   }
 }
 
 function manualTracks(data: FormData): unknown[] {
   const tracks: unknown[] = [];
-  for (let i = 0; ; i += 1) {
-    const path = text(data, `tracks.${i}.path`);
-    const title = text(data, `tracks.${i}.title`);
+  for (let index = 0; ; index += 1) {
+    const path = text(data, `tracks.${index}.path`);
+    const title = text(data, `tracks.${index}.title`);
     if (path === undefined && title === undefined) break;
     tracks.push(
       Object.fromEntries(
         Object.entries({
           path,
           title,
-          artist: text(data, `tracks.${i}.artist`),
-          trackNumber: num(data, `tracks.${i}.trackNumber`),
-          discNumber: num(data, `tracks.${i}.discNumber`),
+          artist: text(data, `tracks.${index}.artist`),
+          trackNumber: number_(data, `tracks.${index}.trackNumber`),
+          discNumber: number_(data, `tracks.${index}.discNumber`),
         }).filter(([, v]) => v !== undefined),
       ),
     );
@@ -130,5 +134,5 @@ function manualTracks(data: FormData): unknown[] {
 }
 
 function compactResolution(value: Record<string, unknown>): unknown {
-  return JSON.parse(JSON.stringify(value)) as ResolveReviewRequestDto;
+  return structuredClone(value);
 }

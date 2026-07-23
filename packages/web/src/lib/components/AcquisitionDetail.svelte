@@ -10,7 +10,7 @@
   import AcquisitionBadge from './AcquisitionBadge.svelte';
   import ProgressBar from './ProgressBar.svelte';
 
-  interface Props {
+  interface Properties {
     acquisition: AcquisitionStatusResponseDto;
     /**
      * The download-through-import history as one timeline, composed web-side and ordered by
@@ -33,10 +33,10 @@
     acquisition,
     timeline = [],
     importState = 'none',
-    progress = undefined,
+    progress,
     progressUnavailable = false,
-    error = undefined,
-  }: Props = $props();
+    error,
+  }: Properties = $props();
 </script>
 
 <h1>{targetDescription(acquisition)}</h1>
@@ -131,7 +131,7 @@
   <p data-testid="no-history">Nothing has happened yet.</p>
 {:else}
   <ol data-testid="history">
-    {#each timeline as item, i (i)}
+    {#each timeline as item, index (index)}
       <li data-module={item.module}>
         {#if item.module === 'downloader'}
           {#if item.entry.kind === 'selected'}

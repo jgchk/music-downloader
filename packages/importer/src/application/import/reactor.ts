@@ -55,7 +55,7 @@ export type EffectInterpreter = (
   effect: Effect,
 ) => ResultAsync<readonly StoredEvent[], CommandError>;
 
-export interface ReactorDeps {
+export interface ReactorDependencies {
   readonly store: EventStorePort;
   readonly checkpoints: CheckpointStore;
   readonly bus: EventBus;
@@ -68,17 +68,17 @@ export interface ReactorDeps {
   readonly logger: Logger;
   readonly interpret: EffectInterpreter;
   /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
-  readonly interval?: (fn: () => void, ms: number) => () => void;
+  readonly interval?: (function_: () => void, ms: number) => () => void;
   readonly pollIntervalMs?: number;
   /** How many times one event's effect may fail retryably before it is dead-lettered (D: budget). */
   readonly retryBudget?: number;
 }
 
-const DEFAULT_POLL_INTERVAL_MS = 5_000;
+const DEFAULT_POLL_INTERVAL_MS = 5000;
 const DEFAULT_RETRY_BUDGET = 5;
 
-const defaultInterval = (fn: () => void, ms: number): (() => void) => {
-  const handle = setInterval(fn, ms);
+const defaultInterval = (function_: () => void, ms: number): (() => void) => {
+  const handle = setInterval(function_, ms);
   return () => {
     clearInterval(handle);
   };
@@ -91,10 +91,10 @@ export class Reactor {
   private running = false;
   private pending = false;
 
-  constructor(private readonly deps: ReactorDeps) {}
+  constructor(private readonly dependencies: ReactorDependencies) {}
 
   private get retryBudget(): number {
-    return this.deps.retryBudget ?? DEFAULT_RETRY_BUDGET;
+    return this.dependencies.retryBudget ?? DEFAULT_RETRY_BUDGET;
   }
 
   /**
@@ -106,15 +106,15 @@ export class Reactor {
    * latency hint; the fallback poll is the delivery guarantee.
    */
   async start(): Promise<void> {
-    const checkpoint = await this.deps.checkpoints.load(REACTOR_CONSUMER);
+    const checkpoint = await this.dependencies.checkpoints.load(REACTOR_CONSUMER);
     this.lastProcessed = checkpoint.unwrapOr(0);
 
-    this.unsubscribe = this.deps.bus.subscribe(() => {
+    this.unsubscribe = this.dependencies.bus.subscribe(() => {
       void this.drain();
     });
-    this.stopInterval = (this.deps.interval ?? defaultInterval)(() => {
+    this.stopInterval = (this.dependencies.interval ?? defaultInterval)(() => {
       void this.drain();
-    }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
+    }, this.dependencies.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
 
     await this.drain();
   }
@@ -136,9 +136,9 @@ export class Reactor {
     try {
       do {
         this.pending = false;
-        const backlog = await this.deps.store.readAll(this.lastProcessed);
+        const backlog = await this.dependencies.store.readAll(this.lastProcessed);
         if (backlog.isErr()) {
-          this.deps.logger.error({ err: backlog.error }, 'reactor catch-up failed');
+          this.dependencies.logger.error({ err: backlog.error }, 'reactor catch-up failed');
           return;
         }
         for (const stored of backlog.value) {
@@ -158,9 +158,9 @@ export class Reactor {
   async process(stored: StoredEvent): Promise<void> {
     if (stored.globalSeq <= this.lastProcessed) return; // already handled (at-least-once dedupe)
 
-    const stream = await this.deps.store.readStream(stored.streamId);
+    const stream = await this.dependencies.store.readStream(stored.streamId);
     if (stream.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, err: stream.error },
         'reactor stream read failed',
       );
@@ -170,50 +170,50 @@ export class Reactor {
     // Read before dispatch: a dead-letter inside the dispatch marks the stream stalled, and that
     // fresh exposure must survive this very event — only a PREVIOUSLY stalled stream that now
     // drives successfully is resolved.
-    const wasStalled = this.deps.stalled.isStalled(stored.streamId);
+    const wasStalled = this.dependencies.stalled.isStalled(stored.streamId);
 
     // React against the state as of `stored` — the fold of the stream prefix up to and including it
     // — not the whole stream. This keeps `react` a deterministic function of the prefix: a
     // co-emitted or redelivered event sees its own post-state, never a later one.
     const prefix = stream.value.filter((entry) => entry.version <= stored.version);
     const aggregate = Import.fromHistory(prefix.map((entry) => entry.event));
-    let deadLettered = false;
+    let isDeadLettered = false;
     for (const effect of aggregate.reactTo(stored.event)) {
-      const result = await this.deps.interpret(stored.streamId, effect);
+      const result = await this.dependencies.interpret(stored.streamId, effect);
       if (result.isErr()) {
         if (isRetryable(result.error)) {
           if (!(await this.handleRetryable(stored, effect.type, result.error))) return; // held
-          deadLettered = true; // budget spent: dead-lettered — fall through to advance past it
+          isDeadLettered = true; // budget spent: dead-lettered — fall through to advance past it
           break;
         }
         // Stale/illegal outcome — the stream has already settled it. Record and advance past
         // it; retrying would only re-fire the same rejection forever.
-        this.deps.logger.warn(
+        this.dependencies.logger.warn(
           { importId: stored.streamId, effect: effect.type, err: result.error },
           'effect follow-on rejected as stale; advancing past it',
         );
         break;
       }
-      this.deps.logger.debug(
+      this.dependencies.logger.debug(
         { importId: stored.streamId, effect: effect.type },
         'effect dispatched',
       );
     }
 
-    const saved = await this.deps.checkpoints.save(REACTOR_CONSUMER, stored.globalSeq);
+    const saved = await this.dependencies.checkpoints.save(REACTOR_CONSUMER, stored.globalSeq);
     if (saved.isErr()) {
       // A failed durable checkpoint write must never be dropped: hold the position (do NOT advance
       // `lastProcessed`) so the event redelivers on the next wakeup/poll, mirroring the
       // subscription's `advance()`. At-least-once tolerates the re-dispatch; the domain's stale
       // guards converge the redelivery.
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, globalSeq: stored.globalSeq, err: saved.error },
         'checkpoint save failed; holding for redelivery',
       );
       return;
     }
     await this.clearPark(stored);
-    if (!deadLettered && wasStalled) await this.clearStalled(stored.streamId);
+    if (!isDeadLettered && wasStalled) await this.clearStalled(stored.streamId);
     this.lastProcessed = stored.globalSeq;
   }
 
@@ -230,9 +230,9 @@ export class Reactor {
     effectType: string,
     error: CommandError,
   ): Promise<boolean> {
-    const existing = await this.deps.parked.find(stored.globalSeq);
+    const existing = await this.dependencies.parked.find(stored.globalSeq);
     if (existing.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, effect: effectType, err: existing.error },
         'retry-budget lookup failed; holding checkpoint',
       );
@@ -247,40 +247,40 @@ export class Reactor {
         streamId: stored.streamId,
         attempt,
         // Preserve the first-failure instant across attempts.
-        parkedAt: existing.value?.parkedAt ?? this.deps.clock.now().toISOString(),
+        parkedAt: existing.value?.parkedAt ?? this.dependencies.clock.now().toISOString(),
         lastError: rendered,
       };
-      const written = await this.deps.parked.park(entry);
+      const written = await this.dependencies.parked.park(entry);
       if (written.isErr()) {
-        this.deps.logger.error(
+        this.dependencies.logger.error(
           { importId: stored.streamId, effect: effectType, err: written.error },
           'failed to record retry attempt; holding checkpoint',
         );
         return false;
       }
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, effect: effectType, attempt, err: error },
         'effect dispatch failed',
       );
       return false;
     }
 
-    const recorded = await this.deps.deadLetters.record({
+    const recorded = await this.dependencies.deadLetters.record({
       subscription: REACTOR_CONSUMER,
       globalSeq: stored.globalSeq,
       streamId: stored.streamId,
       error: rendered,
-      occurredAt: this.deps.clock.now().toISOString(),
+      occurredAt: this.dependencies.clock.now().toISOString(),
     });
     if (recorded.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, effect: effectType, err: recorded.error },
         'dead-letter record failed; holding checkpoint',
       );
       return false;
     }
-    this.deps.stalled.mark(stored.streamId);
-    this.deps.logger.error(
+    this.dependencies.stalled.mark(stored.streamId);
+    this.dependencies.logger.error(
       { importId: stored.streamId, effect: effectType, attempts: attempt, err: error },
       'effect dispatch exhausted retry budget; dead-lettered, import stalled, advancing past it',
     );
@@ -289,9 +289,9 @@ export class Reactor {
 
   /** Drop the resolved event's retry tally (idempotent); a lingering row is harmless but logged. */
   private async clearPark(stored: StoredEvent): Promise<void> {
-    const cleared = await this.deps.parked.clear(stored.globalSeq);
+    const cleared = await this.dependencies.parked.clear(stored.globalSeq);
     if (cleared.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: stored.streamId, globalSeq: stored.globalSeq, err: cleared.error },
         'failed to clear the resolved retry tally',
       );
@@ -305,15 +305,15 @@ export class Reactor {
    * successful event retries the clear.
    */
   private async clearStalled(streamId: string): Promise<void> {
-    const cleared = await this.deps.deadLetters.clearStream(REACTOR_CONSUMER, streamId);
+    const cleared = await this.dependencies.deadLetters.clearStream(REACTOR_CONSUMER, streamId);
     if (cleared.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { importId: streamId, err: cleared.error },
         'failed to clear resolved dead letters',
       );
       return;
     }
-    this.deps.stalled.clear(streamId);
-    this.deps.logger.info({ importId: streamId }, 'stalled import resumed');
+    this.dependencies.stalled.clear(streamId);
+    this.dependencies.logger.info({ importId: streamId }, 'stalled import resumed');
   }
 }

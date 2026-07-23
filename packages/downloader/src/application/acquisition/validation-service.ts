@@ -6,7 +6,7 @@ import {
   playabilityValidator,
   structuralIdentityValidator,
 } from '../../domain/validation/validators.js';
-import { combineVerdict, verdictPasses } from '../../domain/validation/verdict.js';
+import { combineVerdict, isVerdictPassing } from '../../domain/validation/verdict.js';
 import type { ValidationVerdict } from '../../domain/validation/verdict.js';
 import type { InfraError } from '../ports/errors.js';
 import type { AudioProbePort } from '../ports/outbound-ports.js';
@@ -31,6 +31,6 @@ export function runValidation(
       playabilityValidator(probes),
       structuralIdentityValidator(probes, target),
     ]);
-    return { passed: verdictPasses(verdict, matchPolicy), verdict };
+    return { passed: isVerdictPassing(verdict, matchPolicy), verdict };
   });
 }

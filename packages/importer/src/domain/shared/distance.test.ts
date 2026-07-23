@@ -17,13 +17,13 @@ describe('parseDistance', () => {
   });
 
   it('rejects a non-finite value so it can never silently misroute auto-apply', () => {
-    expect(parseDistance(Number.NaN)._unsafeUnwrapErr()).toEqual({
+    expect(parseDistance(NaN)._unsafeUnwrapErr()).toEqual({
       kind: 'InvalidDistance',
-      value: Number.NaN,
+      value: NaN,
     });
-    expect(parseDistance(Number.POSITIVE_INFINITY)._unsafeUnwrapErr()).toEqual({
+    expect(parseDistance(Infinity)._unsafeUnwrapErr()).toEqual({
       kind: 'InvalidDistance',
-      value: Number.POSITIVE_INFINITY,
+      value: Infinity,
     });
   });
 });

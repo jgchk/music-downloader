@@ -3,7 +3,7 @@ import type { Effect } from '../../domain/import/import.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { IntakePort, TaggerPort } from '../ports/outbound-ports.js';
 import { applyCommand } from './command-handler.js';
-import type { CommandDeps, CommandError } from './command-handler.js';
+import type { CommandDependencies, CommandError } from './command-handler.js';
 
 /**
  * The imperative shell: interpret one Effect by calling its port, translate the raw result into a
@@ -18,18 +18,18 @@ export interface EffectPorts {
   readonly intake: IntakePort;
 }
 
-export interface InterpreterDeps extends CommandDeps {
+export interface InterpreterDependencies extends CommandDependencies {
   readonly ports: EffectPorts;
 }
 
 export function interpretEffect(
-  deps: InterpreterDeps,
+  dependencies: InterpreterDependencies,
   importId: string,
   effect: Effect,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
-  const { ports } = deps;
+  const { ports } = dependencies;
   switch (effect.type) {
-    case 'Propose':
+    case 'Propose': {
       return ports.tagger
         .propose(effect.directory, {
           searchId: effect.searchId,
@@ -38,7 +38,7 @@ export function interpretEffect(
         })
         .andThen((outcome) =>
           applyCommand(
-            deps,
+            dependencies,
             importId,
             outcome.kind === 'proposal'
               ? {
@@ -50,29 +50,38 @@ export function interpretEffect(
               : { type: 'RecordDoomed', reason: outcome.reason },
           ),
         );
+    }
 
-    case 'Apply':
+    case 'Apply': {
       return ports.tagger.apply(effect.directory, effect.mode).andThen((outcome) => {
         switch (outcome.kind) {
-          case 'applied':
-            return applyCommand(deps, importId, {
+          case 'applied': {
+            return applyCommand(dependencies, importId, {
               type: 'RecordApplied',
               location: outcome.location,
               failures: outcome.failures,
             });
-          case 'skipped-duplicate':
-            return applyCommand(deps, importId, {
+          }
+          case 'skipped-duplicate': {
+            return applyCommand(dependencies, importId, {
               type: 'RecordApplySkippedDuplicate',
               incumbents: outcome.incumbents,
             });
-          case 'doomed':
-            return applyCommand(deps, importId, { type: 'RecordDoomed', reason: outcome.reason });
+          }
+          case 'doomed': {
+            return applyCommand(dependencies, importId, {
+              type: 'RecordDoomed',
+              reason: outcome.reason,
+            });
+          }
         }
       });
+    }
 
-    case 'DeleteIntake':
+    case 'DeleteIntake': {
       return ports.intake
         .deleteRelease(effect.directory)
-        .andThen(() => applyCommand(deps, importId, { type: 'RecordIntakeDeleted' }));
+        .andThen(() => applyCommand(dependencies, importId, { type: 'RecordIntakeDeleted' }));
+    }
   }
 }

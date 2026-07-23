@@ -24,6 +24,9 @@ const INTAKE = '/intake/Artist - Album';
 
 /** Round-trip a value through JSON and assert nothing was lost. */
 function roundTrip<T>(value: T): T {
+  // The JSON round-trip is the assertion: this proves the DTO survives wire serialization, which
+  // structuredClone (a structured, non-JSON clone) would not exercise.
+  // eslint-disable-next-line unicorn/prefer-structured-clone
   const tripped = JSON.parse(JSON.stringify(value)) as T;
   expect(tripped).toEqual(value);
   return tripped;

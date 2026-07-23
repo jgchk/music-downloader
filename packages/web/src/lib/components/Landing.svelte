@@ -1,9 +1,9 @@
 <script lang="ts">
-  interface Props {
+  interface Properties {
     counts: { acquisitions: number; pendingReviews: number };
   }
 
-  let { counts }: Props = $props();
+  let { counts }: Properties = $props();
 </script>
 
 <h1>Dashboard</h1>

@@ -126,41 +126,48 @@ function evolveResolved(state: AwaitingReviewState, resolution: Resolution): Imp
     candidates: state.candidates,
   });
   switch (resolution.kind) {
-    case 'apply-candidate':
+    case 'apply-candidate': {
       return applying({
         kind: 'candidate',
         ref: resolution.ref,
         duplicateAction: resolution.duplicateAction,
       });
-    case 'import-as-is':
+    }
+    case 'import-as-is': {
       return applying({ kind: 'as-is' });
-    case 'manual-tags':
+    }
+    case 'manual-tags': {
       return applying({ kind: 'manual-tags', tags: resolution.tags });
-    case 'supply-id':
+    }
+    case 'supply-id': {
       return {
         phase: 'proposing',
         ...requestedOf(state),
         pinnedId: resolution.mbReleaseId,
         candidates: state.candidates,
       };
-    case 'refresh-candidates':
+    }
+    case 'refresh-candidates': {
       return { phase: 'proposing', ...requestedOf(state), candidates: state.candidates };
+    }
     case 'reject':
-    case 'reject-and-retry-download':
+    case 'reject-and-retry-download': {
       // The review is settled; the intake deletion is still owed, so the phase holds until
       // `ImportRejected` records the outcome.
       return { ...state, settled: resolution };
+    }
     case 'accept':
-    case 'retry-enrichment':
+    case 'retry-enrichment': {
       // Never reached: `decide` refuses these outside an open remediation. Fold to a defensive
       // no-op rather than an illegal `settled`.
       return state;
+    }
   }
 }
 
 export function evolve(state: ImportState, event: ImportEvent): ImportState {
   switch (event.type) {
-    case 'ImportRequested':
+    case 'ImportRequested': {
       // A fresh cycle begins from nothing or from a settled terminal (the same directory can be
       // re-deposited and resubmitted after a rejection or a completed import).
       if (state.phase !== 'empty' && !isTerminal(state)) return state;
@@ -172,12 +179,14 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         source: event.source,
         candidates: [],
       };
-    case 'CandidatesProposed':
+    }
+    case 'CandidatesProposed': {
       // The phase advances via the co-emitted `AutoApplySelected`/`ReviewRequired`; the proposed
       // list is recorded here so the following states carry it.
       if (state.phase !== 'requested' && state.phase !== 'proposing') return state;
       return { ...state, candidates: event.candidates };
-    case 'AutoApplySelected':
+    }
+    case 'AutoApplySelected': {
       if (state.phase !== 'requested' && state.phase !== 'proposing') return state;
       return {
         phase: 'applying',
@@ -185,7 +194,8 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         mode: { kind: 'candidate', ref: event.ref },
         candidates: state.candidates,
       };
-    case 'ReviewRequired':
+    }
+    case 'ReviewRequired': {
       if (
         state.phase !== 'requested' &&
         state.phase !== 'proposing' &&
@@ -199,7 +209,8 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         cause: event.cause,
         candidates: state.candidates,
       };
-    case 'ReviewResolved':
+    }
+    case 'ReviewResolved': {
       if (state.phase === 'awaiting-review' && state.settled === undefined) {
         return evolveResolved(state, event.resolution);
       }
@@ -210,7 +221,8 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
           : { ...state, remediation: undefined };
       }
       return state;
-    case 'ImportApplied':
+    }
+    case 'ImportApplied': {
       if (state.phase === 'applying') {
         return {
           phase: 'applied',
@@ -224,10 +236,12 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         return { ...state, location: event.location, remediation: undefined };
       }
       return state;
-    case 'RemediationRequired':
+    }
+    case 'RemediationRequired': {
       if (state.phase !== 'applied') return state;
       return { ...state, remediation: { failures: event.failures, status: 'open' } };
-    case 'ImportRejected':
+    }
+    case 'ImportRejected': {
       if (state.phase === 'empty' || isTerminal(state)) return state;
       return {
         phase: 'rejected',
@@ -235,13 +249,17 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         reason: event.reason,
         filesDeleted: event.filesDeleted,
       };
-    case 'ReleaseVerdictRecorded':
+    }
+    case 'ReleaseVerdictRecorded': {
       // A record-only fact for the outbound publisher: it changes no import state.
       return state;
+    }
   }
 }
 
 /** Fold a whole history into state — the replay path and a convenient test builder. */
 export function foldEvents(events: readonly ImportEvent[]): ImportState {
-  return events.reduce(evolve, initialState);
+  let state: ImportState = initialState;
+  for (const event of events) state = evolve(state, event);
+  return state;
 }

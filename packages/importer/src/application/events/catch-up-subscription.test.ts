@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
-  CatchUpSubscriptionDeps,
+  CatchUpSubscriptionDependencies,
   ConsumeFailure,
   SeamEvent,
   SeamFeedBatch,
@@ -18,7 +18,7 @@ class FakeFeed {
   read(fromGlobalSeq: number, limit: number): Promise<Result<SeamFeedBatch, { kind: string }>> {
     if (this.failReads) return Promise.resolve(err({ kind: 'InfraError' }));
     const pending = this.events.filter((event) => event.globalSeq > fromGlobalSeq).slice(0, limit);
-    const scannedTo = pending.length > 0 ? pending[pending.length - 1]!.globalSeq : fromGlobalSeq;
+    const scannedTo = pending.length > 0 ? pending.at(-1)!.globalSeq : fromGlobalSeq;
     return Promise.resolve(ok({ events: pending, scannedTo }));
   }
 }
@@ -47,7 +47,9 @@ beforeEach(() => {
   intervals = [];
 });
 
-function subscription(overrides: Partial<CatchUpSubscriptionDeps> = {}): CatchUpSubscription {
+function subscription(
+  overrides: Partial<CatchUpSubscriptionDependencies> = {},
+): CatchUpSubscription {
   return new CatchUpSubscription({
     name: 'seam:test',
     feed,
@@ -65,7 +67,7 @@ function subscription(overrides: Partial<CatchUpSubscriptionDeps> = {}): CatchUp
     clock: { now: () => new Date('2026-07-21T12:00:00.000Z') },
     retry: { attempts: 3, baseDelayMs: 100 },
     batchSize: 2,
-    pollIntervalMs: 5_000,
+    pollIntervalMs: 5000,
     sleep: (ms) => {
       sleeps.push(ms);
       return Promise.resolve();
@@ -76,8 +78,8 @@ function subscription(overrides: Partial<CatchUpSubscriptionDeps> = {}): CatchUp
         return () => wakeListeners.splice(wakeListeners.indexOf(listener), 1);
       },
     },
-    interval: (fn, ms) => {
-      const entry = { fn, ms, stopped: false };
+    interval: (function_, ms) => {
+      const entry = { fn: function_, ms, stopped: false };
       intervals.push(entry);
       return () => {
         entry.stopped = true;
@@ -88,7 +90,8 @@ function subscription(overrides: Partial<CatchUpSubscriptionDeps> = {}): CatchUp
 }
 
 async function checkpointOf(name = 'seam:test'): Promise<number> {
-  return (await checkpoints.load(name))._unsafeUnwrap();
+  const loadResult = await checkpoints.load(name);
+  return loadResult._unsafeUnwrap();
 }
 
 describe('CatchUpSubscription', () => {
@@ -131,9 +134,9 @@ describe('CatchUpSubscription', () => {
     await sub.start();
     feed.events = [seamEvent(1)];
 
-    wakeListeners.forEach((listener) => {
+    for (const listener of wakeListeners) {
       listener();
-    });
+    }
 
     await vi.waitFor(() => {
       expect(handled).toEqual([1]);
@@ -306,10 +309,7 @@ describe('CatchUpSubscription', () => {
   it('advances the checkpoint past batches that contain no published events', async () => {
     const sub = subscription({
       feed: {
-        read: (from: number) =>
-          Promise.resolve(
-            from < 7 ? ok({ events: [], scannedTo: 7 }) : ok({ events: [], scannedTo: from }),
-          ),
+        read: (from: number) => Promise.resolve(ok({ events: [], scannedTo: Math.max(from, 7) })),
       },
     });
 

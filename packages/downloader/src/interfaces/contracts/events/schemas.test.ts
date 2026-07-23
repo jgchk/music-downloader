@@ -15,7 +15,7 @@ const data = {
     year: 2000,
     trackCount: 2,
   },
-  candidate: { username: 'peer', path: 'peer\\music\\kid-a', sizeBytes: 1000 },
+  candidate: { username: 'peer', path: String.raw`peer\music\kid-a`, sizeBytes: 1000 },
   location: '/library/Radiohead/Kid A (2000)',
   files: [{ name: '01.flac', path: '/library/Radiohead/Kid A (2000)/01.flac' }],
 };

@@ -35,12 +35,12 @@ export function combineVerdict(outcomes: readonly ValidatorOutcome[]): Validatio
   if (outcomes.length === 0) return { confidence: clampUnit(0), reasons: [] };
   const confidence = clampUnit(Math.min(...outcomes.map((outcome) => outcome.score)));
   const reasons = outcomes.flatMap((outcome) =>
-    outcome.reason !== undefined ? [outcome.reason] : [],
+    outcome.reason === undefined ? [] : [outcome.reason],
   );
   return { confidence, reasons };
 }
 
 /** A download is valid only when the verdict clears the acquisition's match threshold (D5). */
-export function verdictPasses(verdict: ValidationVerdict, policy: MatchPolicy): boolean {
+export function isVerdictPassing(verdict: ValidationVerdict, policy: MatchPolicy): boolean {
   return verdict.confidence >= policy.threshold;
 }

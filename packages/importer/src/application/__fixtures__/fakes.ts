@@ -111,7 +111,7 @@ export class FakeEventBus implements EventBus {
 
 /** A logger that discards output — for tests that exercise logging call sites without noise. */
 export function silentLogger(): Logger {
-  return createLogger({ level: 'silent', destination: { write: () => undefined } });
+  return createLogger({ level: 'silent', destination: { write: () => {} } });
 }
 
 export function fixedClock(iso = '2026-07-18T12:00:00.000Z'): Clock {

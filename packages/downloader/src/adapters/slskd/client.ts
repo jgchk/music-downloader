@@ -120,7 +120,7 @@ export class SlskdClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body !== undefined && { body: JSON.stringify(body) }),
     });
   }
 }

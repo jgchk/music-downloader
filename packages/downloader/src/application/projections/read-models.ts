@@ -75,22 +75,28 @@ export interface AcquisitionStatusView {
 /** The kind-specific payload for the events that surface as history — others yield nothing. */
 function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
   switch (event.type) {
-    case 'CandidateSelected':
+    case 'CandidateSelected': {
       return { kind: 'selected', candidate: event.candidate.identity };
-    case 'DownloadFailed':
+    }
+    case 'DownloadFailed': {
       return { kind: 'download-failed', candidate: event.candidate, reason: event.reason };
-    case 'ValidationFailed':
+    }
+    case 'ValidationFailed': {
       return {
         kind: 'validation-failed',
         candidate: event.candidate,
         reasons: event.verdict.reasons,
       };
-    case 'Imported':
+    }
+    case 'Imported': {
       return { kind: 'imported', candidate: event.candidate, location: event.location };
-    case 'FulfillmentRejected':
+    }
+    case 'FulfillmentRejected': {
       return { kind: 'fulfillment-rejected', candidate: event.candidate, reasons: event.reasons };
-    default:
+    }
+    default: {
       return undefined;
+    }
   }
 }
 
@@ -141,7 +147,7 @@ export class AcquisitionStatusProjection {
   }
 
   list(): readonly AcquisitionStatusView[] {
-    return [...this.streams.entries()].map(([id, stored]) => projectStatus(id, stored));
+    return [...this.streams].map(([id, stored]) => projectStatus(id, stored));
   }
 
   rebuild(stored: readonly StoredEvent[]): void {

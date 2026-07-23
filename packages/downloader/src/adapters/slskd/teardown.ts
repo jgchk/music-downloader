@@ -46,14 +46,14 @@ export class TransferTeardown {
     for (let round = 1; ; round++) {
       const unconfirmed: OwnedTransfer[] = [];
       for (const transfer of current) {
-        const terminal = isTransferComplete(transfer);
+        const isTerminal = isTransferComplete(transfer);
         try {
           await this.client.delIfPresent(
-            `${downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=${terminal}`,
+            `${downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=${isTerminal}`,
           );
-          if (!terminal) unconfirmed.push(transfer); // cancelled — must re-poll to confirm removal
-        } catch (err) {
-          this.logger.warn({ err, username }, 'failed to tear down a slskd transfer');
+          if (!isTerminal) unconfirmed.push(transfer); // cancelled — must re-poll to confirm removal
+        } catch (error) {
+          this.logger.warn({ err: error, username }, 'failed to tear down a slskd transfer');
           unconfirmed.push(transfer);
         }
       }

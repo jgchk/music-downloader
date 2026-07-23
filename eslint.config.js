@@ -1,6 +1,7 @@
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 import svelte from 'eslint-plugin-svelte';
+import unicorn from 'eslint-plugin-unicorn';
 import prettier from 'eslint-config-prettier';
 
 const modulePackages = ['downloader', 'importer'];
@@ -132,6 +133,62 @@ export default tseslint.config(
       '**/*.config.ts',
       '**/*.config.js',
     ],
+  },
+  unicorn.configs.recommended,
+  {
+    // `null` is a first-class value at this codebase's external boundaries, so unicorn/no-null is
+    // disabled: better-sqlite3 throws on an `undefined` bind (columns need `null`), the
+    // producer-owned event wire contracts model absence as `.nullable().default(null)`, the
+    // MusicBrainz reader treats `null` as an incident-hardened "unknown" wire value (schemas.ts),
+    // and SvelteKit's own shapes use `null` (`form: null`, `page.error: null`). The pure domain
+    // still prefers `undefined`, but scoping that distinction per-file earns less than it costs.
+    rules: {
+      'unicorn/no-null': 'off',
+      // zod schema composition reads fine a few calls deep (`z.array(z.object({ … }))`, which
+      // reaches 4 in context); the default of 3 is too strict for a schema-heavy codebase. Bumped
+      // to 4 so idiomatic zod passes while genuinely unreadable 5+ deep chains still flag.
+      'unicorn/max-nested-calls': ['error', { max: 4 }],
+      // This codebase orders class members by *cohesion*, not accessibility: related members sit
+      // together — the reactor keeps `dispatchEvent` beside the `process` that calls it, and the
+      // catch-up `drain`/`redrive` pair adjacent. Enforcing a strict accessibility order would
+      // scatter those groups across a 500-line class, so the rule is off — grouping is the convention.
+      'unicorn/consistent-class-member-order': 'off',
+    },
+  },
+  {
+    // Two shapes reassign an outer binding from inside a function by design, not by smell: the
+    // `let fixture; beforeEach(() => { fixture = … })` vitest setup idiom, and Svelte 5 runes,
+    // where assigning a `$state` variable from an effect or handler *is* the reactivity model.
+    // Everywhere else the rule stays on (a stray outer-scope assignment is worth a second look —
+    // the one production singleton was refactored to a holder object rather than exempted).
+    files: ['**/*.test.ts', '**/*.svelte'],
+    rules: {
+      'unicorn/no-top-level-assignment-in-function': 'off',
+    },
+  },
+  {
+    // Test suites keep their fixture-builder helpers (`const hit = (over) => ({ … })`) inside the
+    // `describe` block that uses them — locality next to the assertions they serve reads better than
+    // hoisting every closure-free helper to module scope. The rule stays on for production code,
+    // where a function that closes over nothing usually does belong at the outer scope.
+    files: ['**/*.test.ts'],
+    rules: {
+      'unicorn/consistent-function-scoping': 'off',
+    },
+  },
+  {
+    // Filenames are kebab-case by default, with two carve-outs for established conventions:
+    // vitest `__fixtures__` sentinel directories keep their `__name__` form, and…
+    rules: {
+      'unicorn/filename-case': ['error', { case: 'kebabCase', ignore: [/^__[a-z]+__$/u] }],
+    },
+  },
+  {
+    // …Svelte components (and their co-located tests) stay PascalCase, the SvelteKit convention.
+    files: ['packages/web/src/lib/components/**'],
+    rules: {
+      'unicorn/filename-case': ['error', { cases: { kebabCase: true, pascalCase: true } }],
+    },
   },
   {
     files: ['**/*.ts'],

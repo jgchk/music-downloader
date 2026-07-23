@@ -26,9 +26,12 @@ function importSectionFor(locals: App.Locals, acquisitionId: string): ImportSect
       'import status unavailable for an acquisition',
     );
     return { state: 'unavailable' };
-  } catch (err) {
+  } catch (error_) {
     // An unexpected throw from the importer read must degrade this section, never the page.
-    locals.logger.warn({ acquisitionId, err }, 'import status read threw for an acquisition');
+    locals.logger.warn(
+      { acquisitionId, err: error_ },
+      'import status read threw for an acquisition',
+    );
     return { state: 'unavailable' };
   }
 }

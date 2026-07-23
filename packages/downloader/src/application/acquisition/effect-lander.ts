@@ -7,7 +7,7 @@ import type { Clock } from '../ports/system-ports.js';
 import type { StalledReadModel } from '../projections/read-models.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandError } from './command-handler.js';
-import type { InterpreterDeps } from './interpreter.js';
+import type { InterpreterDependencies } from './interpreter.js';
 import { classifyCommandError, describeCommandError } from './failure-classification.js';
 
 /**
@@ -24,25 +24,29 @@ import { classifyCommandError, describeCommandError } from './failure-classifica
  */
 function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
   switch (effect.type) {
-    case 'ResolveMetadata':
+    case 'ResolveMetadata': {
       return { type: 'RecordMetadataFailed' };
-    case 'Download':
+    }
+    case 'Download': {
       // Hours without progress IS a stalled download; the rejection advances the candidate ladder.
       return { type: 'RecordDownloadFailed', reason: 'Stalled' };
-    case 'AbortDownload':
+    }
+    case 'AbortDownload': {
       // The abort's settlement: reject the pending candidate as the interpreter would have.
       return { type: 'RecordDownloadFailed', reason: 'Cancelled' };
+    }
     case 'Search':
     case 'Validate':
     case 'Import':
-    case 'Cleanup':
+    case 'Cleanup': {
       // No modeled failure to degrade to — dead-letter and expose the acquisition as stalled.
       return undefined;
+    }
   }
 }
 
-export interface EffectLanderDeps {
-  readonly interpreter: InterpreterDeps;
+export interface EffectLanderDependencies {
+  readonly interpreter: InterpreterDependencies;
   readonly deadLetters: DeadLetterStore;
   readonly stalled: StalledReadModel;
   readonly clock: Clock;
@@ -52,7 +56,7 @@ export interface EffectLanderDeps {
 }
 
 export class EffectLander {
-  constructor(private readonly deps: EffectLanderDeps) {}
+  constructor(private readonly dependencies: EffectLanderDependencies) {}
 
   /**
    * Land the failure (D2): degrade where modeled, dead-letter — and mark stalled — where not.
@@ -67,9 +71,9 @@ export class EffectLander {
   ): Promise<boolean> {
     const command = degradeCommand(effect);
     if (command !== undefined) {
-      const applied = await applyCommand(this.deps.interpreter, stored.streamId, command);
+      const applied = await applyCommand(this.dependencies.interpreter, stored.streamId, command);
       if (applied.isOk()) {
-        this.deps.logger.error(
+        this.dependencies.logger.error(
           { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
           'effect landed; degrading to modeled failure',
         );
@@ -77,21 +81,21 @@ export class EffectLander {
       }
       if (classifyCommandError(applied.error) === 'rejection') {
         // The domain rejected the degrade: the stream has already settled past it — landed.
-        this.deps.logger.warn(
+        this.dependencies.logger.warn(
           { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
           'degrade rejected as stale; stream already settled',
         );
         return true;
       }
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
         'degrade command failed; will land again',
       );
       return false;
     }
 
-    const recorded = await this.deps.deadLetters.record({
-      subscription: this.deps.subscription,
+    const recorded = await this.dependencies.deadLetters.record({
+      subscription: this.dependencies.subscription,
       globalSeq: stored.globalSeq,
       streamId: stored.streamId,
       error: JSON.stringify({
@@ -99,17 +103,17 @@ export class EffectLander {
         attempt,
         error: describeCommandError(error),
       }),
-      occurredAt: this.deps.clock.now().toISOString(),
+      occurredAt: this.dependencies.clock.now().toISOString(),
     });
     if (recorded.isErr()) {
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: recorded.error },
         'dead-letter write failed; will land again',
       );
       return false;
     }
-    this.deps.stalled.mark(stored.streamId);
-    this.deps.logger.error(
+    this.dependencies.stalled.mark(stored.streamId);
+    this.dependencies.logger.error(
       { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
       'effect landed; dead-lettered and acquisition stalled',
     );
@@ -118,16 +122,19 @@ export class EffectLander {
 
   /** Resolution clears retention (D2): the stream's letters and its stalled exposure go together. */
   async clearStalled(streamId: string): Promise<void> {
-    const cleared = await this.deps.deadLetters.clearStream(this.deps.subscription, streamId);
+    const cleared = await this.dependencies.deadLetters.clearStream(
+      this.dependencies.subscription,
+      streamId,
+    );
     if (cleared.isErr()) {
       // Stay marked stalled — the letters still exist; a later successful event retries the clear.
-      this.deps.logger.error(
+      this.dependencies.logger.error(
         { acquisitionId: streamId, err: cleared.error },
         'failed to clear resolved dead letters',
       );
       return;
     }
-    this.deps.stalled.clear(streamId);
-    this.deps.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
+    this.dependencies.stalled.clear(streamId);
+    this.dependencies.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
   }
 }

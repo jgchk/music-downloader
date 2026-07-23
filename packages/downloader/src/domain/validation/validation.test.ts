@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combineVerdict, verdictPasses } from './verdict.js';
+import { combineVerdict, isVerdictPassing } from './verdict.js';
 import type { ValidatorOutcome } from './verdict.js';
 import { playabilityValidator, structuralIdentityValidator } from './validators.js';
 import type { ProbedAudio } from './validators.js';
@@ -13,23 +13,23 @@ const target: Target = createTarget({
   artist: 'Massive Attack',
   title: 'Mezzanine',
   tracks: [
-    { position: 1, title: 'Angel', durationMs: 380000 },
-    { position: 2, title: 'Risingson', durationMs: 298000 },
+    { position: 1, title: 'Angel', durationMs: 380_000 },
+    { position: 2, title: 'Risingson', durationMs: 298_000 },
   ],
 })._unsafeUnwrap();
 
 function probe(overrides: Partial<ProbedAudio> = {}): ProbedAudio {
-  return { decodedCleanly: true, codec: 'flac', durationMs: 380000, ...overrides };
+  return { decodedCleanly: true, codec: 'flac', durationMs: 380_000, ...overrides };
 }
 
 describe('playabilityValidator', () => {
   it('passes when every file decodes cleanly, regardless of codec', () => {
-    const probes = [probe({ codec: 'mp3' }), probe({ codec: 'opus', durationMs: 298000 })];
+    const probes = [probe({ codec: 'mp3' }), probe({ codec: 'opus', durationMs: 298_000 })];
     expect(playabilityValidator(probes)).toEqual({ name: 'playability', score: 1 });
   });
 
   it('fails a truncated (undecodable) file', () => {
-    const probes = [probe(), probe({ decodedCleanly: false, durationMs: 298000 })];
+    const probes = [probe(), probe({ decodedCleanly: false, durationMs: 298_000 })];
     expect(playabilityValidator(probes).reason).toBe('Unplayable');
   });
 
@@ -40,7 +40,7 @@ describe('playabilityValidator', () => {
 
 describe('structuralIdentityValidator', () => {
   it('passes when track count and durations align', () => {
-    const probes = [probe({ durationMs: 380000 }), probe({ durationMs: 298000 })];
+    const probes = [probe({ durationMs: 380_000 }), probe({ durationMs: 298_000 })];
     expect(structuralIdentityValidator(probes, target)).toEqual({
       name: 'structuralIdentity',
       score: 1,
@@ -52,7 +52,7 @@ describe('structuralIdentityValidator', () => {
   });
 
   it('fails on a duration mismatch and reports the partial score', () => {
-    const probes = [probe({ durationMs: 380000 }), probe({ durationMs: 120000 })];
+    const probes = [probe({ durationMs: 380_000 }), probe({ durationMs: 120_000 })];
     const outcome = structuralIdentityValidator(probes, target);
     expect(outcome.reason).toBe('DurationMismatch');
     expect(outcome.score).toBe(0.5);
@@ -73,15 +73,15 @@ describe('combineVerdict', () => {
   });
 });
 
-describe('verdictPasses', () => {
+describe('isVerdictPassing', () => {
   it('passes a lenient policy and rejects a strict one for the same verdict', () => {
     // One track aligns, one is far off → structural score 0.5 → verdict confidence 0.5.
-    const probes = [probe({ durationMs: 380000 }), probe({ durationMs: 120000 })];
+    const probes = [probe({ durationMs: 380_000 }), probe({ durationMs: 120_000 })];
     const verdict = combineVerdict([
       playabilityValidator(probes),
       structuralIdentityValidator(probes, target),
     ]);
-    expect(verdictPasses(verdict, createMatchPolicy(0.5)._unsafeUnwrap())).toBe(true);
-    expect(verdictPasses(verdict, createMatchPolicy(0.95)._unsafeUnwrap())).toBe(false);
+    expect(isVerdictPassing(verdict, createMatchPolicy(0.5)._unsafeUnwrap())).toBe(true);
+    expect(isVerdictPassing(verdict, createMatchPolicy(0.95)._unsafeUnwrap())).toBe(false);
   });
 });
