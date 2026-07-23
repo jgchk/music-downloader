@@ -7,6 +7,7 @@ import {
   awaitingReviewWithCandidate,
   resolved,
 } from '../../../domain/import/__fixtures__/import-fixtures.js';
+import { toAcquisitionId } from '../../../domain/shared/acquisition-id.js';
 import { publishedEventMapping } from './mapping.js';
 
 const OCCURRED_AT = '2026-07-18T12:00:00.000Z';
@@ -81,7 +82,9 @@ describe('publishedEventMapping.render — release.verdict', () => {
   });
 
   it('refuses a payload that violates the outbound schema (it must never leave the process)', () => {
-    const error = renderLast(verdictHistory({ acquisitionId: '' }))._unsafeUnwrapErr();
+    const error = renderLast(
+      verdictHistory({ acquisitionId: toAcquisitionId('') }),
+    )._unsafeUnwrapErr();
     expect(error.kind).toBe('RenderError');
     expect(error.message).toContain('schema');
   });

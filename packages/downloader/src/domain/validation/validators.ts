@@ -1,4 +1,5 @@
 import { alignmentScore } from '../shared/duration.js';
+import { clampUnit } from '../shared/unit.js';
 import type { Target } from '../target/target.js';
 import type { ValidatorOutcome } from './verdict.js';
 
@@ -22,8 +23,8 @@ export interface ProbedAudio {
 export function playabilityValidator(probes: readonly ProbedAudio[]): ValidatorOutcome {
   const allPlayable = probes.length > 0 && probes.every((probe) => probe.decodedCleanly);
   return allPlayable
-    ? { name: 'playability', score: 1 }
-    : { name: 'playability', score: 0, reason: 'Unplayable' };
+    ? { name: 'playability', score: clampUnit(1) }
+    : { name: 'playability', score: clampUnit(0), reason: 'Unplayable' };
 }
 
 /** MVP validator 2 — structural identity: track count + decoded durations vs the target (D5 axis 2a). */
@@ -32,13 +33,15 @@ export function structuralIdentityValidator(
   target: Target,
 ): ValidatorOutcome {
   if (probes.length !== target.tracks.length) {
-    return { name: 'structuralIdentity', score: 0, reason: 'WrongTrackCount' };
+    return { name: 'structuralIdentity', score: clampUnit(0), reason: 'WrongTrackCount' };
   }
-  const score = alignmentScore(
-    target.tracks.map((track) => track.durationMs),
-    probes.map((probe) => probe.durationMs),
+  const score = clampUnit(
+    alignmentScore(
+      target.tracks.map((track) => track.durationMs),
+      probes.map((probe) => probe.durationMs),
+    ),
   );
   return score >= 1
-    ? { name: 'structuralIdentity', score: 1 }
+    ? { name: 'structuralIdentity', score: clampUnit(1) }
     : { name: 'structuralIdentity', score, reason: 'DurationMismatch' };
 }

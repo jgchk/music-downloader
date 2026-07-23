@@ -2,6 +2,8 @@ import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { branded } from '../shared/brand.js';
 import type { Brand } from '../shared/brand.js';
+import { parseUnit } from '../shared/unit.js';
+import type { Unit } from '../shared/unit.js';
 import type { QualityPolicy } from './quality-policy.js';
 
 /**
@@ -17,13 +19,14 @@ import type { QualityPolicy } from './quality-policy.js';
  * to obtain a `MatchPolicy` is through {@link createMatchPolicy}, which proves the invariant. The
  * brand is compile-time only and erases at runtime, so the value still round-trips as plain JSON.
  */
-export type MatchPolicy = Brand<{ readonly threshold: number }, 'MatchPolicy'>; // confidence in [0, 1]
+export type MatchPolicy = Brand<{ readonly threshold: Unit }, 'MatchPolicy'>; // confidence in [0, 1]
 
 export type MatchPolicyError = { readonly kind: 'ThresholdOutOfRange' };
 
 export function createMatchPolicy(threshold: number): Result<MatchPolicy, MatchPolicyError> {
-  if (!(threshold >= 0 && threshold <= 1)) return err({ kind: 'ThresholdOutOfRange' });
-  return ok(branded<MatchPolicy>({ threshold }));
+  return parseUnit(threshold)
+    .map((bounded) => branded<MatchPolicy>({ threshold: bounded }))
+    .mapErr(() => ({ kind: 'ThresholdOutOfRange' as const }));
 }
 
 export const DEFAULT_MATCH_POLICY: MatchPolicy = createMatchPolicy(0.7)._unsafeUnwrap();

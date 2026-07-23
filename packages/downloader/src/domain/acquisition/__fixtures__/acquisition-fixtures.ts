@@ -10,6 +10,7 @@ import { rankCandidates } from '../../ranking/ranking.js';
 import type { RankedCandidate } from '../../ranking/ranking.js';
 import { asCandidateIdentity } from '../../shared/__fixtures__/candidate-identity.js';
 import { asMbid } from '../../shared/__fixtures__/mbid.js';
+import { asUnit } from '../../shared/__fixtures__/unit.js';
 import { createTarget } from '../../target/target.js';
 import type { Target } from '../../target/target.js';
 import type {
@@ -161,7 +162,7 @@ export function importingHistory(
     {
       type: 'ValidationPassed',
       candidate: selected.identity,
-      verdict: { confidence: 1, reasons: [] },
+      verdict: { confidence: asUnit(1), reasons: [] },
     },
   ];
 }

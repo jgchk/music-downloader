@@ -6,6 +6,7 @@ import {
   candidate,
 } from '../domain/import/__fixtures__/import-fixtures.js';
 import type { ImportStatusView } from '../application/projections/read-models.js';
+import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
   pendingReviewToDto,
@@ -46,7 +47,10 @@ describe('resolutionToDomain', () => {
     const tags = {
       albumArtist: 'A',
       album: 'B',
-      tracks: [{ path: 'a.mp3', title: 'T', trackNumber: 1 }],
+      tracks: [
+        { path: 'a.mp3', title: 'T', trackNumber: 1, discNumber: 2 },
+        { path: 'b.mp3', title: 'U', trackNumber: 2 },
+      ],
     };
     expect(resolutionToDomain({ verb: 'manual-tags', tags })).toEqual({
       kind: 'manual-tags',
@@ -141,7 +145,7 @@ describe('reviewToDto', () => {
 
 describe('statusViewToDto / pendingReviewToDto', () => {
   const view: ImportStatusView = {
-    importId: 'imp-1',
+    importId: toImportId('imp-1'),
     acquisitionId: 'acq-1',
     directory: DIRECTORY,
     phase: 'rejected',
@@ -168,7 +172,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
 
   it('maps a status view carrying an open review', () => {
     const withReview: ImportStatusView = {
-      importId: 'imp-2',
+      importId: toImportId('imp-2'),
       directory: DIRECTORY,
       phase: 'awaiting-review',
       openReview: { cause: { kind: 'no-match' }, candidates: [] },
@@ -180,7 +184,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
   it('maps a pending review item', () => {
     expect(
       pendingReviewToDto({
-        importId: 'imp-1',
+        importId: toImportId('imp-1'),
         directory: DIRECTORY,
         review: { cause: { kind: 'no-match' }, candidates: [] },
       }),

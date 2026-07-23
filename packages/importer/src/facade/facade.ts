@@ -9,6 +9,7 @@ import {
   submitImport as submitImportUseCase,
 } from '../application/import/use-cases.js';
 import type { UseCaseDeps } from '../application/import/use-cases.js';
+import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
   pendingReviewToDto,
@@ -129,7 +130,8 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
       if (!parsed.success) return validationFailed(parsed.error);
       const result = await resolveReviewUseCase(
         deps,
-        parsed.data.id,
+        // Schema-proven non-empty above; lift the addressed id into its brand for the use-case.
+        toImportId(parsed.data.id),
         resolutionToDomain(parsed.data.resolution),
       );
       return result.match(
@@ -141,7 +143,7 @@ export function createImporterFacade(deps: UseCaseDeps): ImporterFacade {
     getImport(input) {
       const parsed = importIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const view = getImportUseCase(deps, parsed.data.id);
+      const view = getImportUseCase(deps, toImportId(parsed.data.id));
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },

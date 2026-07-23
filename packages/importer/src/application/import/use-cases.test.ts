@@ -8,6 +8,9 @@ import {
   remediationHistory,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
 import type { ImportEvent } from '../../domain/import/events.js';
+import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toImportId } from '../../domain/shared/import-id.js';
+import type { ImportId } from '../../domain/shared/import-id.js';
 import { ImportStatusProjection } from '../projections/read-models.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import type { UseCaseDeps } from './use-cases.js';
@@ -31,7 +34,10 @@ function deps(): UseCaseDeps & { store: FakeEventStore; status: ImportStatusProj
   };
 }
 
-async function seed(d: ReturnType<typeof deps>, history: readonly ImportEvent[]): Promise<string> {
+async function seed(
+  d: ReturnType<typeof deps>,
+  history: readonly ImportEvent[],
+): Promise<ImportId> {
   const importId = importIdFor(DIRECTORY);
   await d.store.append(importId, 0, history, { importId, occurredAt: 't' });
   d.status.rebuild(d.store.all());
@@ -75,14 +81,17 @@ describe('submitImport', () => {
 
   it('records the acquisition source so the linkage is queryable from the log', async () => {
     const d = deps();
-    await submitImport(d, { directory: DIRECTORY, source: { acquisitionId: 'acq-1' } });
+    await submitImport(d, {
+      directory: DIRECTORY,
+      source: { acquisitionId: toAcquisitionId('acq-1') },
+    });
     expect(d.store.all()[0]!.event).toMatchObject({
       type: 'ImportRequested',
       source: { acquisitionId: 'acq-1' },
     });
     d.status.rebuild(d.store.all());
-    expect(findAcquisitionImport(d, 'acq-1')).toBe(importIdFor(DIRECTORY));
-    expect(findAcquisitionImport(d, 'acq-2')).toBeUndefined();
+    expect(findAcquisitionImport(d, toAcquisitionId('acq-1'))).toBe(importIdFor(DIRECTORY));
+    expect(findAcquisitionImport(d, toAcquisitionId('acq-2'))).toBeUndefined();
   });
 });
 
@@ -97,7 +106,7 @@ describe('resolveReview', () => {
 
   it('surfaces the domain refusal for an unknown import', async () => {
     const d = deps();
-    const result = await resolveReview(d, 'imp-missing', { kind: 'import-as-is' });
+    const result = await resolveReview(d, toImportId('imp-missing'), { kind: 'import-as-is' });
     expect(result._unsafeUnwrapErr()).toEqual({ kind: 'UnknownImport' });
   });
 });
@@ -107,7 +116,7 @@ describe('queries', () => {
     const d = deps();
     const importId = await seed(d, awaitingMatchReview());
     expect(getImport(d, importId)?.phase).toBe('awaiting-review');
-    expect(getImport(d, 'imp-unknown')).toBeUndefined();
+    expect(getImport(d, toImportId('imp-unknown'))).toBeUndefined();
     expect(listImports(d).map((view) => view.importId)).toEqual([importId]);
   });
 

@@ -21,6 +21,7 @@ import {
   resolved,
 } from './__fixtures__/import-fixtures.js';
 import { asDistance } from '../shared/__fixtures__/distance.js';
+import { toAcquisitionId } from '../shared/acquisition-id.js';
 import type { ImportCommand } from './commands.js';
 import type { ImportEvent } from './events.js';
 import { Import } from './import.js';
@@ -49,7 +50,7 @@ describe('submission', () => {
 
   it('stamps the acquisition source onto an event-driven request', () => {
     const events = given([])
-      .execute({ ...SUBMIT, source: { acquisitionId: 'acq-1' } })
+      .execute({ ...SUBMIT, source: { acquisitionId: toAcquisitionId('acq-1') } })
       ._unsafeUnwrap();
     expect(events[0]).toMatchObject({
       type: 'ImportRequested',
@@ -351,7 +352,7 @@ describe('resolving a review', () => {
         ._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NoRetainedCandidate' });
     const legacy = [
-      requested({ source: { acquisitionId: 'acq-legacy' } }),
+      requested({ source: { acquisitionId: toAcquisitionId('acq-legacy') } }),
       proposed([candidate({ distance: asDistance(0.5) })]),
       MATCH_REVIEW,
     ];
@@ -643,7 +644,7 @@ describe('react — the reflex', () => {
     expect(agg.reactTo(proposed([]))).toEqual([]);
     expect(agg.reactTo(MATCH_REVIEW)).toEqual([]);
     expect(agg.reactTo(APPLIED)).toEqual([]);
-    expect(agg.reactTo({ type: 'RemediationRequired', failures: [] })).toEqual([]);
+    expect(agg.reactTo({ type: 'RemediationRequired', failures: [FAILURE] })).toEqual([]);
     expect(agg.reactTo(REJECTED)).toEqual([]);
   });
 });

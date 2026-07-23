@@ -9,6 +9,9 @@ import type {
   ResolutionKind,
   ReviewKind,
 } from '../../domain/import/events.js';
+import { toImportId } from '../../domain/shared/import-id.js';
+import type { ImportId } from '../../domain/shared/import-id.js';
+import type { AcquisitionId } from '../../domain/shared/acquisition-id.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 
 /**
@@ -36,7 +39,7 @@ type HistoryPayload =
   | { readonly kind: 'rejected'; readonly reason: string; readonly filesDeleted: boolean }
   | {
       readonly kind: 'release-verdict-recorded';
-      readonly acquisitionId: string;
+      readonly acquisitionId: AcquisitionId;
       readonly reasons: readonly string[];
     };
 
@@ -48,7 +51,7 @@ type HistoryPayload =
 export type StatusHistoryEntry = HistoryPayload & { readonly at: string };
 
 export interface ImportStatusView {
-  readonly importId: string;
+  readonly importId: ImportId;
   /** The originating acquisition, when this import arrived from one — the web-side correlation key. */
   readonly acquisitionId?: string;
   readonly directory?: string;
@@ -61,7 +64,7 @@ export interface ImportStatusView {
 
 /** One resolvable item of the pending-review queue, with its kind-specific carried context. */
 export interface PendingReviewView {
-  readonly importId: string;
+  readonly importId: ImportId;
   readonly directory: string;
   readonly review: OpenReview;
 }
@@ -103,7 +106,10 @@ function acquisitionIdOf(events: readonly ImportEvent[]): string | undefined {
   return requested?.type === 'ImportRequested' ? requested.source?.acquisitionId : undefined;
 }
 
-export function projectStatus(importId: string, stored: readonly StoredEvent[]): ImportStatusView {
+export function projectStatus(
+  importId: ImportId,
+  stored: readonly StoredEvent[],
+): ImportStatusView {
   const events = stored.map((entry) => entry.event);
   const snapshot = Import.fromHistory(events).snapshot;
   return {
@@ -122,15 +128,18 @@ export function projectStatus(importId: string, stored: readonly StoredEvent[]):
 }
 
 export class ImportStatusProjection {
-  private readonly streams = new Map<string, StoredEvent[]>();
-  private readonly acquisitions = new Map<string, string>();
+  private readonly streams = new Map<ImportId, StoredEvent[]>();
+  private readonly acquisitions = new Map<AcquisitionId, ImportId>();
 
   apply(stored: StoredEvent): void {
-    const list = this.streams.get(stored.streamId) ?? [];
+    // The event store speaks a generic streamId; the import read model reads it as the ImportId that
+    // wrote the stream — the single ACL between the two, lifted once here.
+    const importId = toImportId(stored.streamId);
+    const list = this.streams.get(importId) ?? [];
     list.push(stored);
-    this.streams.set(stored.streamId, list);
+    this.streams.set(importId, list);
     if (stored.event.type === 'ImportRequested' && stored.event.source !== undefined) {
-      this.acquisitions.set(stored.event.source.acquisitionId, stored.streamId);
+      this.acquisitions.set(stored.event.source.acquisitionId, importId);
     }
   }
 
@@ -138,11 +147,11 @@ export class ImportStatusProjection {
    * The import an acquisition already submitted, if any — the durable idempotency check for the
    * intake seam consumer. Rebuilt from the log, so redelivery converges across restarts.
    */
-  importIdForAcquisition(acquisitionId: string): string | undefined {
+  importIdForAcquisition(acquisitionId: AcquisitionId): ImportId | undefined {
     return this.acquisitions.get(acquisitionId);
   }
 
-  get(importId: string): ImportStatusView | undefined {
+  get(importId: ImportId): ImportStatusView | undefined {
     const stored = this.streams.get(importId);
     return stored === undefined ? undefined : projectStatus(importId, stored);
   }

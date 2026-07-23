@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
-import type { ApplyMode } from '../../domain/import/events.js';
+import type { ApplyMode, ManualTags } from '../../domain/import/events.js';
+import { toPositiveInt } from '../../domain/shared/positive-int.js';
 import { BeetsBridge, defaultBridgeScript } from './bridge-adapter.js';
 import type { BeetsBridgeConfig } from './bridge-adapter.js';
 import type { CommandResult, CommandRunner } from './runner.js';
@@ -221,10 +222,10 @@ describe('apply', () => {
 
   it('serializes a manual tag payload onto the command line', async () => {
     const runner = runnerReturning(APPLIED);
-    const tags = {
+    const tags: ManualTags = {
       albumArtist: 'Jake Tape',
       album: 'Handmade',
-      tracks: [{ path: 'a.mp3', title: 'First', trackNumber: 1 }],
+      tracks: [{ path: 'a.mp3', title: 'First', trackNumber: toPositiveInt(1) }],
     };
     await bridge(runner).apply('/intake/a', { kind: 'manual-tags', tags });
     expect(runner.calls[0]!.slice(-2)).toEqual(['--tags', JSON.stringify(tags)]);

@@ -11,6 +11,8 @@ import type {
   Resolution,
 } from '../events.js';
 import { asDistance } from '../../shared/__fixtures__/distance.js';
+import { toAcquisitionId } from '../../shared/acquisition-id.js';
+import { toPositiveInt } from '../../shared/positive-int.js';
 
 /** Deterministic builders for domain tests. */
 
@@ -25,7 +27,10 @@ export const DELIVERED_CANDIDATE: DeliveredCandidate = {
 };
 
 /** Provenance of a downloader-delivered import, retained candidate included. */
-export const SOURCE: ImportSource = { acquisitionId: 'acq-1', candidate: DELIVERED_CANDIDATE };
+export const SOURCE: ImportSource = {
+  acquisitionId: toAcquisitionId('acq-1'),
+  candidate: DELIVERED_CANDIDATE,
+};
 
 export function candidate(overrides: Partial<ProposedCandidate> = {}): ProposedCandidate {
   return {
@@ -51,7 +56,7 @@ export const MANUAL_TAGS: ManualTags = {
   albumArtist: 'Artist',
   album: 'Album',
   year: 2020,
-  tracks: [{ path: `${DIRECTORY}/01 Track.flac`, title: 'Track', trackNumber: 1 }],
+  tracks: [{ path: `${DIRECTORY}/01 Track.flac`, title: 'Track', trackNumber: toPositiveInt(1) }],
 };
 
 export function requested(

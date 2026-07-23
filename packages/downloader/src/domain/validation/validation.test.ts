@@ -6,6 +6,7 @@ import type { ProbedAudio } from './validators.js';
 import { createMatchPolicy } from '../policy/policies.js';
 import { createTarget } from '../target/target.js';
 import type { Target } from '../target/target.js';
+import { asUnit } from '../shared/__fixtures__/unit.js';
 
 const target: Target = createTarget({
   type: 'album',
@@ -61,8 +62,8 @@ describe('structuralIdentityValidator', () => {
 describe('combineVerdict', () => {
   it('takes the weakest link and unions the reasons', () => {
     const outcomes: ValidatorOutcome[] = [
-      { name: 'playability', score: 1 },
-      { name: 'structuralIdentity', score: 0.5, reason: 'DurationMismatch' },
+      { name: 'playability', score: asUnit(1) },
+      { name: 'structuralIdentity', score: asUnit(0.5), reason: 'DurationMismatch' },
     ];
     expect(combineVerdict(outcomes)).toEqual({ confidence: 0.5, reasons: ['DurationMismatch'] });
   });

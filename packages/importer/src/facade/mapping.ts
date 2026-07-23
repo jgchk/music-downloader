@@ -1,5 +1,12 @@
-import type { ImportHints, ProposedCandidate, Resolution } from '../domain/import/events.js';
+import type {
+  ImportHints,
+  ManualTags,
+  ProposedCandidate,
+  Resolution,
+} from '../domain/import/events.js';
 import type { OpenReview } from '../domain/import/import.js';
+import { assertNonEmpty } from '../domain/shared/non-empty-array.js';
+import { toPositiveInt } from '../domain/shared/positive-int.js';
 import type {
   ImportStatusView,
   PendingReviewView,
@@ -25,6 +32,26 @@ export function hintsToDomain(dto: SubmitImportRequestDto): ImportHints | undefi
   return { mbReleaseId: hints.mbReleaseId, artist: hints.artist, album: hints.album };
 }
 
+/** Lift a wire manual-tags payload into the domain shape: `.min(1)` tracks and `.int().positive()`
+ * ordinals are proven by the schema, so they are branded here rather than re-validated. */
+function manualTagsToDomain(
+  tags: Extract<ResolveReviewRequestDto, { verb: 'manual-tags' }>['tags'],
+): ManualTags {
+  const tracks = tags.tracks.map((track) => ({
+    path: track.path,
+    title: track.title,
+    artist: track.artist,
+    trackNumber: toPositiveInt(track.trackNumber),
+    discNumber: track.discNumber === undefined ? undefined : toPositiveInt(track.discNumber),
+  }));
+  return {
+    albumArtist: tags.albumArtist,
+    album: tags.album,
+    year: tags.year,
+    tracks: assertNonEmpty(tracks),
+  };
+}
+
 export function resolutionToDomain(dto: ResolveReviewRequestDto): Resolution {
   switch (dto.verb) {
     case 'apply-candidate':
@@ -38,7 +65,7 @@ export function resolutionToDomain(dto: ResolveReviewRequestDto): Resolution {
     case 'refresh-candidates':
       return { kind: 'refresh-candidates' };
     case 'manual-tags':
-      return { kind: 'manual-tags', tags: dto.tags };
+      return { kind: 'manual-tags', tags: manualTagsToDomain(dto.tags) };
     case 'import-as-is':
       return { kind: 'import-as-is' };
     case 'reject':

@@ -8,6 +8,7 @@ import {
 } from './read-models.js';
 import { FakeEventStore } from '../__fixtures__/fakes.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
+import { asUnit } from '../../domain/shared/__fixtures__/unit.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import {
@@ -37,12 +38,16 @@ const history: AcquisitionEvent[] = [
   {
     type: 'ValidationFailed',
     candidate: b.identity,
-    verdict: { confidence: 0, reasons: ['DurationMismatch'] },
+    verdict: { confidence: asUnit(0), reasons: ['DurationMismatch'] },
   },
   { type: 'CandidateRejected', candidate: b.identity },
   { type: 'CandidateSelected', candidate: c },
   { type: 'DownloadCompleted', candidate: c.identity, files: [] },
-  { type: 'ValidationPassed', candidate: c.identity, verdict: { confidence: 1, reasons: [] } },
+  {
+    type: 'ValidationPassed',
+    candidate: c.identity,
+    verdict: { confidence: asUnit(1), reasons: [] },
+  },
   { type: 'Imported', candidate: c.identity, location: '/lib/c' },
   { type: 'AcquisitionFulfilled', location: '/lib/c' },
 ];

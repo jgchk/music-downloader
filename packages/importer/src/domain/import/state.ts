@@ -9,6 +9,7 @@ import type {
   Resolution,
   ReviewCause,
 } from './events.js';
+import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
 
 /**
  * The folded state of one import (the sole aggregate), modelled as a discriminated union on
@@ -37,7 +38,7 @@ interface Requested {
 
 /** The remediation review riding on an applied import (D7). */
 export interface RemediationState {
-  readonly failures: readonly ApplyFailure[];
+  readonly failures: NonEmptyReadonlyArray<ApplyFailure>;
   readonly status: 'open' | 'retrying';
 }
 

@@ -18,6 +18,8 @@ import {
   resolved,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
 import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
+import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import { ImportStatusProjection, projectStatus } from './read-models.js';
@@ -46,7 +48,7 @@ describe('projectStatus', () => {
       AUTO_APPLIED,
       APPLIED,
     ];
-    const view = projectStatus('imp-1', storedAll('imp-1', history));
+    const view = projectStatus(toImportId('imp-1'), storedAll('imp-1', history));
     expect(view).toMatchObject({
       importId: 'imp-1',
       directory: DIRECTORY,
@@ -68,7 +70,7 @@ describe('projectStatus', () => {
 
   it('stamps each history entry with its event occurrence time', () => {
     const view = projectStatus(
-      'imp-1',
+      toImportId('imp-1'),
       storedAll('imp-1', appliedHistory(), 0, (index) => `2026-01-01T00:00:0${index}Z`),
     );
     expect(view.history.map((entry) => entry.at)).toEqual([
@@ -81,12 +83,12 @@ describe('projectStatus', () => {
 
   it('carries the originating acquisition id when the import came from one', () => {
     const withSource = projectStatus(
-      'imp-1',
+      toImportId('imp-1'),
       storedAll('imp-1', [requested({ source: SOURCE }), proposed([candidate()])]),
     );
     expect(withSource.acquisitionId).toBe('acq-1');
 
-    const manual = projectStatus('imp-2', storedAll('imp-2', appliedHistory()));
+    const manual = projectStatus(toImportId('imp-2'), storedAll('imp-2', appliedHistory()));
     expect(manual.acquisitionId).toBeUndefined();
   });
 
@@ -96,7 +98,7 @@ describe('projectStatus', () => {
       resolved({ kind: 'reject', reason: 'wrong rip' }),
       { type: 'ImportRejected', reason: 'wrong rip', filesDeleted: true } as const,
     ];
-    const view = projectStatus('imp-1', storedAll('imp-1', history));
+    const view = projectStatus(toImportId('imp-1'), storedAll('imp-1', history));
     expect(view.history).toContainEqual({
       kind: 'review-required',
       at: 't',
@@ -113,7 +115,7 @@ describe('projectStatus', () => {
   });
 
   it('records remediation entries', () => {
-    const view = projectStatus('imp-1', storedAll('imp-1', remediationHistory()));
+    const view = projectStatus(toImportId('imp-1'), storedAll('imp-1', remediationHistory()));
     expect(view.history).toContainEqual({
       kind: 'remediation-required',
       at: 't',
@@ -132,7 +134,7 @@ describe('projectStatus', () => {
         reasons: ['corrupt rip'],
       } as const,
     ];
-    const view = projectStatus('imp-1', storedAll('imp-1', history));
+    const view = projectStatus(toImportId('imp-1'), storedAll('imp-1', history));
     expect(view.history).toContainEqual({
       kind: 'review-resolved',
       at: 't',
@@ -150,22 +152,24 @@ describe('projectStatus', () => {
 describe('ImportStatusProjection', () => {
   it('indexes acquisition-sourced requests and forgets them on rebuild', () => {
     const projection = new ImportStatusProjection();
-    projection.apply(storedAll('imp-a', [requested({ source: { acquisitionId: 'acq-1' } })])[0]!);
+    projection.apply(
+      storedAll('imp-a', [requested({ source: { acquisitionId: toAcquisitionId('acq-1') } })])[0]!,
+    );
     projection.apply(storedAll('imp-b', [requested()], 10)[0]!);
 
-    expect(projection.importIdForAcquisition('acq-1')).toBe('imp-a');
-    expect(projection.importIdForAcquisition('acq-unknown')).toBeUndefined();
+    expect(projection.importIdForAcquisition(toAcquisitionId('acq-1'))).toBe('imp-a');
+    expect(projection.importIdForAcquisition(toAcquisitionId('acq-unknown'))).toBeUndefined();
 
     projection.rebuild(storedAll('imp-b', [requested()]));
-    expect(projection.importIdForAcquisition('acq-1')).toBeUndefined();
+    expect(projection.importIdForAcquisition(toAcquisitionId('acq-1'))).toBeUndefined();
   });
 
   it('follows applied events and serves get/list', () => {
     const projection = new ImportStatusProjection();
     for (const stored of storedAll('imp-1', awaitingMatchReview())) projection.apply(stored);
 
-    expect(projection.get('imp-1')?.phase).toBe('awaiting-review');
-    expect(projection.get('imp-2')).toBeUndefined();
+    expect(projection.get(toImportId('imp-1'))?.phase).toBe('awaiting-review');
+    expect(projection.get(toImportId('imp-2'))).toBeUndefined();
     expect(projection.list().map((view) => view.importId)).toEqual(['imp-1']);
   });
 
@@ -192,8 +196,8 @@ describe('ImportStatusProjection', () => {
 
     projection.rebuild(storedAll('imp-1', appliedHistory()));
 
-    expect(projection.get('imp-old')).toBeUndefined();
-    expect(projection.get('imp-1')?.phase).toBe('applied');
+    expect(projection.get(toImportId('imp-old'))).toBeUndefined();
+    expect(projection.get(toImportId('imp-1'))?.phase).toBe('applied');
   });
 
   it('never lists a review for a stream that only holds an unfitting event', () => {
