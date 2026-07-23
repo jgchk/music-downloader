@@ -59,7 +59,12 @@ function candidateToDto(candidate: ProposedCandidate) {
     album: candidate.album,
     distance: candidate.distance,
     penalties: [...candidate.penalties],
-    tracks: [...candidate.tracks],
+    // The domain shapes match the DTO shapes exactly; copy the arrays, preserving absent (legacy)
+    // fields as `undefined` so a pre-change review projects to today's score-only view.
+    tracks: candidate.tracks.map((track) => ({ ...track })),
+    extraItems: candidate.extraItems === undefined ? undefined : [...candidate.extraItems],
+    missingTracks: candidate.missingTracks === undefined ? undefined : [...candidate.missingTracks],
+    albumFields: candidate.albumFields === undefined ? undefined : { ...candidate.albumFields },
   };
 }
 
@@ -70,6 +75,7 @@ export function reviewToDto(review: OpenReview): ReviewDto {
       return {
         kind: 'match-review',
         hinted: cause.hinted,
+        hintedReleaseId: cause.hintedReleaseId,
         best: cause.best === undefined ? undefined : { ...cause.best },
         candidates: review.candidates.map(candidateToDto),
       };

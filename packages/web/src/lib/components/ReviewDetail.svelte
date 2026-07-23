@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PendingReviewDto } from '@music/importer';
-  import { contextSummary, kindLabel } from '$lib/reviews.js';
+  import { contextSummary, hintNote, kindLabel } from '$lib/reviews.js';
   import CandidateTable from './CandidateTable.svelte';
   import ManualTagsForm from './ManualTagsForm.svelte';
   import ResolveForms from './ResolveForms.svelte';
@@ -26,8 +26,9 @@
 {/if}
 
 {#if review.kind === 'match-review'}
-  {#if review.hinted}
-    <p data-testid="hinted">The submission hint contradicted these candidates.</p>
+  {@const note = hintNote(review)}
+  {#if note}
+    <p data-testid="hinted">Your hint: {note}.</p>
   {/if}
   <CandidateTable candidates={review.candidates} />
   <ResolveForms supplyId refresh importAsIs reject rejectAndRetry />

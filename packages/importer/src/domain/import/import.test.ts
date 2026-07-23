@@ -118,12 +118,14 @@ describe('recording a proposal', () => {
     });
   });
 
-  it('marks a hint-contradicted weak match as hinted (distance governs, D4)', () => {
+  it('marks a hint-contradicted weak match as hinted, carrying the hinted release id (D4)', () => {
     const weak = candidate({ distance: asDistance(0.6) });
     const events = given([requested({ hints: HINTS })])
       .execute(record([weak]))
       ._unsafeUnwrap();
-    expect(events[1]).toMatchObject({ cause: { kind: 'match-review', hinted: true } });
+    expect(events[1]).toMatchObject({
+      cause: { kind: 'match-review', hinted: true, hintedReleaseId: HINTS.mbReleaseId },
+    });
   });
 
   it('marks a pinned re-proposal as hinted via the supplied id', () => {
@@ -134,7 +136,9 @@ describe('recording a proposal', () => {
     const events = given(history)
       .execute(record([candidate({ distance: asDistance(0.6) })]))
       ._unsafeUnwrap();
-    expect(events[1]).toMatchObject({ cause: { kind: 'match-review', hinted: true } });
+    expect(events[1]).toMatchObject({
+      cause: { kind: 'match-review', hinted: true, hintedReleaseId: 'mb-2' },
+    });
   });
 
   it('marks the proposal hinted when the interpreter reports the pinned id', () => {
@@ -142,7 +146,7 @@ describe('recording a proposal', () => {
       .execute(record([candidate({ distance: asDistance(0.6) })], [], 'mb-9'))
       ._unsafeUnwrap();
     expect(events[0]).toMatchObject({ type: 'CandidatesProposed', pinnedId: 'mb-9' });
-    expect(events[1]).toMatchObject({ cause: { hinted: true } });
+    expect(events[1]).toMatchObject({ cause: { hinted: true, hintedReleaseId: 'mb-9' } });
   });
 
   it('routes no candidates to a no-match review, distinct from low confidence', () => {
@@ -661,6 +665,33 @@ describe('the snapshot projection', () => {
       cause: { kind: 'match-review', hinted: false, best: candidate().ref },
       candidates: [candidate({ distance: asDistance(0.5) })],
     });
+  });
+
+  it('carries a candidate’s field-level diff evidence through the fold', () => {
+    const enriched = candidate({
+      distance: asDistance(0.5),
+      tracks: [
+        {
+          path: `${DIRECTORY}/01 Track.flac`,
+          title: 'Track',
+          index: 1,
+          current: { title: 'Trakk', artist: 'Artist', track: 1, length: 200 },
+          distance: 0.2,
+        },
+      ],
+      extraItems: [{ path: `${DIRECTORY}/99 Extra.flac`, title: 'Extra', track: 9 }],
+      missingTracks: [{ title: 'Absent', index: 2 }],
+      albumFields: {
+        year: 2020,
+        media: 'CD',
+        label: 'Label',
+        catalognum: 'CAT1',
+        country: 'US',
+        albumDisambig: 'deluxe',
+      },
+    });
+    const snapshot = given([requested(), proposed([enriched]), MATCH_REVIEW]).snapshot;
+    expect(snapshot.openReview?.candidates).toEqual([enriched]);
   });
 
   it('hides the review once settled', () => {

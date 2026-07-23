@@ -1,5 +1,5 @@
 {
-  "name": "propose-with-incumbent",
+  "name": "propose-missing-track",
   "output": {
     "candidates": [
       {
@@ -15,10 +15,20 @@
         "album_id": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f",
         "artist": "The Beatles",
         "data_source": "MusicBrainz",
-        "distance": 0.0,
+        "distance": 0.09090909090909091,
         "extra_items": [],
-        "extra_tracks": [],
-        "penalties": [],
+        "extra_tracks": [
+          {
+            "index": 2,
+            "title": "P.S. I Love You"
+          }
+        ],
+        "penalties": [
+          {
+            "amount": 0.09090909090909091,
+            "name": "missing_tracks"
+          }
+        ],
         "tracks": [
           {
             "current": {
@@ -29,31 +39,13 @@
             },
             "distance": 0.0,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/love-me-do/01 Love Me Do.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/missing/01 Love Me Do.mp3",
             "title": "Love Me Do"
-          },
-          {
-            "current": {
-              "artist": "The Beatles",
-              "length": 123.06285714285714,
-              "title": "P.S. I Love You",
-              "track": 2
-            },
-            "distance": 0.0,
-            "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/love-me-do/02 P.S. I Love You.mp3",
-            "title": "P.S. I Love You"
           }
         ]
       }
     ],
-    "duplicates": [
-      {
-        "album": "Love Me Do",
-        "artist": "The Beatles",
-        "path": "/tmp/tmp.5AUSmTvULo/library/The Beatles/Love Me Do"
-      }
-    ],
+    "duplicates": [],
     "status": "proposal"
   },
   "provenance": {

@@ -28,7 +28,7 @@ CAPTURED_AT="$(date -u +%F)"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-mkdir -p "$WORK/beets" "$WORK/library" "$WORK/intake/love-me-do" "$WORK/intake/weak" "$WORK/intake/mystery" "$WORK/intake/empty"
+mkdir -p "$WORK/beets" "$WORK/library" "$WORK/intake/love-me-do" "$WORK/intake/weak" "$WORK/intake/mystery" "$WORK/intake/diff" "$WORK/intake/missing" "$WORK/intake/empty"
 cat > "$WORK/beets/config.yaml" <<EOF
 directory: $WORK/library
 library: $WORK/beets/library.db
@@ -52,6 +52,13 @@ gen "$WORK/intake/weak/02 P.S. I Love You.mp3" 123 "The Beatles" "Love Me Do" "P
 # No-match: an album MusicBrainz will never know.
 gen "$WORK/intake/mystery/01 Jam One.mp3" 61 "Unknown Homie xq77" "Basement Tape zz93" "Jam One" 1
 gen "$WORK/intake/mystery/02 Jam Two.mp3" 59 "Unknown Homie xq77" "Basement Tape zz93" "Jam Two" 2
+# Diff detail: the right release, but track 1 is mis-titled (a retag) and a third file matches no
+# track at all (an unmatched extra) — a candidate carrying a retag and an extra file.
+gen "$WORK/intake/diff/01 Luv Me Do.mp3"      143 "The Beatles" "Love Me Do" "Luv Me Do"      1
+gen "$WORK/intake/diff/02 P.S. I Love You.mp3" 123 "The Beatles" "Love Me Do" "P.S. I Love You" 2
+gen "$WORK/intake/diff/99 Bonus Beatz.mp3"    77  "The Beatles" "Love Me Do" "Bonus Beatz"     9
+# Missing track: only one file for the two-track release, so the second track is missing (no file).
+gen "$WORK/intake/missing/01 Love Me Do.mp3"  143 "The Beatles" "Love Me Do" "Love Me Do"      1
 
 mkdir -p "$FIXTURES"
 record() { # record <name> <verb> [bridge args...]
@@ -87,6 +94,8 @@ record validate-invalid-directory  validate --config "$BAD_CONF" validate
 record propose-pinned-strong  propose "${CONF[@]}" propose "$WORK/intake/love-me-do" --search-id "$MBID"
 record propose-weak-durations propose "${CONF[@]}" propose "$WORK/intake/weak" --search-id "$MBID"
 record propose-free-search-weak propose "${CONF[@]}" propose "$WORK/intake/mystery"
+record propose-diff-detail    propose "${CONF[@]}" propose "$WORK/intake/diff" --search-id "$MBID"
+record propose-missing-track  propose "${CONF[@]}" propose "$WORK/intake/missing" --search-id "$MBID"
 record propose-doomed-missing-directory propose "${CONF[@]}" propose "$WORK/never-existed"
 record propose-doomed-no-audio          propose "${CONF[@]}" propose "$WORK/intake/empty"
 

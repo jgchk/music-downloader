@@ -160,25 +160,69 @@ def identifier_of(info):
     return (source or "", str(album_id or ""))
 
 
+def serialize_track(item, track, distance):
+    """One mapped pair: the candidate's proposed tags, plus the file's current tags and the
+    per-track distance, so a review can show what the import would change, not only how much.
+    An unreadable file duration is omitted (absent), never recorded as a false `0.0` seconds."""
+    current = {
+        "title": item.title or "",
+        "artist": item.artist or "",
+        "track": item.track or 0,
+    }
+    if item.length:
+        current["length"] = float(item.length)
+    return {
+        "path": os.fsdecode(item.path),
+        "title": track.title or "",
+        "index": track.index or 0,
+        "current": current,
+        "distance": float(distance),
+    }
+
+
 def serialize_match(match):
     source, album_id = identifier_of(match.info)
+    info = match.info
+    # Index directly: beets populates a per-track distance for every mapped track, so a missing
+    # key (a beets refactor of `distance.tracks`) crashes into a loud InfraError rather than
+    # silently coercing to `0.0` — which would read as a flawless match on the change's headline data.
+    track_distances = match.distance.tracks
     return {
         "data_source": source,
         "album_id": album_id,
-        "artist": match.info.artist or "",
-        "album": match.info.album or "",
+        "artist": info.artist or "",
+        "album": info.album or "",
         "distance": float(match.distance),
         "penalties": [
             {"name": name, "amount": amount} for name, amount in match.distance.items()
         ],
         "tracks": [
-            {
-                "path": os.fsdecode(item.path),
-                "title": track.title or "",
-                "index": track.index or 0,
-            }
+            serialize_track(item, track, track_distances[track])
             for item, track in match.mapping.items()
         ],
+        # Files the candidate could not place (the `unmatched_tracks` penalty made concrete) and
+        # tracks the candidate expects that no file supplied (the `missing_tracks` penalty).
+        "extra_items": [
+            {
+                "path": os.fsdecode(item.path),
+                "title": item.title or "",
+                "track": item.track or 0,
+            }
+            for item in match.extra_items
+        ],
+        "extra_tracks": [
+            {"title": track.title or "", "index": track.index or 0}
+            for track in match.extra_tracks
+        ],
+        # Album-level fields for the album-field diff against the files' current tags.
+        "album_fields": {
+            "year": info.year or 0,
+            "media": info.media or "",
+            "label": info.label or "",
+            "catalognum": info.catalognum or "",
+            "country": info.country or "",
+            "albumdisambig": info.albumdisambig or "",
+        },
     }
 
 

@@ -73,6 +73,10 @@ describe('recorded bridge fixtures', () => {
 });
 
 describe('fixture semantics the domain relies on', () => {
+  // A strong proposal sits under, and a weak one over, the domain's auto-apply threshold — the
+  // boundary that decides review vs. auto-import (see the ImportPolicy default).
+  const AUTO_APPLY_MAX = 0.04;
+
   function output(name: string): Record<string, unknown> {
     const found = fixtures.find((fixture) => fixture.name === name);
     if (found === undefined) throw new Error(`missing fixture ${name}`);
@@ -86,7 +90,7 @@ describe('fixture semantics the domain relies on', () => {
     expect(proposal.candidates).toHaveLength(1);
     expect(proposal.candidates[0]!.data_source).toBe('MusicBrainz');
     expect(proposal.candidates[0]!.album_id).toMatch(/^[0-9a-f-]{36}$/u);
-    expect(proposal.candidates[0]!.distance).toBeLessThan(0.04);
+    expect(proposal.candidates[0]!.distance).toBeLessThan(AUTO_APPLY_MAX);
     expect(proposal.candidates[0]!.tracks).toHaveLength(2);
   });
 
@@ -94,8 +98,45 @@ describe('fixture semantics the domain relies on', () => {
     const proposal = output('propose-weak-durations') as {
       candidates: { distance: number; penalties: { name: string }[] }[];
     };
-    expect(proposal.candidates[0]!.distance).toBeGreaterThan(0.04);
+    expect(proposal.candidates[0]!.distance).toBeGreaterThan(AUTO_APPLY_MAX);
     expect(proposal.candidates[0]!.penalties.map((penalty) => penalty.name)).toContain('tracks');
+  });
+
+  it('a retag/extra rip carries the concrete field-level differences behind the distance', () => {
+    const proposal = output('propose-diff-detail') as {
+      candidates: {
+        tracks: {
+          title: string;
+          current?: { title: string; length: number };
+          distance?: number;
+        }[];
+        extra_items?: { path: string; title: string }[];
+        album_fields?: { year: number; media: string };
+      }[];
+    };
+    const best = proposal.candidates[0]!;
+    // A retagged track: the file's current title differs from the candidate's proposed title, and
+    // the per-track distance records that this mapped pair is not a clean match.
+    const retagged = best.tracks.find(
+      (track) => track.current !== undefined && track.current.title !== track.title,
+    );
+    expect(retagged).toBeDefined();
+    expect(retagged!.current!.length).toBeGreaterThan(0);
+    expect(retagged!.distance).toBeGreaterThan(0);
+    // A downloaded file that matched no candidate track (the `unmatched_tracks` penalty concretely).
+    expect(best.extra_items!.length).toBeGreaterThan(0);
+    // The candidate's album-level fields ride along for the album-field diff.
+    expect(best.album_fields!.year).toBeGreaterThan(0);
+    expect(best.album_fields!.media).not.toBe('');
+  });
+
+  it('a short rip surfaces the candidate tracks no file supplies (missing tracks)', () => {
+    const proposal = output('propose-missing-track') as {
+      candidates: { extra_tracks?: { title: string; index: number }[] }[];
+    };
+    // Only one file for the two-track release: the second track is missing (no file supplies it).
+    expect(proposal.candidates[0]!.extra_tracks!.length).toBeGreaterThan(0);
+    expect(proposal.candidates[0]!.extra_tracks![0]!.title).not.toBe('');
   });
 
   it('an incumbent surfaces as a duplicate on propose and blocks a plain apply', () => {

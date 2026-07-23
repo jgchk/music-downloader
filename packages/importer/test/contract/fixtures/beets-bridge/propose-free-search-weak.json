@@ -4,10 +4,29 @@
     "candidates": [
       {
         "album": "Basement Tape",
+        "album_fields": {
+          "albumdisambig": "",
+          "catalognum": "",
+          "country": "",
+          "label": "",
+          "media": "Cassette",
+          "year": 1994
+        },
         "album_id": "cb4b3610-b20a-4b6b-aee4-0af06f39176c",
         "artist": "Sloth",
         "data_source": "MusicBrainz",
         "distance": 0.670681423611111,
+        "extra_items": [],
+        "extra_tracks": [
+          {
+            "index": 3,
+            "title": "Kill"
+          },
+          {
+            "index": 4,
+            "title": "Run Down"
+          }
+        ],
         "penalties": [
           {
             "amount": 0.2517361111111111,
@@ -32,23 +51,60 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 61.074285714285715,
+              "title": "Jam One",
+              "track": 1
+            },
+            "distance": 0.7777777777777777,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
             "title": "They Know Me Very Well"
           },
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 59.06285714285714,
+              "title": "Jam Two",
+              "track": 2
+            },
+            "distance": 0.8333333333333334,
             "index": 2,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
             "title": "Drunk"
           }
         ]
       },
       {
         "album": "Gish Basement Tape",
+        "album_fields": {
+          "albumdisambig": "",
+          "catalognum": "[none]",
+          "country": "US",
+          "label": "",
+          "media": "Cassette",
+          "year": 1989
+        },
         "album_id": "74c8fedd-1d95-4ce3-b1a8-d4695101c7f9",
         "artist": "The Smashing Pumpkins",
         "data_source": "MusicBrainz",
         "distance": 0.6965319382002056,
+        "extra_items": [],
+        "extra_tracks": [
+          {
+            "index": 3,
+            "title": "Not Worth Asking"
+          },
+          {
+            "index": 4,
+            "title": "Rhinoceros"
+          },
+          {
+            "index": 5,
+            "title": "Day Dream"
+          }
+        ],
         "penalties": [
           {
             "amount": 0.20550806761429122,
@@ -73,23 +129,56 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 61.074285714285715,
+              "title": "Jam One",
+              "track": 1
+            },
+            "distance": 0.4166666666666667,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
             "title": "I Am One"
           },
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 59.06285714285714,
+              "title": "Jam Two",
+              "track": 2
+            },
+            "distance": 0.8333333333333334,
             "index": 2,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
             "title": "Bury Me"
           }
         ]
       },
       {
         "album": "The Lost Tape",
+        "album_fields": {
+          "albumdisambig": "",
+          "catalognum": "PKWST05",
+          "country": "XW",
+          "label": "Parkwest",
+          "media": "Digital Media",
+          "year": 2016
+        },
         "album_id": "e8c97ed7-b7da-4e6c-973f-8cc168a1f958",
         "artist": "[unknown]",
         "data_source": "MusicBrainz",
         "distance": 0.7370972126831501,
+        "extra_items": [],
+        "extra_tracks": [
+          {
+            "index": 3,
+            "title": "Cabin Blues"
+          },
+          {
+            "index": 4,
+            "title": "Night Walk"
+          }
+        ],
         "penalties": [
           {
             "amount": 0.24002690018315015,
@@ -114,23 +203,64 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 61.074285714285715,
+              "title": "Jam One",
+              "track": 1
+            },
+            "distance": 0.7564102564102564,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
             "title": "Channel Affair"
           },
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 59.06285714285714,
+              "title": "Jam Two",
+              "track": 2
+            },
+            "distance": 0.7797619047619048,
             "index": 2,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
             "title": "Channel Affair (The Love I Lost Mix)"
           }
         ]
       },
       {
         "album": "Basement Tape",
+        "album_fields": {
+          "albumdisambig": "",
+          "catalognum": "[none]",
+          "country": "XW",
+          "label": "",
+          "media": "Digital Media",
+          "year": 2018
+        },
         "album_id": "8011266b-bcac-4e59-acdd-f64fd947ec3d",
         "artist": "5 Girls",
         "data_source": "MusicBrainz",
         "distance": 0.769039465101109,
+        "extra_items": [],
+        "extra_tracks": [
+          {
+            "index": 3,
+            "title": "Heavy Metal Heartbeat"
+          },
+          {
+            "index": 4,
+            "title": "Hunker Down"
+          },
+          {
+            "index": 5,
+            "title": "Pigfarm"
+          },
+          {
+            "index": 6,
+            "title": "Habit"
+          }
+        ],
         "penalties": [
           {
             "amount": 0.24657534246575344,
@@ -155,23 +285,140 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 61.074285714285715,
+              "title": "Jam One",
+              "track": 1
+            },
+            "distance": 0.7619047619047619,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
             "title": "Beach Babe Bogan"
           },
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 59.06285714285714,
+              "title": "Jam Two",
+              "track": 2
+            },
+            "distance": 0.7708333333333334,
             "index": 2,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
             "title": "I\u2019m in Love"
           }
         ]
       },
       {
         "album": "The Basement Safety Tape",
+        "album_fields": {
+          "albumdisambig": "",
+          "catalognum": "",
+          "country": "XW",
+          "label": "",
+          "media": "CD",
+          "year": 2009
+        },
         "album_id": "436f7394-b9b6-4081-99cd-88c31d5c7225",
         "artist": "Bob Dylan & The Band",
         "data_source": "MusicBrainz",
         "distance": 0.8984593837535013,
+        "extra_items": [],
+        "extra_tracks": [
+          {
+            "index": 2,
+            "title": "Yeah! Heavy and a Bottle of Bread"
+          },
+          {
+            "index": 3,
+            "title": "I\u2019m Not There"
+          },
+          {
+            "index": 4,
+            "title": "Please Mrs. Henry"
+          },
+          {
+            "index": 5,
+            "title": "Crash on the Levee"
+          },
+          {
+            "index": 6,
+            "title": "Lo and Behold"
+          },
+          {
+            "index": 7,
+            "title": "This Wheel\u2019s on Fire"
+          },
+          {
+            "index": 8,
+            "title": "You Ain\u2019t Goin\u2019 Nowhere"
+          },
+          {
+            "index": 9,
+            "title": "I Shall Be Released"
+          },
+          {
+            "index": 10,
+            "title": "Too Much of Nothing"
+          },
+          {
+            "index": 11,
+            "title": "Nothing Was Delivered (short version)"
+          },
+          {
+            "index": 12,
+            "title": "Odds and Ends"
+          },
+          {
+            "index": 13,
+            "title": "Get Your Rocks Off"
+          },
+          {
+            "index": 14,
+            "title": "Clothesline Saga"
+          },
+          {
+            "index": 15,
+            "title": "Apple Suckling Tree"
+          },
+          {
+            "index": 16,
+            "title": "Apple Suckling Tree"
+          },
+          {
+            "index": 17,
+            "title": "Open the Door Homer"
+          },
+          {
+            "index": 19,
+            "title": "Open the Door Homer"
+          },
+          {
+            "index": 20,
+            "title": "Nothing Was Delivered"
+          },
+          {
+            "index": 21,
+            "title": "Nothing Was Delivered"
+          },
+          {
+            "index": 22,
+            "title": "Tears of Rage"
+          },
+          {
+            "index": 23,
+            "title": "Tears of Rage"
+          },
+          {
+            "index": 24,
+            "title": "Quinn the Eskimo"
+          },
+          {
+            "index": 25,
+            "title": "Quinn the Eskimo"
+          }
+        ],
         "penalties": [
           {
             "amount": 0.6529968454258674,
@@ -196,13 +443,27 @@
         ],
         "tracks": [
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 61.074285714285715,
+              "title": "Jam One",
+              "track": 1
+            },
+            "distance": 0.7745098039215685,
             "index": 1,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
             "title": "Million Dollar Bash"
           },
           {
+            "current": {
+              "artist": "Unknown Homie xq77",
+              "length": 59.06285714285714,
+              "title": "Jam Two",
+              "track": 2
+            },
+            "distance": 0.6041666666666666,
             "index": 18,
-            "path": "/tmp/tmp.KYCeUjo8Hp/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
             "title": "Open the Door Homer"
           }
         ]
@@ -213,7 +474,7 @@
   },
   "provenance": {
     "beets": "2.12.0",
-    "capturedAt": "2026-07-19",
+    "capturedAt": "2026-07-23",
     "recorder": "test/contract/record-bridge-fixtures.sh",
     "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
   },
