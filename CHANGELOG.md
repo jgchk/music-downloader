@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.12.0](https://github.com/jgchk/music-downloader/compare/v3.11.0...v3.12.0) (2026-07-23)
+
+### Features
+
+* surface decided lifecycle and authorization facts (bff-decided-lifecycle-flags) ([04d3bb9](https://github.com/jgchk/music-downloader/commit/04d3bb930dcb31f859eff3b89692cb3dc067603e))
 ## [3.11.0](https://github.com/jgchk/music-downloader/compare/v3.10.1...v3.11.0) (2026-07-23)
 
 ### Features
