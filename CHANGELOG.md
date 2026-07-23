@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.8.1](https://github.com/jgchk/music-downloader/compare/v3.8.0...v3.8.1) (2026-07-23)
+
+### Bug Fixes
+
+* **web:** compact acquisitions master list — stop the queue table overflowing the detail ([e355b0d](https://github.com/jgchk/music-downloader/commit/e355b0d63762018aafc787c69d3ad70e0401085d))
 ## [3.8.0](https://github.com/jgchk/music-downloader/compare/v3.7.0...v3.8.0) (2026-07-23)
 
 ### Features
