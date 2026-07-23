@@ -74,6 +74,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium (browser-mode client tests)
         run: pnpm --dir packages/web exec playwright install --with-deps chromium
@@ -83,6 +86,8 @@ jobs:
         run: pnpm run test:contract
       - name: Release-tooling tests
         run: pnpm run test:release
+      - name: Beets-bridge unit tests @ 100% coverage (Python)
+        run: pnpm run test:bridge
 
   # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
   # tier — browser parity phase included, so Playwright drives the same image that publishes — then,

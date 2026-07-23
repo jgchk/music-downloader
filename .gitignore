@@ -25,3 +25,9 @@ packages/web/build/
 packages/web/test-results/
 packages/web/playwright-report/
 /packages/web/.e2e-scratch/
+
+# Python (beets bridge tests)
+__pycache__/
+*.pyc
+.coverage
+packages/importer/test/bridge/.venv/
