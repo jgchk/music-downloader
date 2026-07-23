@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.5.4](https://github.com/jgchk/music-downloader/compare/v3.5.3...v3.5.4) (2026-07-23)
+
+### Bug Fixes
+
+* **web:** remove the dead 'Show reasons' disclosure from the acquisition badge ([513979c](https://github.com/jgchk/music-downloader/commit/513979c1bcebe7d0e2c0d14854827d98b4083965))
 ## [3.5.3](https://github.com/jgchk/music-downloader/compare/v3.5.2...v3.5.3) (2026-07-23)
 
 ### Bug Fixes
