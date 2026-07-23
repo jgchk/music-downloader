@@ -153,6 +153,51 @@ describe('createDownloaderRuntime', () => {
     });
   });
 
+  it('stops the connected verdict subscription on stop() so its poll loop cannot outlive the db', async () => {
+    vi.useFakeTimers();
+    try {
+      const runtime = await createDownloaderRuntime(
+        {
+          databaseFile: ':memory:',
+          libraryRoot: '/library',
+          stagingRoot: '/staging',
+          musicbrainz: {},
+          slskd: {},
+        },
+        silentLogger(),
+        { ports: fakePorts() },
+      );
+      let stopped = false;
+      const stopOnce = async () => {
+        if (!stopped) {
+          stopped = true;
+          await runtime.stop();
+        }
+      };
+      cleanups.push(stopOnce);
+
+      const reads: number[] = [];
+      const feed: SeamFeed = {
+        read: (from) => {
+          reads.push(from);
+          return Promise.resolve(ok({ events: [], scannedTo: from }));
+        },
+      };
+      const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => undefined });
+      await subscription.start();
+      const readsAtStop = reads.length;
+
+      await stopOnce(); // must stop the subscription's poll interval BEFORE closing the db
+      await vi.advanceTimersByTimeAsync(30_000); // several 5s poll intervals
+
+      // No further feed polls fired after stop: the interval was cleared, so nothing reads the
+      // feed (or saves checkpoints) against the now-closed handle.
+      expect(reads.length).toBe(readsAtStop);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('rebuilds projections from the stored backlog on a fresh boot over the same file', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'runtime-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));

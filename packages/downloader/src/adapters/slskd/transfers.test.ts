@@ -48,7 +48,6 @@ describe('aggregate', () => {
       { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 },
     ]);
 
-    expect(status.settled).toBe(true);
     expect(status.succeeded).toBe(true);
     expect(status.allQueued).toBe(false);
     expect(status.progress).toEqual({
@@ -59,11 +58,10 @@ describe('aggregate', () => {
     });
   });
 
-  it('treats an empty transfer set as unsettled with zero progress', () => {
+  it('treats an empty transfer set as neither succeeded nor queued, with zero progress', () => {
     const status = aggregate([]);
 
     expect(status).toMatchObject({
-      settled: false,
       succeeded: false,
       allQueued: false,
       failureReason: 'TransferError',
@@ -71,25 +69,23 @@ describe('aggregate', () => {
     });
   });
 
-  it('is settled-but-not-succeeded when a file fails, carrying the failure reason', () => {
+  it('reports not-succeeded when a file fails, carrying the failure reason', () => {
     const status = aggregate([
       { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 },
       { state: 'Completed, Rejected', size: 100, bytesTransferred: 0 },
     ]);
 
-    expect(status.settled).toBe(true);
     expect(status.succeeded).toBe(false);
     expect(status.hasFailure).toBe(true);
     expect(status.failureReason).toBe('FileUnavailable');
   });
 
-  it('flags a failure before the whole set settles, to doom a candidate early', () => {
+  it('flags a failure before the whole set terminates, to doom a candidate early', () => {
     const status = aggregate([
       { state: 'Completed, Errored', size: 100, bytesTransferred: 0 },
       { state: 'InProgress', size: 100, bytesTransferred: 40 },
     ]);
 
-    expect(status.settled).toBe(false);
     expect(status.hasFailure).toBe(true);
     expect(status.failureReason).toBe('TransferError');
   });
@@ -101,18 +97,17 @@ describe('aggregate', () => {
     ]);
 
     expect(status.allQueued).toBe(true);
-    expect(status.settled).toBe(false);
     expect(status.progress.queuePosition).toBe(5);
     expect(status.progress.percent).toBe(0);
   });
 
-  it('classifies in-progress and stateless transfers as neither settled nor queued', () => {
+  it('classifies in-progress and stateless transfers as not all-queued', () => {
     const status = aggregate([
       { state: 'InProgress', size: 200, bytesTransferred: 50 },
       { size: 0 },
     ]);
 
-    expect(status).toMatchObject({ settled: false, allQueued: false });
+    expect(status).toMatchObject({ allQueued: false });
     expect(status.progress.percent).toBe(25);
   });
 });

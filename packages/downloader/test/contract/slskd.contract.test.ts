@@ -5,7 +5,7 @@ import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
 import { baseName } from '../../src/adapters/slskd/mapping.js';
 import { slskdTransfersSchema } from '../../src/adapters/slskd/schemas.js';
-import { aggregate, flattenDownloads } from '../../src/adapters/slskd/transfers.js';
+import { flattenDownloads } from '../../src/adapters/slskd/transfers.js';
 import type { Candidate } from '../../src/domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../src/domain/policy/policies.js';
 import { createTarget } from '../../src/domain/target/target.js';
@@ -85,9 +85,6 @@ describe('slskd contract (tier 1)', () => {
     const body = pollFixture.response.body as { username: string };
     const payload = slskdTransfersSchema.parse(pollFixture.response.body);
     const transfer = flattenDownloads(payload)[0]!;
-    // The outcome the pure pipeline predicts from the real payload — the adapter, fed the same bytes
-    // over the wire, must reach the identical interpretation.
-    const expected = aggregate([transfer]);
 
     const candidate: Candidate = {
       identity: {
@@ -98,7 +95,8 @@ describe('slskd contract (tier 1)', () => {
       files: [{ name: baseName(transfer.filename!), sizeBytes: transfer.size ?? 0 }],
       source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 1 },
     };
-    // maxQueueWaitMs 0 makes a still-queued transfer abandon on the first poll instead of looping.
+    // maxQueueWaitMs 0 bounds the poll loop: were the recorded transfer ever not yet settled,
+    // the adapter abandons on the first poll rather than looping the test.
     const policy: DownloadPolicy = { stallTimeoutMs: 100_000, maxQueueWaitMs: 0 };
     const download = new SlskdDownload(
       silentLogger(),
@@ -118,16 +116,8 @@ describe('slskd contract (tier 1)', () => {
     expect(JSON.parse(enqueue.body)[0]).toMatchObject({ filename: transfer.filename });
     expect(server.requests.some((r) => r.method === 'GET' && r.path === downloadsPath)).toBe(true);
 
-    if (expected.settled && expected.succeeded) {
-      expect(result.kind).toBe('completed');
-    } else {
-      // A still-queued transfer is abandoned: the outcome fails and a cancel DELETE is issued.
-      expect(result.kind).toBe('failed');
-      expect(
-        server.requests.some(
-          (r) => r.method === 'DELETE' && r.path === `${downloadsPath}/${transfer.id}`,
-        ),
-      ).toBe(true);
-    }
+    // The recorded transfers-poll fixture is a Completed, Succeeded transfer, so the adapter —
+    // fed the identical bytes over the wire — must interpret it as a completed download.
+    expect(result.kind).toBe('completed');
   });
 });

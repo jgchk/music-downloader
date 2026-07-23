@@ -199,8 +199,8 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
     }
 
     case 'RecordDownloadCompleted':
-      if (state.phase === 'Cancelled' && state.pending !== undefined)
-        return ok(settleCancelled(state.pending, command.files));
+      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
+        return ok(settleCancelled(state.staging.pending, command.files));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok([
@@ -208,8 +208,8 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       ]);
 
     case 'RecordDownloadFailed':
-      if (state.phase === 'Cancelled' && state.pending !== undefined)
-        return ok(settleCancelled(state.pending, command.files ?? []));
+      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
+        return ok(settleCancelled(state.staging.pending, command.files ?? []));
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       return ok(

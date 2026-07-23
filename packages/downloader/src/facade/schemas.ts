@@ -156,10 +156,13 @@ export const editionCandidateSchema = z.object({
 export const acquisitionStatusResponseSchema = z.object({
   acquisitionId: z.string(),
   status: acquisitionStatusSchema,
+  // Present once metadata has resolved the request into an artist/title (absent while Pending).
   target: acquisitionTargetSchema.optional(),
+  // Present only while a candidate is in flight (Selecting through Importing); absent once terminal.
   currentCandidate: candidateIdentitySchema.optional(),
   attempts: z.number(),
   rejectedCount: z.number(),
+  // Present only once the release has been imported into the library (status Fulfilled/Conflicted).
   location: z.string().optional(),
   history: z.array(historyEntrySchema),
   // Present only while status is AwaitingManualSelection (additive).

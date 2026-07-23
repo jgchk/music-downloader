@@ -128,6 +128,20 @@ describe('the intake event consumer', () => {
     expect(wiring.store.all()).toHaveLength(0);
   });
 
+  it('a faulting directory probe is a distinct transient fault, not "missing"', async () => {
+    const wiring = testWiring();
+    const consume = consumer(wiring, {
+      directoryExists: () => Promise.reject(new Error('EACCES: permission denied')),
+    });
+
+    const outcome = await consume(fulfilledEvent());
+
+    // A probe that throws (EACCES/EIO/…) must not masquerade as IntakeDirectoryMissing — it is
+    // held under its own reason so a genuine infra fault is distinguishable in the logs.
+    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'IntakeProbeFailed' });
+    expect(wiring.store.all()).toHaveLength(0);
+  });
+
   it('an append fault is transient — redelivery heals it', async () => {
     const wiring = testWiring();
     wiring.store.failAppends = true;

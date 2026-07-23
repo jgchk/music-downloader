@@ -157,6 +157,16 @@ describe('LibraryViewProjection', () => {
       { acquisitionId: 'acq-1', artist: 'Radiohead', title: 'Kid A', location: '/lib/c' },
     ]);
   });
+
+  it('skips an import with no resolved target rather than crashing (fail-safe guard)', () => {
+    const projection = new LibraryViewProjection();
+    // An Imported event whose stream never recorded a TargetResolved — an ordering invariant that
+    // holds in practice; the projection degrades to skipping the entry instead of throwing.
+    for (const entry of stored([{ type: 'Imported', candidate: c.identity, location: '/lib/c' }])) {
+      projection.apply(entry);
+    }
+    expect(projection.list()).toEqual([]);
+  });
 });
 
 describe('StalledReadModel', () => {

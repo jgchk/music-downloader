@@ -196,6 +196,19 @@ describe('recording an apply outcome', () => {
     expect(events).toEqual([{ type: 'ImportApplied', location: '/library/A' }]);
   });
 
+  it('re-opens remediation when a human-requested enrichment retry fails enrichment again', () => {
+    // remediation was open, the human asked for retry-enrichment (status → retrying), and the
+    // re-apply still reports failures: re-record the apply and re-open the remediation review.
+    const history = [...remediationHistory(), resolved({ kind: 'retry-enrichment' })];
+    const events = given(history)
+      .execute({ type: 'RecordApplied', location: '/library/A', failures: [FAILURE] })
+      ._unsafeUnwrap();
+    expect(events).toEqual([
+      { type: 'ImportApplied', location: '/library/A' },
+      { type: 'RemediationRequired', failures: [FAILURE] },
+    ]);
+  });
+
   it('drops a stale apply outcome', () => {
     expect(
       given([requested()])
@@ -225,6 +238,22 @@ describe('recording an apply outcome', () => {
         .execute({ type: 'RecordApplySkippedDuplicate', incumbents: [] })
         ._unsafeUnwrap(),
     ).toEqual([]);
+  });
+
+  it('dooms an apply-time duplicate skip that names no incumbent (nothing to review)', () => {
+    // A skipped-duplicate with an empty incumbents list is contradictory: it must not become an
+    // empty, meaningless duplicate review, and must not strand the import in `applying`.
+    const history = [requested(), proposed([candidate()]), AUTO_APPLIED];
+    const events = given(history)
+      .execute({ type: 'RecordApplySkippedDuplicate', incumbents: [] })
+      ._unsafeUnwrap();
+    expect(events).toEqual([
+      {
+        type: 'ImportRejected',
+        reason: 'beets skipped the apply as a duplicate but reported no incumbent',
+        filesDeleted: false,
+      },
+    ]);
   });
 });
 

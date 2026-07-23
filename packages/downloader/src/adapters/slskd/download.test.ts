@@ -503,7 +503,7 @@ describe('SlskdDownload', () => {
   it('fails the candidate when a live slskd rejects the enqueue for an unreachable peer', async () => {
     const { adapter, ledger } = downloader({
       enqueue: {
-        status: 500,
+        status: 400,
         body: 'Failed to establish a direct or indirect message connection to user',
       },
       polls: [],
@@ -511,19 +511,50 @@ describe('SlskdDownload', () => {
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
-    // slskd answered, so the infrastructure is up: the candidate failed, and the retry ladder
-    // advances to the next peer instead of retrying this one forever (prod 2026-07-22).
+    // slskd answered with a 4xx, so the infrastructure is up: the candidate failed, and the retry
+    // ladder advances to the next peer instead of retrying this one forever (prod 2026-07-22).
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'PeerUnavailable' });
     // the write-ahead rows are released: nothing was created at the source
     expect(ledger.removed).toHaveLength(candidate.files.length);
   });
 
   it('fails the candidate as a generic transfer error for other enqueue rejections', async () => {
-    const { adapter } = downloader({ enqueue: { status: 500, body: 'boom' }, polls: [] });
+    const { adapter } = downloader({ enqueue: { status: 400, body: 'boom' }, polls: [] });
 
     const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
 
     expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
+  });
+
+  it('surfaces a 5xx enqueue response as a retryable InfraError, not a candidate defeat', async () => {
+    // A 503 is slskd itself faulting/overloaded — transient infrastructure. Marking it a candidate
+    // failure would manufacture AcquisitionExhausted from a passing slskd hiccup; the reactor must
+    // hold and retry instead.
+    const { adapter } = downloader({
+      enqueue: { status: 503, body: 'Service Unavailable' },
+      polls: [],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.download',
+    });
+  });
+
+  it('surfaces a 429 enqueue response as a retryable InfraError', async () => {
+    const { adapter } = downloader({
+      enqueue: { status: 429, body: 'Too Many Requests' },
+      polls: [],
+    });
+
+    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => undefined);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'slskd.download',
+    });
   });
 
   it('surfaces a transport fault during enqueue as an InfraError (slskd itself unreachable)', async () => {

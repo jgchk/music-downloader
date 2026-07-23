@@ -128,6 +128,24 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).not.toContain('data-testid="edition-candidates"');
   });
 
+  it('says progress is momentarily unavailable when downloading but the progress read failed', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: { acquisition: working, progressUnavailable: true },
+    });
+    expect(body).not.toContain('data-testid="progress"');
+    expect(body).toContain('data-testid="progress-unavailable"');
+  });
+
+  it('renders an unknown history kind through a generic fallback instead of mislabeling it', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        acquisition: { ...working, history: [{ kind: 'teleported' } as never] },
+      },
+    });
+    expect(body).toContain('Something happened in this acquisition');
+    expect(body).not.toContain('Rejected after delivery');
+  });
+
   it('renders an action failure and an empty history', () => {
     const { body } = render(AcquisitionDetail, {
       props: {

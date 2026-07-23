@@ -128,10 +128,22 @@ export interface ConflictedState extends Progress {
 export interface ExhaustedState extends Progress {
   readonly phase: 'Exhausted';
 }
+/**
+ * What a cancellation retained of the acquisition's transfer — at most one candidate, and the two
+ * cases demand opposite handling, so they are a sub-union rather than two independent optionals
+ * (both-present is unrepresentable, not merely never-constructed):
+ * - `settled` — cancelled after the transfer settled (Validating/Importing): staged files to clean up.
+ * - `in-flight` — cancelled mid-download: abort the transfer first, then clean up once it settles.
+ * - `none` — nothing was in flight (or an in-flight transfer has since settled and been cleared).
+ */
+export type CancelledStaging =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'settled'; readonly current: Candidate }
+  | { readonly kind: 'in-flight'; readonly pending: Candidate };
+
 export interface CancelledState extends Progress {
   readonly phase: 'Cancelled';
-  readonly current?: Candidate; // present only when cancelled after the transfer settled (D: Validating/Importing)
-  readonly pending?: Candidate; // present only when cancelled mid-download: abort the transfer, then clean up on settle
+  readonly staging: CancelledStaging;
 }
 
 export type AcquisitionState =
@@ -237,7 +249,9 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       // A cancelled acquisition whose mid-download candidate has now settled: drop `pending` so the
       // deferred cleanup fires once (via `react`) and any later settlement report is a no-op.
       if (state.phase === 'Cancelled') {
-        return state.pending === undefined ? state : { phase: 'Cancelled', ...progressOf(state) };
+        return state.staging.kind === 'in-flight'
+          ? { phase: 'Cancelled', staging: { kind: 'none' }, ...progressOf(state) }
+          : state;
       }
       if (state.phase !== 'Downloading' && state.phase !== 'Validating') return state;
       return {
@@ -326,12 +340,20 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       // cleanup. An in-flight Downloading transfer is still being written — retain it as `pending`
       // so the transfer is first aborted, then cleaned up once it settles (never both at once).
       if (state.phase === 'Validating' || state.phase === 'Importing') {
-        return { phase: 'Cancelled', current: state.current, ...progressOf(state) };
+        return {
+          phase: 'Cancelled',
+          staging: { kind: 'settled', current: state.current },
+          ...progressOf(state),
+        };
       }
       if (state.phase === 'Downloading') {
-        return { phase: 'Cancelled', pending: state.current, ...progressOf(state) };
+        return {
+          phase: 'Cancelled',
+          staging: { kind: 'in-flight', pending: state.current },
+          ...progressOf(state),
+        };
       }
-      return { phase: 'Cancelled', ...progressOf(state) };
+      return { phase: 'Cancelled', staging: { kind: 'none' }, ...progressOf(state) };
   }
 }
 

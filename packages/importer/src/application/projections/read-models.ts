@@ -112,7 +112,7 @@ export class ImportStatusProjection {
 
   /**
    * The import an acquisition already submitted, if any — the durable idempotency check for the
-   * webhook receiver. Rebuilt from the log, so redelivery converges across restarts.
+   * intake seam consumer. Rebuilt from the log, so redelivery converges across restarts.
    */
   importIdForAcquisition(acquisitionId: string): string | undefined {
     return this.acquisitions.get(acquisitionId);

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { DownloaderFacade } from '@music/downloader';
 import { actions, load } from './+page.server.js';
@@ -11,10 +11,12 @@ const base = {
   history: [],
 };
 
+const logger = { warn: vi.fn(), error: vi.fn() };
+
 function eventFor(facade: Record<string, unknown>) {
   return {
     params: { id: 'acq-1' },
-    locals: { facades: { downloader: facade as unknown as DownloaderFacade } },
+    locals: { facades: { downloader: facade as unknown as DownloaderFacade }, logger },
   } as never;
 }
 
@@ -29,12 +31,21 @@ function selectEventFor(facade: Record<string, unknown>, releaseMbid: string) {
 }
 
 describe('acquisition detail load', () => {
+  beforeEach(() => {
+    logger.warn.mockClear();
+    logger.error.mockClear();
+  });
+
   it('returns the status without progress while not downloading', () => {
     const facade = {
       getAcquisition: () => ({ ok: true, value: base }),
       getAcquisitionProgress: vi.fn(),
     };
-    expect(load(eventFor(facade))).toEqual({ acquisition: base, progress: undefined });
+    expect(load(eventFor(facade))).toEqual({
+      acquisition: base,
+      progress: undefined,
+      progressUnavailable: false,
+    });
     expect(facade.getAcquisitionProgress).not.toHaveBeenCalled();
   });
 
@@ -45,16 +56,32 @@ describe('acquisition detail load', () => {
       getAcquisition: () => ({ ok: true, value: downloading }),
       getAcquisitionProgress: () => ({ ok: true, value: progress }),
     };
-    expect(load(eventFor(facade))).toEqual({ acquisition: downloading, progress });
+    expect(load(eventFor(facade))).toEqual({
+      acquisition: downloading,
+      progress,
+      progressUnavailable: false,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('omits progress when the progress query itself fails', () => {
+  it('flags progress unavailable and logs the inconsistency when the progress read fails while downloading', () => {
     const downloading = { ...base, status: 'Downloading' };
     const facade = {
       getAcquisition: () => ({ ok: true, value: downloading }),
       getAcquisitionProgress: () => ({ ok: false, error: { kind: 'NotFound' } }),
     };
-    expect(load(eventFor(facade))).toEqual({ acquisition: downloading, progress: undefined });
+    // A failed progress read while Downloading is a real cross-projection inconsistency (the
+    // "pending forever" family), not the just-started case — it must be surfaced, not collapsed.
+    expect(load(eventFor(facade))).toEqual({
+      acquisition: downloading,
+      progress: undefined,
+      progressUnavailable: true,
+    });
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith(
+      { acquisitionId: 'acq-1', err: { kind: 'NotFound' } },
+      expect.stringMatching(/progress/),
+    );
   });
 
   it('404s a missing acquisition', () => {

@@ -54,16 +54,35 @@ describe('statusOf', () => {
 });
 
 describe('messageOf', () => {
-  it('renders every downloader error kind as a human message', () => {
-    for (const error of downloaderErrors) {
-      expect(messageOf(error)).toBeTruthy();
-    }
+  it.each([
+    ['ValidationFailed', 'Invalid input'],
+    ['InvalidPolicy', 'policy'],
+    ['NotFound', 'No such acquisition'],
+    ['AlreadyExists', 'already exists'],
+    ['IllegalTransition', 'not available'],
+    ['UnknownEdition', 'Unknown edition'],
+    ['ConcurrencyConflict', 'reload'],
+    ['InfraError', 'Something went wrong'],
+  ] as const)('renders the downloader %s error as a human message', (kind, needle) => {
+    const message = messageOf(downloaderErrors.find((e) => e.kind === kind)!);
+    expect(message).toMatch(/\S/);
+    expect(message).toContain(needle);
   });
 
-  it('renders every importer error kind as a human message', () => {
-    for (const error of importerErrors) {
-      expect(messageOf(error)).toBeTruthy();
-    }
+  it.each([
+    ['ValidationFailed', 'Invalid input'],
+    ['NotFound', 'No such acquisition'],
+    ['UnknownImport', 'No such import'],
+    ['NoOpenReview', 'already been settled'],
+    ['InvalidResolution', 'Invalid resolution'],
+    ['UnknownCandidate', 'Unknown candidate'],
+    ['NoRetainedCandidate', 'retained candidate'],
+    ['ConcurrencyConflict', 'reload'],
+    ['InfraError', 'Something went wrong'],
+  ] as const)('renders the importer %s error as a human message', (kind, needle) => {
+    const message = messageOf(importerErrors.find((e) => e.kind === kind)!);
+    expect(message).toMatch(/\S/);
+    expect(message).toContain(needle);
   });
 
   it('carries actionable detail through', () => {

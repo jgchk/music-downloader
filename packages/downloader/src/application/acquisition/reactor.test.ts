@@ -343,6 +343,20 @@ describe('Reactor — per-stream parking (reactor-durability D1)', () => {
     r.stop();
   });
 
+  it('treats a concurrency conflict as retryable — parks the stream rather than advancing past it', async () => {
+    // A follow-on append that loses the optimistic-concurrency race is retryable, not a stale
+    // rejection: were it classified as a rejection, the reactor would log-and-advance WITHOUT
+    // parking and the never-landed effect would be silently lost. The park is the proof it is held.
+    await seed(requestedHistory());
+    store.conflictAppends = true; // the resolved target's RecordTarget append conflicts
+    const r = reactor(stubPorts()); // metadata.resolve returns a resolved target → RecordTarget
+    await r.start();
+
+    expect(parked.peek('acq-1')).toMatchObject({ streamId: 'acq-1', globalSeq: 1, attempt: 1 });
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // advanced only because the effect is parked
+    r.stop();
+  });
+
   it('processes another acquisition immediately while one is parked (the isolation scenario)', async () => {
     await seed(requestedHistory(), 'acq-1');
     await seed(requestedHistory(), 'acq-2');

@@ -12,6 +12,6 @@ describe('landing page (SSR)', () => {
       },
     });
     expect(body).toContain('<h1>music</h1>');
-    expect(body).toContain('>4<');
+    expect(body).toContain('data-testid="acquisition-count">4<');
   });
 });

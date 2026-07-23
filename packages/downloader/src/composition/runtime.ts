@@ -253,6 +253,10 @@ export async function createDownloaderRuntime(
       return { status: verdicts?.isHalted ? 'down' : 'up' };
     },
     stop() {
+      // Stop the inbound verdict subscription BEFORE closing the db: its poll interval reads the
+      // feed and saves checkpoints against this very handle, so leaving it running past db.close()
+      // spins an error loop and keeps the event loop alive.
+      verdicts?.stop();
       reactor.stop();
       db.close();
       return Promise.resolve();

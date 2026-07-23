@@ -456,4 +456,35 @@ describe('MusicBrainzMetadata', () => {
 
     expect(result).toEqual({ kind: 'unresolved' });
   });
+
+  // A 400 on a *search* means MusicBrainz rejected a Lucene query WE constructed — an adapter
+  // defect, not "no result". It must surface as an attributable InfraError, never be swallowed as
+  // silently unresolved (which would hide a query-construction bug behind a clean no-match).
+  it('surfaces a 400 on an album descriptor search as an InfraError (query-construction defect)', async () => {
+    const result = await resolver([['/release?query=', { status: 400, body: '' }]]).resolve({
+      kind: 'descriptor',
+      targetType: 'album',
+      artist: 'Artist',
+      title: 'Album',
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'musicbrainz.resolve',
+    });
+  });
+
+  it('surfaces a 400 on a track descriptor search as an InfraError (query-construction defect)', async () => {
+    const result = await resolver([['/recording?query=', { status: 400, body: '' }]]).resolve({
+      kind: 'descriptor',
+      targetType: 'track',
+      artist: 'Artist',
+      title: 'Song',
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'musicbrainz.resolve',
+    });
+  });
 });

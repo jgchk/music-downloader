@@ -164,6 +164,16 @@ describe('SlskdResourceRemover', () => {
     ]);
   });
 
+  it('treats a 404 transfer listing as already-gone: confirms the removal (prod 2026-07-22)', async () => {
+    // slskd 404s the downloads collection for a user with no transfers; a swept transfer that is
+    // already gone must converge (row marked removed), not surface a retryable fault that leaves the
+    // ledger row live forever.
+    const { remover: r, deletes } = remover([{ status: 404, body: '' }]);
+
+    expect((await r.remove(transfer('live-id')))._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([]); // nothing at the source to remove
+  });
+
   it('surfaces a transport fault as an InfraError', async () => {
     const { remover: r } = remover([ok], 500);
 

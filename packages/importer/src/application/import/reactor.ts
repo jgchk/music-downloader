@@ -1,11 +1,13 @@
 import { Import } from '../../domain/import/import.js';
 import type { Logger } from '../logging/logger.js';
+import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type {
   CheckpointStore,
   EventBus,
   EventStorePort,
   StoredEvent,
 } from '../ports/event-store-port.js';
+import type { Clock } from '../ports/system-ports.js';
 import type { ResultAsync } from 'neverthrow';
 import type { Effect } from '../../domain/import/import.js';
 import type { CommandError } from './command-handler.js';
@@ -17,6 +19,13 @@ import type { CommandError } from './command-handler.js';
  */
 function isRetryable(error: CommandError): boolean {
   return error.kind === 'InfraError' || error.kind === 'ConcurrencyConflict';
+}
+
+/** A one-line rendering of a failed effect's error for a dead-letter entry. */
+function describeError(error: CommandError): string {
+  return error.kind === 'InfraError'
+    ? `${error.operation}: ${error.message}`
+    : JSON.stringify(error);
 }
 
 /**
@@ -38,14 +47,19 @@ export interface ReactorDeps {
   readonly store: EventStorePort;
   readonly checkpoints: CheckpointStore;
   readonly bus: EventBus;
+  readonly deadLetters: DeadLetterStore;
+  readonly clock: Clock;
   readonly logger: Logger;
   readonly interpret: EffectInterpreter;
   /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
   readonly interval?: (fn: () => void, ms: number) => () => void;
   readonly pollIntervalMs?: number;
+  /** How many times one event's effect may fail retryably before it is dead-lettered (D: budget). */
+  readonly retryBudget?: number;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
+const DEFAULT_RETRY_BUDGET = 5;
 
 const defaultInterval = (fn: () => void, ms: number): (() => void) => {
   const handle = setInterval(fn, ms);
@@ -60,8 +74,14 @@ export class Reactor {
   private stopInterval: (() => void) | undefined;
   private running = false;
   private pending = false;
+  /** Per-event retryable-failure tally, keyed by globalSeq; cleared once the event is committed. */
+  private readonly attempts = new Map<number, number>();
 
   constructor(private readonly deps: ReactorDeps) {}
+
+  private get retryBudget(): number {
+    return this.deps.retryBudget ?? DEFAULT_RETRY_BUDGET;
+  }
 
   /**
    * Resume from the checkpoint and drain to the head, following live wakeups plus a fallback
@@ -142,12 +162,8 @@ export class Reactor {
       const result = await this.deps.interpret(stored.streamId, effect);
       if (result.isErr()) {
         if (isRetryable(result.error)) {
-          // Transient fault: leave the checkpoint unadvanced so the effect is retried.
-          this.deps.logger.error(
-            { importId: stored.streamId, effect: effect.type, err: result.error },
-            'effect dispatch failed',
-          );
-          return;
+          if (!(await this.handleRetryable(stored, effect.type, result.error))) return; // held
+          break; // budget spent: dead-lettered — fall through to advance past it
         }
         // Stale/illegal outcome — the stream has already settled it. Record and advance past
         // it; retrying would only re-fire the same rejection forever.
@@ -163,7 +179,60 @@ export class Reactor {
       );
     }
 
+    const saved = await this.deps.checkpoints.save(REACTOR_CONSUMER, stored.globalSeq);
+    if (saved.isErr()) {
+      // A failed durable checkpoint write must never be dropped: hold the position (do NOT advance
+      // `lastProcessed`) so the event redelivers on the next wakeup/poll, mirroring the
+      // subscription's `advance()`. At-least-once tolerates the re-dispatch; the domain's stale
+      // guards converge the redelivery.
+      this.deps.logger.error(
+        { importId: stored.streamId, globalSeq: stored.globalSeq, err: saved.error },
+        'checkpoint save failed; holding for redelivery',
+      );
+      return;
+    }
+    this.attempts.delete(stored.globalSeq);
     this.lastProcessed = stored.globalSeq;
-    await this.deps.checkpoints.save(REACTOR_CONSUMER, stored.globalSeq);
+  }
+
+  /**
+   * Handle a retryable effect failure with a bounded budget: below the budget, hold the checkpoint
+   * for a redelivery (returns false). On exhaustion — a deterministic infra fault, e.g. beets
+   * refusing this release on every attempt — dead-letter the event and let the caller advance past
+   * it (returns true), so one poison effect never wedges the whole global queue behind it forever.
+   */
+  private async handleRetryable(
+    stored: StoredEvent,
+    effectType: string,
+    error: CommandError,
+  ): Promise<boolean> {
+    const attempts = (this.attempts.get(stored.globalSeq) ?? 0) + 1;
+    if (attempts < this.retryBudget) {
+      this.attempts.set(stored.globalSeq, attempts);
+      this.deps.logger.error(
+        { importId: stored.streamId, effect: effectType, attempt: attempts, err: error },
+        'effect dispatch failed',
+      );
+      return false;
+    }
+    const parked = await this.deps.deadLetters.record({
+      subscription: REACTOR_CONSUMER,
+      globalSeq: stored.globalSeq,
+      error: `${effectType}: ${describeError(error)}`,
+      occurredAt: this.deps.clock.now().toISOString(),
+    });
+    if (parked.isErr()) {
+      this.deps.logger.error(
+        { importId: stored.streamId, effect: effectType, err: parked.error },
+        'dead-letter record failed; holding checkpoint',
+      );
+      return false;
+    }
+    this.attempts.delete(stored.globalSeq);
+    this.deps.logger.error(
+      { importId: stored.streamId, effect: effectType, attempts, err: error },
+      'effect dispatch exhausted retry budget; dead-lettered and advancing past it',
+    );
+    return true;
   }
 }

@@ -156,6 +156,18 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
     case 'RecordApplySkippedDuplicate':
       // Beets refused to import over an incumbent it only saw at apply time: route to review.
       if (state.phase !== 'applying') return NOTHING;
+      if (command.incumbents.length === 0) {
+        // A skipped-duplicate with no incumbent is contradictory: there is nothing to compare in a
+        // duplicate review, and the import must not strand in `applying`. Doom it (terminal, files
+        // untouched) so the deposited directory can be investigated and resubmitted.
+        return ok([
+          {
+            type: 'ImportRejected',
+            reason: 'beets skipped the apply as a duplicate but reported no incumbent',
+            filesDeleted: false,
+          },
+        ]);
+      }
       return ok([
         {
           type: 'ReviewRequired',
@@ -165,16 +177,20 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
     case 'RecordIntakeDeleted': {
       if (state.phase !== 'awaiting-review') return NOTHING;
       const settled = state.settled;
-      if (settled?.kind === 'reject') {
-        const reason = settled.reason ?? 'rejected by review';
-        return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);
+      if (settled === undefined) return NOTHING; // review resolved to a non-terminal verb; nothing owed
+      // Exhaustive over the two reject verbs `settled` can hold; a new rejection verb is a compile
+      // error here rather than a silent NOTHING that would leave the intake undeleted forever.
+      switch (settled.kind) {
+        case 'reject': {
+          const reason = settled.reason ?? 'rejected by review';
+          return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);
+        }
+        case 'reject-and-retry-download': {
+          const reasons = settled.reasons ?? [];
+          const reason = reasons.length > 0 ? reasons.join('; ') : 'rejected by review';
+          return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);
+        }
       }
-      if (settled?.kind === 'reject-and-retry-download') {
-        const reasons = settled.reasons ?? [];
-        const reason = reasons.length > 0 ? reasons.join('; ') : 'rejected by review';
-        return ok([{ type: 'ImportRejected', reason, filesDeleted: true }]);
-      }
-      return NOTHING;
     }
     case 'RecordDoomed':
       // A permanent effect failure dooms the import (D7): terminal `rejected`, files untouched.

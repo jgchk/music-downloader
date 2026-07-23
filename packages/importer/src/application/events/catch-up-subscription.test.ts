@@ -248,6 +248,22 @@ describe('CatchUpSubscription', () => {
     expect(handled).toEqual([1]);
   });
 
+  it('halts on a permanent render defect at the feed boundary rather than retrying forever', async () => {
+    // A RenderError is a producer mapping defect a retry can never fix: distinguish it from a
+    // transient store-read fault. Holding-and-retrying would block this position — and every
+    // verdict behind it — forever with readiness still `up`; halting surfaces it (readiness down).
+    const renderDefectFeed = {
+      read: (): Promise<Result<SeamFeedBatch, { kind: string }>> =>
+        Promise.resolve(err({ kind: 'RenderError' })),
+    };
+    const sub = subscription({ feed: renderDefectFeed });
+
+    await sub.start();
+
+    expect(sub.isHalted).toBe(true);
+    expect(await checkpointOf()).toBe(0); // held, never skipped
+  });
+
   it('a checkpoint save failure holds delivery rather than losing it', async () => {
     feed.events = [seamEvent(1)];
     checkpoints.failSaves = true;

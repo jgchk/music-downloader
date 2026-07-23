@@ -9,7 +9,7 @@ describe('Landing (SSR)', () => {
     });
     expect(body).toContain('<h1>music</h1>');
     expect(body).toContain('href="/acquisitions/new"');
-    expect(body).toContain('>3<');
-    expect(body).toContain('>1<');
+    expect(body).toContain('data-testid="acquisition-count">3<');
+    expect(body).toContain('data-testid="review-count">1<');
   });
 });

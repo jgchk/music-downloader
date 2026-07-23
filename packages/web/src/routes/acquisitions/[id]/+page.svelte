@@ -5,4 +5,9 @@
   let { data, form }: PageProps = $props();
 </script>
 
-<AcquisitionDetail acquisition={data.acquisition} progress={data.progress} error={form?.message} />
+<AcquisitionDetail
+  acquisition={data.acquisition}
+  progress={data.progress}
+  progressUnavailable={data.progressUnavailable}
+  error={form?.message}
+/>
