@@ -9,7 +9,7 @@ import {
 } from './schemas.js';
 
 describe('slskd contract schemas', () => {
-  it('accepts a search state and tolerates a bare create response', () => {
+  it('accepts a fully-populated search state', () => {
     expect(
       slskdSearchStateSchema.parse({
         id: 's1',
@@ -18,11 +18,18 @@ describe('slskd contract schemas', () => {
         responseCount: 180,
       }),
     ).toEqual({ id: 's1', isComplete: true, state: 'Completed, TimedOut', responseCount: 180 });
+  });
+
+  it('tolerates a bare create response', () => {
     expect(slskdSearchStateSchema.parse({})).toEqual({});
   });
 
   it('rejects a search state whose isComplete is not a boolean', () => {
     expect(slskdSearchStateSchema.safeParse({ isComplete: 'yes' }).success).toBe(false);
+  });
+
+  it('rejects a search state whose state is not a string', () => {
+    expect(slskdSearchStateSchema.safeParse({ state: 42 }).success).toBe(false);
   });
 
   it('rejects a search state whose responseCount is not a number', () => {

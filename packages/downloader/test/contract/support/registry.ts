@@ -40,6 +40,16 @@ export const fixtureSchemas: Record<string, ZodType> = {
   'slskd/options.json': slskdOptionsSchema,
 };
 
+/**
+ * Consumed fields that must be *present* in a recorded capture, not merely allowed by the
+ * (all-optional, tolerant-reader) schema. The adapter's harvest-integrity gates branch on these
+ * fields and fail open when one is absent — so a re-record that loses one must fail the tier and
+ * force a deliberate decision instead of silently disarming a guard.
+ */
+export const fixtureRequiredFields: Record<string, readonly string[]> = {
+  'slskd/search-state.json': ['isComplete', 'state', 'responseCount'],
+};
+
 /** E2E WireMock stub filename → schema. */
 export const stubSchemas: Record<string, ZodType> = {
   'musicbrainz/search.json': mbReleaseSearchSchema,

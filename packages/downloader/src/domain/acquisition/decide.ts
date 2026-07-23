@@ -64,7 +64,9 @@ function usableCandidates(
 
 /**
  * The slice of state the ladder's next-move choice reads — carried by the in-flight phases and by
- * a revivable fulfilment's retained context alike.
+ * a revivable fulfilment's retained context alike. The search-results branch synthesizes one as a
+ * literal instead: a hand-built context must carry *post-event* values (the just-completed round
+ * already counted).
  */
 interface LadderContext {
   readonly policies: AcquisitionPolicies;
@@ -74,9 +76,8 @@ interface LadderContext {
 }
 
 /**
- * After a rejection (or search) leaves the working set as-is, choose the next move: try the
- * next-best candidate, request a fresh bounded re-search, or give up (D6). `RetryPolicy` bounds
- * guarantee termination.
+ * Given the post-event ladder context, choose the next move: try the next-best candidate, request
+ * a fresh bounded re-search, or give up (D6). `RetryPolicy` bounds guarantee termination.
  */
 function selectNext(state: LadderContext): AcquisitionEvent {
   const retry = state.policies.retry;

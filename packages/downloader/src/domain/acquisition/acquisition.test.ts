@@ -126,19 +126,37 @@ describe('Acquisition.execute — happy path', () => {
   });
 
   it('exhausts only once the search-round budget is spent on empty rounds', () => {
+    // Two prior empty rounds + this one spend the whole (explicitly pinned) three-round budget.
+    const threeRounds = defaultPolicies({ retry: { maxSearchRounds: 3, maxTotalAttempts: 15 } });
     const emptyRound = (round: number): AcquisitionEvent[] => [
       { type: 'SearchCompleted', round, candidates: [] },
       { type: 'CandidatesRanked', ranked: [] },
       { type: 'SearchRequested', round: round + 1 },
     ];
     const events = Acquisition.fromHistory([
-      ...resolvedHistory(),
+      ...resolvedHistory(threeRounds),
       ...emptyRound(1),
       ...emptyRound(2),
     ])
       .execute({ type: 'RecordSearchResults', candidates: [] })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'AcquisitionExhausted']);
+  });
+
+  it('re-searches when a round returns only previously-rejected candidates', () => {
+    const rejected = matchingCandidate('x');
+    const history: AcquisitionEvent[] = [
+      ...selectedHistory([rejected]),
+      { type: 'DownloadFailed', candidate: rejected.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: rejected.identity },
+      { type: 'SearchRequested', round: 2 },
+    ];
+    const events = Acquisition.fromHistory(history)
+      .execute({ type: 'RecordSearchResults', candidates: [rejected] })
+      ._unsafeUnwrap();
+    // The round arrived non-empty, but the ranked working set is empty — the ladder still re-searches.
+    expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'SearchRequested']);
+    expect(events[2]).toEqual({ type: 'SearchRequested', round: 3 });
   });
 
   it('exhausts on an empty round when the policy allows a single round', () => {

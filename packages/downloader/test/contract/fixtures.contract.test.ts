@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadFixtures } from './support/fixture.js';
-import { fixtureSchemas, stubSchemas } from './support/registry.js';
+import { fixtureRequiredFields, fixtureSchemas, stubSchemas } from './support/registry.js';
 
 /**
  * Conformance: every recorded fixture and every E2E stub payload must satisfy the same contract
@@ -35,6 +35,20 @@ describe('recorded fixtures conform to the contract', () => {
       expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
     },
   );
+
+  // Tolerant-reader schemas accept a capture that *lost* a consumed field, which would silently
+  // disarm the guards branching on it — presence is asserted separately for exactly those fields.
+  const witnessed = Object.entries(fixtureRequiredFields).map(([key, fields]) => ({ key, fields }));
+
+  it.each(witnessed)('$key witnesses its consumed integrity fields', ({ key, fields }) => {
+    const [service, name] = key.split('/');
+    const match = fixtures.find((f) => f.service === service && f.name === name);
+    expect(match, `${key} fixture missing`).toBeDefined();
+    const body = match!.fixture.response.body as Record<string, unknown>;
+    for (const field of fields) {
+      expect(body[field], `${key} no longer carries consumed field '${field}'`).toBeDefined();
+    }
+  });
 });
 
 describe('E2E stub payloads conform to the contract', () => {
