@@ -17,7 +17,11 @@ import type { StoredEvent } from '../ports/event-store-port.js';
  * the pending-reviews view is a filter over the same fold — one projection, two queries.
  */
 
-export type StatusHistoryEntry =
+/**
+ * The kind-specific payload of a history entry. Each becomes a `StatusHistoryEntry` once tagged
+ * with the occurrence time of the event it projects (see {@link StatusHistoryEntry}).
+ */
+type HistoryPayload =
   | { readonly kind: 'requested'; readonly hints?: ImportHints }
   | { readonly kind: 'proposed'; readonly candidateCount: number; readonly pinnedId?: string }
   | {
@@ -36,8 +40,17 @@ export type StatusHistoryEntry =
       readonly reasons: readonly string[];
     };
 
+/**
+ * A history entry: its kind-specific payload plus `at`, the ISO-8601 occurrence time of the
+ * underlying event. `at` lets a consumer order this import's history against another context's
+ * (the acquisition timeline the web layer composes) in real time.
+ */
+export type StatusHistoryEntry = HistoryPayload & { readonly at: string };
+
 export interface ImportStatusView {
   readonly importId: string;
+  /** The originating acquisition, when this import arrived from one — the web-side correlation key. */
+  readonly acquisitionId?: string;
   readonly directory?: string;
   readonly phase: ImportPhase;
   readonly location?: string;
@@ -53,7 +66,7 @@ export interface PendingReviewView {
   readonly review: OpenReview;
 }
 
-function historyEntry(event: ImportEvent): StatusHistoryEntry {
+function historyEntry(event: ImportEvent): HistoryPayload {
   switch (event.type) {
     case 'ImportRequested':
       return { kind: 'requested', hints: event.hints };
@@ -84,26 +97,37 @@ function historyEntry(event: ImportEvent): StatusHistoryEntry {
   }
 }
 
-export function projectStatus(importId: string, events: readonly ImportEvent[]): ImportStatusView {
+/** The originating acquisition id, read from the request that opened the stream (if any). */
+function acquisitionIdOf(events: readonly ImportEvent[]): string | undefined {
+  const requested = events.find((event) => event.type === 'ImportRequested');
+  return requested?.type === 'ImportRequested' ? requested.source?.acquisitionId : undefined;
+}
+
+export function projectStatus(importId: string, stored: readonly StoredEvent[]): ImportStatusView {
+  const events = stored.map((entry) => entry.event);
   const snapshot = Import.fromHistory(events).snapshot;
   return {
     importId,
+    acquisitionId: acquisitionIdOf(events),
     directory: snapshot.directory,
     phase: snapshot.phase,
     location: snapshot.location,
     openReview: snapshot.openReview,
     rejection: snapshot.rejection,
-    history: events.map(historyEntry),
+    history: stored.map((entry) => ({
+      ...historyEntry(entry.event),
+      at: entry.metadata.occurredAt,
+    })),
   };
 }
 
 export class ImportStatusProjection {
-  private readonly streams = new Map<string, ImportEvent[]>();
+  private readonly streams = new Map<string, StoredEvent[]>();
   private readonly acquisitions = new Map<string, string>();
 
   apply(stored: StoredEvent): void {
     const list = this.streams.get(stored.streamId) ?? [];
-    list.push(stored.event);
+    list.push(stored);
     this.streams.set(stored.streamId, list);
     if (stored.event.type === 'ImportRequested' && stored.event.source !== undefined) {
       this.acquisitions.set(stored.event.source.acquisitionId, stored.streamId);
@@ -119,12 +143,12 @@ export class ImportStatusProjection {
   }
 
   get(importId: string): ImportStatusView | undefined {
-    const events = this.streams.get(importId);
-    return events === undefined ? undefined : projectStatus(importId, events);
+    const stored = this.streams.get(importId);
+    return stored === undefined ? undefined : projectStatus(importId, stored);
   }
 
   list(): readonly ImportStatusView[] {
-    return [...this.streams.entries()].map(([id, events]) => projectStatus(id, events));
+    return [...this.streams.entries()].map(([id, stored]) => projectStatus(id, stored));
   }
 
   /** Every import currently awaiting a human: typed review items with their carried context. */

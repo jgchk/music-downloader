@@ -28,7 +28,7 @@ describe('AcquisitionList (SSR)', () => {
             status: 'Exhausted',
             attempts: 3,
             rejectedCount: 2,
-            history: [{ kind: 'download-failed', candidate, reason: 'Stalled' }],
+            history: [{ kind: 'download-failed', at: 't', candidate, reason: 'Stalled' }],
           },
         ],
       },

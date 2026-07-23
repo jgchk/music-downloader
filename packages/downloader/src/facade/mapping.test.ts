@@ -88,11 +88,11 @@ describe('statusViewToDto', () => {
       rejectedCount: 1,
       location: '/lib/a',
       history: [
-        { kind: 'selected', candidate },
-        { kind: 'download-failed', candidate, reason: 'Stalled' },
-        { kind: 'validation-failed', candidate, reasons: ['Unplayable'] },
-        { kind: 'imported', candidate, location: '/lib/a' },
-        { kind: 'fulfillment-rejected', candidate, reasons: ['corrupt stub'] },
+        { kind: 'selected', at: 't0', candidate },
+        { kind: 'download-failed', at: 't1', candidate, reason: 'Stalled' },
+        { kind: 'validation-failed', at: 't2', candidate, reasons: ['Unplayable'] },
+        { kind: 'imported', at: 't3', candidate, location: '/lib/a' },
+        { kind: 'fulfillment-rejected', at: 't4', candidate, reasons: ['corrupt stub'] },
       ],
     };
 
@@ -106,6 +106,7 @@ describe('statusViewToDto', () => {
       'imported',
       'fulfillment-rejected',
     ]);
+    expect(dto.history.map((entry) => entry.at)).toEqual(['t0', 't1', 't2', 't3', 't4']);
   });
 
   it('omits an absent current candidate', () => {

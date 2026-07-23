@@ -174,25 +174,51 @@ export const reviewListResponseSchema = z.object({
 
 // --- Status ------------------------------------------------------------------------------------
 
+// Every entry carries `at`, the ISO-8601 occurrence time of the event it projects, so a consumer
+// can order this import's history against another context's history in real time (additive).
 export const historyEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('requested'), hints: importHintsSchema.optional() }),
+  z.object({
+    kind: z.literal('requested'),
+    at: z.iso.datetime(),
+    hints: importHintsSchema.optional(),
+  }),
   z.object({
     kind: z.literal('proposed'),
+    at: z.iso.datetime(),
     candidateCount: z.number().int(),
     pinnedId: z.string().optional(),
   }),
   z.object({
     kind: z.literal('auto-apply-selected'),
+    at: z.iso.datetime(),
     candidate: candidateRefSchema,
     distance: z.number(),
   }),
-  z.object({ kind: z.literal('review-required'), reviewKind: reviewKindSchema }),
-  z.object({ kind: z.literal('review-resolved'), resolution: resolutionVerbSchema }),
-  z.object({ kind: z.literal('applied'), location: z.string() }),
-  z.object({ kind: z.literal('remediation-required'), failures: z.array(applyFailureSchema) }),
-  z.object({ kind: z.literal('rejected'), reason: z.string(), filesDeleted: z.boolean() }),
+  z.object({
+    kind: z.literal('review-required'),
+    at: z.iso.datetime(),
+    reviewKind: reviewKindSchema,
+  }),
+  z.object({
+    kind: z.literal('review-resolved'),
+    at: z.iso.datetime(),
+    resolution: resolutionVerbSchema,
+  }),
+  z.object({ kind: z.literal('applied'), at: z.iso.datetime(), location: z.string() }),
+  z.object({
+    kind: z.literal('remediation-required'),
+    at: z.iso.datetime(),
+    failures: z.array(applyFailureSchema),
+  }),
+  z.object({
+    kind: z.literal('rejected'),
+    at: z.iso.datetime(),
+    reason: z.string(),
+    filesDeleted: z.boolean(),
+  }),
   z.object({
     kind: z.literal('release-verdict-recorded'),
+    at: z.iso.datetime(),
     acquisitionId: z.string(),
     reasons: z.array(z.string()),
   }),
@@ -200,6 +226,8 @@ export const historyEntrySchema = z.discriminatedUnion('kind', [
 
 export const importStatusResponseSchema = z.object({
   importId: z.string(),
+  // Present when the import arrived from an acquisition — the web-side correlation key (additive).
+  acquisitionId: z.string().optional(),
   path: z.string().optional(),
   status: importPhaseSchema,
   // Present only once the import has a library location — the terminal `applied` phase (additive).

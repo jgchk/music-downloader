@@ -20,7 +20,11 @@ import type { Logger } from '../logging/logger.js';
 
 // --- Acquisition status ------------------------------------------------------------------------
 
-export type StatusHistoryEntry =
+/**
+ * The kind-specific payload of a history entry. Each becomes a `StatusHistoryEntry` once tagged
+ * with the occurrence time of the event it projects (see {@link StatusHistoryEntry}).
+ */
+type HistoryPayload =
   | { readonly kind: 'selected'; readonly candidate: CandidateIdentity }
   | {
       readonly kind: 'download-failed';
@@ -40,6 +44,13 @@ export type StatusHistoryEntry =
       readonly candidate: CandidateIdentity;
       readonly reasons: readonly string[];
     };
+
+/**
+ * A history entry: its kind-specific payload plus `at`, the ISO-8601 occurrence time of the
+ * underlying event. `at` lets a consumer order this acquisition's history against another
+ * context's (the import timeline the web layer composes) in real time.
+ */
+export type StatusHistoryEntry = HistoryPayload & { readonly at: string };
 
 export interface AcquisitionStatusView {
   readonly acquisitionId: string;
@@ -61,10 +72,33 @@ export interface AcquisitionStatusView {
   readonly stalled?: boolean;
 }
 
+/** The kind-specific payload for the events that surface as history — others yield nothing. */
+function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
+  switch (event.type) {
+    case 'CandidateSelected':
+      return { kind: 'selected', candidate: event.candidate.identity };
+    case 'DownloadFailed':
+      return { kind: 'download-failed', candidate: event.candidate, reason: event.reason };
+    case 'ValidationFailed':
+      return {
+        kind: 'validation-failed',
+        candidate: event.candidate,
+        reasons: event.verdict.reasons,
+      };
+    case 'Imported':
+      return { kind: 'imported', candidate: event.candidate, location: event.location };
+    case 'FulfillmentRejected':
+      return { kind: 'fulfillment-rejected', candidate: event.candidate, reasons: event.reasons };
+    default:
+      return undefined;
+  }
+}
+
 export function projectStatus(
   acquisitionId: string,
-  events: readonly AcquisitionEvent[],
+  stored: readonly StoredEvent[],
 ): AcquisitionStatusView {
+  const events = stored.map((entry) => entry.event);
   const snapshot = Acquisition.fromHistory(events).snapshot;
   const history: StatusHistoryEntry[] = [];
   let target: { artist: string; title: string } | undefined;
@@ -75,26 +109,9 @@ export function projectStatus(
       target = { artist: event.target.artist, title: event.target.title };
     }
   }
-  for (const event of events) {
-    if (event.type === 'CandidateSelected') {
-      history.push({ kind: 'selected', candidate: event.candidate.identity });
-    } else if (event.type === 'DownloadFailed') {
-      history.push({ kind: 'download-failed', candidate: event.candidate, reason: event.reason });
-    } else if (event.type === 'ValidationFailed') {
-      history.push({
-        kind: 'validation-failed',
-        candidate: event.candidate,
-        reasons: event.verdict.reasons,
-      });
-    } else if (event.type === 'Imported') {
-      history.push({ kind: 'imported', candidate: event.candidate, location: event.location });
-    } else if (event.type === 'FulfillmentRejected') {
-      history.push({
-        kind: 'fulfillment-rejected',
-        candidate: event.candidate,
-        reasons: event.reasons,
-      });
-    }
+  for (const entry of stored) {
+    const payload = historyPayloadOf(entry.event);
+    if (payload !== undefined) history.push({ ...payload, at: entry.metadata.occurredAt });
   }
   return {
     acquisitionId,
@@ -110,21 +127,21 @@ export function projectStatus(
 }
 
 export class AcquisitionStatusProjection {
-  private readonly streams = new Map<string, AcquisitionEvent[]>();
+  private readonly streams = new Map<string, StoredEvent[]>();
 
   apply(stored: StoredEvent): void {
     const list = this.streams.get(stored.streamId) ?? [];
-    list.push(stored.event);
+    list.push(stored);
     this.streams.set(stored.streamId, list);
   }
 
   get(acquisitionId: string): AcquisitionStatusView | undefined {
-    const events = this.streams.get(acquisitionId);
-    return events === undefined ? undefined : projectStatus(acquisitionId, events);
+    const stored = this.streams.get(acquisitionId);
+    return stored === undefined ? undefined : projectStatus(acquisitionId, stored);
   }
 
   list(): readonly AcquisitionStatusView[] {
-    return [...this.streams.entries()].map(([id, events]) => projectStatus(id, events));
+    return [...this.streams.entries()].map(([id, stored]) => projectStatus(id, stored));
   }
 
   rebuild(stored: readonly StoredEvent[]): void {

@@ -79,6 +79,19 @@ export function getImport(deps: UseCaseDeps, importId: string): ImportStatusView
   return deps.status.get(importId);
 }
 
+/**
+ * The import that an acquisition was submitted as, if any — the read behind the web layer's
+ * download-through-import timeline. Served from the same reverse index the intake consumer uses
+ * (`importIdForAcquisition`), so it is an O(1) lookup, never a scan of all imports.
+ */
+export function getImportForAcquisition(
+  deps: UseCaseDeps,
+  acquisitionId: string,
+): ImportStatusView | undefined {
+  const importId = deps.status.importIdForAcquisition(acquisitionId);
+  return importId === undefined ? undefined : deps.status.get(importId);
+}
+
 export function listImports(deps: UseCaseDeps): readonly ImportStatusView[] {
   return deps.status.list();
 }

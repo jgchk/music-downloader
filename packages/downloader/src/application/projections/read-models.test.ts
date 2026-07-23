@@ -55,7 +55,7 @@ function stored(events: readonly AcquisitionEvent[]): readonly StoredEvent[] {
 
 describe('projectStatus', () => {
   it('summarizes state and attempt history from the log', () => {
-    const view = projectStatus('acq-1', history);
+    const view = projectStatus('acq-1', stored(history));
     expect(view.status).toBe('Fulfilled');
     expect(view.target).toEqual({ artist: sampleTarget.artist, title: sampleTarget.title });
     expect(view.location).toBe('/lib/c');
@@ -73,40 +73,69 @@ describe('projectStatus', () => {
       'imported',
     ]);
   });
+
+  it('stamps each history entry with its event occurrence time', () => {
+    const events: AcquisitionEvent[] = [
+      { type: 'CandidateSelected', candidate: a },
+      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+    ];
+    const storedEvents: StoredEvent[] = events.map((event, index) => ({
+      globalSeq: index + 1,
+      streamId: 'acq-1',
+      version: index,
+      type: event.type,
+      event,
+      metadata: { acquisitionId: 'acq-1', occurredAt: `2026-01-01T00:00:0${index}Z` },
+    }));
+    const view = projectStatus('acq-1', storedEvents);
+    expect(view.history.map((entry) => entry.at)).toEqual([
+      '2026-01-01T00:00:00Z',
+      '2026-01-01T00:00:01Z',
+    ]);
+  });
 });
 
 describe('projectStatus — target description', () => {
   it('is absent before any target is known for a musicbrainz request', () => {
-    const view = projectStatus('acq-1', [
-      { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
-    ]);
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+      ]),
+    );
     expect(view.target).toBeUndefined();
   });
 
   it('falls back to the descriptor request before resolution', () => {
-    const view = projectStatus('acq-1', [
-      {
-        type: 'AcquisitionRequested',
-        request: { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
-        policies: defaultPolicies(),
-      },
-    ]);
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        {
+          type: 'AcquisitionRequested',
+          request: { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+          policies: defaultPolicies(),
+        },
+      ]),
+    );
     expect(view.target).toEqual({ artist: 'Artist', title: 'Album' });
   });
 });
 
 describe('projectStatus — awaiting manual edition selection', () => {
   it('exposes the retained candidate editions while awaiting a choice', () => {
-    const view = projectStatus('acq-1', awaitingSelectionHistory());
+    const view = projectStatus('acq-1', stored(awaitingSelectionHistory()));
     expect(view.status).toBe('AwaitingManualSelection');
     expect(view.candidates).toEqual(sampleEditionCandidates);
   });
 
   it('drops the candidates once an edition is selected and the flow resumes', () => {
-    const view = projectStatus('acq-1', [
-      ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
-    ]);
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        ...awaitingSelectionHistory(),
+        { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
+      ]),
+    );
     expect(view.status).toBe('Pending');
     expect(view.candidates).toBeUndefined();
   });
@@ -114,12 +143,16 @@ describe('projectStatus — awaiting manual edition selection', () => {
 
 describe('projectStatus — an external fulfilment rejection', () => {
   it('is recorded in the history with its reasons', () => {
-    const view = projectStatus('acq-1', [
-      ...history,
-      { type: 'FulfillmentRejected', candidate: c.identity, reasons: ['corrupt stub'] },
-    ]);
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        ...history,
+        { type: 'FulfillmentRejected', candidate: c.identity, reasons: ['corrupt stub'] },
+      ]),
+    );
     expect(view.history.at(-1)).toEqual({
       kind: 'fulfillment-rejected',
+      at: 't',
       candidate: c.identity,
       reasons: ['corrupt stub'],
     });

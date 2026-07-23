@@ -19,6 +19,8 @@ describe('acquisition detail page (SSR)', () => {
             rejectedCount: 0,
             history: [],
           },
+          timeline: [],
+          importState: 'none',
           progress: undefined,
           progressUnavailable: false,
         },

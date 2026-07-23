@@ -61,15 +61,26 @@ describe('acquisitionStatusResponseSchema', () => {
       attempts: 2,
       rejectedCount: 1,
       history: [
-        { kind: 'selected', candidate },
-        { kind: 'download-failed', candidate, reason: 'Stalled' },
-        { kind: 'validation-failed', candidate, reasons: ['Unplayable'] },
-        { kind: 'imported', candidate, location: '/lib/a' },
-        { kind: 'fulfillment-rejected', candidate, reasons: ['corrupt stub'] },
+        { kind: 'selected', at: '2026-01-01T00:00:00Z', candidate },
+        { kind: 'download-failed', at: '2026-01-01T00:00:01Z', candidate, reason: 'Stalled' },
+        {
+          kind: 'validation-failed',
+          at: '2026-01-01T00:00:02Z',
+          candidate,
+          reasons: ['Unplayable'],
+        },
+        { kind: 'imported', at: '2026-01-01T00:00:03Z', candidate, location: '/lib/a' },
+        {
+          kind: 'fulfillment-rejected',
+          at: '2026-01-01T00:00:04Z',
+          candidate,
+          reasons: ['corrupt stub'],
+        },
       ],
     });
 
     expect(parsed.history).toHaveLength(5);
+    expect(parsed.history[0]).toMatchObject({ at: '2026-01-01T00:00:00Z' });
   });
 
   it('accepts the additive stalled flag and its absence (reactor-durability D2)', () => {

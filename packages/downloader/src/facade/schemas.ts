@@ -113,26 +113,36 @@ export const candidateIdentitySchema = z.object({
   sizeBytes: z.number(),
 });
 
+// Every entry carries `at`, the ISO-8601 occurrence time of the event it projects, so a consumer
+// can order this acquisition's history against another context's history in real time (additive).
 export const historyEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('selected'), candidate: candidateIdentitySchema }),
+  z.object({
+    kind: z.literal('selected'),
+    at: z.iso.datetime(),
+    candidate: candidateIdentitySchema,
+  }),
   z.object({
     kind: z.literal('download-failed'),
+    at: z.iso.datetime(),
     candidate: candidateIdentitySchema,
     reason: downloadFailureReasonSchema,
   }),
   z.object({
     kind: z.literal('validation-failed'),
+    at: z.iso.datetime(),
     candidate: candidateIdentitySchema,
     reasons: z.array(validationReasonSchema),
   }),
   z.object({
     kind: z.literal('imported'),
+    at: z.iso.datetime(),
     candidate: candidateIdentitySchema,
     location: z.string(),
   }),
   z.object({
     // A delivered candidate rejected by validation outside the system (free-form reasons).
     kind: z.literal('fulfillment-rejected'),
+    at: z.iso.datetime(),
     candidate: candidateIdentitySchema,
     reasons: z.array(z.string()),
   }),

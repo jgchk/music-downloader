@@ -4,6 +4,7 @@ import {
   HINTS,
   POLICY,
   awaitingMatchReview,
+  awaitingReviewWithCandidate,
   remediationHistory,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
 import type { ImportEvent } from '../../domain/import/events.js';
@@ -13,6 +14,7 @@ import type { UseCaseDeps } from './use-cases.js';
 import {
   findAcquisitionImport,
   getImport,
+  getImportForAcquisition,
   importIdFor,
   listImports,
   listPendingReviews,
@@ -107,6 +109,13 @@ describe('queries', () => {
     expect(getImport(d, importId)?.phase).toBe('awaiting-review');
     expect(getImport(d, 'imp-unknown')).toBeUndefined();
     expect(listImports(d).map((view) => view.importId)).toEqual([importId]);
+  });
+
+  it('reads the import that an acquisition submitted, or undefined when none exists', async () => {
+    const d = deps();
+    const importId = await seed(d, awaitingReviewWithCandidate());
+    expect(getImportForAcquisition(d, 'acq-1')?.importId).toBe(importId);
+    expect(getImportForAcquisition(d, 'acq-unknown')).toBeUndefined();
   });
 
   it('lists pending reviews including remediation items', async () => {

@@ -6,11 +6,22 @@
     statusTone,
     targetDescription,
   } from '$lib/acquisitions.js';
+  import type { TimelineEntry } from '$lib/timeline.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
   import ProgressBar from './ProgressBar.svelte';
 
   interface Props {
     acquisition: AcquisitionStatusResponseDto;
+    /**
+     * The download-through-import history as one timeline, composed web-side and ordered by
+     * occurrence time — each entry tagged with its originating module (web-ui).
+     */
+    timeline?: TimelineEntry[];
+    /**
+     * The import section's state: `present` once handed off, `none` before, `unavailable` when the
+     * importer read failed. `none`/`unavailable` still render the downloader timeline (web-ui).
+     */
+    importState?: 'present' | 'none' | 'unavailable';
     progress?: ProgressResponseDto;
     /** Downloading, but the progress read failed — say so rather than render a blank bar. */
     progressUnavailable?: boolean;
@@ -20,6 +31,8 @@
 
   let {
     acquisition,
+    timeline = [],
+    importState = 'none',
     progress = undefined,
     progressUnavailable = false,
     error = undefined,
@@ -107,26 +120,63 @@
 {/if}
 
 <h2>History</h2>
-{#if acquisition.history.length === 0}
+{#if importState === 'unavailable'}
+  <p data-testid="import-unavailable">
+    The import side of this acquisition is currently unavailable.
+  </p>
+{:else if importState === 'none'}
+  <p data-testid="import-none">Not yet handed off to the importer.</p>
+{/if}
+{#if timeline.length === 0}
   <p data-testid="no-history">Nothing has happened yet.</p>
 {:else}
   <ol data-testid="history">
-    {#each acquisition.history as entry, i (i)}
-      <li>
-        {#if entry.kind === 'selected'}
-          Selected {entry.candidate.path} from {entry.candidate.username}
-        {:else if entry.kind === 'download-failed'}
-          Download failed ({entry.reason}) — {entry.candidate.path}
-        {:else if entry.kind === 'validation-failed'}
-          Validation failed ({entry.reasons.join(', ')}) — {entry.candidate.path}
-        {:else if entry.kind === 'imported'}
-          Deposited at {entry.location}
-        {:else if entry.kind === 'fulfillment-rejected'}
-          Rejected after delivery ({entry.reasons.join(', ')})
+    {#each timeline as item, i (i)}
+      <li data-module={item.module}>
+        {#if item.module === 'downloader'}
+          {#if item.entry.kind === 'selected'}
+            Selected {item.entry.candidate.path} from {item.entry.candidate.username}
+          {:else if item.entry.kind === 'download-failed'}
+            Download failed ({item.entry.reason}) — {item.entry.candidate.path}
+          {:else if item.entry.kind === 'validation-failed'}
+            Validation failed ({item.entry.reasons.join(', ')}) — {item.entry.candidate.path}
+          {:else if item.entry.kind === 'imported'}
+            <!-- The downloader's "imported" is the hand-off/staging deposit, NOT the library import;
+                 the importer's `applied` below is the real library import. Label them apart. -->
+            Handed off to importer — staged at {item.entry.location}
+          {:else if item.entry.kind === 'fulfillment-rejected'}
+            Rejected after delivery ({item.entry.reasons.join(', ')})
+          {:else}
+            <!-- Tolerant reader: a downloader history kind added later lands here rather than
+                 mislabeling and dereferencing a field it may not carry. -->
+            Something happened in this acquisition.
+          {/if}
         {:else}
-          <!-- Tolerant reader: a history kind the downloader adds later lands here rather than
-               mislabeling as fulfillment-rejected and dereferencing a field it may not carry. -->
-          Something happened in this acquisition.
+          <span class="module-tag" data-testid="import-entry">Import</span>
+          {#if item.entry.kind === 'requested'}
+            Import requested
+          {:else if item.entry.kind === 'proposed'}
+            Matched {item.entry.candidateCount} candidate{item.entry.candidateCount === 1
+              ? ''
+              : 's'} against the library
+          {:else if item.entry.kind === 'auto-apply-selected'}
+            Auto-selected a confident match (distance {item.entry.distance})
+          {:else if item.entry.kind === 'review-required'}
+            Review required ({item.entry.reviewKind})
+          {:else if item.entry.kind === 'review-resolved'}
+            Review resolved ({item.entry.resolution})
+          {:else if item.entry.kind === 'applied'}
+            Imported into the library at {item.entry.location}
+          {:else if item.entry.kind === 'remediation-required'}
+            Applied, but needs remediation
+          {:else if item.entry.kind === 'rejected'}
+            Import rejected ({item.entry.reason})
+          {:else if item.entry.kind === 'release-verdict-recorded'}
+            Recorded a retry-download verdict ({item.entry.reasons.join(', ')})
+          {:else}
+            <!-- Tolerant reader: an importer history kind added later lands here safely. -->
+            Something happened in the import.
+          {/if}
         {/if}
       </li>
     {/each}

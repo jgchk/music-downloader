@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importIdFor } from '../application/import/use-cases.js';
+import { importIdFor, submitImport } from '../application/import/use-cases.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
@@ -156,6 +156,38 @@ describe('createImporterFacade', () => {
     it('rejects invalid input as a modeled validation error', () => {
       const facade = createImporterFacade(testWiring().deps);
       const result = facade.getImport({ id: '' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
+    });
+  });
+
+  describe('getImportForAcquisition', () => {
+    it('returns the view for the acquisition that submitted it, carrying the acquisition id', async () => {
+      const wiring = testWiring();
+      await submitImport(wiring.deps, { directory: INTAKE, source: { acquisitionId: 'acq-9' } });
+      wiring.sync();
+
+      const result = wiring.facade.getImportForAcquisition({ acquisitionId: 'acq-9' });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(importStatusResultSchema.parse(roundTrip(result.value))).toEqual(result.value);
+        expect(result.value.acquisitionId).toBe('acq-9');
+        expect(result.value.importId).toBe(importIdFor(INTAKE));
+      }
+    });
+
+    it('returns NotFound for an acquisition with no import', () => {
+      const facade = createImporterFacade(testWiring().deps);
+      const result = facade.getImportForAcquisition({ acquisitionId: 'acq-none' });
+
+      expect(result).toEqual({ ok: false, error: { kind: 'NotFound' } });
+    });
+
+    it('rejects invalid input as a modeled validation error', () => {
+      const facade = createImporterFacade(testWiring().deps);
+      const result = facade.getImportForAcquisition({ acquisitionId: '' });
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');

@@ -89,6 +89,7 @@ export function reviewToDto(review: OpenReview): ReviewDto {
 export function statusViewToDto(view: ImportStatusView): ImportStatusResponseDto {
   return {
     importId: view.importId,
+    acquisitionId: view.acquisitionId,
     path: view.directory,
     status: view.phase,
     location: view.location,
