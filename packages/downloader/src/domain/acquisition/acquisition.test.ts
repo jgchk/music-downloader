@@ -3,6 +3,8 @@ import { Acquisition } from './acquisition.js';
 import type { Effect } from './acquisition.js';
 import type { AcquisitionCommand } from './commands.js';
 import type { AcquisitionEvent, AcquisitionRequest } from './events.js';
+import { createRetryPolicy } from '../policy/policies.js';
+import { asMbid } from '../shared/__fixtures__/mbid.js';
 import {
   awaitingSelectionHistory,
   defaultPolicies,
@@ -127,7 +129,9 @@ describe('Acquisition.execute — happy path', () => {
 
   it('exhausts only once the search-round budget is spent on empty rounds', () => {
     // Two prior empty rounds + this one spend the whole (explicitly pinned) three-round budget.
-    const threeRounds = defaultPolicies({ retry: { maxSearchRounds: 3, maxTotalAttempts: 15 } });
+    const threeRounds = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 3, maxTotalAttempts: 15 })._unsafeUnwrap(),
+    });
     const emptyRound = (round: number): AcquisitionEvent[] => [
       { type: 'SearchCompleted', round, candidates: [] },
       { type: 'CandidatesRanked', ranked: [] },
@@ -160,7 +164,9 @@ describe('Acquisition.execute — happy path', () => {
   });
 
   it('exhausts on an empty round when the policy allows a single round', () => {
-    const oneRound = defaultPolicies({ retry: { maxSearchRounds: 1, maxTotalAttempts: 15 } });
+    const oneRound = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 1, maxTotalAttempts: 15 })._unsafeUnwrap(),
+    });
     const events = Acquisition.fromHistory(resolvedHistory(oneRound))
       .execute({ type: 'RecordSearchResults', candidates: [] })
       ._unsafeUnwrap();
@@ -233,7 +239,9 @@ describe('Acquisition.execute — retry loop', () => {
   });
 
   it('exhausts when the working set empties and no search rounds remain', () => {
-    const oneRound = defaultPolicies({ retry: { maxSearchRounds: 1, maxTotalAttempts: 15 } });
+    const oneRound = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 1, maxTotalAttempts: 15 })._unsafeUnwrap(),
+    });
     const events = Acquisition.fromHistory(selectedHistory([matchingCandidate('a')], oneRound))
       .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
       ._unsafeUnwrap();
@@ -241,7 +249,9 @@ describe('Acquisition.execute — retry loop', () => {
   });
 
   it('exhausts when the total-attempts budget is spent even with candidates left', () => {
-    const oneAttempt = defaultPolicies({ retry: { maxSearchRounds: 3, maxTotalAttempts: 1 } });
+    const oneAttempt = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 3, maxTotalAttempts: 1 })._unsafeUnwrap(),
+    });
     const events = Acquisition.fromHistory(
       selectedHistory([matchingCandidate('a'), matchingCandidate('b')], oneAttempt),
     )
@@ -302,7 +312,9 @@ describe('Acquisition.execute — an external validation failure revives fulfilm
   });
 
   it('exhausts when no candidate remains and the search budget is spent', () => {
-    const oneRound = defaultPolicies({ retry: { maxSearchRounds: 1, maxTotalAttempts: 15 } });
+    const oneRound = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 1, maxTotalAttempts: 15 })._unsafeUnwrap(),
+    });
     const events = Acquisition.fromHistory(fulfilledHistory([a], oneRound))
       .execute(verdict(a.identity))
       ._unsafeUnwrap();
@@ -314,7 +326,9 @@ describe('Acquisition.execute — an external validation failure revives fulfilm
   });
 
   it('exhausts when the attempts budget is spent even with candidates left', () => {
-    const oneAttempt = defaultPolicies({ retry: { maxSearchRounds: 3, maxTotalAttempts: 1 } });
+    const oneAttempt = defaultPolicies({
+      retry: createRetryPolicy({ maxSearchRounds: 3, maxTotalAttempts: 1 })._unsafeUnwrap(),
+    });
     const events = Acquisition.fromHistory(fulfilledHistory([a, b], oneAttempt))
       .execute(verdict(a.identity))
       ._unsafeUnwrap();
@@ -575,7 +589,7 @@ describe('Acquisition.reactTo — the event → effect table', () => {
   it('resolves metadata for a release-group request, carrying it verbatim to the effect', () => {
     const request: AcquisitionRequest = {
       kind: 'release-group',
-      mbid: 'rg-1',
+      mbid: asMbid('rg-1'),
       targetType: 'album',
     };
     const effects = Acquisition.fromHistory([
@@ -913,14 +927,14 @@ describe('Acquisition.execute — manual edition selection', () => {
 
   it('selecting a retained candidate records the choice', () => {
     const events = Acquisition.fromHistory(awaitingSelectionHistory())
-      .execute({ type: 'SelectEdition', releaseMbid: 'boot-1' })
+      .execute({ type: 'SelectEdition', releaseMbid: asMbid('boot-1') })
       ._unsafeUnwrap();
     expect(events).toEqual([{ type: 'EditionSelected', releaseMbid: 'boot-1' }]);
   });
 
   it('rejects selecting an edition that is not among the retained candidates', () => {
     const acq = Acquisition.fromHistory(awaitingSelectionHistory());
-    const result = acq.execute({ type: 'SelectEdition', releaseMbid: 'not-a-candidate' });
+    const result = acq.execute({ type: 'SelectEdition', releaseMbid: asMbid('not-a-candidate') });
     expect(result._unsafeUnwrapErr()).toEqual({
       kind: 'UnknownEdition',
       releaseMbid: 'not-a-candidate',
@@ -930,7 +944,7 @@ describe('Acquisition.execute — manual edition selection', () => {
   it('rejects a selection on an acquisition that is not awaiting one', () => {
     const result = Acquisition.fromHistory(resolvedHistory()).execute({
       type: 'SelectEdition',
-      releaseMbid: 'boot-1',
+      releaseMbid: asMbid('boot-1'),
     });
     expect(result._unsafeUnwrapErr()).toEqual({
       kind: 'IllegalTransition',
@@ -943,7 +957,7 @@ describe('Acquisition.execute — manual edition selection', () => {
     const cancelled = [...awaitingSelectionHistory(), { type: 'AcquisitionCancelled' } as const];
     const result = Acquisition.fromHistory(cancelled).execute({
       type: 'SelectEdition',
-      releaseMbid: 'boot-1',
+      releaseMbid: asMbid('boot-1'),
     });
     expect(result._unsafeUnwrapErr()).toEqual({
       kind: 'IllegalTransition',
@@ -955,7 +969,7 @@ describe('Acquisition.execute — manual edition selection', () => {
   it('a resolved target after the selection resumes the normal flow', () => {
     const resumed = [
       ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: 'boot-1' } as const,
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') } as const,
     ];
     const events = Acquisition.fromHistory(resumed)
       .execute({ type: 'RecordTarget', target: sampleTarget })
@@ -980,11 +994,11 @@ describe('Acquisition.execute — manual edition selection', () => {
   it('a recorded selection resolves the chosen release directly (the resume effect)', () => {
     const resumed = [
       ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: 'boot-1' } as const,
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') } as const,
     ];
     const effects = Acquisition.fromHistory(resumed).reactTo({
       type: 'EditionSelected',
-      releaseMbid: 'boot-1',
+      releaseMbid: asMbid('boot-1'),
     });
     expect(effects).toEqual([
       {

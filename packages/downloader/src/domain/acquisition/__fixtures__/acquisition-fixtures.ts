@@ -8,6 +8,8 @@ import type { AcquisitionPolicies } from '../../policy/policies.js';
 import { DEFAULT_QUALITY_POLICY } from '../../policy/quality-policy.js';
 import { rankCandidates } from '../../ranking/ranking.js';
 import type { RankedCandidate } from '../../ranking/ranking.js';
+import { asCandidateIdentity } from '../../shared/__fixtures__/candidate-identity.js';
+import { asMbid } from '../../shared/__fixtures__/mbid.js';
 import { createTarget } from '../../target/target.js';
 import type { Target } from '../../target/target.js';
 import type {
@@ -32,7 +34,7 @@ export const sampleTarget: Target = createTarget({
 
 export const sampleRequest: AcquisitionRequest = {
   kind: 'musicbrainz',
-  mbid: 'mbid-1',
+  mbid: asMbid('mbid-1'),
   targetType: 'album',
 };
 
@@ -54,7 +56,11 @@ export function defaultPolicies(overrides: Partial<AcquisitionPolicies> = {}): A
 /** A lossless, structurally-aligned candidate that clears both gates for {@link sampleTarget}. */
 export function matchingCandidate(username: string): Candidate {
   return {
-    identity: { username, path: `${username}/Radiohead - Kid A (2000) [FLAC]`, sizeBytes: 1000 },
+    identity: asCandidateIdentity({
+      username,
+      path: `${username}/Radiohead - Kid A (2000) [FLAC]`,
+      sizeBytes: 1000,
+    }),
     files: [
       {
         name: '01 Everything in Its Right Place.flac',
@@ -83,21 +89,21 @@ export function requestedHistory(
 
 export const sampleGroupRequest: AcquisitionRequest = {
   kind: 'release-group',
-  mbid: 'rg-1',
+  mbid: asMbid('rg-1'),
   targetType: 'album',
 };
 
 /** The candidate editions of a group with no official edition, as resolution would present them. */
 export const sampleEditionCandidates: readonly EditionCandidate[] = [
   {
-    releaseMbid: 'boot-1',
+    releaseMbid: asMbid('boot-1'),
     title: 'Live at Budokan',
     date: '1995-05-01',
     country: 'JP',
     format: 'CD',
     trackCount: 12,
   },
-  { releaseMbid: 'boot-2', title: 'Promo Sampler', trackCount: 12 },
+  { releaseMbid: asMbid('boot-2'), title: 'Promo Sampler', trackCount: 12 },
 ];
 
 /** History paused for a human's edition choice — an AwaitingManualSelection state. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AcquisitionEvent } from './events.js';
 import { evolve, foldEvents } from './state.js';
+import { asMbid } from '../shared/__fixtures__/mbid.js';
 import type { AcquisitionPhase, AcquisitionState } from './state.js';
 import {
   awaitingSelectionHistory,
@@ -52,7 +53,7 @@ const allEvents: AcquisitionEvent[] = [
   { type: 'TargetResolved', target: sampleTarget },
   { type: 'MetadataResolutionFailed' },
   { type: 'ManualSelectionRequested', candidates: sampleEditionCandidates },
-  { type: 'EditionSelected', releaseMbid: 'boot-1' },
+  { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
   { type: 'SearchRequested', round: 2 },
   { type: 'SearchCompleted', round: 1, candidates: [] },
   { type: 'CandidatesRanked', ranked: [] },
@@ -266,7 +267,7 @@ describe('evolve — manual edition selection pauses and resumes', () => {
   it('folds an edition selection back to Pending, keeping the original request', () => {
     const state = foldEvents([
       ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
     ]);
     expect(state).toMatchObject({ phase: 'Pending', request: sampleGroupRequest });
     expect('candidates' in state).toBe(false);
@@ -275,7 +276,7 @@ describe('evolve — manual edition selection pauses and resumes', () => {
   it('resolves to Searching once the selected edition yields a target (the normal flow)', () => {
     const state = foldEvents([
       ...awaitingSelectionHistory(),
-      { type: 'EditionSelected', releaseMbid: 'boot-1' },
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
       { type: 'TargetResolved', target: sampleTarget },
     ]);
     expect(state).toMatchObject({ phase: 'Searching', target: sampleTarget });

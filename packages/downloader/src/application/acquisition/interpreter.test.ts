@@ -4,7 +4,8 @@ import { interpretEffect } from './interpreter.js';
 import type { EffectPorts, InterpreterDeps } from './interpreter.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import { infraError } from '../ports/errors.js';
-import { DEFAULT_DOWNLOAD_POLICY } from '../../domain/policy/policies.js';
+import { createMatchPolicy, DEFAULT_DOWNLOAD_POLICY } from '../../domain/policy/policies.js';
+import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import {
@@ -76,7 +77,7 @@ describe('interpretEffect — metadata resolution', () => {
     });
     await interpretEffect(deps(ports), 'acq-1', {
       type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: 'x', targetType: 'album' },
+      request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
     });
     expect(appendedTypes()).toContain('MetadataResolutionFailed');
   });
@@ -107,7 +108,10 @@ describe('interpretEffect — metadata resolution', () => {
   });
 
   it('resolves the chosen edition on the resume path and records the target', async () => {
-    await seed([...awaitingSelectionHistory(), { type: 'EditionSelected', releaseMbid: 'boot-1' }]);
+    await seed([
+      ...awaitingSelectionHistory(),
+      { type: 'EditionSelected', releaseMbid: asMbid('boot-1') },
+    ]);
     const ports = stubPorts({
       metadata: {
         resolve: vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget })),
@@ -116,7 +120,7 @@ describe('interpretEffect — metadata resolution', () => {
     // The effect `react` emits for EditionSelected: the direct-by-release-id request.
     await interpretEffect(deps(ports), 'acq-1', {
       type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: 'boot-1', targetType: 'album' },
+      request: { kind: 'musicbrainz', mbid: asMbid('boot-1'), targetType: 'album' },
     });
     const resolved = store
       .all()
@@ -135,7 +139,7 @@ describe('interpretEffect — metadata resolution', () => {
     });
     const result = await interpretEffect(deps(ports), 'acq-1', {
       type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: 'x', targetType: 'album' },
+      request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
     });
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });
@@ -281,7 +285,7 @@ describe('interpretEffect — validation', () => {
       type: 'Validate',
       files: sampleFiles,
       target: sampleTarget,
-      matchPolicy: { threshold: 0.5 },
+      matchPolicy: createMatchPolicy(0.5)._unsafeUnwrap(),
     });
     expect(appendedTypes()).toContain('ValidationPassed');
   });
@@ -297,7 +301,7 @@ describe('interpretEffect — validation', () => {
       type: 'Validate',
       files: sampleFiles,
       target: sampleTarget,
-      matchPolicy: { threshold: 0.9 },
+      matchPolicy: createMatchPolicy(0.9)._unsafeUnwrap(),
     });
     expect(appendedTypes()).toContain('ValidationFailed');
   });

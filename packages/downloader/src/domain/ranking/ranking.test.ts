@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { asCandidateIdentity } from '../shared/__fixtures__/candidate-identity.js';
 import { candidateQualityBucket, rankCandidates } from './ranking.js';
 import type { Candidate, CandidateFile } from '../candidate/candidate.js';
-import { DEFAULT_MATCH_POLICY } from '../policy/policies.js';
-import { DEFAULT_QUALITY_POLICY } from '../policy/quality-policy.js';
+import { createMatchPolicy, DEFAULT_MATCH_POLICY } from '../policy/policies.js';
+import { createQualityPolicy, DEFAULT_QUALITY_POLICY } from '../policy/quality-policy.js';
 import { createTarget } from '../target/target.js';
 import type { Target } from '../target/target.js';
 
@@ -38,11 +39,11 @@ function candidate(overrides: {
     bitrate: overrides.bitrate ?? file.bitrate,
   }));
   return {
-    identity: {
+    identity: asCandidateIdentity({
       username: overrides.username ?? 'peer',
       path: overrides.path ?? 'Radiohead - Kid A (2000)',
       sizeBytes: 1000,
-    },
+    }),
     files,
     source: {
       speedBytesPerSec: overrides.speed ?? 100,
@@ -71,7 +72,10 @@ describe('candidateQualityBucket', () => {
 
 describe('rankCandidates', () => {
   it('excludes candidates below the quality floor', () => {
-    const losslessFloor = { order: DEFAULT_QUALITY_POLICY.order, floor: 'LOSSLESS' as const };
+    const losslessFloor = createQualityPolicy(
+      DEFAULT_QUALITY_POLICY.order,
+      'LOSSLESS',
+    )._unsafeUnwrap();
     const lossy = candidate({ codec: 'mp3', bitrate: 320000 });
     expect(rankCandidates([lossy], target, losslessFloor, DEFAULT_MATCH_POLICY)).toHaveLength(0);
   });
@@ -80,7 +84,7 @@ describe('rankCandidates', () => {
     const wrong = candidate({
       files: [{ name: 'unrelated.flac', sizeBytes: 1, durationMs: 5000 }],
     });
-    const strict = { threshold: 0.9 };
+    const strict = createMatchPolicy(0.9)._unsafeUnwrap();
     expect(rankCandidates([wrong], target, DEFAULT_QUALITY_POLICY, strict)).toHaveLength(0);
   });
 

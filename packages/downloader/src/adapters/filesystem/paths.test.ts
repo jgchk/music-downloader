@@ -1,15 +1,16 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import { renderReleaseDir, sanitizeSegment } from './paths.js';
 
-const target: Target = {
+const target: Target = createTarget({
   type: 'album',
   artist: 'The Band',
   title: 'Great Album',
   tracks: [{ position: 1, title: 'One', durationMs: 1000 }],
   year: 2020,
-};
+})._unsafeUnwrap();
 
 describe('sanitizeSegment', () => {
   it('replaces filesystem-unsafe characters and spaces', () => {

@@ -1,7 +1,9 @@
 import { join } from 'node:path';
+import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-identity.js';
 import { describe, expect, it } from 'vitest';
 import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { Candidate } from '../../domain/candidate/candidate.js';
+import { createDownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
@@ -13,7 +15,7 @@ const STAGING = '/staging';
 const DOWNLOADS_ROOT = '/downloads';
 const ACQ = 'acq-1';
 const candidate: Candidate = {
-  identity: { username: 'u1', path: '@@a\\Album', sizeBytes: 200 },
+  identity: asCandidateIdentity({ username: 'u1', path: '@@a\\Album', sizeBytes: 200 }),
   files: [
     { name: '01.flac', sizeBytes: 100 },
     { name: '02.flac', sizeBytes: 100 },
@@ -21,10 +23,8 @@ const candidate: Candidate = {
   source: { speedBytesPerSec: 0, freeSlots: 1, queueLength: 0 },
 };
 
-const policy = (stallTimeoutMs: number, maxQueueWaitMs: number): DownloadPolicy => ({
-  stallTimeoutMs,
-  maxQueueWaitMs,
-});
+const policy = (stallTimeoutMs: number, maxQueueWaitMs: number): DownloadPolicy =>
+  createDownloadPolicy({ stallTimeoutMs, maxQueueWaitMs })._unsafeUnwrap();
 
 function transfer(name: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { id: name, filename: `@@a\\Album\\${name}`, ...extra };

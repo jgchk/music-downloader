@@ -1,5 +1,8 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
+import { branded } from '../shared/brand.js';
+import type { Brand } from '../shared/brand.js';
+import type { Mbid } from '../shared/mbid.js';
 
 /**
  * The normalized, source-agnostic description of what a caller wants to acquire (D11).
@@ -14,16 +17,32 @@ export interface TrackMetadata {
   readonly durationMs: number;
 }
 
-export interface Target {
+/**
+ * Branded (compile-time only, runtime-erased) so a validated target cannot be forged from a raw
+ * object literal — the only source is {@link createTarget}. The value still serializes on events
+ * as plain JSON.
+ */
+export type Target = Brand<
+  {
+    readonly type: TargetType;
+    readonly artist: string;
+    readonly title: string;
+    readonly tracks: readonly TrackMetadata[];
+    readonly year?: number;
+    readonly mbid?: Mbid;
+  },
+  'Target'
+>;
+
+/** The unvalidated shape accepted by {@link createTarget}: the target fields without the brand. */
+export interface TargetInput {
   readonly type: TargetType;
   readonly artist: string;
   readonly title: string;
   readonly tracks: readonly TrackMetadata[];
   readonly year?: number;
-  readonly mbid?: string;
+  readonly mbid?: Mbid;
 }
-
-export type TargetInput = Target;
 
 export type TargetError =
   | { readonly kind: 'EmptyArtist' }
@@ -47,14 +66,16 @@ export function createTarget(input: TargetInput): Result<Target, TargetError> {
     }
   }
 
-  return ok({
-    type: input.type,
-    artist,
-    title,
-    tracks: input.tracks,
-    year: input.year,
-    mbid: input.mbid,
-  });
+  return ok(
+    branded<Target>({
+      type: input.type,
+      artist,
+      title,
+      tracks: input.tracks,
+      year: input.year,
+      mbid: input.mbid,
+    }),
+  );
 }
 
 export function trackCount(target: Target): number {

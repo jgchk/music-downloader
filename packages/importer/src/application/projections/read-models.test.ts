@@ -17,6 +17,7 @@ import {
   requested,
   resolved,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
+import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import { ImportStatusProjection, projectStatus } from './read-models.js';
@@ -50,7 +51,7 @@ describe('projectStatus', () => {
     expect(view.history).toEqual([
       { kind: 'requested', hints: HINTS },
       { kind: 'proposed', candidateCount: 1, pinnedId: 'mb-1' },
-      { kind: 'auto-apply-selected', candidate: candidate().ref, distance: 0.05 },
+      { kind: 'auto-apply-selected', candidate: candidate().ref, distance: asDistance(0.05) },
       { kind: 'applied', location: '/library/Artist/Album' },
     ]);
   });
@@ -135,7 +136,7 @@ describe('ImportStatusProjection', () => {
       directory: DIRECTORY,
       review: {
         cause: { kind: 'match-review' },
-        candidates: [candidate({ distance: 0.5 })],
+        candidates: [candidate({ distance: asDistance(0.5) })],
       },
     });
   });

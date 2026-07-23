@@ -1,5 +1,7 @@
-import { Result } from 'neverthrow';
+import { Result, ok } from 'neverthrow';
 import type { AcquisitionRequest } from '../domain/acquisition/events.js';
+import { parseMbid } from '../domain/shared/mbid.js';
+import type { InvalidMbid } from '../domain/shared/mbid.js';
 import type { AcquisitionPolicies } from '../domain/policy/policies.js';
 import {
   DEFAULT_DOWNLOAD_POLICY,
@@ -31,9 +33,13 @@ import type {
 
 type HistoryDto = AcquisitionStatusResponseDto['history'][number];
 
-export function requestToDomain(dto: AcquisitionRequestDto): AcquisitionRequest {
-  // The wire request mirrors the domain request today; the explicit boundary lets them diverge.
-  return dto;
+export function requestToDomain(
+  dto: AcquisitionRequestDto,
+): Result<AcquisitionRequest, InvalidMbid> {
+  // The wire request mirrors the domain request today, but its id crosses the anti-corruption
+  // boundary here: parse it once into an Mbid so the domain only ever holds well-formed ids.
+  if (dto.kind === 'descriptor') return ok(dto);
+  return parseMbid(dto.mbid).map((mbid) => ({ ...dto, mbid }));
 }
 
 export function resolvePolicies(

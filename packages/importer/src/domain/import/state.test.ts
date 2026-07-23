@@ -19,6 +19,7 @@ import {
   requested,
   resolved,
 } from './__fixtures__/import-fixtures.js';
+import { asDistance } from '../shared/__fixtures__/distance.js';
 import type { ImportEvent } from './events.js';
 import { candidateRefKey } from './events.js';
 import { evolve, foldEvents, initialState, isTerminal } from './state.js';
@@ -82,7 +83,7 @@ describe('evolve — the tolerant, total fold', () => {
     expect(state).toMatchObject({
       phase: 'awaiting-review',
       cause: { kind: 'match-review' },
-      candidates: [candidate({ distance: 0.5 })],
+      candidates: [candidate({ distance: asDistance(0.5) })],
     });
   });
 

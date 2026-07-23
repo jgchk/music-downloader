@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { asCandidateIdentity } from '../shared/__fixtures__/candidate-identity.js';
 import {
   audioFiles,
   candidateText,
@@ -28,7 +29,7 @@ function candidate(
   path = 'Portishead - Dummy (1994) [FLAC]',
 ): Candidate {
   return {
-    identity: { username: 'peer', path, sizeBytes: 1000 },
+    identity: asCandidateIdentity({ username: 'peer', path, sizeBytes: 1000 }),
     files,
     source: { speedBytesPerSec: 1, freeSlots: 1, queueLength: 0 },
   };

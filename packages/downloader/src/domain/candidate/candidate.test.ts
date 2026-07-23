@@ -1,8 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import { candidateKey, fileCount, refersTo, sameCandidate } from './candidate.js';
+import {
+  candidateKey,
+  fileCount,
+  parseCandidateIdentity,
+  refersTo,
+  sameCandidate,
+} from './candidate.js';
 import type { Candidate, CandidateIdentity } from './candidate.js';
 
-const identity: CandidateIdentity = { username: 'peer1', path: '/music/album', sizeBytes: 4200 };
+const identity: CandidateIdentity = parseCandidateIdentity({
+  username: 'peer1',
+  path: '/music/album',
+  sizeBytes: 4200,
+})._unsafeUnwrap();
+
+describe('parseCandidateIdentity', () => {
+  it('accepts a well-formed identity, preserving its fields', () => {
+    expect(
+      parseCandidateIdentity({ username: 'peer1', path: '/a', sizeBytes: 0 })._unsafeUnwrap(),
+    ).toEqual({ username: 'peer1', path: '/a', sizeBytes: 0 });
+  });
+
+  it('rejects an empty username or path', () => {
+    expect(
+      parseCandidateIdentity({ username: '  ', path: '/a', sizeBytes: 1 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'EmptyUsername' });
+    expect(
+      parseCandidateIdentity({ username: 'peer1', path: '', sizeBytes: 1 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'EmptyPath' });
+  });
+
+  it('rejects a negative or non-finite size (the dedup key must be sound)', () => {
+    expect(
+      parseCandidateIdentity({ username: 'peer1', path: '/a', sizeBytes: -1 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'InvalidSize' });
+    expect(
+      parseCandidateIdentity({
+        username: 'peer1',
+        path: '/a',
+        sizeBytes: Number.NaN,
+      })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'InvalidSize' });
+  });
+});
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
   return {

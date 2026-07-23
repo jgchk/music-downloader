@@ -1,23 +1,42 @@
 import { describe, expect, it } from 'vitest';
+import { asCandidateIdentity } from '../domain/shared/__fixtures__/candidate-identity.js';
 import { DEFAULT_MATCH_POLICY } from '../domain/policy/policies.js';
 import type { AcquisitionStatusView } from '../application/projections/read-models.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 
 describe('requestToDomain', () => {
-  it('carries the wire request through to the domain shape', () => {
-    expect(requestToDomain({ kind: 'musicbrainz', mbid: 'rel-1', targetType: 'album' })).toEqual({
-      kind: 'musicbrainz',
-      mbid: 'rel-1',
-      targetType: 'album',
-    });
+  const MBID = '11111111-1111-4111-8111-111111111111';
+
+  it('parses a musicbrainz request id into a domain mbid', () => {
+    expect(
+      requestToDomain({ kind: 'musicbrainz', mbid: MBID, targetType: 'album' })._unsafeUnwrap(),
+    ).toEqual({ kind: 'musicbrainz', mbid: MBID, targetType: 'album' });
   });
 
-  it('carries a release-group request through to the domain shape', () => {
-    expect(requestToDomain({ kind: 'release-group', mbid: 'rg-1', targetType: 'album' })).toEqual({
-      kind: 'release-group',
-      mbid: 'rg-1',
-      targetType: 'album',
-    });
+  it('parses a release-group request id into a domain mbid', () => {
+    expect(
+      requestToDomain({ kind: 'release-group', mbid: MBID, targetType: 'album' })._unsafeUnwrap(),
+    ).toEqual({ kind: 'release-group', mbid: MBID, targetType: 'album' });
+  });
+
+  it('carries a descriptor request through unchanged (no id to parse)', () => {
+    const descriptor = {
+      kind: 'descriptor' as const,
+      targetType: 'album' as const,
+      artist: 'Radiohead',
+      title: 'Kid A',
+    };
+    expect(requestToDomain(descriptor)._unsafeUnwrap()).toEqual(descriptor);
+  });
+
+  it('rejects a malformed MusicBrainz id as a modeled error', () => {
+    expect(
+      requestToDomain({
+        kind: 'musicbrainz',
+        mbid: 'not-a-uuid',
+        targetType: 'album',
+      })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'InvalidMbid', value: 'not-a-uuid' });
   });
 });
 
@@ -58,7 +77,7 @@ describe('resolvePolicies', () => {
 });
 
 describe('statusViewToDto', () => {
-  const candidate = { username: 'u1', path: 'p', sizeBytes: 100 };
+  const candidate = asCandidateIdentity({ username: 'u1', path: 'p', sizeBytes: 100 });
 
   it('maps every history-entry kind and the current candidate', () => {
     const view: AcquisitionStatusView = {

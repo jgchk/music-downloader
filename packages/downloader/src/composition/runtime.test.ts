@@ -62,7 +62,13 @@ function fakePorts(): EffectPorts {
   };
 }
 
-const SUBMIT = { request: { kind: 'musicbrainz', mbid: 'mbid-1', targetType: 'album' } };
+const SUBMIT = {
+  request: {
+    kind: 'musicbrainz',
+    mbid: '11111111-1111-4111-8111-111111111111',
+    targetType: 'album',
+  },
+};
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {

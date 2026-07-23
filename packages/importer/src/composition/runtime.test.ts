@@ -94,6 +94,22 @@ describe('createImporterRuntime', () => {
     expect(startupError.detail).toContain('bad yaml');
   });
 
+  it('refuses to boot on an out-of-range auto-apply threshold', async () => {
+    const result = await createImporterRuntime(
+      config({ autoApplyThreshold: 1.5 }),
+      silentLogger(),
+      {
+        tagger: fakeTagger(),
+      },
+    );
+    expect(result.isErr()).toBe(true);
+    const startupError = result._unsafeUnwrapErr();
+    expect(startupError.kind).toBe('InvalidAutoApplyThreshold');
+    if (startupError.kind === 'InvalidAutoApplyThreshold') {
+      expect(startupError.detail).toContain('1.5');
+    }
+  });
+
   it('consumes a downloader fulfilment over the connected feed into a native import', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'intake-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));

@@ -1,6 +1,7 @@
 import type { Candidate, CandidateIdentity } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { RankedCandidate } from '../ranking/ranking.js';
+import type { Mbid } from '../shared/mbid.js';
 import type { Target, TargetType } from '../target/target.js';
 import type { ValidationVerdict } from '../validation/verdict.js';
 
@@ -16,8 +17,8 @@ import type { ValidationVerdict } from '../validation/verdict.js';
  * selection when none is official), or a structured descriptor to resolve (D12).
  */
 export type AcquisitionRequest =
-  | { readonly kind: 'musicbrainz'; readonly mbid: string; readonly targetType: TargetType }
-  | { readonly kind: 'release-group'; readonly mbid: string; readonly targetType: 'album' }
+  | { readonly kind: 'musicbrainz'; readonly mbid: Mbid; readonly targetType: TargetType }
+  | { readonly kind: 'release-group'; readonly mbid: Mbid; readonly targetType: 'album' }
   | {
       readonly kind: 'descriptor';
       readonly targetType: TargetType;
@@ -49,7 +50,7 @@ export interface DownloadedFile {
  * 0 (the mapping sums per-medium counts, unknown contributing nothing).
  */
 export interface EditionCandidate {
-  readonly releaseMbid: string;
+  readonly releaseMbid: Mbid;
   readonly title?: string;
   readonly date?: string;
   readonly country?: string;
@@ -74,7 +75,7 @@ export type AcquisitionEvent =
   | {
       // The human chose: resolve exactly this release, identical to a direct-by-release-id request.
       readonly type: 'EditionSelected';
-      readonly releaseMbid: string;
+      readonly releaseMbid: Mbid;
     }
   | { readonly type: 'SearchRequested'; readonly round: number }
   | {

@@ -3,6 +3,7 @@ import { combineVerdict, verdictPasses } from './verdict.js';
 import type { ValidatorOutcome } from './verdict.js';
 import { playabilityValidator, structuralIdentityValidator } from './validators.js';
 import type { ProbedAudio } from './validators.js';
+import { createMatchPolicy } from '../policy/policies.js';
 import { createTarget } from '../target/target.js';
 import type { Target } from '../target/target.js';
 
@@ -79,7 +80,7 @@ describe('verdictPasses', () => {
       playabilityValidator(probes),
       structuralIdentityValidator(probes, target),
     ]);
-    expect(verdictPasses(verdict, { threshold: 0.5 })).toBe(true);
-    expect(verdictPasses(verdict, { threshold: 0.95 })).toBe(false);
+    expect(verdictPasses(verdict, createMatchPolicy(0.5)._unsafeUnwrap())).toBe(true);
+    expect(verdictPasses(verdict, createMatchPolicy(0.95)._unsafeUnwrap())).toBe(false);
   });
 });

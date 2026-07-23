@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import type { z } from 'zod';
 import type { ApplyMode } from '../../domain/import/events.js';
+import { branded } from '../../domain/shared/brand.js';
+import type { Distance } from '../../domain/shared/distance.js';
 import type { Logger } from '../../application/logging/logger.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
@@ -89,8 +91,12 @@ export class BeetsBridge implements TaggerPort {
           ref: { dataSource: candidate.data_source, albumId: candidate.album_id },
           artist: candidate.artist,
           album: candidate.album,
-          distance: candidate.distance,
-          penalties: candidate.penalties,
+          // The schema's [0, 1] bound is the parse edge; brand the validated numbers as Distance.
+          distance: branded<Distance>(candidate.distance),
+          penalties: candidate.penalties.map((penalty) => ({
+            name: penalty.name,
+            amount: branded<Distance>(penalty.amount),
+          })),
           tracks: candidate.tracks,
         })),
         duplicates: output.duplicates,
