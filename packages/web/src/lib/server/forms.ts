@@ -98,7 +98,7 @@ export function resolveReviewForm(data: FormData): unknown {
     case 'reject': {
       return compactResolution({ verb, reason: text(data, 'reason') });
     }
-    case 'reject-and-retry-download': {
+    case 'reject-unusable-delivery': {
       const reasons = text(data, 'reasons')
         ?.split('\n')
         .map((s) => s.trim())

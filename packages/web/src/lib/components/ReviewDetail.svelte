@@ -31,13 +31,13 @@
     <p data-testid="hinted">Your hint: {note}.</p>
   {/if}
   <CandidateTable candidates={review.candidates} />
-  <ResolveForms supplyId refresh importAsIs reject rejectAndRetry />
+  <ResolveForms supplyId refresh importAsIs reject rejectUnusable />
   <ManualTagsForm />
 {:else if review.kind === 'no-match'}
   <p data-testid="no-match-note">
     Beets found no candidates for this directory — this release may not exist in MusicBrainz.
   </p>
-  <ResolveForms supplyId refresh importAsIs reject rejectAndRetry />
+  <ResolveForms supplyId refresh importAsIs reject rejectUnusable />
   <ManualTagsForm />
 {:else if review.kind === 'duplicate-review'}
   <h2>Already in the library</h2>
@@ -47,7 +47,7 @@
     {/each}
   </ul>
   <CandidateTable candidates={review.candidates} withDuplicateAction />
-  <ResolveForms reject rejectAndRetry />
+  <ResolveForms reject rejectUnusable />
 {:else if review.kind === 'remediation-review'}
   <h2>The import applied, but enrichment failed</h2>
   <ul data-testid="failures">

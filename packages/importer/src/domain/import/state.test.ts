@@ -150,14 +150,14 @@ describe('evolve — the tolerant, total fold', () => {
       expect(state).toMatchObject({ phase: 'awaiting-review', settled: { kind: 'reject' } });
     });
 
-    it('settles the review but holds the phase on reject-and-retry-download', () => {
+    it('settles the review but holds the phase on reject-unusable-delivery', () => {
       const state = foldEvents([
         ...awaitingReviewWithCandidate(),
-        resolved({ kind: 'reject-and-retry-download', reasons: ['corrupt rip'] }),
+        resolved({ kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] }),
       ]);
       expect(state).toMatchObject({
         phase: 'awaiting-review',
-        settled: { kind: 'reject-and-retry-download' },
+        settled: { kind: 'reject-unusable-delivery' },
       });
     });
 
@@ -255,7 +255,7 @@ describe('evolve — the tolerant, total fold', () => {
     expect(reviewing).toMatchObject({ phase: 'awaiting-review', source: SOURCE });
     const rejected = foldEvents([
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download' }),
+      resolved({ kind: 'reject-unusable-delivery' }),
       REJECTED,
     ]);
     expect(rejected).toMatchObject({ phase: 'rejected', source: SOURCE });
@@ -275,7 +275,7 @@ describe('evolve — the tolerant, total fold', () => {
     };
     const settledState = foldEvents([
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download' }),
+      resolved({ kind: 'reject-unusable-delivery' }),
     ]);
     expect(evolve(settledState, verdict)).toBe(settledState);
     expect(evolve(initialState, verdict)).toBe(initialState);

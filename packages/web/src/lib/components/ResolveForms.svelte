@@ -4,7 +4,7 @@
     refresh?: boolean;
     importAsIs?: boolean;
     reject?: boolean;
-    rejectAndRetry?: boolean;
+    rejectUnusable?: boolean;
     accept?: boolean;
     retryEnrichment?: boolean;
   }
@@ -14,7 +14,7 @@
     refresh = false,
     importAsIs = false,
     reject = false,
-    rejectAndRetry = false,
+    rejectUnusable = false,
     accept = false,
     retryEnrichment = false,
   }: Properties = $props();
@@ -67,13 +67,13 @@
   </form>
 {/if}
 
-{#if rejectAndRetry}
-  <form method="POST" action="?/resolve" data-testid="reject-retry">
-    <input type="hidden" name="verb" value="reject-and-retry-download" />
+{#if rejectUnusable}
+  <form method="POST" action="?/resolve" data-testid="reject-unusable">
+    <input type="hidden" name="verb" value="reject-unusable-delivery" />
     <label>
       Reasons (one per line)
       <textarea name="reasons"></textarea>
     </label>
-    <button type="submit">Reject and retry the download</button>
+    <button type="submit">Reject as unusable (delete files)</button>
   </form>
 {/if}

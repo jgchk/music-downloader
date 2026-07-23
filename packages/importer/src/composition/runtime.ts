@@ -11,7 +11,7 @@ import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import { SqliteParkedEffectStore } from '../adapters/sqlite/parked-effects.js';
 import { parseDistance } from '../domain/shared/distance.js';
 import { openEventDatabase } from '../adapters/sqlite/schema.js';
-import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
+import { buildUpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { interpretEffect } from '../application/import/interpreter.js';
 import type { InterpreterDependencies } from '../application/import/interpreter.js';
 import { REACTOR_CONSUMER, Reactor } from '../application/import/reactor.js';
@@ -166,7 +166,7 @@ export async function createImporterRuntime(
   mkdirSync(path.dirname(config.databaseFile), { recursive: true });
   const database = openEventDatabase(config.databaseFile);
   const bus = new InProcessEventBus(logger);
-  const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
+  const store = new SqliteEventStore(database, buildUpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(database);
   const deadLetters = new SqliteDeadLetterStore(database);
   const parkedEffects = new SqliteParkedEffectStore(database);

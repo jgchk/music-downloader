@@ -12,7 +12,7 @@ describe('ResolveForms (SSR)', () => {
       'accept',
       'retry-enrichment',
       'reject',
-      'reject-retry',
+      'reject-unusable',
     ]) {
       expect(body).not.toContain(`data-testid="${id}"`);
     }
@@ -25,7 +25,7 @@ describe('ResolveForms (SSR)', () => {
         refresh: true,
         importAsIs: true,
         reject: true,
-        rejectAndRetry: true,
+        rejectUnusable: true,
         accept: true,
         retryEnrichment: true,
       },
@@ -37,7 +37,7 @@ describe('ResolveForms (SSR)', () => {
       'accept',
       'retry-enrichment',
       'reject',
-      'reject-retry',
+      'reject-unusable',
     ]) {
       expect(body).toContain(`data-testid="${id}"`);
     }
@@ -50,7 +50,7 @@ describe('ResolveForms (SSR)', () => {
       'accept',
       'retry-enrichment',
       'reject',
-      'reject-and-retry-download',
+      'reject-unusable-delivery',
     ]) {
       expect(body).toContain(`value="${verb}"`);
     }

@@ -331,9 +331,9 @@ describe('resolving a review', () => {
     expect(error).toMatchObject({ kind: 'InvalidResolution' });
   });
 
-  it('mints the release verdict beside the rejection on reject-and-retry-download', () => {
+  it('mints the release verdict beside the rejection on reject-unusable-delivery', () => {
     const resolution = {
-      kind: 'reject-and-retry-download',
+      kind: 'reject-unusable-delivery',
       reasons: ['corrupt rip', 'transcode'],
     } as const;
     const events = given(awaitingReviewWithCandidate())
@@ -352,16 +352,16 @@ describe('resolving a review', () => {
 
   it('defaults the verdict reasons to an empty list when none are given', () => {
     const events = given(awaitingReviewWithCandidate())
-      .execute(resolve({ kind: 'reject-and-retry-download' }))
+      .execute(resolve({ kind: 'reject-unusable-delivery' }))
       ._unsafeUnwrap();
     expect(events[1]).toMatchObject({ type: 'ReleaseVerdictRecorded', reasons: [] });
   });
 
-  it('refuses reject-and-retry-download without a retained candidate', () => {
+  it('refuses reject-unusable-delivery without a retained candidate', () => {
     // A manual import has no source at all; a legacy intake import has a source but no candidate.
     expect(
       given(awaitingMatchReview())
-        .execute(resolve({ kind: 'reject-and-retry-download' }))
+        .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NoRetainedCandidate' });
     const legacy = [
@@ -371,7 +371,7 @@ describe('resolving a review', () => {
     ];
     expect(
       given(legacy)
-        .execute(resolve({ kind: 'reject-and-retry-download' }))
+        .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NoRetainedCandidate' });
     // Plain reject still resolves the same review normally.
@@ -382,14 +382,14 @@ describe('resolving a review', () => {
     ).toEqual([{ type: 'ReviewResolved', resolution: { kind: 'reject' } }]);
   });
 
-  it('no-ops a redelivered reject-and-retry-download of a settled review', () => {
+  it('no-ops a redelivered reject-unusable-delivery of a settled review', () => {
     const history = [
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download' }),
+      resolved({ kind: 'reject-unusable-delivery' }),
     ];
     expect(
       given(history)
-        .execute(resolve({ kind: 'reject-and-retry-download' }))
+        .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -464,10 +464,10 @@ describe('recording rejection outcomes', () => {
     expect(events[0]).toMatchObject({ reason: 'rejected by review' });
   });
 
-  it('records the rejection with joined reasons after a reject-and-retry-download', () => {
+  it('records the rejection with joined reasons after a reject-unusable-delivery', () => {
     const history = [
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download', reasons: ['corrupt rip', 'transcode'] }),
+      resolved({ kind: 'reject-unusable-delivery', reasons: ['corrupt rip', 'transcode'] }),
     ];
     const events = given(history).execute({ type: 'RecordIntakeDeleted' })._unsafeUnwrap();
     expect(events).toEqual([
@@ -478,7 +478,7 @@ describe('recording rejection outcomes', () => {
   it('defaults the rejection reason when the retry verb carried no reasons', () => {
     const history = [
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download' }),
+      resolved({ kind: 'reject-unusable-delivery' }),
     ];
     const events = given(history).execute({ type: 'RecordIntakeDeleted' })._unsafeUnwrap();
     expect(events[0]).toMatchObject({ reason: 'rejected by review' });
@@ -607,8 +607,8 @@ describe('react — the reflex', () => {
     expect(given([]).reactTo(resolved({ kind: 'reject' }))).toEqual([]);
   });
 
-  it('fires DeleteIntake on reject-and-retry-download — same hygiene as reject', () => {
-    const resolution = resolved({ kind: 'reject-and-retry-download', reasons: ['corrupt rip'] });
+  it('fires DeleteIntake on reject-unusable-delivery — same hygiene as reject', () => {
+    const resolution = resolved({ kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] });
     const history = [...awaitingReviewWithCandidate(), resolution];
     expect(given(history).reactTo(resolution)).toEqual([
       { type: 'DeleteIntake', directory: DIRECTORY },
@@ -625,7 +625,7 @@ describe('react — the reflex', () => {
     } as const;
     const history = [
       ...awaitingReviewWithCandidate(),
-      resolved({ kind: 'reject-and-retry-download' }),
+      resolved({ kind: 'reject-unusable-delivery' }),
       verdict,
     ];
     expect(given(history).reactTo(verdict)).toEqual([]);

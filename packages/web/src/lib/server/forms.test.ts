@@ -142,14 +142,14 @@ describe('resolveReviewForm', () => {
     ).toEqual({ verb: 'reject', reason: 'wrong album' });
   });
 
-  it('shapes reject-and-retry-download with newline-separated reasons', () => {
+  it('shapes reject-unusable-delivery with newline-separated reasons', () => {
     expect(
       resolveReviewRequestSchema.parse(
         resolveReviewForm(
-          form({ verb: 'reject-and-retry-download', reasons: 'clipped\n\ntranscode' }),
+          form({ verb: 'reject-unusable-delivery', reasons: 'clipped\n\ntranscode' }),
         ),
       ),
-    ).toEqual({ verb: 'reject-and-retry-download', reasons: ['clipped', 'transcode'] });
+    ).toEqual({ verb: 'reject-unusable-delivery', reasons: ['clipped', 'transcode'] });
   });
 
   it('shapes the payload-free verbs', () => {

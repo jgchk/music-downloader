@@ -34,7 +34,7 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).toContain('data-testid="hinted"');
     expect(body).toContain('data-testid="candidates"');
     expect(body).toContain('data-testid="supply-id"');
-    expect(body).toContain('data-testid="reject-retry"');
+    expect(body).toContain('data-testid="reject-unusable"');
     expect(body).toContain('data-testid="manual-tags"');
     expect(body).toContain('data-testid="action-error"');
   });

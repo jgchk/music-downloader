@@ -22,9 +22,9 @@ export interface ImportPolicy {
 }
 
 /**
- * The delivered candidate's identity as the sender published it — which peer's copy was
- * downloaded. Retained so a later release verdict can echo the identity the sender's stale-guard
- * compares against; `sizeBytes` is corroborating detail the sender may omit.
+ * The delivered candidate's identity as it arrived — which peer's copy was downloaded. Retained as
+ * opaque provenance so a later release verdict can echo back exactly which copy the importer judged;
+ * the importer never interprets it. `sizeBytes` is corroborating detail that may be absent.
  */
 export interface DeliveredCandidate {
   readonly username: string;
@@ -209,7 +209,7 @@ export type Resolution =
   | { readonly kind: 'manual-tags'; readonly tags: ManualTags }
   | { readonly kind: 'import-as-is' }
   | { readonly kind: 'reject'; readonly reason?: string }
-  | { readonly kind: 'reject-and-retry-download'; readonly reasons?: readonly string[] }
+  | { readonly kind: 'reject-unusable-delivery'; readonly reasons?: readonly string[] }
   | { readonly kind: 'accept' }
   | { readonly kind: 'retry-enrichment' };
 
@@ -251,9 +251,10 @@ export type ImportEvent =
   | { readonly type: 'ImportRejected'; readonly reason: string; readonly filesDeleted: boolean }
   | {
       /**
-       * The delivered release failed external validation (reject-and-retry-download): the fact the
-       * outbound publisher ships to the sender so it can revive the acquisition. Minted in the same
-       * decision as the rejection's `ReviewResolved`; drives no effect and no state change.
+       * A record-only fact the importer publishes: the delivered copy was rejected as unusable
+       * (reject-unusable-delivery). It carries the acquisition id, delivered candidate, and reasons
+       * as opaque provenance echoed back — what a consumer does with them is the consumer's business.
+       * Minted in the same decision as the rejection's `ReviewResolved`; drives no effect, no state.
        */
       readonly type: 'ReleaseVerdictRecorded';
       readonly acquisitionId: AcquisitionId;

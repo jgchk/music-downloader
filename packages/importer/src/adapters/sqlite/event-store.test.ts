@@ -5,10 +5,22 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
+import {
+  candidate,
+  MATCH_REVIEW,
+  proposed,
+  requested,
+  resolved,
+  SOURCE,
+} from '../../domain/import/__fixtures__/import-fixtures.js';
+import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
+import { toImportId } from '../../domain/shared/import-id.js';
+import { projectStatus } from '../../application/projections/read-models.js';
 import { InProcessEventBus } from './event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from './event-store.js';
+import { legacyRejectResolvedData } from './__fixtures__/legacy-review-resolved.js';
 import { openEventDatabase, type EventDatabase } from './schema.js';
-import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 const META: EventMetadata = { importId: 'imp-1', occurredAt: '2026-07-03T12:00:00.000Z' };
 
@@ -169,10 +181,15 @@ describe('SqliteEventStore', () => {
   });
 
   it('upcasts stored events on read', async () => {
-    const registry = new UpcasterRegistry().register('ImportApplied', 1, (data) => ({
-      ...data,
-      location: '/library/renamed',
-    }));
+    // Registered at the version `append` stamps, so a freshly-stored row is lifted on read-back.
+    const registry = new UpcasterRegistry().register(
+      'ImportApplied',
+      CURRENT_SCHEMA_VERSION,
+      (data) => ({
+        ...data,
+        location: '/library/renamed',
+      }),
+    );
     const store = new SqliteEventStore(freshDatabase(), registry);
     await store.append('imp-1', 0, [APPLIED], META);
 
@@ -180,6 +197,51 @@ describe('SqliteEventStore', () => {
     const read = readStreamResult2._unsafeUnwrap();
 
     expect(read[0]!.event).toEqual({ type: 'ImportApplied', location: '/library/renamed' });
+  });
+
+  it('reads a legacy v1 rejection stream identically to a natively-written v2 one', async () => {
+    // The legacy-tolerance guarantee: a downloader-delivered import rejected as unusable, whose
+    // `ReviewResolved` was persisted under the pre-rename verb at schema v1, must fold and project
+    // exactly as a stream written natively today (the verb upcast on read, its store carrying it).
+    const reasons = ['corrupt rip'];
+    const nativeEvents: ImportEvent[] = [
+      requested({ source: SOURCE }),
+      proposed([candidate({ distance: asDistance(0.5) })]),
+      MATCH_REVIEW,
+      resolved({ kind: 'reject-unusable-delivery', reasons }),
+      { type: 'ImportRejected', reason: 'corrupt rip', filesDeleted: true },
+    ];
+
+    const nativeStore = new SqliteEventStore(freshDatabase(), buildUpcasterRegistry());
+    const nativeAppend = await nativeStore.append('imp-native', 0, nativeEvents, META);
+    nativeAppend._unsafeUnwrap();
+    const nativeReadResult = await nativeStore.readStream('imp-native');
+    const nativeRead = nativeReadResult._unsafeUnwrap();
+
+    // The same stream raw-inserted at schema v1, its `ReviewResolved` carrying the old verb.
+    const legacyDatabase = freshDatabase();
+    const insert = legacyDatabase.prepare(
+      `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+       VALUES (?, ?, ?, 1, ?, ?)`,
+    );
+    for (const [version, event] of nativeEvents.entries()) {
+      const data = version === 3 ? legacyRejectResolvedData(reasons) : event;
+      insert.run('imp-legacy', version, event.type, JSON.stringify(data), JSON.stringify(META));
+    }
+    const legacyStore = new SqliteEventStore(legacyDatabase, buildUpcasterRegistry());
+    const legacyReadResult = await legacyStore.readStream('imp-legacy');
+    const legacyRead = legacyReadResult._unsafeUnwrap();
+
+    const nativeView = projectStatus(toImportId('imp-native'), nativeRead);
+    const legacyView = projectStatus(toImportId('imp-legacy'), legacyRead);
+
+    // The folded state settles terminal and the history projects the importer's own verb…
+    expect(legacyView.phase).toBe('rejected');
+    expect(legacyView.history.find((entry) => entry.kind === 'review-resolved')).toMatchObject({
+      resolution: 'reject-unusable-delivery',
+    });
+    // …identically to the natively-written stream (only the stream's own id differs).
+    expect({ ...legacyView, importId: nativeView.importId }).toEqual(nativeView);
   });
 
   it('surfaces an infrastructure fault from append', async () => {

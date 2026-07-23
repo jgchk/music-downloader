@@ -76,8 +76,8 @@ export function resolutionToDomain(dto: ResolveReviewRequestDto): Resolution {
     case 'reject': {
       return { kind: 'reject', reason: dto.reason };
     }
-    case 'reject-and-retry-download': {
-      return { kind: 'reject-and-retry-download', reasons: dto.reasons };
+    case 'reject-unusable-delivery': {
+      return { kind: 'reject-unusable-delivery', reasons: dto.reasons };
     }
     case 'accept': {
       return { kind: 'accept' };
