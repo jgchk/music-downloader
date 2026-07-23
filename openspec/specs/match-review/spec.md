@@ -45,6 +45,8 @@ A `match-review` item SHALL additionally carry, for each candidate, the actual f
 
 The system SHALL resolve review items through explicit verbs on the importer module's facade: apply a listed candidate, supply a release ID for a pinned re-propose (accepting any identifier a loaded beets source can resolve, not MusicBrainz alone), refresh the candidate list, apply a full manual tag payload (per-track fields with an explicit track mapping; beets applies them with autotagging bypassed, plugins still firing), import as-is, reject, and reject-unusable-delivery. The two reject verbs express the importer's own intent: reject is "wrong thing to have"; reject-unusable-delivery is "right thing, bad copy". Rejecting SHALL delete the release's files from the intake directory. Reject-unusable-delivery SHALL do everything reject does and SHALL additionally record a release verdict — the fact that the delivered copy was rejected as unusable — carrying the originating acquisition id, the delivered candidate's identity, and the reviewer's reasons as opaque provenance the importer echoes back without interpreting; it SHALL be available only for imports that retain a delivered candidate's identity, and SHALL otherwise be refused with an error naming the missing precondition while plain reject remains available. Resolving an already-settled review SHALL be a tolerated no-op. A review recorded under the module's earlier verb name SHALL read, settle, and project identically to one recorded under the current name, so no historical import is broken by the rename.
 
+The module SHALL additionally expose, for each pending review, the set of resolution verbs permitted for that review — its **available actions** — as part of the pending-review item. This set SHALL be the module's own determination, computed from the review kind, whether the review carries candidates, and whether a delivered candidate is retained (the reject-unusable-delivery precondition), and SHALL never include a verb the resolve decision would refuse for that review. A consumer SHALL therefore be able to offer exactly the legal verbs from this set rather than re-deriving per-kind legality itself. The available-action set SHALL be additive on the pending-review contract (absent-tolerant).
+
 #### Scenario: Supplying an ID re-proposes pinned to that release
 
 - **GIVEN** a match-review whose candidates are all wrong
@@ -87,3 +89,21 @@ The system SHALL resolve review items through explicit verbs on the importer mod
 - **GIVEN** a `ReviewResolved` event persisted under the module's earlier verb name for an unusable delivery
 - **WHEN** the import stream is replayed and its status is projected
 - **THEN** the fold settles the review and the history projects the current verb, exactly as for a natively-recorded one, with no error
+
+#### Scenario: A pending review carries its permitted verb set
+
+- **GIVEN** a pending review of any kind
+- **WHEN** it is read from the pending-review queue
+- **THEN** it carries the set of resolution verbs permitted for it, and that set includes no verb the resolve decision would refuse for that review
+
+#### Scenario: A review without a retained candidate omits the retry verb from its permitted set
+
+- **GIVEN** a pending review for an import that retains no delivered candidate
+- **WHEN** its permitted verb set is read
+- **THEN** the set excludes reject-unusable-delivery while still including plain reject
+
+#### Scenario: A remediation review permits only its own verbs
+
+- **GIVEN** a pending remediation review on an applied import
+- **WHEN** its permitted verb set is read
+- **THEN** the set contains exactly accept and retry-enrichment
