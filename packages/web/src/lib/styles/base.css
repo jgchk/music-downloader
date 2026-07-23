@@ -1,9 +1,11 @@
 /* ============================================================================
-   Base — semantic HTML styled through tokens ONLY. No skin knowledge here.
+   Base — semantic HTML styled through tokens, carrying no skin knowledge.
 
-   Everything targets bare elements + the stable hooks the components already
-   emit (.badge[data-phase], .chip[data-kind], role="alert"). Skins never need
-   the components to change; they remap tokens and reach these same hooks.
+   Colours and skinnable dimensions read from tokens (a few fixed structural
+   values are inlined); no theme colour is hardcoded here. Everything targets
+   bare elements + the stable hooks the components already emit
+   (.badge[data-phase], .chip[data-kind], role="alert"). Skins never need the
+   components to change; they remap tokens and reach these same hooks.
    ============================================================================ */
 
 *,

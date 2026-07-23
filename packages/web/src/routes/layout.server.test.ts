@@ -41,12 +41,18 @@ describe('root layout load', () => {
       listPendingReviews: () => ({ reviews: [pendingReview] }),
       listAcquisitions: () => ({ acquisitions: [awaiting, searching] }),
     });
-    expect(load({ locals: event } as never)).toEqual({ attentionCount: 2 });
+    expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
+      attentionCount: 2,
+      pathname: '/',
+    });
   });
 
   it('is zero when nothing waits', () => {
     const { locals: event } = locals({});
-    expect(load({ locals: event } as never)).toEqual({ attentionCount: 0 });
+    expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
+      attentionCount: 0,
+      pathname: '/',
+    });
   });
 
   it('logs and contributes zero for a failing importer instead of breaking every page', () => {
@@ -57,7 +63,10 @@ describe('root layout load', () => {
       },
       listAcquisitions: () => ({ acquisitions: [awaiting] }),
     });
-    expect(load({ locals: event } as never)).toEqual({ attentionCount: 1 });
+    expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
+      attentionCount: 1,
+      pathname: '/',
+    });
     expect(warnings).toEqual([{ err: fault, module: 'importer' }]);
   });
 
@@ -69,7 +78,10 @@ describe('root layout load', () => {
         throw fault;
       },
     });
-    expect(load({ locals: event } as never)).toEqual({ attentionCount: 1 });
+    expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
+      attentionCount: 1,
+      pathname: '/',
+    });
     expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });
 });

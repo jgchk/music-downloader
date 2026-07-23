@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { LayoutProps } from './$types';
-  // Global style system: tokens (the switchboard) → base (semantic elements) →
-  // skins. Import order is the cascade order; base must precede the skins. The
-  // active skin is chosen by `data-skin` on <html> (see app.html) and can be
-  // swapped at runtime to restyle AND re-lay-out the whole app with no DOM change.
+  // Global style system, kept in tokens → base → skin order for readability. Order isn't
+  // load-bearing: every skin rule is scoped under `:root[data-skin=…]` and wins by specificity.
+  // The active skin is chosen by `data-skin` on <html> (see app.html) and can be swapped at
+  // runtime to restyle AND re-lay-out the whole app with no DOM change.
   import '$lib/styles/tokens.css';
   import '$lib/styles/base.css';
   import '$lib/styles/skins/glass.css';
@@ -12,6 +12,14 @@
   import SkinSwitcher from '$lib/components/SkinSwitcher.svelte';
 
   let { data, children }: LayoutProps = $props();
+
+  // SvelteKit does not set `aria-current` for us; derive it from the server-provided pathname so
+  // the skins' selected-tab styling (and screen-reader wayfinding) engages on first paint. Section
+  // links stay current across their child routes (e.g. Acquisitions on /acquisitions/[id]).
+  function isCurrent(href: string): boolean {
+    const path = data.pathname;
+    return href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
+  }
 </script>
 
 <div class="app">
@@ -26,10 +34,14 @@
 
   <nav class="primary" data-testid="site-nav" aria-label="Primary">
     <ul>
-      <li><a href="/">Home</a></li>
-      <li><a href="/acquisitions">Acquisitions</a></li>
+      <li><a href="/" aria-current={isCurrent('/') ? 'page' : undefined}>Home</a></li>
       <li>
-        <a href="/reviews">
+        <a href="/acquisitions" aria-current={isCurrent('/acquisitions') ? 'page' : undefined}>
+          Acquisitions
+        </a>
+      </li>
+      <li>
+        <a href="/reviews" aria-current={isCurrent('/reviews') ? 'page' : undefined}>
           Needs attention
           {#if data.attentionCount > 0}
             <span class="badge" data-testid="attention-badge">{data.attentionCount}</span>

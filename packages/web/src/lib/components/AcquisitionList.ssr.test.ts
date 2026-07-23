@@ -38,6 +38,8 @@ describe('AcquisitionList (SSR)', () => {
     expect(body).toContain('/acquisitions/acq-1');
     expect(body).toContain('Exhausted (Stalled)');
     expect(body).toContain('Searching');
+    // With no selection, no row is marked current.
+    expect(body).not.toContain('aria-current');
   });
 
   it('marks the selected acquisition as the current row', () => {

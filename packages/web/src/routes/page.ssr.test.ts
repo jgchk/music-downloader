@@ -6,7 +6,7 @@ describe('landing page (SSR)', () => {
   it('renders the landing view over its load data', () => {
     const { body } = render(Page, {
       props: {
-        data: { attentionCount: 0, counts: { acquisitions: 4, pendingReviews: 0 } },
+        data: { attentionCount: 0, pathname: '/', counts: { acquisitions: 4, pendingReviews: 0 } },
         params: {},
         form: null,
       },
