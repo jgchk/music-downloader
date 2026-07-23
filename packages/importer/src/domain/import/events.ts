@@ -24,7 +24,7 @@ export interface ImportPolicy {
 /**
  * The delivered candidate's identity as it arrived — which peer's copy was downloaded. Retained as
  * opaque provenance so a later release verdict can echo back exactly which copy the importer judged;
- * the importer never interprets it. `sizeBytes` is corroborating detail that may be absent.
+ * the importer never interprets its contents. `sizeBytes` is corroborating detail that may be absent.
  */
 export interface DeliveredCandidate {
   readonly username: string;
@@ -252,9 +252,10 @@ export type ImportEvent =
   | {
       /**
        * A record-only fact the importer publishes: the delivered copy was rejected as unusable
-       * (reject-unusable-delivery). It carries the acquisition id, delivered candidate, and reasons
-       * as opaque provenance echoed back — what a consumer does with them is the consumer's business.
-       * Minted in the same decision as the rejection's `ReviewResolved`; drives no effect, no state.
+       * (reject-unusable-delivery). It echoes back the acquisition id and delivered candidate as
+       * opaque provenance, plus the reviewer's own rejection reasons — what a consumer does with
+       * them is the consumer's business. Minted in the same decision as the rejection's
+       * `ReviewResolved`; drives no effect, no state.
        */
       readonly type: 'ReleaseVerdictRecorded';
       readonly acquisitionId: AcquisitionId;

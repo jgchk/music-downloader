@@ -475,7 +475,7 @@ describe('recording rejection outcomes', () => {
     ]);
   });
 
-  it('defaults the rejection reason when the retry verb carried no reasons', () => {
+  it('defaults the rejection reason when the unusable-delivery verb carried no reasons', () => {
     const history = [
       ...awaitingReviewWithCandidate(),
       resolved({ kind: 'reject-unusable-delivery' }),
