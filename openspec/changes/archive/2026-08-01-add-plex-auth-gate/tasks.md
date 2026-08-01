@@ -45,7 +45,7 @@
 
 - [x] 7.1 Update README/env documentation for the new variables and the domain-only `ORIGIN` posture
 - [x] 7.2 `pnpm check` green (format, lint, typecheck, build, 100% merged coverage) and `pnpm test:e2e` green
-- [ ] 7.3 Version prep (feat → minor), PR, merge on green
+- [x] 7.3 Version prep (feat → minor), PR, merge on green
 
 ## 8. Homelab companion (jgchk/homelab repo) and live verification
 
