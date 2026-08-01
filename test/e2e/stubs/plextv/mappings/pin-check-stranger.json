@@ -1,0 +1,8 @@
+{
+  "request": { "method": "GET", "urlPath": "/pins/5555" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "id": 5555, "authToken": "e2e-stranger-token" }
+  }
+}

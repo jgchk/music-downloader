@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { authenticatedStorageState } from './auth.js';
+
+// Every journey here runs signed-in via a harness-minted session (the production codec under the
+// harness secret — web-access-control design D7). The gate itself is proven in gate.spec.ts.
+test.use({ storageState: authenticatedStorageState() });
 
 /**
  * Switch the request kind to `descriptor` and wait for its reactive fields. A selectOption that

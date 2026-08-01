@@ -34,18 +34,32 @@ isolated behind ports (slskd, MusicBrainz, ffmpeg, filesystem, SQLite).
 All configuration comes from the environment (12-factor); invalid config fails startup fast. See
 [`.env.example`](.env.example).
 
-| Variable                 | Required | Default                 | Description                                    |
-| ------------------------ | -------- | ----------------------- | ---------------------------------------------- |
-| `LIBRARY_ROOT`           | yes      | —                       | Where validated releases are organized.        |
-| `STAGING_ROOT`           | yes      | —                       | Where in-flight downloads stage before import. |
-| `HTTP_PORT`              | no       | `3000`                  | HTTP API port.                                 |
-| `HTTP_HOST`              | no       | `0.0.0.0`               | HTTP API bind host.                            |
-| `DATABASE_FILE`          | no       | `data/events.db`        | SQLite event-store file.                       |
-| `LOG_LEVEL`              | no       | `info`                  | pino level (`debug`/`info`/`warn`/`error`).    |
-| `MUSICBRAINZ_BASE_URL`   | no       | public MusicBrainz      | Metadata API base URL.                         |
-| `MUSICBRAINZ_USER_AGENT` | no       | built-in                | User-Agent sent to MusicBrainz.                |
-| `SLSKD_BASE_URL`         | no       | `http://localhost:5030` | slskd API base URL.                            |
-| `SLSKD_API_KEY`          | no       | —                       | slskd API key (secret; never commit).          |
+| Variable                 | Required | Default                  | Description                                                                |
+| ------------------------ | -------- | ------------------------ | -------------------------------------------------------------------------- |
+| `LIBRARY_ROOT`           | yes      | —                        | Where validated releases are organized.                                    |
+| `STAGING_ROOT`           | yes      | —                        | Where in-flight downloads stage before import.                             |
+| `HTTP_PORT`              | no       | `3000`                   | HTTP API port.                                                             |
+| `HTTP_HOST`              | no       | `0.0.0.0`                | HTTP API bind host.                                                        |
+| `DATABASE_FILE`          | no       | `data/events.db`         | SQLite event-store file.                                                   |
+| `LOG_LEVEL`              | no       | `info`                   | pino level (`debug`/`info`/`warn`/`error`).                                |
+| `MUSICBRAINZ_BASE_URL`   | no       | public MusicBrainz       | Metadata API base URL.                                                     |
+| `MUSICBRAINZ_USER_AGENT` | no       | built-in                 | User-Agent sent to MusicBrainz.                                            |
+| `SLSKD_BASE_URL`         | no       | `http://localhost:5030`  | slskd API base URL.                                                        |
+| `SLSKD_API_KEY`          | no       | —                        | slskd API key (secret; never commit).                                      |
+| `SESSION_SECRET`         | yes      | —                        | Signs session cookies (secret; rotating it signs everyone out).            |
+| `PLEX_SERVER_MACHINE_ID` | yes      | —                        | Your Plex server's `machineIdentifier` — accounts that see it may sign in. |
+| `PLEX_API_BASE_URL`      | no       | `https://plex.tv/api/v2` | plex.tv API base; overridden only by test tiers.                           |
+| `ORIGIN`                 | prod     | —                        | The public browsing URL, exact-match-enforced on form posts.               |
+
+### Access control
+
+The web UI requires signing in with a Plex account (full-page PIN redirect); authorization is
+**share-is-approval** — an account is admitted iff its own token can see the server named by
+`PLEX_SERVER_MACHINE_ID` (find it with `curl http://<plex-host>:32400/identity`). Sessions are
+stateless signed cookies with a fixed 7-day expiry; the app never stores any Plex token, and
+plex.tv being unreachable blocks new logins but never existing sessions. `/health` stays open for
+deploy verification and monitoring. Missing `SESSION_SECRET`/`PLEX_SERVER_MACHINE_ID` fails
+startup — there is no way to run with the gate off.
 
 ## Running
 

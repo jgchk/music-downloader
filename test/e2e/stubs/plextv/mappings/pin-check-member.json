@@ -1,0 +1,8 @@
+{
+  "request": { "method": "GET", "urlPath": "/pins/4242" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "id": 4242, "authToken": "e2e-member-token" }
+  }
+}

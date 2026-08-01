@@ -2,6 +2,9 @@ import Database from 'better-sqlite3';
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The PRODUCTION session codec, imported — not reimplemented — so the harness's minted cookies
+// can never drift from what the image's unmodified gate verifies (out-of-process-e2e).
+import { SESSION_COOKIE, signSession } from '../../packages/web/src/lib/server/session.js';
 
 /**
  * Shared driver utilities for the out-of-process E2E tier. The suite is a browserless HTTP client
@@ -12,6 +15,19 @@ import { fileURLToPath } from 'node:url';
 
 export const BASE_URL = process.env['E2E_BASE_URL'] ?? 'http://localhost:3000';
 export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e-tmp');
+
+/** The harness secret run.sh handed the container — a throwaway that guards nothing real. */
+export const SESSION_SECRET = process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret';
+
+/** Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. */
+export function sessionCookieHeader(): string {
+  const cookie = signSession(
+    { plexAccountId: 'e2e', username: 'e2e-harness' },
+    SESSION_SECRET,
+    Date.now(),
+  );
+  return `${SESSION_COOKIE}=${cookie}`;
+}
 
 export const STAGING_DIR = join(DATA_DIR, 'music', 'staging');
 export const DEPOSIT_DIR = join(DATA_DIR, 'music', 'deposit');
@@ -62,6 +78,7 @@ export async function submitAcquisition(mbid: string): Promise<string> {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Origin: BASE_URL,
+      Cookie: sessionCookieHeader(),
     },
     body: new URLSearchParams({ kind: 'musicbrainz', mbid, targetType: 'album' }),
     redirect: 'manual',
@@ -82,7 +99,10 @@ export async function submitAcquisition(mbid: string): Promise<string> {
 
 /** Read an acquisition's status text from its detail page's `data-testid="status"` marker. */
 export async function readStatus(id: string): Promise<string | undefined> {
-  const res = await fetch(`${BASE_URL}/acquisitions/${id}`, { signal: AbortSignal.timeout(3000) });
+  const res = await fetch(`${BASE_URL}/acquisitions/${id}`, {
+    signal: AbortSignal.timeout(3000),
+    headers: { Cookie: sessionCookieHeader() },
+  });
   if (!res.ok) return undefined;
   const html = await res.text();
   return /data-testid="status"[^>]*>([^<]+)</.exec(html)?.[1]?.trim();
@@ -104,7 +124,10 @@ export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise
 
 /** True when the review queue page shows its explicit empty marker. */
 export async function reviewQueueEmpty(): Promise<boolean> {
-  const res = await fetch(`${BASE_URL}/reviews`, { signal: AbortSignal.timeout(3000) });
+  const res = await fetch(`${BASE_URL}/reviews`, {
+    signal: AbortSignal.timeout(3000),
+    headers: { Cookie: sessionCookieHeader() },
+  });
   if (!res.ok) throw new Error(`GET /reviews returned ${res.status}`);
   return (await res.text()).includes('data-testid="empty"');
 }

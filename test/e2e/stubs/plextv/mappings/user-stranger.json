@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/user",
+    "headers": { "X-Plex-Token": { "equalTo": "e2e-stranger-token" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "id": 88, "username": "e2estranger", "title": "e2estranger" }
+  }
+}

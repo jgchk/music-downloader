@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/pins",
+    "queryParameters": { "strong": { "equalTo": "true" } },
+    "headers": { "X-Plex-Client-Identifier": { "equalTo": "music-downloader-web" } }
+  },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "id": 4242, "code": "e2e-pin-code" }
+  }
+}

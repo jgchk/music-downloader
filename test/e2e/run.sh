@@ -38,23 +38,29 @@ IMAGE=music-downloader:e2e
 APP=music-e2e-app
 MB_STUB=music-e2e-mb
 SLSKD_STUB=music-e2e-slskd
+PLEX_STUB=music-e2e-plextv
 WIREMOCK_IMAGE=wiremock/wiremock:3.13.2
 PORT="${E2E_PORT:-3000}"
 MB_PORT="${E2E_MB_PORT:-8081}"
 SLSKD_PORT="${E2E_SLSKD_PORT:-8082}"
+PLEX_PORT="${E2E_PLEX_PORT:-8083}"
 
 export E2E_DATA_DIR="$(pwd)/.e2e-tmp"
 export E2E_BASE_URL="http://localhost:$PORT"
 export E2E_SLSKD_ADMIN_URL="http://localhost:$SLSKD_PORT/__admin"
 export E2E_APP_CONTAINER="$APP"
+# The gate's harness credentials (web-access-control): the specs mint session cookies with the
+# PRODUCTION session codec under this throwaway secret — the image's gate runs exactly as shipped.
+export E2E_SESSION_SECRET="e2e-session-secret"
+E2E_MACHINE_ID="e2e-machine"
 
 dump_logs() {
-  for c in "$APP" "$MB_STUB" "$SLSKD_STUB"; do
+  for c in "$APP" "$MB_STUB" "$SLSKD_STUB" "$PLEX_STUB"; do
     echo "=== docker logs: $c (tail) ===" >&2
     docker logs --tail 120 "$c" >&2 || true
   done
 }
-cleanup() { docker rm -f "$APP" "$MB_STUB" "$SLSKD_STUB" >/dev/null 2>&1 || true; }
+cleanup() { docker rm -f "$APP" "$MB_STUB" "$SLSKD_STUB" "$PLEX_STUB" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup
 
@@ -83,8 +89,12 @@ docker run -d --name "$MB_STUB" --network host \
 docker run -d --name "$SLSKD_STUB" --network host \
   -v "$(pwd)/test/e2e/stubs/slskd:/home/wiremock" \
   "$WIREMOCK_IMAGE" --port "$SLSKD_PORT" --disable-banner >/dev/null
+docker run -d --name "$PLEX_STUB" --network host \
+  -v "$(pwd)/test/e2e/stubs/plextv:/home/wiremock" \
+  "$WIREMOCK_IMAGE" --port "$PLEX_PORT" --disable-banner >/dev/null
 wait_ready "http://localhost:$MB_PORT/__admin/mappings" mb-stub
 wait_ready "http://localhost:$SLSKD_PORT/__admin/mappings" slskd-stub
+wait_ready "http://localhost:$PLEX_PORT/__admin/mappings" plextv-stub
 
 fresh_env() {
   rm -rf .e2e-tmp
@@ -140,6 +150,9 @@ start_app() { # start_app [extra docker-run args...]
     -e IMPORTER_DATABASE_FILE=/data/importer/events.db \
     -e BEETS_CONFIG=/config/beets/config.yaml \
     -e AUTO_APPLY_THRESHOLD=0.15 \
+    -e SESSION_SECRET="$E2E_SESSION_SECRET" \
+    -e PLEX_SERVER_MACHINE_ID="$E2E_MACHINE_ID" \
+    -e PLEX_API_BASE_URL="http://127.0.0.1:9" \
     -v "$E2E_DATA_DIR/music:/music" \
     -v "$E2E_DATA_DIR/data:/data" \
     -v "$E2E_DATA_DIR/config/beets:/config/beets" \
@@ -162,10 +175,13 @@ run_phase() { # run_phase <spec-file>
 # failure with zero network dependence — keeping acquisitions retrying (the cancel test's
 # window) without coupling the smoke to WireMock's unmatched-request 404s, whose classification
 # is deliberate adapter behavior.
-echo "── phase 0: web parity (real browser; third parties unreachable)"
+echo "── phase 0: web parity (real browser; slskd/MB unreachable, plex.tv stubbed for the login journey)"
 fresh_env
-start_app -e SLSKD_BASE_URL=http://127.0.0.1:9 -e MUSICBRAINZ_BASE_URL=http://127.0.0.1:9
-if ! pnpm --dir packages/web exec playwright test; then
+# slskd/MB stay unreachable (the degraded-boot proof), but plex.tv points at ITS stub so the
+# login-journey spec can walk the real login routes end to end (out-of-process-e2e).
+start_app -e SLSKD_BASE_URL=http://127.0.0.1:9 -e MUSICBRAINZ_BASE_URL=http://127.0.0.1:9 \
+  -e PLEX_API_BASE_URL="http://localhost:$PLEX_PORT"
+if ! E2E_PLEX_STUB=1 pnpm --dir packages/web exec playwright test; then
   dump_logs
   exit 1
 fi
