@@ -6,12 +6,12 @@
   },
   "request": {
     "method": "GET",
-    "path": "/pins/309334229"
+    "path": "/pins/1530161260"
   },
   "response": {
     "status": 200,
     "body": {
-      "id": 309334229,
+      "id": 1530161260,
       "authToken": null
     }
   }

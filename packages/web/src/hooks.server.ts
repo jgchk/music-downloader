@@ -20,19 +20,19 @@ export const init: ServerInit = async () => {
 /**
  * The routes that answer without a session (web-access-control): the login flow — a user must be
  * able to reach the door — and the health probe, which deploy verification and monitoring hit
- * credential-less. Everything else requires a valid session cookie.
+ * credential-less. An exact set, not a prefix: a future route born under /login/ starts out
+ * GATED until deliberately listed here (fail closed).
  */
-function isOpenRoute(pathname: string): boolean {
-  return pathname === '/health' || pathname === '/login' || pathname.startsWith('/login/');
-}
+const OPEN_ROUTES = new Set(['/health', '/login', '/login/callback']);
 
 /**
  * The access gate (web-access-control, design D6/D7): every request's cookie is verified by the
  * pure session codec — no I/O, no plex.tv call — and a valid session lands on `locals.session`
  * (so even the open login page can bounce an already-authenticated user home). Gated routes
- * without one: page GETs are redirected to the login form; anything else (actions, data requests)
- * is refused outright before any facade is invoked. Tampered and expired cookies are verdicts,
- * not exceptions, and both land outside.
+ * without one: GET/HEAD requests (pages, and SvelteKit's __data.json data requests are GETs too)
+ * are redirected to the login form; non-GET requests (form actions) are refused outright with a
+ * 403 — either way, before any facade is invoked. Tampered and expired cookies are verdicts, not
+ * exceptions, and both land outside; a failed SIGNATURE is logged as the tamper signal it is.
  */
 export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
@@ -41,15 +41,29 @@ export const handle: Handle = ({ event, resolve }) => {
 
   const cookie = event.cookies.get(SESSION_COOKIE);
   if (cookie !== undefined) {
-    const verdict = verifySession(cookie, accessOf().sessionSecret, Date.now());
-    if (verdict.kind === 'valid') event.locals.session = verdict.claims;
+    const verdict = verifySession(cookie, event.locals.access.sessionSecret, Date.now());
+    if (verdict.kind === 'valid') {
+      event.locals.session = verdict.claims;
+    } else if (verdict.kind === 'invalid') {
+      // A cookie that FAILS VERIFICATION (vs merely expiring) is a forgery/tamper signal an
+      // operator must be able to see — distinct from the routine no-cookie and expired cases.
+      event.locals.logger.warn(
+        { pathname: event.url.pathname },
+        'session cookie failed verification',
+      );
+    }
   }
 
-  if (event.locals.session === undefined && !isOpenRoute(event.url.pathname)) {
+  if (event.locals.session === undefined && !OPEN_ROUTES.has(event.url.pathname)) {
     const method = event.request.method;
-    return method === 'GET' || method === 'HEAD'
-      ? new Response(undefined, { status: 303, headers: { location: '/login' } })
-      : new Response('Unauthorized', { status: 403 });
+    if (method === 'GET' || method === 'HEAD') {
+      return new Response(undefined, { status: 303, headers: { location: '/login' } });
+    }
+    event.locals.logger.warn(
+      { pathname: event.url.pathname, method },
+      'unauthenticated non-GET refused by the access gate',
+    );
+    return new Response('Unauthorized', { status: 403 });
   }
 
   return resolve(event);

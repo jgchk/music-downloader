@@ -1,5 +1,9 @@
 {
-  "request": { "method": "GET", "urlPath": "/pins/4242" },
+  "request": {
+    "method": "GET",
+    "urlPath": "/pins/4242",
+    "headers": { "X-Plex-Client-Identifier": { "equalTo": "music-downloader-web" } }
+  },
   "response": {
     "status": 200,
     "headers": { "Content-Type": "application/json" },

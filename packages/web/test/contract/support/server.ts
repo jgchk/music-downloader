@@ -5,7 +5,7 @@ import type { ContractFixture } from './fixture.js';
 
 /**
  * A throwaway HTTP server that replays recorded plex.tv fixtures (the downloader tier's pattern).
- * The real {@link PlexTvAccess} adapter, with its real `fetch`, is pointed at this server's
+ * The real `PlexTvAccess` adapter, with its real `fetch`, is pointed at this server's
  * ephemeral port, so the tier exercises genuine wire behaviour — URL construction, identity
  * headers, token headers, status handling — against frozen ground truth, offline. Every incoming
  * request is recorded so tests can assert what the adapter actually sent.
@@ -54,7 +54,11 @@ export async function startFixtureServer(
     response.end(payload);
   });
 
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  // Reject on listen failure so the tier fails with the real error, not a vitest timeout.
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
   const { port } = server.address() as AddressInfo;
 
   return {

@@ -6,12 +6,12 @@
   },
   "request": {
     "method": "GET",
-    "path": "/pins/509182436"
+    "path": "/pins/1581085318"
   },
   "response": {
     "status": 200,
     "body": {
-      "id": 509182436,
+      "id": 1581085318,
       "authToken": "plex-user-token-scrubbed"
     }
   }

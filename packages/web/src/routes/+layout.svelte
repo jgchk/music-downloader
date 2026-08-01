@@ -30,7 +30,8 @@
       <a class="btn primary" href="/acquisitions/new"
         ><span aria-hidden="true">＋</span> Request a download</a
       >
-      <!-- Sign-out is a plain form POST (progressive enhancement; the gate refuses stray GETs). -->
+      <!-- Sign-out is a plain form POST (progressive enhancement); a stray GET of /logout just
+           redirects home — only the POST clears the session. -->
       <form class="session" method="POST" action="/logout">
         <span class="user" data-testid="user">{data.username}</span>
         <button class="btn" data-testid="logout">Sign out</button>

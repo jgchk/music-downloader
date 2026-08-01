@@ -17,7 +17,8 @@ export const BASE_URL = process.env['E2E_BASE_URL'] ?? 'http://localhost:3000';
 export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e-tmp');
 
 /** The harness secret run.sh handed the container — a throwaway that guards nothing real. */
-export const SESSION_SECRET = process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret';
+export const SESSION_SECRET =
+  process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret-0123456789abcdef';
 
 /** Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. */
 export function sessionCookieHeader(): string {

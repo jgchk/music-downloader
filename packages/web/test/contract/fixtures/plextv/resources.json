@@ -2,7 +2,7 @@
   "provenance": {
     "source": "https://plex.tv/api/v2 (live)",
     "capturedAt": "2026-08-01",
-    "note": "projected to consumed fields; 8 clientIdentifiers pseudonymized to machine-N"
+    "note": "validated live body projected to consumed fields; 8 clientIdentifiers pseudonymized to machine-N"
   },
   "request": {
     "method": "GET",

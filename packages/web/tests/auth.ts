@@ -8,7 +8,7 @@ import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '../src/lib/server/s
  * auth-disabling configuration to lean on.
  */
 
-const SECRET = process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret';
+const SECRET = process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret-0123456789abcdef';
 const BASE_URL = process.env['E2E_BASE_URL'] || 'http://localhost:4173';
 
 type StorageState = {

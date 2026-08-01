@@ -49,12 +49,38 @@ test.describe('login journey (plex.tv stubbed)', () => {
     await expect(page).toHaveURL(/\/acquisitions$/);
   });
 
-  test('an account without the server is denied and stays outside', async ({ page }) => {
+  test('an account without the server is denied and stays outside', async ({
+    context,
+    page,
+    baseURL,
+  }) => {
+    // A browser that STARTED this login (the binding cookie) whose account turns out unshared —
+    // going straight to the callback stands in for the app.plex.tv bounce.
+    await context.addCookies([
+      {
+        name: 'md_login_pin',
+        value: '5555',
+        domain: new URL(baseURL!).hostname,
+        path: '/login',
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax',
+      },
+    ]);
     await page.goto('/login/callback?pin=5555');
     await expect(page).toHaveURL(/\/login\?error=denied/);
     await expect(page.getByTestId('login-error')).toContainText('does not have access');
 
     await page.goto('/acquisitions');
     await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test('a callback for a PIN this browser did not start is refused before any plex.tv exchange', async ({
+    page,
+  }) => {
+    // No binding cookie: the guessable-pin hijack / login-fixation vector lands on invalid.
+    await page.goto('/login/callback?pin=4242');
+    await expect(page).toHaveURL(/\/login\?error=invalid/);
+    await expect(page.getByTestId('login-error')).toBeVisible();
   });
 });

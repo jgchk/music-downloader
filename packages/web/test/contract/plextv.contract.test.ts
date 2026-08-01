@@ -55,17 +55,23 @@ describe('plex.tv contract (tier 1)', () => {
     expect(request!.headers['accept']).toBe('application/json');
   });
 
-  it('reads an approved PIN check as authorized, handing over the (scrubbed) token', async () => {
+  it('reads an approved PIN check as authorized, sending the same identity headers that created the PIN', async () => {
     const result = await adapter('any').checkPin(pinIdOf('pin-check-authorized.json'));
     expect(result._unsafeUnwrap()).toEqual({
       kind: 'authorized',
       token: 'plex-user-token-scrubbed',
     });
+    // Plex's pairing contract: the CHECKING client identifier must match the creating one, or
+    // real checks never authorize — so the tier pins the headers here, not just on create.
+    const [request] = server.requests;
+    expect(request!.headers['x-plex-client-identifier']).toBe('music-downloader-web');
+    expect(request!.headers['accept']).toBe('application/json');
   });
 
-  it('reads an unapproved PIN check as pending', async () => {
+  it('reads an unapproved PIN check as pending, with the identity headers riding along', async () => {
     const result = await adapter('any').checkPin(pinIdOf('pin-check-pending.json'));
     expect(result._unsafeUnwrap()).toEqual({ kind: 'pending' });
+    expect(server.requests[0]!.headers['x-plex-client-identifier']).toBe('music-downloader-web');
   });
 
   it('reads the recorded 404 for a nonexistent PIN as expired', async () => {
@@ -81,9 +87,10 @@ describe('plex.tv contract (tier 1)', () => {
       identity: { plexAccountId: String(user.id), username: user.username },
     });
 
-    expect(server.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
-      'GET /user',
+    // Both lookups must happen with the token — their relative order is not part of the contract.
+    expect(server.requests.map((r) => `${r.method} ${r.path}`).toSorted()).toEqual([
       'GET /resources',
+      'GET /user',
     ]);
     for (const request of server.requests) {
       expect(request.headers['x-plex-token']).toBe('a-token');

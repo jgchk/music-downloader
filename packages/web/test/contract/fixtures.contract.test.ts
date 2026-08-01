@@ -18,7 +18,11 @@ import { CONTRACT_FIXTURE_ROOT, loadFixtures } from './support/fixture.js';
  */
 
 const fixtures = loadFixtures('plextv');
-const byName = (name: string) => fixtures.find((f) => f.name === name)!;
+const byName = (name: string) => {
+  const hit = fixtures.find((f) => f.name === name);
+  if (hit === undefined) throw new Error(`missing fixture ${name}`);
+  return hit;
+};
 
 /** Which schema governs each 2xx fixture body. */
 const SCHEMAS: Record<string, ZodType> = {
@@ -64,9 +68,14 @@ describe('plex.tv fixtures', () => {
 
   it('holds no account data beyond the pseudonymized consumed identity', () => {
     const body = byName('user.json').fixture.response.body as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(['id', 'title', 'username']);
-    expect(body['username']).toMatch(/^user\d+$/);
-    expect(body['title']).toMatch(/^user\d+$/);
+    // The recorder preserves which consumed fields the wire carried (and their null-ness) but
+    // every present string value must be the pseudonym — nothing real survives.
+    expect(['id', 'title', 'username']).toEqual(expect.arrayContaining(Object.keys(body)));
+    expect(body['id']).toBe(1);
+    for (const field of ['username', 'title']) {
+      if (typeof body[field] === 'string') expect(body[field]).toMatch(/^user\d+$/);
+      else expect([null, undefined]).toContain(body[field]);
+    }
   });
 
   it('holds only pseudonymized machine identifiers, one consumed field per resource', () => {

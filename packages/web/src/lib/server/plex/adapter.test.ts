@@ -1,6 +1,7 @@
 import type { ResultAsync } from 'neverthrow';
 import { describe, expect, it, vi } from 'vitest';
-import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT, PlexTvAccess } from './adapter.js';
+import { PlexTvAccess } from './adapter.js';
+import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from './identity.js';
 import type { PlexUnavailable } from './port.js';
 
 const CONFIG = { baseUrl: 'https://plex.test/api/v2', machineId: 'my-server-machine' };
@@ -72,6 +73,14 @@ describe('PlexTvAccess.createPin', () => {
     const error = await unwrapError(new PlexTvAccess(CONFIG, stub as never).createPin());
     expect(error.detail).toBe('wat');
   });
+
+  it('flattens the Error.cause chain into the detail (undici buries ECONNREFUSED there)', async () => {
+    const fault = new Error('fetch failed', {
+      cause: new Error('connect ECONNREFUSED 127.0.0.1:443', { cause: new Error('bad wire') }),
+    });
+    const error = await unwrapError(new PlexTvAccess(CONFIG, fetchStub(fault)).createPin());
+    expect(error.detail).toBe('fetch failed: connect ECONNREFUSED 127.0.0.1:443: bad wire');
+  });
 });
 
 describe('PlexTvAccess.checkPin', () => {
@@ -84,7 +93,7 @@ describe('PlexTvAccess.checkPin', () => {
     expect((init.headers as Record<string, string>)['Accept']).toBe('application/json');
   });
 
-  it('reports a not-yet-approved pin (null or absent token) as pending', async () => {
+  it('reports a not-yet-approved pin (null, absent, or blank token) as pending — authorized implies a usable token', async () => {
     const nullToken = await unwrap(
       new PlexTvAccess(CONFIG, fetchStub(jsonResponse({ id: 9, authToken: null }))).checkPin(9),
     );
@@ -93,6 +102,10 @@ describe('PlexTvAccess.checkPin', () => {
       new PlexTvAccess(CONFIG, fetchStub(jsonResponse({ id: 9 }))).checkPin(9),
     );
     expect(absentToken).toEqual({ kind: 'pending' });
+    const blankToken = await unwrap(
+      new PlexTvAccess(CONFIG, fetchStub(jsonResponse({ id: 9, authToken: '' }))).checkPin(9),
+    );
+    expect(blankToken).toEqual({ kind: 'pending' });
   });
 
   it('reports a 404 as expired — a business outcome, not a fault', async () => {

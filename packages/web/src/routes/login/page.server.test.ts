@@ -11,13 +11,21 @@ function loadEvent(url: string, session?: { plexAccountId: string; username: str
 }
 
 function actionEvent(plex: FakePlexAccess) {
+  const jar = new Map<string, { value: string; options: Record<string, unknown> }>();
   return {
-    locals: {
-      access: { sessionSecret: 's', plex },
-      logger: { warn: vi.fn() },
-    },
-    url: new URL('https://music.example/login'),
-  } as never;
+    jar,
+    event: {
+      cookies: {
+        set: (name: string, value: string, options: Record<string, unknown>) =>
+          void jar.set(name, { value, options }),
+      },
+      locals: {
+        access: { sessionSecret: 's', plex },
+        logger: { warn: vi.fn() },
+      },
+      url: new URL('https://music.example/login'),
+    } as never,
+  };
 }
 
 describe('login page load', () => {
@@ -51,10 +59,11 @@ describe('login page load', () => {
 });
 
 describe('login start action', () => {
-  it('creates a PIN only on POST and redirects the tab to the hosted Plex auth page with the callback forward URL', async () => {
+  it('creates a PIN only on POST, binds it to this browser, and redirects the tab to the hosted Plex auth page', async () => {
     const plex = new FakePlexAccess();
     plex.pin = { id: 55, code: 'code-55' };
-    await expect(actions.default!(actionEvent(plex))).rejects.toSatisfy((thrown: unknown) => {
+    const { event, jar } = actionEvent(plex);
+    await expect(actions.default!(event)).rejects.toSatisfy((thrown: unknown) => {
       if (!isRedirect(thrown)) return false;
       expect(thrown.location).toContain('https://app.plex.tv/auth#?');
       const parameters = new URLSearchParams(thrown.location.split('#?', 2)[1]);
@@ -62,16 +71,29 @@ describe('login start action', () => {
       expect(parameters.get('forwardUrl')).toBe('https://music.example/login/callback?pin=55');
       return true;
     });
+    // The state binding the callback verifies (hijack/fixation guard): short-lived, HttpOnly,
+    // scoped to the login flow, carrying exactly the created pin id.
+    const binding = jar.get('md_login_pin')!;
+    expect(binding.value).toBe('55');
+    expect(binding.options).toEqual({
+      path: '/login',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      maxAge: 600,
+    });
   });
 
-  it('re-renders a modeled 503 when plex.tv is unreachable — never a grant, never a throw', async () => {
+  it('re-renders a modeled 503 when plex.tv is unreachable — never a grant, never a binding, never a throw', async () => {
     const plex = new FakePlexAccess();
     plex.failCreatePin = true;
-    const result = (await actions.default!(actionEvent(plex))) as {
+    const { event, jar } = actionEvent(plex);
+    const result = (await actions.default!(event)) as {
       status: number;
       data: { error: string };
     };
     expect(result.status).toBe(503);
     expect(result.data.error).toMatch(/could not be reached/);
+    expect(jar.size).toBe(0);
   });
 });

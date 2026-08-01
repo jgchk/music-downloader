@@ -1,4 +1,4 @@
-import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from './adapter.js';
+import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from './identity.js';
 
 /**
  * The hosted Plex auth page URL for a created PIN (design D3, full-page redirect): the tab
