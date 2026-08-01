@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.13.0](https://github.com/jgchk/music-downloader/compare/v3.12.0...v3.13.0) (2026-08-01)
+
+### Features
+
+* **web:** gate the web UI behind Plex-authenticated, share-approved sessions ([ea776f4](https://github.com/jgchk/music-downloader/commit/ea776f42378998b4189252581086c8f41735334f))
+
+### Bug Fixes
+
+* **web:** __Host- cookies, SPA-safe gate redirect, and distinct refusal logging per review cycle 2 ([e078de2](https://github.com/jgchk/music-downloader/commit/e078de25ee15dcb55f5fb387acb8d32a73a0f623))
+* **web:** bind login PINs to the starting browser and harden the gate per review ([bbf519f](https://github.com/jgchk/music-downloader/commit/bbf519fd0f1e2c81b5d973b988101ac6ff84e349))
 ## [3.12.0](https://github.com/jgchk/music-downloader/compare/v3.11.0...v3.12.0) (2026-07-23)
 
 ### Features
