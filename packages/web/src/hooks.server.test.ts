@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RequestEvent, ResolveOptions } from '@sveltejs/kit';
-import { SESSION_TTL_MS, signSession } from '$lib/server/session.js';
+import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session.js';
 
 const bootRuntimes = vi.fn(() => Promise.resolve());
 const facadesOf = vi.fn(() => ({ downloader: {}, importer: {} }));
@@ -25,8 +25,13 @@ function gateEvent(
     locals: {},
     url: new URL(`http://host${pathname}`),
     request: { method },
-    cookies: { get: (name: string) => (name === 'md_session' ? cookie : undefined) },
+    cookies: { get: (name: string) => (name === SESSION_COOKIE ? cookie : undefined) },
   } as unknown as RequestEvent;
+}
+
+/** The gate REDIRECTS by throwing SvelteKit's redirect (so data requests get the JSON envelope). */
+function expectLoginRedirect(run: () => unknown): void {
+  expect(run).toThrow(expect.objectContaining({ status: 303, location: '/login' }));
 }
 
 /** Mint-a-cookie (design D7): tests sign with the known secret — the gate runs unmodified. */
@@ -66,20 +71,17 @@ describe('server hooks', () => {
       'a cookie signed under another secret',
       signSession({ plexAccountId: '1', username: 'x' }, 'wrong-secret', Date.now()),
     ],
-  ])(
-    'redirects a gated page GET with %s to the login page without resolving',
-    async (_case, cookie) => {
-      const resolve = vi.fn();
-      const response = await handle({ event: gateEvent('/acquisitions', { cookie }), resolve });
-      expect(response.status).toBe(303);
-      expect(response.headers.get('location')).toBe('/login');
-      expect(resolve).not.toHaveBeenCalled();
-    },
-  );
+  ])('redirects a gated page GET with %s to the login page without resolving', (_case, cookie) => {
+    const resolve = vi.fn();
+    expectLoginRedirect(() => handle({ event: gateEvent('/acquisitions', { cookie }), resolve }));
+    expect(resolve).not.toHaveBeenCalled();
+  });
 
-  it('logs a cookie that FAILS VERIFICATION as a tamper signal — distinct from expiry and absence', async () => {
+  it('logs a cookie that FAILS VERIFICATION as a tamper signal — distinct from expiry and absence', () => {
     logger.warn.mockClear();
-    await handle({ event: gateEvent('/acquisitions', { cookie: 'forged' }), resolve: vi.fn() });
+    expectLoginRedirect(() =>
+      handle({ event: gateEvent('/acquisitions', { cookie: 'forged' }), resolve: vi.fn() }),
+    );
     expect(logger.warn).toHaveBeenCalledWith(
       { pathname: '/acquisitions' },
       expect.stringContaining('failed verification'),
@@ -87,25 +89,24 @@ describe('server hooks', () => {
 
     // The routine cases stay quiet: no cookie at all, and an expired (correctly signed) cookie.
     logger.warn.mockClear();
-    await handle({ event: gateEvent('/acquisitions'), resolve: vi.fn() });
+    expectLoginRedirect(() => handle({ event: gateEvent('/acquisitions'), resolve: vi.fn() }));
     const expired = validCookie(Date.now() - SESSION_TTL_MS - 1000);
-    await handle({ event: gateEvent('/acquisitions', { cookie: expired }), resolve: vi.fn() });
+    expectLoginRedirect(() =>
+      handle({ event: gateEvent('/acquisitions', { cookie: expired }), resolve: vi.fn() }),
+    );
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('gates a route born under /login/ that is not the callback (exact open set, fail closed)', async () => {
+  it('gates a route born under /login/ that is not the callback (exact open set, fail closed)', () => {
     const resolve = vi.fn();
-    const response = await handle({ event: gateEvent('/login/future-subroute'), resolve });
-    expect(response.status).toBe(303);
+    expectLoginRedirect(() => handle({ event: gateEvent('/login/future-subroute'), resolve }));
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('treats an expired session as unauthenticated — activity never extends it (fixed expiry)', async () => {
+  it('treats an expired session as unauthenticated — activity never extends it (fixed expiry)', () => {
     const resolve = vi.fn();
     const expired = validCookie(Date.now() - SESSION_TTL_MS - 1000);
-    const response = await handle({ event: gateEvent('/', { cookie: expired }), resolve });
-    expect(response.status).toBe(303);
-    expect(response.headers.get('location')).toBe('/login');
+    expectLoginRedirect(() => handle({ event: gateEvent('/', { cookie: expired }), resolve }));
     expect(resolve).not.toHaveBeenCalled();
   });
 
@@ -144,10 +145,10 @@ describe('server hooks', () => {
     expect(event.locals.session).toMatchObject({ username: 'jake' });
   });
 
-  it('gates HEAD like GET (redirect, not refusal)', async () => {
-    const resolve = vi.fn();
-    const response = await handle({ event: gateEvent('/', { method: 'HEAD' }), resolve });
-    expect(response.status).toBe(303);
+  it('gates HEAD like GET (redirect, not refusal)', () => {
+    expectLoginRedirect(() =>
+      handle({ event: gateEvent('/', { method: 'HEAD' }), resolve: vi.fn() }),
+    );
   });
 
   it('handleError records the fault through the pino root with an id + request context and returns a shaped, id-carrying message', () => {

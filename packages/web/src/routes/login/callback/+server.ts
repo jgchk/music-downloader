@@ -13,14 +13,33 @@ import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session
  * plex.tv down — lands OUTSIDE the gate (fail closed).
  */
 export const GET: RequestHandler = async ({ cookies, locals, url }) => {
-  const pinId = Number(url.searchParams.get('pin'));
+  // Three refusal shapes, logged distinctly so an operator can tell attack traffic (a mismatched
+  // binding) from the benign ones (malformed link; binding expired or another browser's link).
+  // The raw values are loggable: a pin id is not a secret.
+  const rawPin = url.searchParams.get('pin');
+  const pinId = Number(rawPin);
   const boundPin = cookies.get(LOGIN_PIN_COOKIE);
-  if (!Number.isSafeInteger(pinId) || pinId <= 0 || boundPin !== String(pinId)) {
-    locals.logger.warn({ pinId }, 'login callback refused: pin not bound to this browser');
+  if (!Number.isSafeInteger(pinId) || pinId <= 0) {
+    locals.logger.warn({ pin: rawPin }, 'login callback refused: malformed pin parameter');
     redirect(303, loginErrorPath('invalid'));
   }
-  // The binding is single-use: consumed now, whatever the outcome.
-  cookies.delete(LOGIN_PIN_COOKIE, { path: '/login' });
+  if (boundPin === undefined) {
+    // A slow approval past the binding TTL, or a link opened in a browser that never started a
+    // login (including a lure) — either way the truthful UX is "expired, try again".
+    locals.logger.warn({ pin: rawPin }, 'login callback refused: no pin binding in this browser');
+    redirect(303, loginErrorPath('expired'));
+  }
+  if (boundPin !== String(pinId)) {
+    // The hijack/fixation signal: this browser is mid-login for a DIFFERENT pin.
+    locals.logger.warn(
+      { pin: rawPin, bound: boundPin },
+      'login callback refused: pin does not match this browser binding',
+    );
+    redirect(303, loginErrorPath('invalid'));
+  }
+  // The binding is single-use: consumed now, whatever the outcome. (`secure: true` so the
+  // deletion Set-Cookie satisfies the `__Host-` rules and is actually honored.)
+  cookies.delete(LOGIN_PIN_COOKIE, { path: '/', secure: true });
 
   const check = await locals.access.plex.checkPin(pinId);
   if (check.isErr()) {

@@ -36,7 +36,8 @@ export function authenticatedStorageState(): StorageState {
         path: '/',
         expires: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
         httpOnly: true,
-        secure: false,
+        // __Host--prefixed cookies must be Secure; browsers still send them on localhost http.
+        secure: true,
         sameSite: 'Lax',
       },
     ],

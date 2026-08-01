@@ -40,8 +40,9 @@ export const actions: Actions = {
         error: 'Plex could not be reached to start the sign-in. Try again shortly.',
       });
     }
+    // `__Host-` demands Path=/ (path scoping was never a security boundary anyway).
     cookies.set(LOGIN_PIN_COOKIE, String(pin.value.id), {
-      path: '/login',
+      path: '/',
       httpOnly: true,
       sameSite: 'lax',
       secure: true,

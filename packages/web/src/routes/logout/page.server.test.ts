@@ -14,7 +14,7 @@ describe('logout', () => {
       expect.objectContaining({ status: 303, location: '/login' }),
     );
     // Deletion must name the same path the login callback set, or the cookie survives.
-    expect(deleted).toEqual([['md_session', { path: '/' }]]);
+    expect(deleted).toEqual([['__Host-md_session', { path: '/', secure: true }]]);
   });
 
   it('sends a stray GET of /logout home instead of serving a page', () => {

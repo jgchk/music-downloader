@@ -26,10 +26,12 @@ export function loginErrorPath(code: LoginErrorCode): string {
  * Binds the created PIN to the browser that started the login (the OAuth `state` parameter's
  * role): the login POST sets this short-lived cookie with the PIN id, and the callback refuses —
  * before any plex.tv call — a PIN the presenting browser did not start. Without it, an attacker
- * could complete a victim's PIN (the ids are guessable incrementing integers) or fix a victim
- * onto the attacker's session by luring them to the callback URL.
+ * could redeem a PIN id they learned or probed, or fix a victim onto the attacker's session by
+ * luring them to the callback URL. The `__Host-` prefix (Secure, Domain-less, Path=/) stops a
+ * sibling-subdomain service from planting a binding for the attacker's own PIN — signing the
+ * value would not (the attacker can mint a legitimately-issued binding for a PIN they own).
  */
-export const LOGIN_PIN_COOKIE = 'md_login_pin';
+export const LOGIN_PIN_COOKIE = '__Host-md_login_pin';
 
 /** The binding cookie's lifetime: ample for a Plex approval, short enough to be disposable. */
 export const LOGIN_PIN_TTL_SECONDS = 10 * 60;

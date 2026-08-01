@@ -68,9 +68,10 @@ async function requestJson(
 /**
  * A fixture body must be a PROJECTION OF A VALIDATED LIVE RESPONSE, never a fabrication: the
  * token-requiring operations are replay-only (no scheduled drift, design D8), so re-recording is
- * the ONLY moment their schemas ever meet real wire data — a recorder that writes a template
- * would mask exactly the drift this tier exists to catch. Validate first, abort loudly on a
- * violation or unexpected status, and only then pseudonymize the parsed values.
+ * the only moment IN THE DEVELOPMENT LOOP their schemas meet real wire data (production logins
+ * meet it too, but fail closed) — a recorder that writes a template would mask exactly the drift
+ * this tier exists to catch. Validate first, abort loudly on a violation or unexpected status,
+ * and only then pseudonymize the parsed values.
  */
 function validated<T>(
   operation: string,

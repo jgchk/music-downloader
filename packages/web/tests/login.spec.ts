@@ -58,12 +58,12 @@ test.describe('login journey (plex.tv stubbed)', () => {
     // going straight to the callback stands in for the app.plex.tv bounce.
     await context.addCookies([
       {
-        name: 'md_login_pin',
+        name: '__Host-md_login_pin',
         value: '5555',
         domain: new URL(baseURL!).hostname,
-        path: '/login',
+        path: '/',
         httpOnly: true,
-        secure: false,
+        secure: true,
         sameSite: 'Lax',
       },
     ]);
@@ -78,9 +78,10 @@ test.describe('login journey (plex.tv stubbed)', () => {
   test('a callback for a PIN this browser did not start is refused before any plex.tv exchange', async ({
     page,
   }) => {
-    // No binding cookie: the guessable-pin hijack / login-fixation vector lands on invalid.
+    // No binding cookie: the guessable-pin hijack / login-fixation vector is refused (the benign
+    // reading of "no binding" is an expired one, so that is the message shown).
     await page.goto('/login/callback?pin=4242');
-    await expect(page).toHaveURL(/\/login\?error=invalid/);
+    await expect(page).toHaveURL(/\/login\?error=expired/);
     await expect(page.getByTestId('login-error')).toBeVisible();
   });
 });

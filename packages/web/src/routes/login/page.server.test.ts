@@ -72,11 +72,11 @@ describe('login start action', () => {
       return true;
     });
     // The state binding the callback verifies (hijack/fixation guard): short-lived, HttpOnly,
-    // scoped to the login flow, carrying exactly the created pin id.
-    const binding = jar.get('md_login_pin')!;
+    // __Host--conformant (Path=/, Secure, no Domain), carrying exactly the created pin id.
+    const binding = jar.get('__Host-md_login_pin')!;
     expect(binding.value).toBe('55');
     expect(binding.options).toEqual({
-      path: '/login',
+      path: '/',
       httpOnly: true,
       sameSite: 'lax',
       secure: true,

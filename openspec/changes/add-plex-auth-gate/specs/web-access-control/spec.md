@@ -2,7 +2,7 @@
 
 ### Requirement: The web interface requires an authorized session
 
-The web interface SHALL require a valid session on every server route except the login flow (`/login`, its callback) and the health endpoint. An unauthenticated page request SHALL be redirected to the login page; an unauthenticated form action or non-page request SHALL be refused without side effects. A valid session SHALL grant the full interface — submission, cancellation, selection, and review resolution — with no further per-user distinctions.
+The web interface SHALL require a valid session on every server route except the login flow (`/login`, its callback) and the health endpoint. An unauthenticated GET or HEAD request SHALL be redirected to the login page; any other unauthenticated request (form actions and other writes) SHALL be refused without side effects. A valid session SHALL grant the full interface — submission, cancellation, selection, and review resolution — with no further per-user distinctions.
 
 #### Scenario: Unauthenticated page request lands on login
 

@@ -1,3 +1,4 @@
+import { redirect } from '@sveltejs/kit';
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { accessOf, bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
@@ -32,7 +33,8 @@ const OPEN_ROUTES = new Set(['/health', '/login', '/login/callback']);
  * without one: GET/HEAD requests (pages, and SvelteKit's __data.json data requests are GETs too)
  * are redirected to the login form; non-GET requests (form actions) are refused outright with a
  * 403 — either way, before any facade is invoked. Tampered and expired cookies are verdicts, not
- * exceptions, and both land outside; a failed SIGNATURE is logged as the tamper signal it is.
+ * exceptions, and both land outside; a cookie that FAILS VERIFICATION (malformed, forged, or
+ * unparseable — anything but valid/expired) is logged as the tamper signal it is.
  */
 export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
@@ -57,7 +59,10 @@ export const handle: Handle = ({ event, resolve }) => {
   if (event.locals.session === undefined && !OPEN_ROUTES.has(event.url.pathname)) {
     const method = event.request.method;
     if (method === 'GET' || method === 'HEAD') {
-      return new Response(undefined, { status: 303, headers: { location: '/login' } });
+      // SvelteKit's thrown redirect, NOT a hand-built 303: for a client-side `__data.json`
+      // request the framework converts it to the JSON redirect envelope the SPA router expects —
+      // a raw 303 would be followed to the login page's HTML and explode in the data parser.
+      redirect(303, '/login');
     }
     event.locals.logger.warn(
       { pathname: event.url.pathname, method },
