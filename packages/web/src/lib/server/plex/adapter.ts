@@ -22,9 +22,7 @@ import {
  * embedded in an error detail.
  */
 
-/** Identifies this app to Plex — stable so users see ONE "music-downloader" device entry. */
-export const PLEX_CLIENT_IDENTIFIER = 'music-downloader-web';
-export const PLEX_PRODUCT = 'music-downloader';
+import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from './identity.js';
 
 /** The identifying headers Plex requires on every api v2 call (PIN pairing contract). */
 const IDENTITY_HEADERS = {
@@ -75,7 +73,8 @@ export class PlexTvAccess implements PlexAccessPort {
     if (!response.ok) throw new PlexHttpError('pin check', response.status);
     const pin = parseOrThrow(plexPinCheckSchema, await response.json(), 'pin check');
     const token = pin.authToken;
-    return token == null ? { kind: 'pending' } : { kind: 'authorized', token };
+    // Empty OR nullish: `authorized` must imply a usable token, never a blank one.
+    return token === '' || token == null ? { kind: 'pending' } : { kind: 'authorized', token };
   }
 
   private async doCheckMembership(token: string): Promise<MembershipOutcome> {
@@ -117,7 +116,17 @@ function parseOrThrow<T>(schema: ZodType<T>, json: unknown, operation: string): 
   return parsed.data;
 }
 
-/** Fault classifier: whatever escaped (fetch fault, contract break) becomes a token-free value. */
+/**
+ * Fault classifier: whatever escaped (fetch fault, contract break) becomes a token-free value.
+ * Node's `fetch` buries the actual transport reason (ECONNREFUSED, DNS, TLS) in `Error.cause`, so
+ * the chain is flattened into the detail — cause messages are transport errors, which never echo
+ * request headers, so the token-free guarantee holds.
+ */
 function toUnavailable(cause: unknown): PlexUnavailable {
-  return unavailable(cause instanceof Error ? cause.message : String(cause));
+  if (!(cause instanceof Error)) return unavailable(String(cause));
+  const messages = [cause.message];
+  for (let inner = cause.cause; inner instanceof Error; inner = inner.cause) {
+    messages.push(inner.message);
+  }
+  return unavailable(messages.join(': '));
 }

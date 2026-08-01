@@ -6,33 +6,59 @@ import { GET } from './+server.js';
 
 const SECRET = 'callback-test-secret';
 
-function event(plex: FakePlexAccess, query: string) {
+function event(
+  plex: FakePlexAccess,
+  query: string,
+  options: { boundPin?: string | undefined } = {},
+) {
+  // `'in'`-check, not a destructuring default: `{ boundPin: undefined }` must mean NO cookie.
+  const boundPin = 'boundPin' in options ? options.boundPin : '55';
   const jar = new Map<string, { value: string; options: Record<string, unknown> }>();
+  const deleted: [string, Record<string, unknown>][] = [];
+  const logger = { warn: vi.fn(), info: vi.fn() };
   return {
     event: {
       cookies: {
+        get: (name: string) => (name === 'md_login_pin' ? boundPin : undefined),
         set: (name: string, value: string, options: Record<string, unknown>) =>
           void jar.set(name, { value, options }),
+        delete: (name: string, options: Record<string, unknown>) =>
+          void deleted.push([name, options]),
       },
       locals: {
         access: { sessionSecret: SECRET, plex },
-        logger: { warn: vi.fn(), info: vi.fn() },
+        logger,
       },
       url: new URL(`https://music.example/login/callback${query}`),
     } as never,
     jar,
+    deleted,
+    logger,
   };
 }
 
-async function outcome(plex: FakePlexAccess, query: string) {
-  const { event: requestEvent, jar } = event(plex, query);
+async function outcome(
+  plex: FakePlexAccess,
+  query: string,
+  options: { boundPin?: string | undefined } = {},
+) {
+  const { event: requestEvent, jar, deleted, logger } = event(plex, query, options);
   try {
     await GET(requestEvent);
     throw new Error('callback did not redirect');
   } catch (error) {
     if (!isRedirect(error)) throw error;
-    return { location: error.location, jar };
+    return { location: error.location, jar, deleted, logger };
   }
+}
+
+/** No logger call may ever carry the Plex token (web-access-control: token dies with the exchange). */
+function expectNoTokenLogged(
+  logger: { warn: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> },
+  token: string,
+) {
+  const allCalls = [...logger.warn.mock.calls, ...logger.info.mock.calls];
+  expect(JSON.stringify(allCalls)).not.toContain(token);
 }
 
 describe('login callback', () => {
@@ -41,7 +67,7 @@ describe('login callback', () => {
     plex.pinCheck = { kind: 'authorized', token: 'user-token-1' };
     plex.membership = { kind: 'granted', identity: { plexAccountId: '9', username: 'friend' } };
 
-    const { location, jar } = await outcome(plex, '?pin=55');
+    const { location, jar, deleted, logger } = await outcome(plex, '?pin=55');
 
     expect(location).toBe('/');
     expect(plex.seen.checkedPins).toEqual([55]);
@@ -54,22 +80,46 @@ describe('login callback', () => {
       kind: 'valid',
       claims: { plexAccountId: '9', username: 'friend' },
     });
-    // …carries the hardening attributes, and never the Plex token.
-    expect(cookie.options).toMatchObject({
+    // …carries every hardening attribute EXPLICITLY (secure must not ride a framework default)…
+    expect(cookie.options).toEqual({
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
+      secure: true,
       maxAge: SESSION_TTL_MS / 1000,
     });
+    // …never the Plex token — not in the cookie, not in any log line…
     expect(cookie.value).not.toContain('user-token-1');
+    expectNoTokenLogged(logger, 'user-token-1');
+    // …and the single-use PIN binding was consumed.
+    expect(deleted).toEqual([['md_login_pin', { path: '/login' }]]);
+  });
+
+  it('refuses a PIN this browser did not start — before any plex.tv call (hijack/fixation guard)', async () => {
+    const missing = await outcome(new FakePlexAccess(), '?pin=55', { boundPin: undefined });
+    expect(missing.location).toBe('/login?error=invalid');
+
+    const mismatched = await outcome(new FakePlexAccess(), '?pin=55', { boundPin: '999' });
+    expect(mismatched.location).toBe('/login?error=invalid');
+    expect(mismatched.jar.size).toBe(0);
+    expect(mismatched.logger.warn).toHaveBeenCalledOnce();
+  });
+
+  it('makes no plex.tv call for an unbound PIN', async () => {
+    const plex = new FakePlexAccess();
+    await outcome(plex, '?pin=55', { boundPin: undefined });
+    expect(plex.seen.checkedPins).toEqual([]);
+    expect(plex.seen.membershipTokens).toEqual([]);
   });
 
   it('routes a denied membership back to the door with no cookie (unshared account stays outside)', async () => {
     const plex = new FakePlexAccess();
+    plex.pinCheck = { kind: 'authorized', token: 'tok-x' };
     plex.membership = { kind: 'denied', username: 'stranger' };
-    const { location, jar } = await outcome(plex, '?pin=55');
+    const { location, jar, logger } = await outcome(plex, '?pin=55');
     expect(location).toBe('/login?error=denied');
     expect(jar.size).toBe(0);
+    expectNoTokenLogged(logger, 'tok-x');
   });
 
   it.each([
@@ -106,8 +156,9 @@ describe('login callback', () => {
   it('fails closed to the door when the membership check cannot reach plex.tv', async () => {
     const plex = new FakePlexAccess();
     plex.failCheckMembership = true;
-    const { location, jar } = await outcome(plex, '?pin=55');
+    const { location, jar, logger } = await outcome(plex, '?pin=55');
     expect(location).toBe('/login?error=unavailable');
     expect(jar.size).toBe(0);
+    expectNoTokenLogged(logger, 'fake-token');
   });
 });

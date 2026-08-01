@@ -77,6 +77,29 @@ describe('server hooks', () => {
     },
   );
 
+  it('logs a cookie that FAILS VERIFICATION as a tamper signal — distinct from expiry and absence', async () => {
+    logger.warn.mockClear();
+    await handle({ event: gateEvent('/acquisitions', { cookie: 'forged' }), resolve: vi.fn() });
+    expect(logger.warn).toHaveBeenCalledWith(
+      { pathname: '/acquisitions' },
+      expect.stringContaining('failed verification'),
+    );
+
+    // The routine cases stay quiet: no cookie at all, and an expired (correctly signed) cookie.
+    logger.warn.mockClear();
+    await handle({ event: gateEvent('/acquisitions'), resolve: vi.fn() });
+    const expired = validCookie(Date.now() - SESSION_TTL_MS - 1000);
+    await handle({ event: gateEvent('/acquisitions', { cookie: expired }), resolve: vi.fn() });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('gates a route born under /login/ that is not the callback (exact open set, fail closed)', async () => {
+    const resolve = vi.fn();
+    const response = await handle({ event: gateEvent('/login/future-subroute'), resolve });
+    expect(response.status).toBe(303);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
   it('treats an expired session as unauthenticated — activity never extends it (fixed expiry)', async () => {
     const resolve = vi.fn();
     const expired = validCookie(Date.now() - SESSION_TTL_MS - 1000);
@@ -86,7 +109,8 @@ describe('server hooks', () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('refuses a gated non-GET (form action) without a session before any facade is invoked', async () => {
+  it('refuses a gated non-GET (form action) without a session before any facade is invoked, leaving a trace', async () => {
+    logger.warn.mockClear();
     const resolve = vi.fn();
     const response = await handle({
       event: gateEvent('/acquisitions/new', { method: 'POST' }),
@@ -94,6 +118,11 @@ describe('server hooks', () => {
     });
     expect(response.status).toBe(403);
     expect(resolve).not.toHaveBeenCalled();
+    // An unauthenticated write attempt is an operator-visible event, not a silent bounce.
+    expect(logger.warn).toHaveBeenCalledWith(
+      { pathname: '/acquisitions/new', method: 'POST' },
+      expect.stringContaining('refused'),
+    );
   });
 
   it.each([['/login'], ['/login/callback'], ['/health']])(

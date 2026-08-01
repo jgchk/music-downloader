@@ -54,8 +54,10 @@ const environmentSchema = z.object({
   // --- web access control (add-plex-auth-gate) -------------------------------------------------
   // Both gate settings are REQUIRED: a process without them must fail startup, never serve with a
   // weakened or open gate (web-access-control: misconfiguration fails closed).
-  /** Signs session cookies; rotating it is the everyone-out-now revocation lever (design D4). */
-  SESSION_SECRET: z.string().min(1),
+  /** Signs session cookies; rotating it is the everyone-out-now revocation lever (design D4).
+   * The 32-char floor is part of fail-closed: a brute-forceable HMAC secret IS a misconfiguration,
+   * and it must fail startup, not serve a weakened gate. */
+  SESSION_SECRET: z.string().min(32),
   /** The owner's Plex server `machineIdentifier` — membership in it IS approval (design D2/D5). */
   PLEX_SERVER_MACHINE_ID: z.string().min(1),
   /** plex.tv API base; overridden only by test tiers pointing at stubs (design D7). */

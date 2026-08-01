@@ -4,7 +4,12 @@ import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
 import { load } from './+layout.server.js';
 
-function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: () => unknown }): {
+function locals(over: {
+  listPendingReviews?: () => unknown;
+  listAcquisitions?: () => unknown;
+  /** The one significant value per test: authenticated by default, `undefined` = signed out. */
+  session?: { plexAccountId: string; username: string; expiresAt: number } | undefined;
+}): {
   locals: App.Locals;
   warnings: unknown[];
 } {
@@ -21,7 +26,10 @@ function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: (
         } as unknown as DownloaderFacade,
       },
       logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
-      session: { plexAccountId: '42', username: 'jake', expiresAt: Number.MAX_SAFE_INTEGER },
+      session:
+        'session' in over
+          ? over.session
+          : { plexAccountId: '42', username: 'jake', expiresAt: Number.MAX_SAFE_INTEGER },
     } as unknown as App.Locals,
   };
 }
@@ -75,8 +83,8 @@ describe('root layout load', () => {
         reads.push('acquisitions');
         return { acquisitions: [awaiting] };
       },
+      session: undefined,
     });
-    (event as { session?: unknown }).session = undefined;
     expect(load({ locals: event, url: new URL('http://host/login') } as never)).toEqual({
       attentionCount: 0,
       pathname: '/login',

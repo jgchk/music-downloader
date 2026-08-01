@@ -88,4 +88,15 @@ test.describe('composed app boot smoke (not a11y/layout parity — deferred)', (
     await page.goto('/reviews');
     await expect(page.getByTestId('empty')).toBeVisible();
   });
+
+  test('signing out ends the session for real: gated pages bounce to the door afterwards', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByTestId('logout').click();
+    await expect(page).toHaveURL(/\/login$/);
+    // The cleared cookie is gone, not just the page changed: a fresh gated navigation stays out.
+    await page.goto('/acquisitions');
+    await expect(page).toHaveURL(/\/login$/);
+  });
 });

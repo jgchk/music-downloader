@@ -34,7 +34,7 @@ const VALID_ENV = {
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
-  SESSION_SECRET: 'runtime-test-secret',
+  SESSION_SECRET: 'runtime-test-secret-0123456789abcd',
   PLEX_SERVER_MACHINE_ID: 'runtime-machine',
 };
 
@@ -208,7 +208,7 @@ describe('bootRuntimes', () => {
       onShutdownSignal: vi.fn(),
     });
     const access = accessOf();
-    expect(access.sessionSecret).toBe('runtime-test-secret');
+    expect(access.sessionSecret).toBe('runtime-test-secret-0123456789abcd');
     // The one concretion behind the PlexAccess port is constructed HERE (design D6): no fake, no
     // null strategy, nothing an environment value could select instead (design D7).
     expect(access.plex).toBeInstanceOf(PlexTvAccess);
@@ -255,7 +255,7 @@ describe('bootRuntimes', () => {
           BRIDGE_PYTHON: '/bin/false',
           BRIDGE_TIMEOUT_MS: '2000',
           LOG_LEVEL: 'silent',
-          SESSION_SECRET: 'real-boot-secret',
+          SESSION_SECRET: 'real-boot-secret-0123456789abcdef',
           PLEX_SERVER_MACHINE_ID: 'real-boot-machine',
         }),
       ).rejects.toThrow(/importer startup failed/);

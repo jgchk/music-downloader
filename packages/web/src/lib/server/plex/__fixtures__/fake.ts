@@ -11,9 +11,9 @@ import type {
 /**
  * In-memory fake of OUR PlexAccess port for unit tests (design D7): the composition-root swap the
  * literature blesses lives HERE, in the test's process — never as a selectable strategy in the
- * shipped artifact. Behaviors are per-call outcome queues so a test can script grant, denial,
- * pending, and outage paths without touching plex.tv's wire shapes (GOOS: don't mock what you
- * don't own).
+ * shipped artifact. Behaviors are per-operation scripted outcomes (one fixed result per
+ * operation, plus a fail flag for the Err track) so a test can script grant, denial, pending, and
+ * outage paths without touching plex.tv's wire shapes (GOOS: don't mock what you don't own).
  */
 
 const UNAVAILABLE: PlexUnavailable = { kind: 'plex-unavailable', detail: 'fake outage' };

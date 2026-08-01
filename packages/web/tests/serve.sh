@@ -25,9 +25,10 @@ export MUSICBRAINZ_BASE_URL="http://127.0.0.1:9"
 export MUSICBRAINZ_USER_AGENT="music-web-e2e/0.0"
 # The access gate's local-mode credentials: same throwaway secret the Playwright auth helper
 # defaults to; plex.tv unreachable (login-journey specs skip locally — no stub here).
-export SESSION_SECRET="${E2E_SESSION_SECRET:-e2e-session-secret}"
+export SESSION_SECRET="${E2E_SESSION_SECRET:-e2e-session-secret-0123456789abcdef}"
 export PLEX_SERVER_MACHINE_ID="e2e-machine"
-# Overridable so a locally-run plex.tv stub can exercise the login journey outside the harness.
+# Overridable so a locally-run plex.tv stub can exercise the login journey outside the harness —
+# also export E2E_PLEX_STUB=1 to un-skip the login-journey specs when doing that.
 export PLEX_API_BASE_URL="${PLEX_API_BASE_URL:-http://127.0.0.1:9}"
 export BRIDGE_SCRIPT="$root/../importer/src/adapters/beets/bridge/bridge.py"
 export LOG_LEVEL=warn

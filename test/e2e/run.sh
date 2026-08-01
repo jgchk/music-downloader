@@ -51,7 +51,7 @@ export E2E_SLSKD_ADMIN_URL="http://localhost:$SLSKD_PORT/__admin"
 export E2E_APP_CONTAINER="$APP"
 # The gate's harness credentials (web-access-control): the specs mint session cookies with the
 # PRODUCTION session codec under this throwaway secret — the image's gate runs exactly as shipped.
-export E2E_SESSION_SECRET="e2e-session-secret"
+export E2E_SESSION_SECRET="e2e-session-secret-0123456789abcdef"
 E2E_MACHINE_ID="e2e-machine"
 
 dump_logs() {
@@ -183,6 +183,12 @@ start_app -e SLSKD_BASE_URL=http://127.0.0.1:9 -e MUSICBRAINZ_BASE_URL=http://12
   -e PLEX_API_BASE_URL="http://localhost:$PLEX_PORT"
 if ! E2E_PLEX_STUB=1 pnpm --dir packages/web exec playwright test; then
   dump_logs
+  exit 1
+fi
+# Skip-guard: the login-journey specs gate on E2E_PLEX_STUB and would SKIP (green) if that env
+# plumbing were ever lost — so prove the journey actually ran by checking the stub served a PIN.
+if ! curl -fsS "http://localhost:$PLEX_PORT/__admin/requests" | grep -q '"/pins?strong=true"'; then
+  echo "login journey never exercised the plex.tv stub — specs skipped?" >&2
   exit 1
 fi
 docker rm -f "$APP" >/dev/null

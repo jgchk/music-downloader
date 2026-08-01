@@ -1,7 +1,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from '../../../src/lib/server/plex/adapter.js';
+import type { ZodType } from 'zod';
+import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from '../../../src/lib/server/plex/identity.js';
+import {
+  plexPinCheckSchema,
+  plexPinCreateSchema,
+  plexResourcesSchema,
+  plexUserSchema,
+} from '../../../src/lib/server/plex/schemas.js';
 import { CONTRACT_FIXTURE_ROOT } from '../support/fixture.js';
 import type { ContractFixture } from '../support/fixture.js';
 
@@ -58,15 +65,39 @@ async function requestJson(
   return { status: response.status, body: text === '' ? undefined : JSON.parse(text) };
 }
 
+/**
+ * A fixture body must be a PROJECTION OF A VALIDATED LIVE RESPONSE, never a fabrication: the
+ * token-requiring operations are replay-only (no scheduled drift, design D8), so re-recording is
+ * the ONLY moment their schemas ever meet real wire data — a recorder that writes a template
+ * would mask exactly the drift this tier exists to catch. Validate first, abort loudly on a
+ * violation or unexpected status, and only then pseudonymize the parsed values.
+ */
+function validated<T>(
+  operation: string,
+  response: { status: number; body: unknown },
+  schema: ZodType<T>,
+): T {
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`${operation} answered ${response.status} — fixture NOT written`);
+  }
+  const parsed = schema.safeParse(response.body);
+  if (!parsed.success) {
+    throw new Error(
+      `${operation} violated the consumed schema — live drift; fixture NOT written: ${JSON.stringify(parsed.error.issues)}`,
+    );
+  }
+  return parsed.data;
+}
+
 async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
 
   // 1. The pending PIN: created and checked once, never approved.
   console.log('── creating the never-approved PIN (pending fixture)');
   const pendingCreate = await requestJson('POST', '/pins?strong=true');
-  const pending = pendingCreate.body as { id: number; code: string };
+  const pending = validated('pin create (pending)', pendingCreate, plexPinCreateSchema);
   const pendingCheck = await requestJson('GET', `/pins/${pending.id}`);
-  const pendingChecked = pendingCheck.body as { id: number; authToken?: string | null };
+  const pendingChecked = validated('pin check (pending)', pendingCheck, plexPinCheckSchema);
   if (pendingChecked.authToken != null) throw new Error('pending pin unexpectedly authorized');
   write('pin-check-pending.json', {
     provenance: provenance('projected to consumed fields; PIN never approved'),
@@ -88,7 +119,7 @@ async function main(): Promise<void> {
   // 3. The PIN you approve: its create response is THE pin-create fixture.
   console.log('── creating the PIN to approve (pin-create + authorized fixtures)');
   const create = await requestJson('POST', '/pins?strong=true');
-  const pin = create.body as { id: number; code: string };
+  const pin = validated('pin create', create, plexPinCreateSchema);
   write('pin-create.json', {
     provenance: provenance('projected to consumed fields (id, code)'),
     request: { method: 'POST', path: '/pins', query: { strong: 'true' } },
@@ -106,8 +137,8 @@ async function main(): Promise<void> {
     if (Date.now() >= deadline) throw new Error('pin was not approved within 10 minutes');
     await sleep(5000);
     const check = await requestJson('GET', `/pins/${pin.id}`);
-    const body = check.body as { id: number; authToken?: string | null };
-    if (body.authToken != null) {
+    const body = validated('pin check (approved)', check, plexPinCheckSchema);
+    if (body.authToken != null && body.authToken !== '') {
       approved = { status: check.status, id: body.id, token: body.authToken };
     } else {
       console.log('  …still waiting for approval');
@@ -120,28 +151,44 @@ async function main(): Promise<void> {
     response: { status: approved.status, body: { id: approved.id, authToken: SCRUBBED_TOKEN } },
   });
 
-  // 4. Account + resources with the token — held in memory only, never written.
-  console.log('── capturing account + resources (pseudonymized)');
-  const user = await requestJson('GET', '/user', token);
+  // 4. Account + resources with the token — held in memory only, never written. The bodies are
+  // schema-validated LIVE data, pseudonymized field-by-field: which fields were present (and
+  // their null-ness) is preserved from the wire; only the values are replaced.
+  console.log('── capturing account + resources (validated, then pseudonymized)');
+  const userResponse = await requestJson('GET', '/user', token);
+  const user = validated('user lookup', userResponse, plexUserSchema);
   write('user.json', {
-    provenance: provenance('projected to consumed fields; account pseudonymized to user1'),
+    provenance: provenance(
+      'validated live body projected to consumed fields; account pseudonymized to user1',
+    ),
     request: { method: 'GET', path: '/user' },
-    response: { status: user.status, body: { id: 1, username: 'user1', title: 'user1' } },
+    response: {
+      status: userResponse.status,
+      body: {
+        id: 1,
+        // Preserve wire null-ness/absence so the adapter's username fallback chain keeps
+        // real-data grounding across re-records.
+        ...(user.username === undefined
+          ? {}
+          : { username: user.username === null ? null : 'user1' }),
+        ...(user.title === undefined ? {} : { title: user.title === null ? null : 'user1' }),
+      },
+    },
   });
 
-  const resources = await requestJson('GET', '/resources', token);
-  const entries = resources.body as { clientIdentifier?: unknown }[];
-  const projected = entries
-    .filter((entry) => typeof entry.clientIdentifier === 'string')
-    .map((_entry, index) => ({ clientIdentifier: `machine-${index + 1}` }));
+  const resourcesResponse = await requestJson('GET', '/resources', token);
+  const resources = validated('resources', resourcesResponse, plexResourcesSchema);
+  const projected = resources.map((_entry, index) => ({
+    clientIdentifier: `machine-${index + 1}`,
+  }));
   if (projected.length === 0)
     throw new Error('no resources with a clientIdentifier — token account sees no devices');
   write('resources.json', {
     provenance: provenance(
-      `projected to consumed fields; ${projected.length} clientIdentifiers pseudonymized to machine-N`,
+      `validated live body projected to consumed fields; ${projected.length} clientIdentifiers pseudonymized to machine-N`,
     ),
     request: { method: 'GET', path: '/resources' },
-    response: { status: resources.status, body: projected },
+    response: { status: resourcesResponse.status, body: projected },
   });
 
   console.log('\n── done. Review the fixtures before committing:');

@@ -6,7 +6,7 @@ const VALID = {
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
-  SESSION_SECRET: 'test-session-secret',
+  SESSION_SECRET: 'test-session-secret-0123456789abcd',
   PLEX_SERVER_MACHINE_ID: 'abc123machine',
 };
 
@@ -128,6 +128,21 @@ describe('loadComposedConfig', () => {
     expect(blankMachine).toContain('PLEX_SERVER_MACHINE_ID');
   });
 
+  it('rejects a brute-forceable session secret: shorter than 32 characters fails startup', () => {
+    // The HMAC secret IS the gate's strength; a short one is a misconfiguration, and
+    // misconfiguration fails closed (web-access-control).
+    const short = loadComposedConfig({
+      ...VALID,
+      SESSION_SECRET: 'only-twenty-chars!!',
+    })._unsafeUnwrapErr();
+    expect(short).toContain('SESSION_SECRET');
+  });
+
+  it('rejects a set-but-blank plex.tv base URL rather than silently falling back', () => {
+    const blank = loadComposedConfig({ ...VALID, PLEX_API_BASE_URL: '' })._unsafeUnwrapErr();
+    expect(blank).toContain('PLEX_API_BASE_URL');
+  });
+
   it('defaults the plex.tv base URL and carries an explicit one through', () => {
     expect(loadComposedConfig(VALID)._unsafeUnwrap().access.plex.baseUrl).toBe(
       'https://plex.tv/api/v2',
@@ -137,7 +152,7 @@ describe('loadComposedConfig', () => {
       PLEX_API_BASE_URL: 'http://localhost:8083',
     })._unsafeUnwrap();
     expect(config.access.plex.baseUrl).toBe('http://localhost:8083');
-    expect(config.access.sessionSecret).toBe('test-session-secret');
+    expect(config.access.sessionSecret).toBe('test-session-secret-0123456789abcd');
     expect(config.access.plex.machineId).toBe('abc123machine');
   });
 });

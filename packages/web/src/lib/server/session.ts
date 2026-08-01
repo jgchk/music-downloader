@@ -23,11 +23,15 @@ export interface SessionIdentity {
   readonly username: string;
 }
 
-const claimsSchema = z.object({
-  plexAccountId: z.string(),
-  username: z.string(),
-  expiresAt: z.number(),
-});
+// `.readonly()` so the inferred claims match SessionIdentity's immutability — claims land on the
+// shared `locals` bag, where a route mutating them would otherwise compile.
+const claimsSchema = z
+  .object({
+    plexAccountId: z.string(),
+    username: z.string(),
+    expiresAt: z.number(),
+  })
+  .readonly();
 
 export type SessionClaims = z.infer<typeof claimsSchema>;
 

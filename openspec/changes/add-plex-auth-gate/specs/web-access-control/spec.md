@@ -21,7 +21,7 @@ The web interface SHALL require a valid session on every server route except the
 
 ### Requirement: Login is the Plex PIN flow via full-page redirect
 
-The login page SHALL render without contacting any external service. Submitting the login form SHALL create a Plex PIN server-side and redirect the browser to Plex's hosted auth page with a forward URL back to the app's callback route; the callback SHALL check the PIN once server-side. Upstream PIN creation SHALL occur only on form submission, never on page render.
+The login page SHALL render without contacting any external service. Submitting the login form SHALL create a Plex PIN server-side, bind its identifier to the submitting browser via a short-lived cookie, and redirect the browser to Plex's hosted auth page with a forward URL back to the app's callback route; the callback SHALL refuse — before any plex.tv call — a PIN the presenting browser did not start, and SHALL check a bound PIN once server-side. Upstream PIN creation SHALL occur only on form submission, never on page render.
 
 #### Scenario: Rendering the login page costs nothing upstream
 
@@ -37,6 +37,11 @@ The login page SHALL render without contacting any external service. Submitting 
 
 - **WHEN** the callback is reached with a PIN that was not approved or has expired
 - **THEN** the login page re-renders with a modeled error and no session is created
+
+#### Scenario: The callback refuses a PIN this browser did not start
+
+- **WHEN** the callback is reached with a PIN identifier that does not match the presenting browser's login-start binding (or with none) — a lure to someone else's callback URL, or a guessed PIN identifier
+- **THEN** the login page re-renders with a modeled error, no plex.tv call is made, and no session is created
 
 ### Requirement: Access is granted solely by Plex server membership
 
@@ -106,12 +111,17 @@ The user's Plex token SHALL be used only for the duration of the login exchange 
 
 ### Requirement: Access-control misconfiguration fails closed
 
-Missing or blank access-control configuration (`SESSION_SECRET`, `PLEX_SERVER_MACHINE_ID`) SHALL fail startup precisely, and no environment configuration of the shipped artifact SHALL disable or bypass the gate.
+Missing, blank, or brute-forceable access-control configuration (a `SESSION_SECRET` shorter than 32 characters, a missing `PLEX_SERVER_MACHINE_ID`) SHALL fail startup precisely, and no environment configuration of the shipped artifact SHALL disable or bypass the gate.
 
 #### Scenario: Missing configuration fails startup
 
 - **WHEN** the process starts without a session secret or machine identifier
 - **THEN** startup fails naming the missing variable, rather than serving with a weakened or open gate
+
+#### Scenario: A weak session secret fails startup
+
+- **WHEN** the process starts with a session secret shorter than 32 characters
+- **THEN** startup fails naming `SESSION_SECRET` — a brute-forceable HMAC secret is a misconfiguration, not a weaker gate to serve with
 
 #### Scenario: No configuration opens the gate
 
