@@ -12,7 +12,9 @@ export const load: PageServerLoad = () => {
 
 export const actions: Actions = {
   default: ({ cookies }) => {
-    cookies.delete(SESSION_COOKIE, { path: '/' });
+    // `secure: true` explicitly: the deletion Set-Cookie must itself satisfy the `__Host-` prefix
+    // rules or the browser REJECTS the deletion and the session survives sign-out.
+    cookies.delete(SESSION_COOKIE, { path: '/', secure: true });
     redirect(303, '/login');
   },
 };

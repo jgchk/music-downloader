@@ -14,8 +14,14 @@ import { z } from 'zod';
  * re-verification cadence, so it must survive any client-side tampering with cookie metadata. */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** The session cookie's name, shared by the gate, the login routes, and the e2e harness. */
-export const SESSION_COOKIE = 'md_session';
+/**
+ * The session cookie's name, shared by the gate, the login routes, and the e2e harness. The
+ * `__Host-` prefix makes the browser refuse the cookie unless it is Secure, Domain-less, and
+ * Path=/ — so a sibling `*.jake.cafe` service (compromised or stale) cannot set a shadowing
+ * cookie with `Domain=jake.cafe` and sign the user out (or, for the login-pin binding, restore
+ * the fixation vector).
+ */
+export const SESSION_COOKIE = '__Host-md_session';
 
 /** Who the session is for — the only identity facts the app retains (never a Plex token). */
 export interface SessionIdentity {

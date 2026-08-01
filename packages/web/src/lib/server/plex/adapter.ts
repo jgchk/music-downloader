@@ -125,7 +125,12 @@ function parseOrThrow<T>(schema: ZodType<T>, json: unknown, operation: string): 
 function toUnavailable(cause: unknown): PlexUnavailable {
   if (!(cause instanceof Error)) return unavailable(String(cause));
   const messages = [cause.message];
-  for (let inner = cause.cause; inner instanceof Error; inner = inner.cause) {
+  // Depth-capped so a (hypothetical) self-referential cause chain cannot spin forever.
+  for (
+    let inner = cause.cause, depth = 0;
+    inner instanceof Error && depth < 5;
+    inner = inner.cause, depth += 1
+  ) {
     messages.push(inner.message);
   }
   return unavailable(messages.join(': '));

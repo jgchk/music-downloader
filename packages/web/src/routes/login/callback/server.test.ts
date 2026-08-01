@@ -19,7 +19,7 @@ function event(
   return {
     event: {
       cookies: {
-        get: (name: string) => (name === 'md_login_pin' ? boundPin : undefined),
+        get: (name: string) => (name === '__Host-md_login_pin' ? boundPin : undefined),
         set: (name: string, value: string, options: Record<string, unknown>) =>
           void jar.set(name, { value, options }),
         delete: (name: string, options: Record<string, unknown>) =>
@@ -73,7 +73,7 @@ describe('login callback', () => {
     expect(plex.seen.checkedPins).toEqual([55]);
     // The membership check ran with the token the PIN check handed over…
     expect(plex.seen.membershipTokens).toEqual(['user-token-1']);
-    const cookie = jar.get('md_session')!;
+    const cookie = jar.get('__Host-md_session')!;
     // …the cookie is verifiable by the production codec with the same secret…
     const verdict = verifySession(cookie.value, SECRET, Date.now());
     expect(verdict).toMatchObject({
@@ -92,17 +92,23 @@ describe('login callback', () => {
     expect(cookie.value).not.toContain('user-token-1');
     expectNoTokenLogged(logger, 'user-token-1');
     // …and the single-use PIN binding was consumed.
-    expect(deleted).toEqual([['md_login_pin', { path: '/login' }]]);
+    expect(deleted).toEqual([['__Host-md_login_pin', { path: '/', secure: true }]]);
   });
 
   it('refuses a PIN this browser did not start — before any plex.tv call (hijack/fixation guard)', async () => {
+    // No binding at all is the benign shape (expired binding, or a lure into a fresh browser):
+    // the truthful UX is "expired, try again".
     const missing = await outcome(new FakePlexAccess(), '?pin=55', { boundPin: undefined });
-    expect(missing.location).toBe('/login?error=invalid');
+    expect(missing.location).toBe('/login?error=expired');
 
+    // A DIFFERENT bound pin is the attack signal, logged with both values (pin ids, not secrets).
     const mismatched = await outcome(new FakePlexAccess(), '?pin=55', { boundPin: '999' });
     expect(mismatched.location).toBe('/login?error=invalid');
     expect(mismatched.jar.size).toBe(0);
-    expect(mismatched.logger.warn).toHaveBeenCalledOnce();
+    expect(mismatched.logger.warn).toHaveBeenCalledWith(
+      { pin: '55', bound: '999' },
+      expect.stringContaining('does not match'),
+    );
   });
 
   it('makes no plex.tv call for an unbound PIN', async () => {
@@ -116,9 +122,12 @@ describe('login callback', () => {
     const plex = new FakePlexAccess();
     plex.pinCheck = { kind: 'authorized', token: 'tok-x' };
     plex.membership = { kind: 'denied', username: 'stranger' };
-    const { location, jar, logger } = await outcome(plex, '?pin=55');
+    const { location, jar, deleted, logger } = await outcome(plex, '?pin=55');
     expect(location).toBe('/login?error=denied');
     expect(jar.size).toBe(0);
+    // The binding is consumed on EVERY bound outcome, not just success — a still-live binding
+    // after a denial would make the callback replayable.
+    expect(deleted).toHaveLength(1);
     expectNoTokenLogged(logger, 'tok-x');
   });
 
@@ -128,9 +137,10 @@ describe('login callback', () => {
   ])('routes %s back to the door with no cookie', async (_case, pinCheck, expected) => {
     const plex = new FakePlexAccess();
     plex.pinCheck = pinCheck;
-    const { location, jar } = await outcome(plex, '?pin=55');
+    const { location, jar, deleted } = await outcome(plex, '?pin=55');
     expect(location).toBe(expected);
     expect(jar.size).toBe(0);
+    expect(deleted).toHaveLength(1);
   });
 
   it.each([
