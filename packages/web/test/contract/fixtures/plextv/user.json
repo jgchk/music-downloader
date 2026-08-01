@@ -1,0 +1,19 @@
+{
+  "provenance": {
+    "source": "https://plex.tv/api/v2 (live)",
+    "capturedAt": "2026-08-01",
+    "note": "projected to consumed fields; account pseudonymized to user1"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/user"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": 1,
+      "username": "user1",
+      "title": "user1"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "provenance": {
+    "source": "https://plex.tv/api/v2 (live)",
+    "capturedAt": "2026-08-01",
+    "note": "projected to consumed fields; 8 clientIdentifiers pseudonymized to machine-N"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/resources"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "clientIdentifier": "machine-1"
+      },
+      {
+        "clientIdentifier": "machine-2"
+      },
+      {
+        "clientIdentifier": "machine-3"
+      },
+      {
+        "clientIdentifier": "machine-4"
+      },
+      {
+        "clientIdentifier": "machine-5"
+      },
+      {
+        "clientIdentifier": "machine-6"
+      },
+      {
+        "clientIdentifier": "machine-7"
+      },
+      {
+        "clientIdentifier": "machine-8"
+      }
+    ]
+  }
+}

@@ -42,6 +42,15 @@ jobs:
           set -o pipefail
           pnpm tsx packages/downloader/test/contract/drift/musicbrainz.ts 2>&1 | tee mb.log
 
+      - name: plex.tv drift (live PIN surface vs schemas)
+        id: plextv
+        continue-on-error: true
+        # Unauthenticated PIN operations only: the token-requiring surface is replay-only by
+        # design (no stored Plex credential exists to live-check it with).
+        run: |
+          set -o pipefail
+          pnpm tsx packages/web/test/contract/drift/plextv.ts 2>&1 | tee plextv.log
+
       - name: Wait for slskd swagger
         run: |
           for i in $(seq 1 30); do
@@ -63,7 +72,7 @@ jobs:
           pnpm tsx packages/downloader/test/contract/drift/slskd.ts 2>&1 | tee slskd.log
 
       - name: Open or refresh drift issue
-        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure'
+        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure' || steps.plextv.outcome == 'failure'
         uses: actions/github-script@v9
         with:
           script: |
@@ -76,9 +85,11 @@ jobs:
               '',
               `- MusicBrainz: **${{ steps.mb.outcome }}**`,
               `- slskd: **${{ steps.slskd.outcome }}**`,
+              `- plex.tv: **${{ steps.plextv.outcome }}**`,
               '',
               '### MusicBrainz', '```', read('mb.log'), '```',
               '### slskd', '```', read('slskd.log'), '```',
+              '### plex.tv', '```', read('plextv.log'), '```',
               '',
               `Run: ${runUrl}`,
               '',
@@ -94,5 +105,5 @@ jobs:
             }
 
       - name: Fail the run on drift
-        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure'
+        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure' || steps.plextv.outcome == 'failure'
         run: echo "contract drift detected — see the drift issue" && exit 1

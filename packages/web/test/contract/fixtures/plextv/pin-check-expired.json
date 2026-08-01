@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "source": "https://plex.tv/api/v2 (live)",
+    "capturedAt": "2026-08-01",
+    "note": "nonexistent pin id; body not consumed (adapter reads the status)"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/pins/999999999"
+  },
+  "response": {
+    "status": 404,
+    "body": {}
+  }
+}

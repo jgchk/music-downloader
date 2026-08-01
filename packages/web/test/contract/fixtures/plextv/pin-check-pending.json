@@ -1,0 +1,18 @@
+{
+  "provenance": {
+    "source": "https://plex.tv/api/v2 (live)",
+    "capturedAt": "2026-08-01",
+    "note": "projected to consumed fields; PIN never approved"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/pins/309334229"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "id": 309334229,
+      "authToken": null
+    }
+  }
+}
