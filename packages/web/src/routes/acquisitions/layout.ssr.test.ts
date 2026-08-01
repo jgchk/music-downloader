@@ -12,6 +12,7 @@ describe('acquisitions master-detail layout (SSR)', () => {
     const { body } = render(Layout, {
       props: {
         data: {
+          username: 'jake',
           attentionCount: 0,
           pathname: '/acquisitions',
           acquisitions: [],
@@ -35,6 +36,7 @@ describe('acquisitions master-detail layout (SSR)', () => {
     const { body } = render(Layout, {
       props: {
         data: {
+          username: 'jake',
           attentionCount: 0,
           pathname: '/acquisitions',
           acquisitions: [],

@@ -21,7 +21,7 @@ function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: (
         } as unknown as DownloaderFacade,
       },
       logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
-    },
+    } as unknown as App.Locals,
   };
 }
 

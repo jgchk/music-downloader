@@ -1,6 +1,7 @@
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
+import { accessOf, bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
+import { SESSION_COOKIE, verifySession } from '$lib/server/session.js';
 
 /**
  * The composed process's server hooks (design D8): `init` boots both module runtimes and the
@@ -16,9 +17,41 @@ export const init: ServerInit = async () => {
   await bootRuntimes(env);
 };
 
+/**
+ * The routes that answer without a session (web-access-control): the login flow — a user must be
+ * able to reach the door — and the health probe, which deploy verification and monitoring hit
+ * credential-less. Everything else requires a valid session cookie.
+ */
+function isOpenRoute(pathname: string): boolean {
+  return pathname === '/health' || pathname === '/login' || pathname.startsWith('/login/');
+}
+
+/**
+ * The access gate (web-access-control, design D6/D7): every request's cookie is verified by the
+ * pure session codec — no I/O, no plex.tv call — and a valid session lands on `locals.session`
+ * (so even the open login page can bounce an already-authenticated user home). Gated routes
+ * without one: page GETs are redirected to the login form; anything else (actions, data requests)
+ * is refused outright before any facade is invoked. Tampered and expired cookies are verdicts,
+ * not exceptions, and both land outside.
+ */
 export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
   event.locals.logger = loggerOf();
+  event.locals.access = accessOf();
+
+  const cookie = event.cookies.get(SESSION_COOKIE);
+  if (cookie !== undefined) {
+    const verdict = verifySession(cookie, accessOf().sessionSecret, Date.now());
+    if (verdict.kind === 'valid') event.locals.session = verdict.claims;
+  }
+
+  if (event.locals.session === undefined && !isOpenRoute(event.url.pathname)) {
+    const method = event.request.method;
+    return method === 'GET' || method === 'HEAD'
+      ? new Response(undefined, { status: 303, headers: { location: '/login' } })
+      : new Response('Unauthorized', { status: 403 });
+  }
+
   return resolve(event);
 };
 

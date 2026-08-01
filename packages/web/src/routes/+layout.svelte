@@ -26,30 +26,39 @@
   <header class="masthead">
     <a class="wordmark" href="/"><span class="mark" aria-hidden="true">▚</span> music</a>
     <span class="spacer"></span>
-    <a class="btn primary" href="/acquisitions/new"
-      ><span aria-hidden="true">＋</span> Request a download</a
-    >
+    {#if data.username !== undefined}
+      <a class="btn primary" href="/acquisitions/new"
+        ><span aria-hidden="true">＋</span> Request a download</a
+      >
+      <!-- Sign-out is a plain form POST (progressive enhancement; the gate refuses stray GETs). -->
+      <form class="session" method="POST" action="/logout">
+        <span class="user" data-testid="user">{data.username}</span>
+        <button class="btn" data-testid="logout">Sign out</button>
+      </form>
+    {/if}
     <SkinSwitcher />
   </header>
 
-  <nav class="primary" data-testid="site-nav" aria-label="Primary">
-    <ul>
-      <li><a href="/" aria-current={isCurrent('/') ? 'page' : undefined}>Home</a></li>
-      <li>
-        <a href="/acquisitions" aria-current={isCurrent('/acquisitions') ? 'page' : undefined}>
-          Acquisitions
-        </a>
-      </li>
-      <li>
-        <a href="/reviews" aria-current={isCurrent('/reviews') ? 'page' : undefined}>
-          Needs attention
-          {#if data.attentionCount > 0}
-            <span class="badge" data-testid="attention-badge">{data.attentionCount}</span>
-          {/if}
-        </a>
-      </li>
-    </ul>
-  </nav>
+  {#if data.username !== undefined}
+    <nav class="primary" data-testid="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="/" aria-current={isCurrent('/') ? 'page' : undefined}>Home</a></li>
+        <li>
+          <a href="/acquisitions" aria-current={isCurrent('/acquisitions') ? 'page' : undefined}>
+            Acquisitions
+          </a>
+        </li>
+        <li>
+          <a href="/reviews" aria-current={isCurrent('/reviews') ? 'page' : undefined}>
+            Needs attention
+            {#if data.attentionCount > 0}
+              <span class="badge" data-testid="attention-badge">{data.attentionCount}</span>
+            {/if}
+          </a>
+        </li>
+      </ul>
+    </nav>
+  {/if}
 
   <main>
     {@render children()}

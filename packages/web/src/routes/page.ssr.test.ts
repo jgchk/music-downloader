@@ -7,6 +7,7 @@ describe('landing page (SSR)', () => {
     const { body } = render(Page, {
       props: {
         data: {
+          username: 'jake',
           attentionCount: 0,
           pathname: '/',
           acquisitions: { kind: 'ok', count: 4 },

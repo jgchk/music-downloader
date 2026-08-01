@@ -7,8 +7,14 @@ import { guardedRead } from '$lib/server/facade-reads.js';
  * queue itself (design D3) — no polling endpoint; freshness is page-navigation freshness. The
  * badge is discovery, not truth: a failing module read is logged and contributes zero here
  * rather than breaking every page; the queue page models the failure per section.
+ *
+ * Without a session (the open login page), the layout reads NOTHING: no facade call runs and no
+ * count leaks to an unauthenticated visitor — the chrome renders signed-out (web-access-control).
  */
 export const load: LayoutServerLoad = ({ locals, url }) => {
+  if (locals.session === undefined) {
+    return { attentionCount: 0, pathname: url.pathname, username: undefined };
+  }
   const reviews = guardedRead(
     locals.logger,
     'importer',
@@ -23,5 +29,7 @@ export const load: LayoutServerLoad = ({ locals, url }) => {
     attentionCount: attentionItems(reviews.entries, acquisitions.entries).length,
     // The current path drives the primary nav's active-tab state in +layout.svelte.
     pathname: url.pathname,
+    // Whose session this is — the masthead shows it beside the sign-out control.
+    username: locals.session.username,
   };
 };

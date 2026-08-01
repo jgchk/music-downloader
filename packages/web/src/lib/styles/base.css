@@ -122,6 +122,16 @@ main p {
 .masthead .spacer {
   flex: 1;
 }
+/* The signed-in identity + sign-out control (web-access-control): one inline form. */
+.masthead .session {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--inline-gap);
+}
+.masthead .session .user {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
 
 /* -- Buttons + button-styled links ---------------------------------------- */
 button,

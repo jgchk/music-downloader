@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
-import type { Facades } from '$lib/server/runtime.js';
+import type { Access, Facades } from '$lib/server/runtime.js';
+import type { SessionClaims } from '$lib/server/session.js';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts for information about these interfaces.
 declare global {
@@ -14,6 +15,13 @@ declare global {
       facades: Facades;
       /** The composed process's structured logger, for request-scoped diagnostics. */
       logger: Logger;
+      /** The access-control composition (session secret + PlexAccess port) for the login flow. */
+      access: Access;
+      /**
+       * The verified session's claims, set by the gate when the request carries a valid cookie.
+       * Undefined on the open routes (login flow, health) when no valid session rides along.
+       */
+      session?: SessionClaims;
     }
   }
 }
