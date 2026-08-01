@@ -51,12 +51,13 @@ CI's required `version-check` re-runs `version:prep --check`, so this commit mus
 
 ## Phase 5 — PR and merge
 
-1. Create a bookmark and push: `jj bookmark create <change-name> -r @` then `jj git push --bookmark <change-name> --allow-new`.
-2. `gh pr create --head <change-name>` with a concise body: what the change does, link to the archived OpenSpec change, review outcome (cycles run, anything consciously skipped). End the body with the standard Claude Code attribution line.
-3. Watch required checks (`version-check`, `quality`, `test`): `gh pr checks <PR#> --watch`. If a required check fails, fix, commit, `jj git push --bookmark <change-name>`, and re-watch.
-4. **CHECKPOINT — stop and ask the user to confirm the merge**, presenting: PR URL, version, one-paragraph summary, review-cycle summary, check status.
-5. On confirmation: `gh pr merge <PR#> --rebase` (always pass the PR number explicitly — detached-HEAD breaks gh's branch inference; do not pass `--delete-branch`). Then `jj git fetch` to confirm the commit landed on `main`.
-6. Retire the workspace now that its work is on trunk: `cd` back to the main repo, `jj workspace forget <change>`, and remove the workspace directory. Only do this after verifying the merge via `gh pr view <PR#> --json state` and the fetch.
+1. **Run the out-of-process E2E tier locally first: `pnpm test:e2e`.** It is the same gate the main pipeline runs post-merge — the PR's required checks do NOT include it, so this is the only pre-merge execution it gets. It needs Docker running (plus this host's NAT modules — see memory). If the environment can't run it, stop and ask rather than skip: a miss here surfaces only as a dead main pipeline run after merge.
+2. Create a bookmark and push: `jj bookmark create <change-name> -r @` then `jj git push --bookmark <change-name> --allow-new`.
+3. `gh pr create --head <change-name>` with a concise body: what the change does, link to the archived OpenSpec change, review outcome (cycles run, anything consciously skipped). End the body with the standard Claude Code attribution line.
+4. Watch required checks (`version-check`, `quality`, `test`): `gh pr checks <PR#> --watch`. If a required check fails, fix, commit, `jj git push --bookmark <change-name>`, and re-watch.
+5. **CHECKPOINT — stop and ask the user to confirm the merge**, presenting: PR URL, version, one-paragraph summary, review-cycle summary, check status.
+6. On confirmation: `gh pr merge <PR#> --rebase` (always pass the PR number explicitly — detached-HEAD breaks gh's branch inference; do not pass `--delete-branch`). Then `jj git fetch` to confirm the commit landed on `main`.
+7. Retire the workspace now that its work is on trunk: `cd` back to the main repo, `jj workspace forget <change>`, and remove the workspace directory. Only do this after verifying the merge via `gh pr view <PR#> --json state` and the fetch.
 
 ## Phase 6 — Wait for the image publish
 
