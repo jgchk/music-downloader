@@ -1,0 +1,21 @@
+{
+  "provenance": {
+    "source": "https://plex.tv/api/v2 (live)",
+    "capturedAt": "2026-08-01",
+    "note": "projected to consumed fields (id, code)"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/pins",
+    "query": {
+      "strong": "true"
+    }
+  },
+  "response": {
+    "status": 201,
+    "body": {
+      "id": 509182436,
+      "code": "aqkxrufi570gxwhr0khygi1c6"
+    }
+  }
+}

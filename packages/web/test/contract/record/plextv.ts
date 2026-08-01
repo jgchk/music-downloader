@@ -1,0 +1,152 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from '../../../src/lib/server/plex/adapter.js';
+import { CONTRACT_FIXTURE_ROOT } from '../support/fixture.js';
+import type { ContractFixture } from '../support/fixture.js';
+
+/**
+ * Interactive recorder for the consumed plex.tv surface (external-api-contracts, design D8):
+ *
+ *   pnpm tsx packages/web/test/contract/record/plextv.ts
+ *
+ * The PIN flow needs a human: the script creates two PINs — one is left UNAPPROVED (the pending
+ * fixture), the other you approve at the printed plex.tv link — then captures the authorized
+ * check, the account lookup, and the resources listing with the resulting token.
+ *
+ * SANITIZATION IS THE POINT (slskd-recorder lesson): every response is PROJECTED to the consumed
+ * fields before anything is written. The auth token is replaced with a fixed placeholder, the
+ * account is pseudonymized (`user1`), and every resource clientIdentifier becomes `machine-N`.
+ * The token itself lives only in this process's memory and dies with it. Review the printed
+ * summary before committing.
+ */
+
+const BASE = process.env['PLEX_API_BASE_URL'] ?? 'https://plex.tv/api/v2';
+const OUT = join(CONTRACT_FIXTURE_ROOT, 'plextv');
+const TODAY = new Date().toISOString().slice(0, 10);
+
+/** The committed stand-in for the real token — the schema only requires a string. The tier's
+ * scrub assertions pin this exact literal, so a fixture carrying anything else fails the gate. */
+const SCRUBBED_TOKEN = 'plex-user-token-scrubbed';
+
+const IDENTITY_HEADERS = {
+  Accept: 'application/json',
+  'X-Plex-Product': PLEX_PRODUCT,
+  'X-Plex-Client-Identifier': PLEX_CLIENT_IDENTIFIER,
+};
+
+function write(name: string, fixture: ContractFixture): void {
+  writeFileSync(join(OUT, name), `${JSON.stringify(fixture, undefined, 2)}\n`);
+  console.log(`  wrote ${name}`);
+}
+
+function provenance(note: string): ContractFixture['provenance'] {
+  return { source: `${BASE} (live)`, capturedAt: TODAY, note };
+}
+
+async function requestJson(
+  method: 'GET' | 'POST',
+  path: string,
+  token?: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await fetch(`${BASE}${path}`, {
+    method,
+    headers:
+      token === undefined ? IDENTITY_HEADERS : { ...IDENTITY_HEADERS, 'X-Plex-Token': token },
+  });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? undefined : JSON.parse(text) };
+}
+
+async function main(): Promise<void> {
+  mkdirSync(OUT, { recursive: true });
+
+  // 1. The pending PIN: created and checked once, never approved.
+  console.log('── creating the never-approved PIN (pending fixture)');
+  const pendingCreate = await requestJson('POST', '/pins?strong=true');
+  const pending = pendingCreate.body as { id: number; code: string };
+  const pendingCheck = await requestJson('GET', `/pins/${pending.id}`);
+  const pendingChecked = pendingCheck.body as { id: number; authToken?: string | null };
+  if (pendingChecked.authToken != null) throw new Error('pending pin unexpectedly authorized');
+  write('pin-check-pending.json', {
+    provenance: provenance('projected to consumed fields; PIN never approved'),
+    request: { method: 'GET', path: `/pins/${pending.id}` },
+    response: { status: pendingCheck.status, body: { id: pendingChecked.id, authToken: null } },
+  });
+
+  // 2. An id no PIN ever had: the expired/unknown outcome.
+  console.log('── checking a nonexistent PIN (expired fixture)');
+  const gone = await requestJson('GET', '/pins/999999999');
+  if (gone.status !== 404)
+    throw new Error(`expected 404 for a nonexistent pin, got ${gone.status}`);
+  write('pin-check-expired.json', {
+    provenance: provenance('nonexistent pin id; body not consumed (adapter reads the status)'),
+    request: { method: 'GET', path: '/pins/999999999' },
+    response: { status: 404, body: {} },
+  });
+
+  // 3. The PIN you approve: its create response is THE pin-create fixture.
+  console.log('── creating the PIN to approve (pin-create + authorized fixtures)');
+  const create = await requestJson('POST', '/pins?strong=true');
+  const pin = create.body as { id: number; code: string };
+  write('pin-create.json', {
+    provenance: provenance('projected to consumed fields (id, code)'),
+    request: { method: 'POST', path: '/pins', query: { strong: 'true' } },
+    response: { status: create.status, body: { id: pin.id, code: pin.code } },
+  });
+
+  const authUrl = `https://app.plex.tv/auth#?clientID=${PLEX_CLIENT_IDENTIFIER}&code=${pin.code}&context%5Bdevice%5D%5Bproduct%5D=${PLEX_PRODUCT}`;
+  console.log('\n►► approve the PIN in a browser (any account shared with the server works):');
+  console.log(`   ${authUrl}\n`);
+
+  // The human pause: poll the PIN until it is approved (or the ~10-minute budget runs out).
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let approved: { status: number; id: number; token: string } | undefined;
+  while (approved === undefined) {
+    if (Date.now() >= deadline) throw new Error('pin was not approved within 10 minutes');
+    await sleep(5000);
+    const check = await requestJson('GET', `/pins/${pin.id}`);
+    const body = check.body as { id: number; authToken?: string | null };
+    if (body.authToken != null) {
+      approved = { status: check.status, id: body.id, token: body.authToken };
+    } else {
+      console.log('  …still waiting for approval');
+    }
+  }
+  const token = approved.token;
+  write('pin-check-authorized.json', {
+    provenance: provenance('projected to consumed fields; REAL TOKEN REPLACED with placeholder'),
+    request: { method: 'GET', path: `/pins/${pin.id}` },
+    response: { status: approved.status, body: { id: approved.id, authToken: SCRUBBED_TOKEN } },
+  });
+
+  // 4. Account + resources with the token — held in memory only, never written.
+  console.log('── capturing account + resources (pseudonymized)');
+  const user = await requestJson('GET', '/user', token);
+  write('user.json', {
+    provenance: provenance('projected to consumed fields; account pseudonymized to user1'),
+    request: { method: 'GET', path: '/user' },
+    response: { status: user.status, body: { id: 1, username: 'user1', title: 'user1' } },
+  });
+
+  const resources = await requestJson('GET', '/resources', token);
+  const entries = resources.body as { clientIdentifier?: unknown }[];
+  const projected = entries
+    .filter((entry) => typeof entry.clientIdentifier === 'string')
+    .map((_entry, index) => ({ clientIdentifier: `machine-${index + 1}` }));
+  if (projected.length === 0)
+    throw new Error('no resources with a clientIdentifier — token account sees no devices');
+  write('resources.json', {
+    provenance: provenance(
+      `projected to consumed fields; ${projected.length} clientIdentifiers pseudonymized to machine-N`,
+    ),
+    request: { method: 'GET', path: '/resources' },
+    response: { status: resources.status, body: projected },
+  });
+
+  console.log('\n── done. Review the fixtures before committing:');
+  console.log(`   ${OUT}`);
+  console.log('   (no token, no account data, no real machine ids should appear anywhere)');
+}
+
+await main();

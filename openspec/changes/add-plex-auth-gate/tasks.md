@@ -26,11 +26,11 @@
 
 ## 5. plex.tv contract tier
 
-- [ ] 5.1 Scaffold `packages/web/test/contract` following the downloader tier (replay against a throwaway local server in the commit gate, excluded from unit coverage)
-- [ ] 5.2 Write the interactive recorder script: drives a real PIN exchange (pausing for human approval in a browser), records the consumed operations, projects to consumed fields and scrubs all tokens/PII before writing; fixtures carry provenance
-- [ ] 5.3 Record fixtures from real plex.tv; add replay tests validating adapter requests and fixture conformance to the schemas
-- [ ] 5.4 Add fixture-scrub assertions (no token, no unconsumed account fields anywhere in recorded artifacts)
-- [ ] 5.5 Extend scheduled drift only for the unauthenticated PIN operations; document the replay-only posture for token-requiring operations
+- [x] 5.1 Scaffold `packages/web/test/contract` following the downloader tier (replay against a throwaway local server in the commit gate, excluded from unit coverage)
+- [x] 5.2 Write the interactive recorder script: drives a real PIN exchange (pausing for human approval in a browser), records the consumed operations, projects to consumed fields and scrubs all tokens/PII before writing; fixtures carry provenance
+- [x] 5.3 Record fixtures from real plex.tv; add replay tests validating adapter requests and fixture conformance to the schemas
+- [x] 5.4 Add fixture-scrub assertions (no token, no unconsumed account fields anywhere in recorded artifacts)
+- [x] 5.5 Extend scheduled drift only for the unauthenticated PIN operations; document the replay-only posture for token-requiring operations
 
 ## 6. E2E tier
 
