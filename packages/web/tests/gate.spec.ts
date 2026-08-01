@@ -20,6 +20,22 @@ test.describe('access gate (no session)', () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test('a client-side data request without a session gets the SPA redirect envelope, not HTML', async ({
+    request,
+  }) => {
+    // The framework must convert the gate's thrown redirect into the JSON envelope the SPA
+    // router parses — a hand-built 303 here used to get followed to login HTML and explode in
+    // the client's data parser (the expired-session-in-an-open-tab case).
+    const response = await request.get('/acquisitions/__data.json?x-sveltekit-invalidated=01', {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(200);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({
+      type: 'redirect',
+      location: '/login',
+    });
+  });
+
   test('the health endpoint answers without any session', async ({ request }) => {
     const response = await request.get('/health');
     expect(response.status()).toBe(200);
