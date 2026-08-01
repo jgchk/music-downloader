@@ -21,7 +21,8 @@ function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: (
         } as unknown as DownloaderFacade,
       },
       logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
-    },
+      session: { plexAccountId: '42', username: 'jake', expiresAt: Number.MAX_SAFE_INTEGER },
+    } as unknown as App.Locals,
   };
 }
 
@@ -50,6 +51,7 @@ describe('root layout load', () => {
     expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
       attentionCount: 2,
       pathname: '/',
+      username: 'jake',
     });
   });
 
@@ -58,7 +60,29 @@ describe('root layout load', () => {
     expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
       attentionCount: 0,
       pathname: '/',
+      username: 'jake',
     });
+  });
+
+  it('reads NOTHING without a session: no facade call runs and no count leaks to the login page', () => {
+    const reads: string[] = [];
+    const { locals: event } = locals({
+      listPendingReviews: () => {
+        reads.push('reviews');
+        return { reviews: [pendingReview] };
+      },
+      listAcquisitions: () => {
+        reads.push('acquisitions');
+        return { acquisitions: [awaiting] };
+      },
+    });
+    (event as { session?: unknown }).session = undefined;
+    expect(load({ locals: event, url: new URL('http://host/login') } as never)).toEqual({
+      attentionCount: 0,
+      pathname: '/login',
+      username: undefined,
+    });
+    expect(reads).toEqual([]);
   });
 
   it('logs and contributes zero for a failing importer instead of breaking every page', () => {
@@ -72,6 +96,7 @@ describe('root layout load', () => {
     expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
       attentionCount: 1,
       pathname: '/',
+      username: 'jake',
     });
     expect(warnings).toEqual([{ err: fault, module: 'importer' }]);
   });
@@ -87,6 +112,7 @@ describe('root layout load', () => {
     expect(load({ locals: event, url: new URL('http://host/') } as never)).toEqual({
       attentionCount: 1,
       pathname: '/',
+      username: 'jake',
     });
     expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });

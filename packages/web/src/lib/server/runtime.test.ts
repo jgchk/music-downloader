@@ -5,7 +5,9 @@ import { err, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DownloaderRuntime } from '@music/downloader/runtime';
 import type { createImporterRuntime, ImporterRuntime } from '@music/importer/runtime';
+import { PlexTvAccess } from './plex/adapter.js';
 import {
+  accessOf,
   bootRuntimes,
   facadesOf,
   loggerOf,
@@ -32,6 +34,8 @@ const VALID_ENV = {
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
+  SESSION_SECRET: 'runtime-test-secret',
+  PLEX_SERVER_MACHINE_ID: 'runtime-machine',
 };
 
 function fakeSubscription(log: string[], name: string) {
@@ -196,8 +200,26 @@ describe('bootRuntimes', () => {
     expect(log).toContain('downloader:stop');
   });
 
+  it('composes the access surface: the configured session secret and the real plex.tv adapter', async () => {
+    const fakes = fakeRuntimes([]);
+    await bootRuntimes(VALID_ENV, {
+      createDownloader: fakes.createDownloader,
+      createImporter: fakes.createImporter,
+      onShutdownSignal: vi.fn(),
+    });
+    const access = accessOf();
+    expect(access.sessionSecret).toBe('runtime-test-secret');
+    // The one concretion behind the PlexAccess port is constructed HERE (design D6): no fake, no
+    // null strategy, nothing an environment value could select instead (design D7).
+    expect(access.plex).toBeInstanceOf(PlexTvAccess);
+  });
+
   it('facadesOf refuses before boot', () => {
     expect(() => facadesOf()).toThrow(/init hook/);
+  });
+
+  it('accessOf refuses before boot', () => {
+    expect(() => accessOf()).toThrow(/init hook/);
   });
 
   it('loggerOf refuses before boot', () => {
@@ -233,6 +255,8 @@ describe('bootRuntimes', () => {
           BRIDGE_PYTHON: '/bin/false',
           BRIDGE_TIMEOUT_MS: '2000',
           LOG_LEVEL: 'silent',
+          SESSION_SECRET: 'real-boot-secret',
+          PLEX_SERVER_MACHINE_ID: 'real-boot-machine',
         }),
       ).rejects.toThrow(/importer startup failed/);
     } finally {

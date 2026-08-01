@@ -7,6 +7,7 @@ describe('acquisition detail page (SSR)', () => {
     const { body } = render(Page, {
       props: {
         data: {
+          username: 'jake',
           attentionCount: 0,
           pathname: '/acquisitions/acq-1',
           acquisitions: [],

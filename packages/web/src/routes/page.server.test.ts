@@ -21,7 +21,7 @@ function locals(over: { listAcquisitions?: () => unknown; listPendingReviews?: (
         } as unknown as ImporterFacade,
       },
       logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
-    },
+    } as unknown as App.Locals,
   };
 }
 

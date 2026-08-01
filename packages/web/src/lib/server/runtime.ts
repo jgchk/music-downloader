@@ -9,6 +9,8 @@ import type { ImporterReadiness } from '@music/importer/runtime';
 import type { Logger } from 'pino';
 import { loadComposedConfig } from './config.js';
 import { createLogger } from './logger.js';
+import { PlexTvAccess } from './plex/adapter.js';
+import type { PlexAccessPort } from './plex/port.js';
 import { version } from './version.js';
 
 /**
@@ -30,6 +32,16 @@ export interface Facades {
 }
 
 /**
+ * The access-control composition (design D6/D7): the session secret for the pure codec and the one
+ * PlexAccess port instance, wired here beside the facades — concretions constructed only in this
+ * composition root, and no auth-disabling alternative exists to select.
+ */
+export interface Access {
+  readonly sessionSecret: string;
+  readonly plex: PlexAccessPort;
+}
+
+/**
  * The composed process's readiness surface (design D4/D6): the server-layer projection routes read
  * to answer `GET /health`. Overall `status` is `ok` only when both module runtimes report `up`,
  * else `degraded`; `version` is the shipped artifact version; each module's live status is
@@ -46,6 +58,7 @@ export interface Readiness {
 
 interface Booted {
   readonly facades: Facades;
+  readonly access: Access;
   /** The pino root shared with the module runtimes, exposed so routes can leave a trace too. */
   readonly logger: Logger;
   /** Live readiness accessors captured at boot; invoked per probe so a later halt is honest. */
@@ -120,6 +133,10 @@ async function boot(
 
   return {
     facades: { downloader: downloader.facade, importer: importer.facade },
+    access: {
+      sessionSecret: config.value.access.sessionSecret,
+      plex: new PlexTvAccess(config.value.access.plex),
+    },
     logger,
     readiness: {
       downloader: () => downloader.readiness(),
@@ -150,6 +167,14 @@ export function facadesOf(): Facades {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
   return runtime.booted.facades;
+}
+
+/** The access-control composition for the gate and login routes; boots with the daemon. */
+export function accessOf(): Access {
+  if (runtime.booted === undefined) {
+    throw new Error('runtimes not booted — the init hook must run before requests are served');
+  }
+  return runtime.booted.access;
 }
 
 /** The structured logger for request handling; the daemon must have booted first (init hook). */

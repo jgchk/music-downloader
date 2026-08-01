@@ -50,13 +50,33 @@ const environmentSchema = z.object({
    * (a STAGING_ROOT default would reject every delivery as outside the source root).
    */
   INTAKE_SOURCE_ROOT: z.string().min(1).optional(),
+
+  // --- web access control (add-plex-auth-gate) -------------------------------------------------
+  // Both gate settings are REQUIRED: a process without them must fail startup, never serve with a
+  // weakened or open gate (web-access-control: misconfiguration fails closed).
+  /** Signs session cookies; rotating it is the everyone-out-now revocation lever (design D4). */
+  SESSION_SECRET: z.string().min(1),
+  /** The owner's Plex server `machineIdentifier` — membership in it IS approval (design D2/D5). */
+  PLEX_SERVER_MACHINE_ID: z.string().min(1),
+  /** plex.tv API base; overridden only by test tiers pointing at stubs (design D7). */
+  PLEX_API_BASE_URL: z.string().min(1).default('https://plex.tv/api/v2'),
 });
+
+/** The web interface's access-control settings (web-access-control capability). */
+export interface AccessConfig {
+  readonly sessionSecret: string;
+  readonly plex: {
+    readonly machineId: string;
+    readonly baseUrl: string;
+  };
+}
 
 export interface ComposedConfig {
   readonly logLevel: string;
   readonly downloader: DownloaderRuntimeConfig;
   readonly importer: ImporterRuntimeConfig;
   readonly intakeSourceRoot: string;
+  readonly access: AccessConfig;
 }
 
 export function loadComposedConfig(
@@ -101,5 +121,9 @@ export function loadComposedConfig(
       autoApplyThreshold: v.AUTO_APPLY_THRESHOLD,
     },
     intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? v.LIBRARY_ROOT,
+    access: {
+      sessionSecret: v.SESSION_SECRET,
+      plex: { machineId: v.PLEX_SERVER_MACHINE_ID, baseUrl: v.PLEX_API_BASE_URL },
+    },
   });
 }

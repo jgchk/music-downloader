@@ -6,6 +6,8 @@ const VALID = {
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
+  SESSION_SECRET: 'test-session-secret',
+  PLEX_SERVER_MACHINE_ID: 'abc123machine',
 };
 
 describe('loadComposedConfig', () => {
@@ -103,5 +105,39 @@ describe('loadComposedConfig', () => {
     expect(error).toContain('LIBRARY_ROOT');
     const bad = loadComposedConfig({ ...VALID, BRIDGE_TIMEOUT_MS: 'soon' })._unsafeUnwrapErr();
     expect(bad).toContain('BRIDGE_TIMEOUT_MS');
+  });
+
+  it('fails startup precisely when access-control settings are missing or blank (fail closed)', () => {
+    // web-access-control: a process must never serve with a weakened gate — absence is fatal.
+    const noSecret = loadComposedConfig({
+      ...VALID,
+      SESSION_SECRET: undefined,
+    })._unsafeUnwrapErr();
+    expect(noSecret).toContain('SESSION_SECRET');
+    const blankSecret = loadComposedConfig({ ...VALID, SESSION_SECRET: '' })._unsafeUnwrapErr();
+    expect(blankSecret).toContain('SESSION_SECRET');
+    const noMachine = loadComposedConfig({
+      ...VALID,
+      PLEX_SERVER_MACHINE_ID: undefined,
+    })._unsafeUnwrapErr();
+    expect(noMachine).toContain('PLEX_SERVER_MACHINE_ID');
+    const blankMachine = loadComposedConfig({
+      ...VALID,
+      PLEX_SERVER_MACHINE_ID: '',
+    })._unsafeUnwrapErr();
+    expect(blankMachine).toContain('PLEX_SERVER_MACHINE_ID');
+  });
+
+  it('defaults the plex.tv base URL and carries an explicit one through', () => {
+    expect(loadComposedConfig(VALID)._unsafeUnwrap().access.plex.baseUrl).toBe(
+      'https://plex.tv/api/v2',
+    );
+    const config = loadComposedConfig({
+      ...VALID,
+      PLEX_API_BASE_URL: 'http://localhost:8083',
+    })._unsafeUnwrap();
+    expect(config.access.plex.baseUrl).toBe('http://localhost:8083');
+    expect(config.access.sessionSecret).toBe('test-session-secret');
+    expect(config.access.plex.machineId).toBe('abc123machine');
   });
 });
