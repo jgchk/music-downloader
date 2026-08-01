@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/user",
+    "headers": { "X-Plex-Token": { "equalTo": "e2e-member-token" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "id": 77, "username": "e2euser", "title": "e2euser" }
+  }
+}

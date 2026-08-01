@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/resources",
+    "headers": { "X-Plex-Token": { "equalTo": "e2e-member-token" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": [{ "clientIdentifier": "e2e-machine" }, { "clientIdentifier": "another-device" }]
+  }
+}

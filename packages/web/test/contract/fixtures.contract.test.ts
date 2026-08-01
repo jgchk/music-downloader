@@ -89,3 +89,32 @@ describe('plex.tv fixtures', () => {
     }
   });
 });
+
+describe('E2E plex.tv stub payloads conform to the contract', () => {
+  // The E2E tier is product-level and lives at the workspace root (external-api-contracts:
+  // "E2E stub payloads conform to the contract" — the doubles must not drift from the schemas).
+  const STUB_ROOT = new URL('../../../../test/e2e/stubs/plextv/mappings/', import.meta.url)
+    .pathname;
+
+  const STUB_SCHEMAS: Record<string, ZodType> = {
+    'pins-create.json': plexPinCreateSchema,
+    'pin-check-member.json': plexPinCheckSchema,
+    'pin-check-stranger.json': plexPinCheckSchema,
+    'user-member.json': plexUserSchema,
+    'user-stranger.json': plexUserSchema,
+    'resources-member.json': plexResourcesSchema,
+    'resources-stranger.json': plexResourcesSchema,
+  };
+
+  it('every mapping is schema-governed (a new stub must register here)', () => {
+    expect(readdirSync(STUB_ROOT).sort()).toEqual(Object.keys(STUB_SCHEMAS).sort());
+  });
+
+  it.each(Object.entries(STUB_SCHEMAS))('%s validates against its schema', (name, schema) => {
+    const mapping = JSON.parse(readFileSync(join(STUB_ROOT, name), 'utf8')) as {
+      response: { jsonBody: unknown };
+    };
+    const parsed = schema.safeParse(mapping.response.jsonBody);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+  });
+});

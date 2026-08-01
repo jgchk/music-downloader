@@ -34,17 +34,17 @@
 
 ## 6. E2E tier
 
-- [ ] 6.1 Harness: pass a throwaway `SESSION_SECRET` into the container env; add a `mintSessionCookie()` helper that imports the production codec and installs cookies via Playwright storage state
-- [ ] 6.2 Convert existing browser journeys to run authenticated via the minted cookie
-- [ ] 6.3 Gate specs from outside: no cookie → login page, garbage cookie → login page, `/health` answers with no session
-- [ ] 6.4 Add the plex.tv stub to the harness stubs (PIN create/check, resources; contract-conforming payloads) wired via `PLEX_API_BASE_URL`
-- [ ] 6.5 Login-journey spec against the stub: form POST → redirect contract → callback → session → gated page; plus the denial path staying outside
-- [ ] 6.6 Verify the degraded-boot phase still passes with plex.tv unreachable (existing sessions unaffected; login fails closed)
+- [x] 6.1 Harness: pass a throwaway `SESSION_SECRET` into the container env; add a `mintSessionCookie()` helper that imports the production codec and installs cookies via Playwright storage state
+- [x] 6.2 Convert existing browser journeys to run authenticated via the minted cookie
+- [x] 6.3 Gate specs from outside: no cookie → login page, garbage cookie → login page, `/health` answers with no session
+- [x] 6.4 Add the plex.tv stub to the harness stubs (PIN create/check, resources; contract-conforming payloads) wired via `PLEX_API_BASE_URL`
+- [x] 6.5 Login-journey spec against the stub: form POST → redirect contract → callback → session → gated page; plus the denial path staying outside
+- [x] 6.6 Verify the degraded-boot phase still passes with plex.tv unreachable (existing sessions unaffected; login fails closed)
 
 ## 7. Gate, docs, release
 
-- [ ] 7.1 Update README/env documentation for the new variables and the domain-only `ORIGIN` posture
-- [ ] 7.2 `pnpm check` green (format, lint, typecheck, build, 100% merged coverage) and `pnpm test:e2e` green
+- [x] 7.1 Update README/env documentation for the new variables and the domain-only `ORIGIN` posture
+- [x] 7.2 `pnpm check` green (format, lint, typecheck, build, 100% merged coverage) and `pnpm test:e2e` green
 - [ ] 7.3 Version prep (feat → minor), PR, merge on green
 
 ## 8. Homelab companion (jgchk/homelab repo) and live verification
