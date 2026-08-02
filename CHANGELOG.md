@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.16.0](https://github.com/jgchk/music-downloader/compare/v3.15.1...v3.16.0) (2026-08-02)
+
+### Features
+
+* **downloader:** download supervisor — the watch leaves the reactor dispatch ([e2806ad](https://github.com/jgchk/music-downloader/commit/e2806adea018c66fa2ecd5787e37b15c0e84ec10))
+* **downloader:** record DownloadStarted and narrate the downloading phase ([58beaf6](https://github.com/jgchk/music-downloader/commit/58beaf60671c6e0f6c2f12d27d7398eba4d56bdd))
+* **web:** honest downloading views — preparing vs live transfer ([7b16a2d](https://github.com/jgchk/music-downloader/commit/7b16a2d33aaa915f9bd29c6882a128a0cd02ac87))
+
+### Bug Fixes
+
+* **downloader:** close review cycle 2 — retirement, reservation, honest costs ([0509315](https://github.com/jgchk/music-downloader/commit/0509315617588ae41f0b0f9f1b1bee0d3a742430))
+* **downloader:** harden the supervisor per review — guards, lifecycle, verdicts ([5b86abe](https://github.com/jgchk/music-downloader/commit/5b86abe683d9ed7e82b90c1429cd65291e00cd46))
 ## [3.15.1](https://github.com/jgchk/music-downloader/compare/v3.15.0...v3.15.1) (2026-08-02)
 
 ### Bug Fixes
