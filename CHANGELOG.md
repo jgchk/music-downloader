@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.14.0](https://github.com/jgchk/music-downloader/compare/v3.13.0...v3.14.0) (2026-08-02)
+
+### Features
+
+* **downloader:** project full lifecycle history + requested-target echo onto the status facade ([3a641ab](https://github.com/jgchk/music-downloader/commit/3a641abbf0674325682fa747d63d033a5299eace))
+* **web:** legible acquisition history — unified-voice timeline, live pending row, timestamps, disclosure, page register ([66f577f](https://github.com/jgchk/music-downloader/commit/66f577ffdfef8c86c379d7199029f130382f8f29))
+
+### Bug Fixes
+
+* **web:** review cycle 1 — honest settledness across the async hand-off + compile-pressured copy layer ([59d469c](https://github.com/jgchk/music-downloader/commit/59d469cd3138a2081e84b27af95a198e824efa39))
+* **web:** review cycle 2 — watch through the rejection-revival race, non-absorbing refresh banner, drift-safe phase fallbacks ([af6ffd9](https://github.com/jgchk/music-downloader/commit/af6ffd94ca1bd0102d746c3c80a7da6007b8b64a))
+* **web:** review cycle 2b — liveness policy extracted and fully unit-tested, remediation entry links to its review, album hint echoed ([4e73ea6](https://github.com/jgchk/music-downloader/commit/4e73ea621e4d8ccc7821eca977d42efc336000eb))
 ## [3.13.0](https://github.com/jgchk/music-downloader/compare/v3.12.0...v3.13.0) (2026-08-01)
 
 ### Features
