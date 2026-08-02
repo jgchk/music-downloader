@@ -75,3 +75,19 @@
 :root[data-skin='terminal'] ol.timeline > li.timeline-entry {
   padding: 2px 0;
 }
+
+/* Review decision surface as console output: inverse-video diff marks, a
+   bracketed hazard block for the destructive confirm, dimmed unchanged rows. */
+:root[data-skin='terminal'] .track-diff mark {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: 0;
+}
+:root[data-skin='terminal'] .confirm-destructive {
+  border: 1px dashed var(--danger);
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-skin='terminal'] .track-diff tr.unchanged {
+  opacity: 0.6;
+}

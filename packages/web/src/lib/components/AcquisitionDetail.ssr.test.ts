@@ -154,8 +154,10 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('Review resolved — you rejected the import');
     expect(body).toContain('Added to the library');
     expect(body).toContain('Added to the library, but needs attention');
-    expect(body).toContain('Import rejected — wrong rip. A new download may be tried.');
-    expect(body).toContain('Marked this delivery unusable — a new download may be tried');
+    expect(body).toContain(
+      'Import rejected — wrong rip. Nothing more will be tried — request the release again for another attempt.',
+    );
+    expect(body).toContain('Marked this delivery unusable — searching for a replacement');
     expect(body).not.toContain('retry-download verdict');
     expect(body).toContain('data-testid="location"');
     expect(body).toContain('In library at');

@@ -35,7 +35,8 @@
 </script>
 
 <details data-testid="manual-tags">
-  <summary>Import with manual tags</summary>
+  <!-- Ellipsis: this opens further input rather than committing (affordance register, design D1). -->
+  <summary>Import with manual tags…</summary>
   <form method="POST" action="?/resolve">
     <input type="hidden" name="verb" value="manual-tags" />
     <label>Album artist <input name="albumArtist" required /></label>

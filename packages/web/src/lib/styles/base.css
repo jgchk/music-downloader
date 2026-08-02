@@ -704,3 +704,86 @@ li.timeline-date {
   color: var(--text);
   overflow-wrap: anywhere;
 }
+
+/* -- Review decision surface (reviews-register-alignment D10).
+   Anatomy defined once: the staged-path support line, the coarse match-quality
+   headline, word-level diff marks over de-emphasized unchanged rows, the
+   per-candidate disclosure, and the destructive confirm block. Danger color is
+   never the only signal — the labels carry the consequence on their own. */
+.path-line {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.path-line .path {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.match-quality {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.track-diff mark {
+  background: var(--diff-mark-bg);
+  color: var(--diff-mark-fg);
+  padding: 0 0.12em;
+  border-radius: 2px;
+}
+.track-diff tr.unchanged {
+  color: var(--text-muted);
+}
+.candidate-details summary,
+.review-detail-disclosure summary {
+  color: var(--text-muted);
+  font-weight: inherit;
+}
+.candidate-details dl,
+.review-detail-disclosure dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--inline-gap);
+  margin: var(--step-1) 0 0;
+  font-size: var(--fs-small);
+}
+.candidate-details dl > div,
+.review-detail-disclosure dl > div {
+  display: contents;
+}
+.candidate-details dt,
+.review-detail-disclosure dt {
+  color: var(--text-muted);
+}
+.candidate-details dd,
+.review-detail-disclosure dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+button.danger {
+  --btn-bg: transparent;
+  --btn-fg: var(--danger);
+  --btn-bd: color-mix(in oklab, var(--danger) 55%, var(--border));
+}
+button.danger:hover {
+  border-color: var(--danger);
+}
+.confirm-destructive {
+  align-self: stretch;
+  display: grid;
+  gap: var(--stack-gap);
+  padding: var(--step-3);
+  border: var(--border-width) solid color-mix(in oklab, var(--danger) 45%, var(--border));
+  background: color-mix(in oklab, var(--danger) 8%, transparent);
+  border-radius: var(--radius-sm);
+}
+.confirm-destructive > p {
+  margin: 0;
+}
+.confirm-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inline-gap);
+  align-items: center;
+}
+.confirm-choices form {
+  display: contents;
+}

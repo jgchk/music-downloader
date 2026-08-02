@@ -85,3 +85,15 @@
 :root[data-skin='glass'] li.timeline-date {
   padding-left: calc(var(--step-3) + var(--inline-gap));
 }
+
+/* Review decision surface: the confirm block floats as a frosted danger card;
+   diff marks glow softly rather than filling hard. */
+:root[data-skin='glass'] .confirm-destructive {
+  backdrop-filter: blur(var(--surface-blur));
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+  box-shadow: var(--shadow);
+}
+:root[data-skin='glass'] .track-diff mark {
+  background: color-mix(in oklab, var(--warn) 30%, transparent);
+  border-radius: 4px;
+}

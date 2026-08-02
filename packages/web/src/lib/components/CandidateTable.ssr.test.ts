@@ -41,65 +41,59 @@ const enriched = {
 };
 
 describe('CandidateTable (SSR)', () => {
-  it('renders a candidate with a distance, glossed penalties, and an apply form', () => {
+  it('headlines coarse higher-is-better quality with raw identifiers only in disclosure', () => {
     const { body } = render(CandidateTable, { props: { candidates: [candidate] } });
     expect(body).toContain('A — L');
-    expect(body).toContain('MusicBrainz · r-1');
-    expect(body).toContain('3.1%');
-    // The raw beets key is glossed, not shown bare.
-    expect(body).toContain('track differences 2.0%');
-    expect(body).not.toContain('tracks 2.0%');
+    // 0.031 → 97%: coarse, higher-is-better, categorized.
+    expect(body).toContain('Strong match — 97%');
+    // Raw source · id pairs and lower-is-better percentages left layer 1.
+    expect(body).not.toContain('MusicBrainz · r-1');
+    expect(body).not.toContain('3.1%');
+    expect(body).not.toContain('away');
+    expect(body).not.toContain(' off');
+    // The disclosure holds them, behind a strong-scent summary.
+    expect(body).toContain('data-testid="matching-details"');
+    expect(body).toContain('Matching details — source, release ID, raw score');
+    expect(body).toContain('MusicBrainz');
+    expect(body).toContain('r-1');
+    expect(body).toContain('0.031');
+    // Penalty reasons stay visible, glossed, without amounts; amounts live in the disclosure.
+    expect(body).toContain('track differences');
+    expect(body).toContain('2.0%');
     expect(body).toContain('value="apply-candidate"');
-    expect(body).toContain('value="r-1"');
+    expect(body).toContain('Approve this match');
     expect(body).not.toContain('data-testid="duplicate-action"');
   });
 
-  it('renders the concrete field-level differences for an enriched candidate', () => {
+  it('keeps penalty amounts out of the visible score line', () => {
+    const { body } = render(CandidateTable, { props: { candidates: [candidate] } });
+    const visible = body.split('data-testid="matching-details"', 1)[0] ?? '';
+    expect(visible).toContain('track differences');
+    expect(visible).not.toContain('2.0%');
+  });
+
+  it('renders the concrete field-level differences with word-level highlighting', () => {
     const { body } = render(CandidateTable, { props: { candidates: [enriched] } });
-    // The album-field (release-details) panel.
     expect(body).toContain('data-testid="album-fields"');
     expect(body).toContain('Parlophone');
     expect(body).toContain('8cm CD');
-    // The per-track diff: current title beside proposed, marked as a retag.
     expect(body).toContain('data-testid="track-diff"');
-    expect(body).toContain('Luv Me Do');
-    expect(body).toContain('Love Me Do');
+    // Direction is explicit: the columns name current and proposed.
+    expect(body).toContain('Currently tagged');
+    expect(body).toContain('Will become');
+    // The changed word carries a highlight mark on each side; the shared words render plain.
+    expect(body).toContain('<mark>Luv</mark>');
+    expect(body).toContain('<mark>Love</mark>');
     expect(body).toContain('data-testid="retag"');
-    // The unmatched download and the missing candidate track.
     expect(body).toContain('data-testid="extra-item"');
     expect(body).toContain('Bonus Beatz');
     expect(body).toContain('98 Untitled.flac');
     expect(body).toContain('data-testid="missing-track"');
     expect(body).toContain('P.S. I Love You');
-    expect(body).toContain('different release 10.0%');
+    expect(body).toContain('different release');
   });
 
-  it('omits the album-fields panel when every field is empty or a beets placeholder', () => {
-    const blank = {
-      ...enriched,
-      albumFields: {
-        year: 0,
-        media: '',
-        label: '[none]',
-        catalognum: '[none]',
-        country: '',
-        albumDisambig: '',
-      },
-    };
-    const { body } = render(CandidateTable, { props: { candidates: [blank] } });
-    expect(body).not.toContain('data-testid="album-fields"');
-  });
-
-  it('falls back to a score-only view for a legacy candidate with no diff evidence', () => {
-    const legacy = { ...candidate, tracks: [], penalties: [] };
-    const { body } = render(CandidateTable, { props: { candidates: [legacy] } });
-    expect(body).not.toContain('data-testid="album-fields"');
-    expect(body).not.toContain('data-testid="track-diff"');
-    expect(body).toContain('clean match');
-    expect(body).toContain('data-testid="apply"');
-  });
-
-  it('shows a track without a retag mark when the current title already matches', () => {
+  it('de-emphasizes unchanged rows and leaves them unmarked', () => {
     const clean = {
       ...enriched,
       tracks: [
@@ -115,17 +109,46 @@ describe('CandidateTable (SSR)', () => {
       missingTracks: [],
     };
     const { body } = render(CandidateTable, { props: { candidates: [clean] } });
-    expect(body).toContain('data-testid="track-diff"');
+    expect(body).toContain('class="unchanged"');
+    expect(body).not.toContain('<mark>');
     expect(body).not.toContain('data-testid="retag"');
     expect(body).not.toContain('data-testid="extra-item"');
     expect(body).not.toContain('data-testid="missing-track"');
   });
 
-  it('renders the duplicate action when asked', () => {
+  it('omits the album-fields panel when every field is empty or a placeholder', () => {
+    const blank = {
+      ...enriched,
+      albumFields: {
+        year: 0,
+        media: '',
+        label: '[none]',
+        catalognum: '[none]',
+        country: '',
+        albumDisambig: '',
+      },
+    };
+    const { body } = render(CandidateTable, { props: { candidates: [blank] } });
+    expect(body).not.toContain('data-testid="album-fields"');
+  });
+
+  it('falls back to a quality-only view for a legacy candidate with no diff evidence', () => {
+    const legacy = { ...candidate, tracks: [], penalties: [] };
+    const { body } = render(CandidateTable, { props: { candidates: [legacy] } });
+    expect(body).not.toContain('data-testid="album-fields"');
+    expect(body).not.toContain('data-testid="track-diff"');
+    expect(body).toContain('Strong match — 97%');
+    expect(body).toContain('clean match');
+    expect(body).toContain('data-testid="apply"');
+  });
+
+  it('renders the duplicate action with outcome-named choices when asked', () => {
     const { body } = render(CandidateTable, {
       props: { candidates: [candidate], withDuplicateAction: true },
     });
     expect(body).toContain('data-testid="duplicate-action"');
-    expect(body).toContain('keep-both');
+    expect(body).toContain('value="keep-both"');
+    expect(body).toContain('Replace the existing copy');
+    expect(body).toContain('Keep both copies');
   });
 });

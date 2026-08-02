@@ -1,25 +1,54 @@
 import type { PendingReviewDto, ReviewDto } from '@music/importer';
+import { matchPercent } from './copy.js';
 
 /**
- * Presentation vocabulary for the review queue: pure mappings from importer facade DTOs to what
- * the queue shows. No-match is deliberately distinct from low confidence (match-review spec).
+ * Presentation vocabulary for the review surface: pure mappings from importer facade DTOs to what
+ * the queue and detail pages show, written to the register (design D4/D6/D9): chips speak the ask,
+ * match quality is coarse and higher-is-better, copy is source-agnostic — no internal tool names —
+ * and every open-string code passes through a gloss map with a verbatim-safe fallback. No-match is
+ * deliberately distinct from low confidence (match-review spec).
  */
 
+/** The chip names the decision waiting on the user — the ask, never the machinery (design D8). */
 export function kindLabel(kind: ReviewDto['kind']): string {
   switch (kind) {
     case 'match-review': {
-      return 'Match review';
+      return 'Choose a match';
     }
     case 'no-match': {
-      return 'No match';
+      return 'No match found';
     }
     case 'duplicate-review': {
-      return 'Duplicate';
+      return 'Already in the library';
     }
     case 'remediation-review': {
-      return 'Remediation';
+      return 'Fix after import';
     }
   }
+}
+
+// --- Match quality (design D6) -----------------------------------------------------------------
+
+export interface MatchQuality {
+  readonly category: 'Strong match' | 'Good match' | 'Weak match';
+  readonly pct: number;
+}
+
+/**
+ * Coarse, higher-is-better match quality: a category word plus the shipped whole-number percent —
+ * never a raw distance or a lower-is-better figure in visible text (research §3). The bands are
+ * presentation-only and live here so adjusting them is a copy change, no contract touch.
+ */
+export function matchQuality(distance: number): MatchQuality {
+  const pct = matchPercent(distance);
+  const category = pct >= 95 ? 'Strong match' : pct >= 85 ? 'Good match' : 'Weak match';
+  return { category, pct };
+}
+
+/** The headline form: `Strong match — 96%`. */
+export function matchQualityText(distance: number): string {
+  const quality = matchQuality(distance);
+  return `${quality.category} \u{2014} ${quality.pct}%`;
 }
 
 type MatchReview = Extract<ReviewDto, { kind: 'match-review' }>;
@@ -40,7 +69,7 @@ export function hintNote(review: MatchReview): string | undefined {
     : 'the release you pinned was not the best match';
 }
 
-/** Plain-language label for beets' penalty keys, so the demoted score line is not bare jargon. */
+/** Plain-language label for the matcher's penalty keys, so the score line is not bare jargon. */
 export function penaltyLabel(name: string): string {
   const glossary: Record<string, string> = {
     album_id: 'different release',
@@ -62,6 +91,21 @@ export function penaltyLabel(name: string): string {
   return glossary[name] ?? name;
 }
 
+/**
+ * Plain-language gloss for a remediation stage code. The stage is an open string on the wire, so
+ * the fallback renders the code verbatim — visible but honest — rather than inventing a phrase.
+ */
+export function stageGloss(stage: string): string {
+  const glossary: Record<string, string> = {
+    embedart: 'embedding album art',
+    fetchart: 'fetching album art',
+    lyrics: 'fetching lyrics',
+    scrub: 'cleaning old tags',
+    replaygain: 'volume analysis',
+  };
+  return glossary[stage] ?? stage;
+}
+
 /** Whether a mapped track would be retagged: its current title differs from the proposed one. */
 export function isRetag(track: MatchReview['candidates'][number]['tracks'][number]): boolean {
   return track.current !== undefined && track.current.title !== track.title;
@@ -79,7 +123,7 @@ export function albumFieldList(fields: CandidateAlbumFields): { label: string; v
     ['Country', fields.country],
     ['Disambiguation', fields.albumDisambig],
   ];
-  // Drop empties and beets' `[none]` placeholder so the panel never shows an absence as data.
+  // Drop empties and the matcher's `[none]` placeholder so the panel never shows an absence as data.
   return entries
     .filter(([, value]) => value !== '' && value !== 0 && value !== '[none]')
     .map(([label, value]) => ({ label, value: String(value) }));
@@ -90,13 +134,14 @@ export function contextSummary(pending: PendingReviewDto): string {
   switch (review.kind) {
     case 'match-review': {
       const best = review.candidates[0];
-      const detail = best === undefined ? '' : ` — best ${formatDistance(best.distance)} away`;
+      const detail = best === undefined ? '' : ` \u{2014} best: ${matchQualityText(best.distance)}`;
       const note = hintNote(review);
-      const hint = note === undefined ? '' : ` (${note})`;
-      return `${review.candidates.length} candidate${review.candidates.length === 1 ? '' : 's'}${detail}${hint}`;
+      const hint = note === undefined ? '' : ` \u{2014} ${note}`;
+      const plural = review.candidates.length === 1 ? '' : 'es';
+      return `${review.candidates.length} candidate match${plural}${detail}${hint}`;
     }
     case 'no-match': {
-      return 'Beets found no candidates at all';
+      return 'No release matched in any connected source';
     }
     case 'duplicate-review': {
       const incumbent = review.incumbents[0];
@@ -106,13 +151,31 @@ export function contextSummary(pending: PendingReviewDto): string {
     case 'remediation-review': {
       const failure = review.failures[0];
       return failure === undefined
-        ? 'A post-import step failed'
-        : `Import applied, but ${failure.stage} failed`;
+        ? 'Added to the library, but a finishing step failed'
+        : `Added to the library, but ${stageGloss(failure.stage)} failed`;
     }
   }
 }
 
-/** Distances are 0..1 where smaller is better; show as a percentage penalty. */
+/** Distances are 0..1 where smaller is better; the disclosure-only percentage form (design D7). */
 export function formatDistance(distance: number): string {
   return `${(distance * 100).toFixed(1)}%`;
+}
+
+// --- Titling (design D3) -----------------------------------------------------------------------
+
+/** Strip everything up to the last slash (a leaf path stays whole). */
+export function pathBasename(path: string): string {
+  return path.replace(/^.*\//u, '');
+}
+
+/**
+ * The review's display title, falling through the musical intent — the acquisition's request
+ * phrase, composed server-side — to the staged directory's basename, to a neutral awaiting-review
+ * phrase. The staged path itself is supporting detail, never the title (research §2).
+ */
+export function reviewTitle(path: string, acquisitionTitle: string | undefined): string {
+  if (acquisitionTitle !== undefined && acquisitionTitle !== '') return acquisitionTitle;
+  const base = pathBasename(path);
+  return base === '' ? 'Import awaiting review' : base;
 }

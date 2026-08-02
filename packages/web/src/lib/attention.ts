@@ -1,18 +1,25 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import type { PendingReviewDto } from '@music/importer';
 import { targetDescription } from './acquisitions.js';
+import { kindLabel, reviewTitle } from './reviews.js';
 
 /**
  * The attention queue's vocabulary (design D1): a web-owned view model composing everything that
  * waits on a human across modules. The unification lives at the UI edge on purpose — each facade
  * keeps its own read-model vocabulary, and the promotion trigger for a facade-level standard shape
  * is a second out-of-process consumer (design D2). Pure; unit-tested in the node project.
+ *
+ * The user sees one system: the visible row carries the title and the ask — the decision waiting
+ * on them — never a module name. `module` stays machine-readable (a DOM attribute for skins and
+ * tests), the same treatment the timeline gave its module tag.
  */
 export interface AttentionItem {
   readonly module: 'importer' | 'downloader';
   readonly kind: 'match-review' | 'edition-selection';
   readonly id: string;
   readonly title: string;
+  /** The decision asked of the user, in plain action-oriented language (the chip's text). */
+  readonly ask: string;
   /** ISO instant the item started waiting — optional: neither facade carries one today. */
   readonly waitingSince?: string;
   readonly href: string;
@@ -27,9 +34,11 @@ const MODULE_OF = {
 export function attentionItems(
   reviews: readonly PendingReviewDto[],
   acquisitions: readonly AcquisitionStatusResponseDto[],
+  /** Composed musical-intent titles keyed by import id (design D3); absent entries degrade. */
+  reviewTitles?: ReadonlyMap<string, string>,
 ): AttentionItem[] {
   return orderByLongestWaiting([
-    ...reviews.map((item) => reviewItem(item)),
+    ...reviews.map((item) => reviewItem(item, reviewTitles?.get(item.importId))),
     // Membership in the edition-selection arm follows the downloader's decided awaiting-selection
     // flag, not the badge tone or the status enum: the pause is the downloader's determination, the
     // queue merely composes it. An older producer that omits the flag simply contributes no entry.
@@ -39,13 +48,15 @@ export function attentionItems(
   ]);
 }
 
-function reviewItem(pending: PendingReviewDto): AttentionItem {
+function reviewItem(pending: PendingReviewDto, composedTitle: string | undefined): AttentionItem {
   return {
     module: MODULE_OF['match-review'],
     kind: 'match-review',
     id: pending.importId,
-    // Sparse presentation fields degrade the item, never drop it (web-ui spec).
-    title: pending.path === '' ? 'Import awaiting review' : pending.path,
+    // Musical intent first, then the staged basename, then the neutral phrase — sparse
+    // presentation fields degrade the item, never drop it (web-ui spec).
+    title: reviewTitle(pending.path, composedTitle),
+    ask: kindLabel(pending.review.kind),
     waitingSince: undefined,
     href: `/reviews/${pending.importId}`,
   };
@@ -57,6 +68,7 @@ function editionItem(acquisition: AcquisitionStatusResponseDto): AttentionItem {
     kind: 'edition-selection',
     id: acquisition.acquisitionId,
     title: targetDescription(acquisition),
+    ask: 'Choose an edition',
     waitingSince: undefined,
     href: `/acquisitions/${acquisition.acquisitionId}`,
   };
@@ -65,30 +77,8 @@ function editionItem(acquisition: AcquisitionStatusResponseDto): AttentionItem {
 /** Longest-waiting first; items without a date follow the dated ones in their given order. */
 export function orderByLongestWaiting(items: readonly AttentionItem[]): AttentionItem[] {
   // ISO instants in one uniform format (UTC `Z`, fixed precision) compare lexicographically —
-  // keep producers uniform. '\uffff' (U+FFFF, the max BMP code unit) sorts undated items after
+  // keep producers uniform. '￿' (U+FFFF, the max BMP code unit) sorts undated items after
   // any date; the sort is stable, so the facades' given order survives among equals.
   const key = (entry: AttentionItem): string => entry.waitingSince ?? '\u{FFFF}';
   return items.toSorted((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
-}
-
-export function attentionKindLabel(kind: AttentionItem['kind']): string {
-  switch (kind) {
-    case 'match-review': {
-      return 'Match review';
-    }
-    case 'edition-selection': {
-      return 'Edition selection';
-    }
-  }
-}
-
-export function moduleLabel(module: AttentionItem['module']): string {
-  switch (module) {
-    case 'importer': {
-      return 'Importer';
-    }
-    case 'downloader': {
-      return 'Downloader';
-    }
-  }
 }

@@ -1,5 +1,6 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import { formatBytes, isTerminal, statusTone } from './acquisitions.js';
+import { RESOLUTION_ACTIONS } from './resolution-actions.js';
 import type { BadgePhase } from './phase-label.js';
 import type {
   DownloaderHistoryEntry,
@@ -65,17 +66,15 @@ const VALIDATION_REASON_GLOSS = {
   QualityNotAuthentic: 'the audio quality wasn’t what it claimed',
 } satisfies Record<ValidationReason, string>;
 
-const RESOLUTION_GLOSS = {
-  'apply-candidate': 'you approved the match',
-  'supply-id': 'you supplied the release id',
-  'refresh-candidates': 'you asked for fresh matches',
-  'manual-tags': 'you supplied tags by hand',
-  'import-as-is': 'you chose to import the files as they are',
-  reject: 'you rejected the import',
-  'retry-enrichment': 'you asked for the release data to be fetched again',
-  'reject-unusable-delivery': 'you rejected the files. A new download may be tried.',
-  accept: 'you accepted it',
-} satisfies Record<ResolutionVerb, string>;
+// The narration side of the single verb inventory (design D1.6/D11): the resolution echo is the
+// resolving action's own verb, tense-shifted — sourced from the same entry as the button label so
+// the two tellings cannot diverge. The `satisfies` here re-proves totality against the history
+// entry's own verb union, so inventory/wire drift is a compile error in this module too.
+const RESOLUTION_GLOSS: Record<string, string> = Object.fromEntries(
+  Object.entries(RESOLUTION_ACTIONS satisfies Record<ResolutionVerb, { echo: string }>).map(
+    ([verb, action]) => [verb, action.echo],
+  ),
+);
 
 function glossOf(map: Record<string, string>, code: string): string | undefined {
   return (map as Partial<Record<string, string>>)[code];
@@ -279,15 +278,18 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
       };
     }
     case 'rejected': {
+      // The importer never publishes a plain rejection, so no revival can follow (design D2):
+      // state the composed contract, never a hedge that reads as "wait for a retry".
       return {
-        text: `Import rejected — ${entry.reason}. A new download may be tried.`,
+        text: `Import rejected — ${entry.reason}. Nothing more will be tried — request the release again for another attempt.`,
         state: 'failure',
         detail: [],
       };
     }
     case 'release-verdict-recorded': {
+      // The published verdict deterministically revives the acquisition (design D2).
       return {
-        text: 'Marked this delivery unusable — a new download may be tried',
+        text: 'Marked this delivery unusable — searching for a replacement',
         state: 'routine',
         detail: [{ label: 'Reasons', value: entry.reasons.join(', ') }],
       };

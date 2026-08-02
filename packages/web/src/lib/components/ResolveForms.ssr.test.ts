@@ -2,6 +2,16 @@ import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import ResolveForms from './ResolveForms.svelte';
 
+const ALL_ON = {
+  supplyId: true,
+  refresh: true,
+  importAsIs: true,
+  reject: true,
+  rejectUnusable: true,
+  accept: true,
+  retryEnrichment: true,
+};
+
 describe('ResolveForms (SSR)', () => {
   it('renders nothing when no verb is enabled', () => {
     const { body } = render(ResolveForms, { props: {} });
@@ -19,17 +29,7 @@ describe('ResolveForms (SSR)', () => {
   });
 
   it('renders each enabled verb as its own form', () => {
-    const { body } = render(ResolveForms, {
-      props: {
-        supplyId: true,
-        refresh: true,
-        importAsIs: true,
-        reject: true,
-        rejectUnusable: true,
-        accept: true,
-        retryEnrichment: true,
-      },
-    });
+    const { body } = render(ResolveForms, { props: ALL_ON });
     for (const id of [
       'supply-id',
       'refresh',
@@ -54,5 +54,33 @@ describe('ResolveForms (SSR)', () => {
     ]) {
       expect(body).toContain(`value="${verb}"`);
     }
+  });
+
+  it('labels every action from the verb inventory — imperative, em-dash consequence, no asides', () => {
+    const { body } = render(ResolveForms, { props: ALL_ON });
+    expect(body).toContain('Import as-is — keep the current tags');
+    expect(body).toContain('Refresh the candidates — search the connected sources again');
+    expect(body).toContain('Accept it as-is — leave the failed steps undone');
+    expect(body).toContain('Retry the failed steps');
+    expect(body).toContain('Reject the import — delete the files; nothing more will be tried');
+    expect(body).toContain('Reject the files — delete them and search for a replacement');
+    // The old parenthesized asides are gone.
+    expect(body).not.toContain('(delete files)');
+    expect(body).not.toContain('(keep current tags)');
+  });
+
+  it('opens the release-ID form behind an ellipsis summary and never names the matcher', () => {
+    const { body } = render(ResolveForms, { props: { supplyId: true } });
+    expect(body).toContain('Supply a release ID…');
+    expect(body).toContain('Search with this release ID');
+    expect(body).toContain('from any connected source');
+    expect(body).not.toContain('beets');
+  });
+
+  it('styles exactly the file-deleting verbs as low-emphasis danger', () => {
+    const { body } = render(ResolveForms, { props: ALL_ON });
+    const dangerCount = body.match(/class="[^"]*\bdanger\b[^"]*"/gu)?.length ?? 0;
+    expect(dangerCount).toBe(2);
+    expect(body).not.toContain('class="primary');
   });
 });

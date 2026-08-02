@@ -7,7 +7,8 @@ const reviewItem: AttentionItem = {
   module: 'importer',
   kind: 'match-review',
   id: 'imp-1',
-  title: '/intake/album',
+  title: 'Artist — Album',
+  ask: 'Choose a match',
   href: '/reviews/imp-1',
 };
 
@@ -16,6 +17,7 @@ const editionItem: AttentionItem = {
   kind: 'edition-selection',
   id: 'acq-1',
   title: 'OK Computer — awaiting your edition choice',
+  ask: 'Choose an edition',
   href: '/acquisitions/acq-1',
 };
 
@@ -25,15 +27,21 @@ describe('AttentionQueue (SSR)', () => {
     expect(body).toContain('data-testid="empty"');
   });
 
-  it('renders one ordered list with module and kind labels and resolution links', () => {
+  it('renders one ordered list of ask-labeled items with resolution links', () => {
     const { body } = render(AttentionQueue, { props: { items: [reviewItem, editionItem] } });
     expect(body).toContain('href="/reviews/imp-1"');
     expect(body).toContain('href="/acquisitions/acq-1"');
-    expect(body).toContain('Importer');
-    expect(body).toContain('Match review');
-    expect(body).toContain('Downloader');
-    expect(body).toContain('Edition selection');
+    expect(body).toContain('Choose a match');
+    expect(body).toContain('Choose an edition');
     expect(body.indexOf('/reviews/imp-1')).toBeLessThan(body.indexOf('/acquisitions/acq-1'));
+  });
+
+  it('never names the machinery: no visible module words, machine-readable attribute kept', () => {
+    const { body } = render(AttentionQueue, { props: { items: [reviewItem, editionItem] } });
+    expect(body).not.toContain('>Importer<');
+    expect(body).not.toContain('>Downloader<');
+    expect(body).toContain('data-module="importer"');
+    expect(body).toContain('data-module="downloader"');
   });
 
   it('notes when an item has been waiting, only for dated items', () => {

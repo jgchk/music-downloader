@@ -1,6 +1,15 @@
 <script lang="ts">
   import type { ReviewDto } from '@music/importer';
-  import { albumFieldList, formatDistance, isRetag, penaltyLabel } from '$lib/reviews.js';
+  import { wordDiff } from '$lib/diff.js';
+  import { actionButtonText } from '$lib/resolution-actions.js';
+  import {
+    albumFieldList,
+    formatDistance,
+    isRetag,
+    matchQualityText,
+    pathBasename,
+    penaltyLabel,
+  } from '$lib/reviews.js';
 
   type Candidate = Extract<ReviewDto, { kind: 'match-review' }>['candidates'][number];
 
@@ -16,9 +25,6 @@
   }
 
   let { candidates, withDuplicateAction = false, canApply = true }: Properties = $props();
-
-  // Branchless: strip everything up to the last slash (a leaf path stays whole).
-  const basename = (path: string): string => path.replace(/^.*\//u, '');
 </script>
 
 <ul data-testid="candidates" class="candidates">
@@ -26,8 +32,9 @@
     <li data-testid="candidate-row" class="candidate">
       <header class="candidate-head">
         <strong>{candidate.artist} — {candidate.album}</strong>
-        <span class="source">{candidate.ref.dataSource} · {candidate.ref.albumId}</span>
-        <span class="distance">{formatDistance(candidate.distance)} off</span>
+        <!-- Coarse, higher-is-better (design D6); the raw score and identifiers live in the
+             disclosure below, never in the headline. -->
+        <span class="match-quality">{matchQualityText(candidate.distance)}</span>
       </header>
 
       {#if candidate.albumFields}
@@ -47,23 +54,42 @@
       {#if candidate.tracks.length > 0 || candidate.extraItems?.length || candidate.missingTracks?.length}
         <table data-testid="track-diff" class="track-diff">
           <thead>
-            <tr><th>#</th><th>Your file</th><th>Candidate track</th><th></th></tr>
+            <!-- Direction is explicit in the column names: current → proposed (design D7). -->
+            <tr><th>#</th><th>Currently tagged</th><th>Will become</th><th></th></tr>
           </thead>
           <tbody>
             {#each candidate.tracks as track (track.path)}
-              <tr>
-                <td>{track.index}</td>
-                <td>{track.current ? track.current.title : basename(track.path)}</td>
-                <td>{track.title}</td>
-                <td>
-                  {#if isRetag(track)}<span data-testid="retag" class="tag retag">retag</span>{/if}
-                </td>
-              </tr>
+              {#if isRetag(track) && track.current}
+                {@const diff = wordDiff(track.current.title, track.title)}
+                <tr>
+                  <td>{track.index}</td>
+                  <td>
+                    {#each diff.from as segment, index (index)}
+                      {#if segment.changed}<mark>{segment.text}</mark>{:else}{segment.text}{/if}
+                    {/each}
+                  </td>
+                  <td>
+                    {#each diff.to as segment, index (index)}
+                      {#if segment.changed}<mark>{segment.text}</mark>{:else}{segment.text}{/if}
+                    {/each}
+                  </td>
+                  <td><span data-testid="retag" class="tag retag">retag</span></td>
+                </tr>
+              {:else}
+                <!-- Unchanged (or not-yet-tagged) rows stay visible as coverage evidence, but
+                     de-emphasized so the differences carry the eye (design D7). -->
+                <tr class={track.current ? 'unchanged' : undefined}>
+                  <td>{track.index}</td>
+                  <td>{track.current ? track.current.title : pathBasename(track.path)}</td>
+                  <td>{track.title}</td>
+                  <td></td>
+                </tr>
+              {/if}
             {/each}
             {#each candidate.extraItems ?? [] as extra (extra.path)}
               <tr data-testid="extra-item">
                 <td>—</td>
-                <td>{extra.title || basename(extra.path)}</td>
+                <td>{extra.title || pathBasename(extra.path)}</td>
                 <td class="muted">no matching track</td>
                 <td><span class="tag extra">extra file</span></td>
               </tr>
@@ -80,14 +106,40 @@
         </table>
       {/if}
 
+      <!-- Penalty reasons are decision evidence and stay visible; their amounts are diagnostics
+           and live in the disclosure (design D6/D7). -->
       <p class="penalties" data-testid="penalties">
         Why this score:
         {#each candidate.penalties as penalty (penalty.name)}
-          <span class="chip">{penaltyLabel(penalty.name)} {formatDistance(penalty.amount)}</span>
+          <span class="chip">{penaltyLabel(penalty.name)}</span>
         {:else}
           <span>clean match</span>
         {/each}
       </p>
+
+      <details class="candidate-details" data-testid="matching-details">
+        <summary>Matching details — source, release ID, raw score</summary>
+        <dl>
+          <div>
+            <dt>Source</dt>
+            <dd>{candidate.ref.dataSource}</dd>
+          </div>
+          <div>
+            <dt>Release ID</dt>
+            <dd>{candidate.ref.albumId}</dd>
+          </div>
+          <div>
+            <dt>Raw distance</dt>
+            <dd>{candidate.distance}</dd>
+          </div>
+          {#each candidate.penalties as penalty (penalty.name)}
+            <div>
+              <dt>{penaltyLabel(penalty.name)}</dt>
+              <dd>{formatDistance(penalty.amount)}</dd>
+            </div>
+          {/each}
+        </dl>
+      </details>
 
       {#if canApply}
         <form method="POST" action="?/resolve">
@@ -96,11 +148,11 @@
           <input type="hidden" name="albumId" value={candidate.ref.albumId} />
           {#if withDuplicateAction}
             <select name="duplicateAction" data-testid="duplicate-action">
-              <option value="replace">Replace existing</option>
-              <option value="keep-both">Keep both</option>
+              <option value="replace">Replace the existing copy</option>
+              <option value="keep-both">Keep both copies</option>
             </select>
           {/if}
-          <button type="submit" data-testid="apply">Apply this candidate</button>
+          <button type="submit" data-testid="apply">{actionButtonText('apply-candidate')}</button>
         </form>
       {/if}
     </li>

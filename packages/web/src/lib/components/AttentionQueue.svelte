@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { attentionKindLabel, moduleLabel, type AttentionItem } from '$lib/attention.js';
+  import type { AttentionItem } from '$lib/attention.js';
 
   interface Properties {
     items: readonly AttentionItem[];
@@ -25,11 +25,12 @@
   {/if}
 {:else}
   <ul>
+    <!-- One system to the user: the row is the title plus the ask. The owning module survives
+         only as a machine-readable attribute for skins and tests (design D8). -->
     {#each items as item (`${item.module}:${item.id}`)}
-      <li data-testid="attention-row">
+      <li data-testid="attention-row" data-module={item.module}>
         <a href={item.href}>{item.title}</a>
-        <span class="chip" data-module={item.module}>{moduleLabel(item.module)}</span>
-        <span class="chip" data-kind={item.kind}>{attentionKindLabel(item.kind)}</span>
+        <span class="chip" data-kind={item.kind}>{item.ask}</span>
         {#if item.waitingSince !== undefined}
           <span data-testid="waiting-since">waiting since {item.waitingSince}</span>
         {/if}

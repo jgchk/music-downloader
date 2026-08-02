@@ -295,13 +295,16 @@ describe('entryCopy — importer entries (no module prefix, unified voice)', () 
     expect(copy?.detail).toEqual([{ label: 'Review kind', value: 'match-review' }]);
   });
 
-  it('glosses review resolutions in the user’s voice', () => {
+  it('glosses review resolutions in the user’s voice, echoing the action’s own verb', () => {
     expect(entryCopy(im({ kind: 'review-resolved', resolution: 'apply-candidate' }))?.text).toBe(
-      'Review resolved — you approved the match',
+      'Review resolved — you approved a match',
     );
     expect(
       entryCopy(im({ kind: 'review-resolved', resolution: 'reject-unusable-delivery' }))?.text,
-    ).toBe('Review resolved — you rejected the files. A new download may be tried.');
+    ).toBe('Review resolved — you rejected the files — the search resumed');
+    expect(entryCopy(im({ kind: 'review-resolved', resolution: 'reject' }))?.text).toBe(
+      'Review resolved — you rejected the import',
+    );
   });
 
   it('degrades an unknown resolution to the plain line with the verb in the disclosure', () => {
@@ -330,21 +333,21 @@ describe('entryCopy — importer entries (no module prefix, unified voice)', () 
     expect(copy?.link).toEqual({ href: '/reviews', label: 'Open the review' });
   });
 
-  it('renders an import rejection with its reason, promising only what may follow', () => {
+  it('renders an import rejection truthfully: nothing more will be tried', () => {
     const copy = entryCopy(
       im({ kind: 'rejected', reason: 'no readable audio files', filesDeleted: true }),
     );
     expect(copy?.text).toBe(
-      'Import rejected — no readable audio files. A new download may be tried.',
+      'Import rejected — no readable audio files. Nothing more will be tried — request the release again for another attempt.',
     );
     expect(copy?.state).toBe('failure');
   });
 
-  it('renders a recorded unusable-delivery verdict as the user’s act', () => {
+  it('renders a recorded unusable-delivery verdict with its deterministic revival', () => {
     const copy = entryCopy(
       im({ kind: 'release-verdict-recorded', acquisitionId: 'acq-1', reasons: ['truncated'] }),
     );
-    expect(copy?.text).toBe('Marked this delivery unusable — a new download may be tried');
+    expect(copy?.text).toBe('Marked this delivery unusable — searching for a replacement');
     expect(copy?.detail).toEqual([{ label: 'Reasons', value: 'truncated' }]);
   });
 
