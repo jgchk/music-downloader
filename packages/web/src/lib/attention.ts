@@ -4,10 +4,10 @@ import { targetDescription } from './acquisitions.js';
 import { kindLabel, reviewTitle } from './reviews.js';
 
 /**
- * The attention queue's vocabulary (design D1): a web-owned view model composing everything that
- * waits on a human across modules. The unification lives at the UI edge on purpose — each facade
- * keeps its own read-model vocabulary, and the promotion trigger for a facade-level standard shape
- * is a second out-of-process consumer (design D2). Pure; unit-tested in the node project.
+ * The attention queue's vocabulary (unified-attention-queue D1): a web-owned view model composing
+ * everything that waits on a human across modules. The unification lives at the UI edge on
+ * purpose — each facade keeps its own read-model vocabulary, and the promotion trigger for a
+ * facade-level standard shape is a second out-of-process consumer (unified-attention-queue D2). Pure; unit-tested in the node project.
  *
  * The user sees one system: the visible row carries the title and the ask — the decision waiting
  * on them — never a module name. `module` stays machine-readable (a DOM attribute for skins and

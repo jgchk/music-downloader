@@ -32,7 +32,7 @@
     <li data-testid="candidate-row" class="candidate">
       <header class="candidate-head">
         <strong>{candidate.artist} — {candidate.album}</strong>
-        <!-- Coarse, higher-is-better (design D6); the raw score and identifiers live in the
+        <!-- Coarse, higher-is-better (reviews-register-alignment D6); the raw score and identifiers live in the
              disclosure below, never in the headline. -->
         <span class="match-quality">{matchQualityText(candidate.distance)}</span>
       </header>
@@ -54,7 +54,7 @@
       {#if candidate.tracks.length > 0 || candidate.extraItems?.length || candidate.missingTracks?.length}
         <table data-testid="track-diff" class="track-diff">
           <thead>
-            <!-- Direction is explicit in the column names: current → proposed (design D7). -->
+            <!-- Direction is explicit in the column names: current → proposed (reviews-register-alignment D7). -->
             <tr><th>#</th><th>Currently tagged</th><th>Will become</th><th></th></tr>
           </thead>
           <tbody>
@@ -108,7 +108,7 @@
       {/if}
 
       <!-- Penalty reasons are decision evidence and stay visible; their amounts are diagnostics
-           and live in the disclosure (design D6/D7). -->
+           and live in the disclosure (reviews-register-alignment D6/D7). -->
       <p class="penalties" data-testid="penalties">
         Why this score:
         {#each candidate.penalties as penalty (penalty.name)}

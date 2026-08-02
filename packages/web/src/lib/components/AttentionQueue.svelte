@@ -26,7 +26,7 @@
 {:else}
   <ul>
     <!-- One system to the user: the row is the title plus the ask. The owning module survives
-         only as a machine-readable attribute for skins and tests (design D8). -->
+         only as a machine-readable attribute for skins and tests (reviews-register-alignment D8). -->
     {#each items as item (`${item.module}:${item.id}`)}
       <li data-testid="attention-row" data-module={item.module}>
         <a href={item.href}>{item.title}</a>
