@@ -36,12 +36,12 @@ RUN rm -rf node_modules packages/downloader/node_modules packages/importer/node_
 # --- Runtime: Node + both modules' OS-level dependencies ------------------------------------------
 # ffmpeg serves the downloader's audio probe; python3 runs the stateless beets bridge; the venv
 # pins beets at the contract-tested version (packages/importer/src/adapters/beets/bridge/
-# requirements.txt); fpcalc (libchromaprint-tools), oggz-tools and opus-tools let the user's beets
-# plugin chain run unmodified.
+# requirements.txt); fpcalc (libchromaprint-tools), flac (badfiles' FLAC validator), oggz-tools
+# and opus-tools let the user's beets plugin chain run unmodified.
 FROM node:24.18.0-slim AS runtime
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    python3 python3-venv ffmpeg libchromaprint-tools oggz-tools opus-tools \
+    python3 python3-venv ffmpeg libchromaprint-tools flac oggz-tools opus-tools \
   && rm -rf /var/lib/apt/lists/*
 
 COPY packages/importer/src/adapters/beets/bridge/requirements.txt /opt/beets-bridge/requirements.txt
