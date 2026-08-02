@@ -54,17 +54,18 @@ function fakePorts(observer: DownloadObserverPort): EffectPorts {
         // Deliver like the real watch: at-least-once, retrying until the consumer lands it (a
         // concurrency conflict with the reactor's own follow-on append is expected and benign).
         const deliver = async (): Promise<void> => {
-          observer.progress(id, candidate.identity, {
-            percent: 100,
-            bytesTransferred: 1,
-            bytesTotal: 1,
-          });
-          for (;;) {
-            const delivered = await observer.outcome(id, candidate, COMPLETED);
-            if (delivered.isOk()) break;
+          observer.progress(id, { percent: 100, bytesTransferred: 1, bytesTotal: 1 });
+          // At-least-once like the real watch, but BOUNDED so a regression fails fast instead of
+          // hanging the suite (the expected loser is one benign concurrency conflict).
+          for (let attempt = 1; attempt <= 100; attempt += 1) {
+            const delivered = await observer.outcome(id, candidate.identity, COMPLETED);
+            if (delivered.isOk()) {
+              observer.finished(id);
+              return;
+            }
             await new Promise((resolve) => setTimeout(resolve, 1));
           }
-          observer.finished(id);
+          throw new Error('fake supervisor could not deliver the outcome in 100 attempts');
         };
         queueMicrotask(() => void deliver());
         return okAsync({ kind: 'started' });
@@ -131,8 +132,8 @@ describe('createDownloaderRuntime', () => {
     await untilFulfilled(runtime, id);
     expect(wokeUp).toHaveBeenCalled();
 
-    // The settled watch retired its live progress through the observer wiring: a fulfilled
-    // acquisition reports none (the flow-through itself is pinned by the adapter tier).
+    // The settled watch retired its live progress: a fulfilled acquisition reports none. The
+    // observer→read-model flow-through itself is pinned mid-flight by its own test below.
     const progress = runtime.facade.getAcquisitionProgress({ id });
     expect(progress.ok).toBe(false);
 
@@ -141,6 +142,78 @@ describe('createDownloaderRuntime', () => {
     expect(batch.isOk()).toBe(true);
     const events = batch._unsafeUnwrap().events;
     expect(events.map((event) => event.type)).toContain('acquisition.fulfilled');
+  });
+
+  it('feeds live progress through the observer wiring into the read model, then retires it', async () => {
+    // The delivery is gated so the download stays in flight while the test reads progress —
+    // pinning observer.progress → read model (an assertion the post-settle read cannot make).
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+    const ports = (observer: DownloadObserverPort): EffectPorts => ({
+      ...fakePorts(observer),
+      download: {
+        start: (id, candidate) => {
+          const deliver = async (): Promise<void> => {
+            observer.progress(id, { percent: 42, bytesTransferred: 42, bytesTotal: 100 });
+            await gate;
+            for (let attempt = 1; attempt <= 100; attempt += 1) {
+              const delivered = await observer.outcome(id, candidate.identity, COMPLETED);
+              if (delivered.isOk()) {
+                observer.finished(id);
+                return;
+              }
+              await new Promise((resolve) => setTimeout(resolve, 1));
+            }
+            throw new Error('fake supervisor could not deliver the outcome in 100 attempts');
+          };
+          queueMicrotask(() => void deliver());
+          return okAsync({ kind: 'started' });
+        },
+        abort: () => okAsync([]),
+      },
+    });
+    const runtime = await createDownloaderRuntime(
+      {
+        databaseFile: ':memory:',
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      silentLogger(),
+      { ports },
+    );
+    cleanups.push(() => runtime.stop());
+
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT);
+    if (!submitted.ok) throw new Error('submit failed');
+    const id = submitted.value.acquisitionId;
+
+    await vi.waitFor(() => {
+      const progress = runtime.facade.getAcquisitionProgress({ id });
+      if (!progress.ok) throw new Error('no progress yet');
+      expect(progress.value.percent).toBe(42);
+    });
+
+    release();
+    await untilFulfilled(runtime, id);
+    expect(runtime.facade.getAcquisitionProgress({ id }).ok).toBe(false); // retired on finish
+  });
+
+  it('boots and stops cleanly with the real adapters (no overrides), latching the supervisor', async () => {
+    // No acquisitions are submitted, so nothing dispatches — this pins construction plus the
+    // stop seam that latches supervisor watches before the store closes.
+    const runtime = await createDownloaderRuntime(
+      {
+        databaseFile: ':memory:',
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      silentLogger(),
+    );
+    await runtime.stop();
+    expect(runtime.readiness()).toEqual({ status: 'up' });
   });
 
   it('consumes importer verdicts over the connected feed and revives the acquisition', async () => {

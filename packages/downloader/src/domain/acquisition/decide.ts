@@ -91,14 +91,13 @@ function selectNext(state: LadderContext): AcquisitionEvent {
 }
 
 /**
- * The asynchronous-outcome stale-guard (nonblocking-download-observation): an outcome or start
- * report that names a candidate is judged against the one actually in flight; a candidate-less
- * report (the pre-async shape) is guarded by phase alone. Outcomes arrive from the download
- * supervisor's own cadence, so a boot re-emit can lawfully name a candidate the ladder has
- * already rejected — absorbing the mismatch, never mis-attaching it, is the contract.
+ * The late-report guard (nonblocking-download-observation): an outcome or start report is judged
+ * against the candidate actually in flight. Such reports record external work, so one may
+ * lawfully arrive after the ladder has already rejected its candidate and moved on — absorbing
+ * the mismatch, never mis-attaching it to the current candidate, is the contract.
  */
-function isNaming(named: CandidateIdentity | undefined, inFlight: CandidateIdentity): boolean {
-  return named === undefined || candidateKey(named) === candidateKey(inFlight);
+function isNaming(named: CandidateIdentity, inFlight: CandidateIdentity): boolean {
+  return candidateKey(named) === candidateKey(inFlight);
 }
 
 /**

@@ -264,6 +264,9 @@ export const acquisitionStatusResponseSchema = z.object({
   // The acquisition's decided lifecycle flags (additive/optional so an older producer omitting them,
   // and a legacy consumer ignoring them, both keep working): whether a cancel would still act
   // (`!isTerminal`) and whether it is paused for a human's edition choice.
+  // The current attempt's transfer is live at the source (decided by the acquisition's fold) —
+  // additive; a tolerant reader of an older producer degrades to "not yet live".
+  transferStarted: z.boolean().optional(),
   cancellable: z.boolean().optional(),
   awaitingSelection: z.boolean().optional(),
   // Present (true) only when the acquisition dead-lettered awaiting an operator (additive).

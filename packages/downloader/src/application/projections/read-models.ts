@@ -75,6 +75,12 @@ export type StatusHistoryEntry = HistoryPayload & { readonly at: string };
 export interface AcquisitionStatusView {
   readonly acquisitionId: string;
   readonly status: AcquisitionPhase;
+  /**
+   * The current attempt's transfer is live at the source — the decided fact behind the UI's
+   * "preparing vs downloading" split, read from the fold rather than re-derived from history
+   * (the decided-lifecycle-flags rule).
+   */
+  readonly transferStarted: boolean;
   /** The human description of what is being acquired: resolved metadata, or the descriptor. */
   readonly target?: { readonly artist: string; readonly title: string };
   /**
@@ -211,6 +217,7 @@ export function projectStatus(
   return {
     acquisitionId,
     status: snapshot.phase,
+    transferStarted: snapshot.transferStarted,
     target,
     requestedTarget,
     currentCandidate: snapshot.currentCandidate,

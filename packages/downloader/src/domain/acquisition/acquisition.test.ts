@@ -183,7 +183,7 @@ describe('Acquisition.execute — happy path', () => {
     expect(
       types(
         Acquisition.fromHistory(selectedHistory([a]))
-          .execute({ type: 'RecordDownloadCompleted', files: [] })
+          .execute({ type: 'RecordDownloadCompleted', files: [], candidate: a.identity })
           ._unsafeUnwrap(),
       ),
     ).toEqual(['DownloadCompleted']);
@@ -221,7 +221,7 @@ describe('Acquisition.execute — retry loop', () => {
     const events = Acquisition.fromHistory(
       selectedHistory([matchingCandidate('a'), matchingCandidate('b'), matchingCandidate('c')]),
     )
-      .execute({ type: 'RecordDownloadFailed', reason: 'PeerUnavailable' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'PeerUnavailable', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['DownloadFailed', 'CandidateRejected', 'CandidateSelected']);
     const selected = events[2] as Extract<AcquisitionEvent, { type: 'CandidateSelected' }>;
@@ -242,7 +242,7 @@ describe('Acquisition.execute — retry loop', () => {
 
   it('requests a bounded re-search when the working set empties', () => {
     const events = Acquisition.fromHistory(selectedHistory([matchingCandidate('a')]))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['DownloadFailed', 'CandidateRejected', 'SearchRequested']);
   });
@@ -252,7 +252,7 @@ describe('Acquisition.execute — retry loop', () => {
       retry: createRetryPolicy({ maxSearchRounds: 1, maxTotalAttempts: 15 })._unsafeUnwrap(),
     });
     const events = Acquisition.fromHistory(selectedHistory([matchingCandidate('a')], oneRound))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['DownloadFailed', 'CandidateRejected', 'AcquisitionExhausted']);
   });
@@ -264,7 +264,7 @@ describe('Acquisition.execute — retry loop', () => {
     const events = Acquisition.fromHistory(
       selectedHistory([matchingCandidate('a'), matchingCandidate('b')], oneAttempt),
     )
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['DownloadFailed', 'CandidateRejected', 'AcquisitionExhausted']);
   });
@@ -453,8 +453,8 @@ describe('Acquisition.execute — cancellation and guards', () => {
     { type: 'RecordTarget', target: sampleTarget },
     { type: 'RecordMetadataFailed' },
     { type: 'RecordSearchResults', candidates: [] },
-    { type: 'RecordDownloadCompleted', files: [] },
-    { type: 'RecordDownloadFailed', reason: 'Stalled' },
+    { type: 'RecordDownloadCompleted', files: [], candidate: a.identity },
+    { type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity },
     { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
     { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
@@ -469,8 +469,8 @@ describe('Acquisition.execute — cancellation and guards', () => {
   const pending = Acquisition.fromHistory(requestedHistory());
   const illegalOnPending: AcquisitionCommand[] = [
     { type: 'RecordSearchResults', candidates: [] },
-    { type: 'RecordDownloadCompleted', files: [] },
-    { type: 'RecordDownloadFailed', reason: 'Stalled' },
+    { type: 'RecordDownloadCompleted', files: [], candidate: a.identity },
+    { type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity },
     { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
     { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
@@ -493,7 +493,7 @@ describe('Acquisition.execute — cancellation and guards', () => {
 
   it('rejects the pending candidate when a cancelled download settles (completed)', () => {
     const events = Acquisition.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles })
+      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles, candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['CandidateRejected']);
     const rejected = events[0] as Extract<AcquisitionEvent, { type: 'CandidateRejected' }>;
@@ -502,7 +502,7 @@ describe('Acquisition.execute — cancellation and guards', () => {
 
   it('rejects the pending candidate when a cancelled download settles (failed)', () => {
     const events = Acquisition.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['CandidateRejected']);
   });
@@ -514,7 +514,9 @@ describe('Acquisition.execute — cancellation and guards', () => {
     ]);
     expect(settled.phase).toBe('Cancelled');
     expect(
-      settled.execute({ type: 'RecordDownloadFailed', reason: 'Cancelled' })._unsafeUnwrap(),
+      settled
+        .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
+        ._unsafeUnwrap(),
     ).toEqual([]);
   });
 });
@@ -538,7 +540,7 @@ describe('Acquisition.execute — cleanup events carry the staged files (D3)', (
 
   it('carries no staged files on a rejection from a download that never staged anything', () => {
     const events = Acquisition.fromHistory(selectedHistory([a, matchingCandidate('b')]))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled' })
+      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
   });
@@ -547,14 +549,24 @@ describe('Acquisition.execute — cleanup events carry the staged files (D3)', (
     // The domain never saw a completion for the abandoned candidate; the adapter reports the partial
     // subset on the failed command, and `decide` stamps it onto the rejection for cleanup (D2).
     const events = Acquisition.fromHistory(selectedHistory([a, matchingCandidate('b')]))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', files: sampleFiles })
+      .execute({
+        type: 'RecordDownloadFailed',
+        reason: 'Stalled',
+        files: sampleFiles,
+        candidate: a.identity,
+      })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
   });
 
   it('stamps an aborted candidate’s completed files onto the cancelled-settlement rejection', () => {
     const events = Acquisition.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', files: sampleFiles })
+      .execute({
+        type: 'RecordDownloadFailed',
+        reason: 'Cancelled',
+        files: sampleFiles,
+        candidate: a.identity,
+      })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
   });
@@ -845,10 +857,12 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
     const empty = Acquisition.fromHistory([]).snapshot;
     expect(empty).toEqual({
       phase: 'Empty',
+      transferStarted: false,
       currentCandidate: undefined,
       attempts: 0,
       rejectedCount: 0,
       location: undefined,
+      candidates: undefined,
     });
   });
 
@@ -875,8 +889,16 @@ describe('Acquisition.fromHistory — phase, isTerminal, and the read snapshot',
 describe('Acquisition — immutability', () => {
   it('does not mutate on execute; repeated calls agree', () => {
     const acq = Acquisition.fromHistory(selectedHistory([matchingCandidate('a')]));
-    const first = acq.execute({ type: 'RecordDownloadFailed', reason: 'Stalled' });
-    const second = acq.execute({ type: 'RecordDownloadFailed', reason: 'Stalled' });
+    const first = acq.execute({
+      type: 'RecordDownloadFailed',
+      reason: 'Stalled',
+      candidate: a.identity,
+    });
+    const second = acq.execute({
+      type: 'RecordDownloadFailed',
+      reason: 'Stalled',
+      candidate: a.identity,
+    });
     expect(types(second._unsafeUnwrap())).toEqual(types(first._unsafeUnwrap()));
     expect(acq.phase).toBe('Downloading');
     expect(acq.isTerminal).toBe(false);
@@ -1105,14 +1127,7 @@ describe('Acquisition.execute — asynchronous outcomes carry their candidate as
     ).toEqual([]);
   });
 
-  it('still accepts a candidate-less outcome (the pre-async command shape)', () => {
-    const events = Acquisition.fromHistory(startedHistory([candidate]))
-      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles })
-      ._unsafeUnwrap();
-    expect(types(events)).toEqual(['DownloadCompleted']);
-  });
-
-  it('settles a cancelled in-flight candidate on a completion only when it names it', () => {
+  it('a completion settles a cancelled in-flight candidate only when it names the pending one', () => {
     const cancelled = [...startedHistory([candidate]), { type: 'AcquisitionCancelled' } as const];
     const other = matchingCandidate('z');
     expect(
@@ -1133,7 +1148,7 @@ describe('Acquisition.execute — asynchronous outcomes carry their candidate as
     ).toEqual(['CandidateRejected']);
   });
 
-  it('settles a cancelled in-flight candidate only when the outcome names it', () => {
+  it('a failure settles a cancelled in-flight candidate only when it names the pending one', () => {
     const cancelled = [...startedHistory([candidate]), { type: 'AcquisitionCancelled' } as const];
     const other = matchingCandidate('z');
     expect(
@@ -1152,6 +1167,35 @@ describe('Acquisition.execute — asynchronous outcomes carry their candidate as
           ._unsafeUnwrap(),
       ),
     ).toEqual(['CandidateRejected']);
+  });
+});
+
+describe('Acquisition.snapshot — the transfer-started decided flag', () => {
+  const candidate = matchingCandidate('a');
+
+  it('reports a live transfer once the start is recorded, and not before', () => {
+    expect(Acquisition.fromHistory(selectedHistory([candidate])).snapshot.transferStarted).toBe(
+      false,
+    );
+    expect(Acquisition.fromHistory(startedHistory([candidate])).snapshot.transferStarted).toBe(
+      true,
+    );
+  });
+
+  it('resets on a re-attempt: a later selection is a new not-yet-started transfer', () => {
+    const reattempt = Acquisition.fromHistory([
+      ...startedHistory([candidate, matchingCandidate('b')]),
+      { type: 'DownloadFailed', candidate: candidate.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: candidate.identity },
+      { type: 'CandidateSelected', candidate: matchingCandidate('b') },
+    ]);
+    expect(reattempt.snapshot.transferStarted).toBe(false);
+  });
+
+  it('reports no live transfer outside the downloading phase', () => {
+    expect(Acquisition.fromHistory(validatingHistory([candidate])).snapshot.transferStarted).toBe(
+      false,
+    );
   });
 });
 

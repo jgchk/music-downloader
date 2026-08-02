@@ -166,7 +166,7 @@ export async function createDownloaderRuntime(
   // into the ephemeral read model, outcomes through the download-outcome consumer (the appended
   // events publish on the bus, waking the reactor), and watch-end retiring live progress.
   const downloadObserver: DownloadObserverPort = {
-    progress: (acquisitionId, _candidate, progress) => {
+    progress: (acquisitionId, progress) => {
       progressModel.update(acquisitionId, progress);
     },
     outcome: (acquisitionId, candidate, result) =>
@@ -175,26 +175,34 @@ export async function createDownloaderRuntime(
       progressModel.clear(acquisitionId);
     },
   };
-  const ports: EffectPorts = overrides.ports?.(downloadObserver) ?? {
-    metadata: new MusicBrainzMetadata(logger, fetchHttpClient, {
-      baseUrl: config.musicbrainz.baseUrl,
-      userAgent: config.musicbrainz.userAgent,
-    }),
-    search: new SlskdSearch(logger, ledger, slskdClient, realTimer),
-    download: new SlskdDownload(
-      logger,
-      ledger,
-      { stagingRoot: config.stagingRoot },
-      downloadObserver,
-      slskdClient,
-      realTimer,
-    ),
-    probe: new FfmpegAudioProbe(logger),
-    library: new FilesystemLibrary(
-      { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
-      logger,
-    ),
-  };
+  // Held concretely (not via the port) so stop() can latch its watches — the shutdown seam only
+  // composition needs; fake ports have no floating watches to latch.
+  const slskdDownload =
+    overrides.ports === undefined
+      ? new SlskdDownload(
+          logger,
+          ledger,
+          { stagingRoot: config.stagingRoot },
+          downloadObserver,
+          slskdClient,
+          realTimer,
+        )
+      : undefined;
+  const ports: EffectPorts =
+    overrides.ports?.(downloadObserver) ??
+    ({
+      metadata: new MusicBrainzMetadata(logger, fetchHttpClient, {
+        baseUrl: config.musicbrainz.baseUrl,
+        userAgent: config.musicbrainz.userAgent,
+      }),
+      search: new SlskdSearch(logger, ledger, slskdClient, realTimer),
+      download: slskdDownload!,
+      probe: new FfmpegAudioProbe(logger),
+      library: new FilesystemLibrary(
+        { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
+        logger,
+      ),
+    } satisfies EffectPorts);
 
   await new SourceResourceSweep({
     ledger,
@@ -281,6 +289,11 @@ export async function createDownloaderRuntime(
       // spins an error loop and keeps the event loop alive.
       verdicts?.stop();
       reactor.stop();
+      // Latch every supervisor watch before closing the store: a watch settling after close
+      // would otherwise retry its delivery against the closed handle forever — the same error
+      // loop the verdict poller's stop guards against. Watches are storeless; the next boot's
+      // re-drive rebuilds them (level-triggered).
+      slskdDownload?.stop();
       database.close();
       return Promise.resolve();
     },

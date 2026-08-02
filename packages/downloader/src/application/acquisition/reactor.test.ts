@@ -15,6 +15,7 @@ import {
 import type { SettableClock } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
 import { StalledReadModel } from '../projections/read-models.js';
+import { deliverDownloadOutcome } from './download-outcome-consumer.js';
 import { infraError, permanentInfraError } from '../ports/errors.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
@@ -1302,6 +1303,39 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     await reactor(ports).process(imported);
     expect(ports.library.discardStaging).toHaveBeenCalledWith(sampleFiles);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(imported.globalSeq);
+  });
+
+  it('absorbs an outcome that lands before the start report (the re-attach-to-settled race)', async () => {
+    // The composed interleave: start registers the watch, the watch finds the transfers already
+    // settled and delivers the outcome BEFORE the reactor's own RecordDownloadStarted append.
+    // The late start report is an IllegalTransition in Validating — recorded and advanced past;
+    // the stream ends sane, unparked, with exactly one completion.
+    const a = matchingCandidate('a');
+    await seed(selectedHistory([a]));
+    const outcomeDependencies = { store, clock, logger: silentLogger() };
+    const start = vi.fn(() =>
+      deliverDownloadOutcome(outcomeDependencies, 'acq-1', a.identity, {
+        kind: 'completed',
+        files: sampleFiles,
+      }).map(() => ({ kind: 'started' }) as const),
+    );
+    const probe = vi.fn((path: string) =>
+      okAsync({
+        decodedCleanly: true,
+        codec: 'flac',
+        durationMs: path.includes('01') ? 251_000 : 264_000,
+      }),
+    );
+    const r = reactor(
+      stubPorts({ download: { start, abort: vi.fn(() => okAsync([])) }, probe: { probe } }),
+    );
+    await r.start();
+
+    const types = streamEventTypes('acq-1');
+    expect(types.filter((type) => type === 'DownloadCompleted')).toHaveLength(1);
+    expect(types).not.toContain('DownloadStarted'); // the late report was absorbed, not recorded
+    expect(parked.peek('acq-1')).toBeUndefined(); // and nothing parked on the benign race
+    r.stop();
   });
 
   it('re-fires Download on redelivery of CandidateSelected, then advances past the stale completion', async () => {

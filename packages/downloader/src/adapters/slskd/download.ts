@@ -34,7 +34,7 @@ import type { OwnedTransfer } from './transfers.js';
  * holds nothing, registers an in-memory watch, and returns promptly; the watch then observes the
  * transfers on its own cadence — never inside a reactor dispatch — and reports one candidate-level
  * outcome through the {@link DownloadObserverPort} when it settles. Progress is surfaced live via
- * the observer (never as events — D1). The supervisor owns the *detection* of stalls and hopeless
+ * the observer (never as events — D4). The supervisor owns the *detection* of stalls and hopeless
  * queues against the caller-supplied policy (the policy stays source-agnostic), and dooms the
  * whole candidate the moment any file fails rather than downloading the rest of a release it will
  * reject.
@@ -60,6 +60,8 @@ import type { OwnedTransfer } from './transfers.js';
  */
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
+/** Persistent-failure loops promote every Nth warn to an error — a wedge is loud, a blip is not. */
+const ESCALATE_EVERY = 10;
 
 export interface SlskdDownloadConfig extends SlskdConfig {
   /** Root under which each candidate's files are staged (shared with the filesystem library). */
@@ -111,7 +113,7 @@ export class SlskdDownload implements DownloadPort {
     );
   }
 
-  /** Every watch has run to completion — the test seam and the graceful-shutdown drain. */
+  /** Every watch has run to completion — the test seam. */
   async settled(): Promise<void> {
     while (this.watches.size > 0) {
       await Promise.all(this.watches.values().map((watch) => watch.done));
@@ -124,7 +126,16 @@ export class SlskdDownload implements DownloadPort {
     policy: DownloadPolicy,
   ): Promise<DownloadStart> {
     const key = this.watchKey(acquisitionId, candidate);
-    if (this.watches.has(key)) return { kind: 'started' }; // level-triggered ensure: already live
+    const existing = this.watches.get(key);
+    // Level-triggered ensure: an already-live watch is the answer. An aborted watch still winding
+    // down is NOT — fall through and register afresh (its guarded cleanup cannot touch ours).
+    if (existing !== undefined && !existing.aborted) return { kind: 'started' };
+
+    // Reserve the key before the first await: the one-watch-per-key invariant is enforced HERE,
+    // not by trusting every caller to serialize (the reactor's mutex does today, but the adapter
+    // cannot see that). A concurrent ensure during the reconcile/enqueue below answers `started`.
+    const watch: Watch = { aborted: false, done: Promise.resolve() };
+    this.watches.set(key, watch);
 
     const { username } = candidate.identity;
     const requests = candidate.files.map((file) => ({
@@ -136,6 +147,35 @@ export class SlskdDownload implements DownloadPort {
       this.transferLedger.keyFor(acquisitionId, username, request.filename),
     );
 
+    try {
+      return await this.reconcileAndEnqueue(
+        watch,
+        key,
+        acquisitionId,
+        candidate,
+        policy,
+        requests,
+        wanted,
+        ownedKeys,
+      );
+    } catch (error) {
+      this.releaseWatch(key, watch);
+      throw error;
+    }
+  }
+
+  /** The reserve-then-enqueue body of {@link doStart}; the caller owns releasing on a throw. */
+  private async reconcileAndEnqueue(
+    watch: Watch,
+    key: string,
+    acquisitionId: string,
+    candidate: Candidate,
+    policy: DownloadPolicy,
+    requests: readonly { readonly filename: string; readonly size: number }[],
+    wanted: ReadonlySet<string>,
+    ownedKeys: readonly SourceResourceKey[],
+  ): Promise<DownloadStart> {
+    const { username } = candidate.identity;
     // Reconcile before enqueue (reactor-durability D3): live ledgered rows are evidence of a
     // prior attempt whose watch died with the process. If the source still holds those
     // transfers, re-attach — resume watching with fresh stall/queue budgets — rather than
@@ -166,22 +206,44 @@ export class SlskdDownload implements DownloadPort {
           'slskd rejected the enqueue; failing the candidate',
         );
         await this.transferLedger.release(ownedKeys);
+        this.releaseWatch(key, watch);
         return { kind: 'rejected', reason };
       }
     }
 
-    const watch: Watch = { aborted: false, done: Promise.resolve() };
     watch.done = this.runWatch(watch, key, acquisitionId, candidate, policy, wanted, ownedKeys);
-    this.watches.set(key, watch);
     return { kind: 'started' };
+  }
+
+  /** Drop a reservation/watch entry — only our own (a successor may have replaced it). */
+  private releaseWatch(key: string, watch: Watch): void {
+    if (this.watches.get(key) === watch) this.watches.delete(key);
+  }
+
+  /** True while any watch (any candidate) for the acquisition is still registered. */
+  private hasWatchFor(acquisitionId: string): boolean {
+    const prefix = `${acquisitionId}|`;
+    for (const key of this.watches.keys()) if (key.startsWith(prefix)) return true;
+    return false;
+  }
+
+  /**
+   * Shutdown latch: every watch exits at its next wake without delivering, so nothing keeps
+   * polling the source or retrying deliveries against torn-down infrastructure. Deliberately not
+   * a drain — watches are storeless and rebuilt by the startup re-drive (level-triggered), so
+   * dying promptly IS the graceful shutdown.
+   */
+  stop(): void {
+    for (const watch of this.watches.values()) watch.aborted = true;
   }
 
   /**
    * The watch loop — the observation the reactor used to block on, now on the supervisor's own
    * cadence. Each tick samples the source, surfaces progress, judges the caller's stall/queue
-   * budgets, and either settles (delivering the single outcome fact) or sleeps. A tick that
-   * throws is logged and retried next tick; an aborted watch exits without an outcome — the
-   * abort path owns that settlement.
+   * budgets, and either settles (pinning the verdict BEFORE any source teardown, then delivering
+   * the single outcome fact) or sleeps. A tick that throws is logged and retried next tick — with
+   * escalation once failures persist; an aborted watch exits without an outcome — the abort path
+   * owns that settlement. The whole loop is exception-contained: `watch.done` never rejects.
    */
   private async runWatch(
     watch: Watch,
@@ -196,6 +258,7 @@ export class SlskdDownload implements DownloadPort {
     const start = this.timer.now();
     let lastBytes = 0;
     let lastProgressAt = start;
+    let consecutiveTickFailures = 0;
     const captured = new Set<string>();
     try {
       for (;;) {
@@ -205,21 +268,23 @@ export class SlskdDownload implements DownloadPort {
           const mine = await pollOwnedTransfers(this.client, username, wanted);
           await this.transferLedger.captureIds(acquisitionId, username, mine, captured);
           const status = aggregate(mine);
-          this.observer.progress(acquisitionId, candidate.identity, status.progress);
+          this.observer.progress(acquisitionId, status.progress);
 
           if (status.succeeded) {
             this.logger.debug({ username }, 'slskd download completed');
+            // Resolve the staged files BEFORE any teardown (a throw here retries against the
+            // still-present transfers), then pin the verdict — teardown can no longer lose it.
             const files = await this.staged.stagedFiles(mine, candidate);
-            await this.removeOwned(username, mine, ownedKeys);
             result = { kind: 'completed', files };
+            await this.teardownOwned(acquisitionId, username, mine, ownedKeys);
           } else if (status.hasFailure) {
             // One failed file dooms the candidate: cancel the rest (confirming their records are
             // gone) and report the original failure, not the cancellation it triggers. Files that
             // succeeded before the doom are reported so their staging is cleaned (design D2).
             this.logger.warn({ username, reason: status.failureReason }, 'slskd download failed');
             const files = await this.staged.completedStagedFiles(mine, candidate);
-            await this.removeOwned(username, mine, ownedKeys);
             result = { kind: 'failed', reason: status.failureReason, files };
+            await this.teardownOwned(acquisitionId, username, mine, ownedKeys);
           } else {
             const now = this.timer.now();
             if (status.progress.bytesTransferred > lastBytes) {
@@ -227,16 +292,38 @@ export class SlskdDownload implements DownloadPort {
               lastProgressAt = now;
             }
             if (status.allQueued && now - start >= policy.maxQueueWaitMs) {
-              result = await this.abandon(username, mine, ownedKeys, 'QueueTimeout', candidate);
+              result = await this.abandon(
+                acquisitionId,
+                username,
+                mine,
+                ownedKeys,
+                'QueueTimeout',
+                candidate,
+              );
             } else if (!status.allQueued && now - lastProgressAt >= policy.stallTimeoutMs) {
-              result = await this.abandon(username, mine, ownedKeys, 'Stalled', candidate);
+              result = await this.abandon(
+                acquisitionId,
+                username,
+                mine,
+                ownedKeys,
+                'Stalled',
+                candidate,
+              );
             }
           }
+          consecutiveTickFailures = 0;
         } catch (error) {
-          // Self-healing (level-triggered): a failed observation delays the outcome, it never
-          // loses it — the next tick re-samples current state and re-attempts any settle.
-          this.logger.warn(
-            { acquisitionId, username, err: error },
+          // Self-healing (level-triggered): a failed observation delays the settle, it never
+          // loses it — the next tick re-samples current state. Escalate once failures persist,
+          // so a wedged watch (schema drift, misconfigured staging) is distinguishable from a
+          // one-tick events-log lag in the logs.
+          consecutiveTickFailures += 1;
+          const log =
+            consecutiveTickFailures % ESCALATE_EVERY === 0
+              ? this.logger.error.bind(this.logger)
+              : this.logger.warn.bind(this.logger);
+          log(
+            { acquisitionId, username, consecutiveTickFailures, err: error },
             'download watch tick failed; retrying on the next tick',
           );
         }
@@ -246,26 +333,49 @@ export class SlskdDownload implements DownloadPort {
         }
         await this.timer.sleep(this.pollIntervalMs);
       }
+    } catch (error) {
+      // Nothing may escape the floating loop: an unexpected throw (a bug, not a modeled fault)
+      // is logged with its context and the watch dies; the startup re-drive re-derives it.
+      this.logger.error(
+        { acquisitionId, username, err: error },
+        'download watch failed unexpectedly; a restart re-drive resumes it',
+      );
     } finally {
-      this.watches.delete(key);
-      this.observer.finished(acquisitionId);
+      this.releaseWatch(key, watch);
+      // Retire live progress only when no sibling watch (a successor candidate's) is running —
+      // an old watch's exit must not blank the new candidate's fresh bar.
+      if (!this.hasWatchFor(acquisitionId)) this.observer.finished(acquisitionId);
     }
   }
 
-  /** Deliver the settled outcome, retrying on the watch cadence until it lands — exactly once. */
+  /**
+   * Deliver the settled outcome, retrying on the watch cadence until it lands — once per watch
+   * (system-wide, delivery is at-least-once: a boot re-emit may repeat it; `decide` dedupes).
+   * Persistent failures escalate so an undeliverable outcome is loud, not a quiet warn loop.
+   */
   private async deliver(
     watch: Watch,
     acquisitionId: string,
     candidate: Candidate,
     result: DownloadResult,
   ): Promise<void> {
-    for (;;) {
+    for (let attempt = 1; ; attempt += 1) {
       if (watch.aborted) return;
-      const delivered = await this.observer.outcome(acquisitionId, candidate, result);
+      const delivered = await this.observer.outcome(acquisitionId, candidate.identity, result);
       if (delivered.isOk()) return;
-      this.logger.warn(
-        { acquisitionId, err: delivered.error },
-        'download outcome delivery failed; retrying',
+      const log =
+        attempt % ESCALATE_EVERY === 0
+          ? this.logger.error.bind(this.logger)
+          : this.logger.warn.bind(this.logger);
+      log(
+        {
+          acquisitionId,
+          username: candidate.identity.username,
+          outcome: result.kind,
+          attempt,
+          err: delivered.error,
+        },
+        'download outcome delivery failed; retrying on the watch cadence',
       );
       await this.timer.sleep(this.pollIntervalMs);
     }
@@ -334,11 +444,12 @@ export class SlskdDownload implements DownloadPort {
   }
 
   /**
-   * Report a policy abandonment: cancel + confirm-remove the owned transfers, then surface the
-   * reason together with the subset the source already completed into staging, so its files are
-   * cleaned via the domain (design D2).
+   * Report a policy abandonment: resolve the already-completed subset and pin the verdict, then
+   * cancel + confirm-remove the owned transfers (guarded — the verdict survives a teardown
+   * fault), so the reason and the staged subset reach the domain for cleanup (design D2).
    */
   private async abandon(
+    acquisitionId: string,
     username: string,
     mine: readonly OwnedTransfer[],
     ownedKeys: readonly SourceResourceKey[],
@@ -347,8 +458,31 @@ export class SlskdDownload implements DownloadPort {
   ): Promise<DownloadResult> {
     this.logger.warn({ username, reason }, 'abandoning slskd download');
     const files = await this.staged.completedStagedFiles(mine, candidate);
-    await this.removeOwned(username, mine, ownedKeys);
-    return { kind: 'failed', reason, files };
+    const result: DownloadResult = { kind: 'failed', reason, files };
+    await this.teardownOwned(acquisitionId, username, mine, ownedKeys);
+    return result;
+  }
+
+  /**
+   * Teardown guarded so a fault can never mutate a settled verdict: once the source's records
+   * are being removed, a retried tick would mis-read the emptied listing as a stall — so the
+   * verdict is pinned first and a teardown fault is logged and left to the startup sweep (the
+   * documented backstop for unconfirmed removals), never rethrown into the tick.
+   */
+  private async teardownOwned(
+    acquisitionId: string,
+    username: string,
+    mine: readonly OwnedTransfer[],
+    ownedKeys: readonly SourceResourceKey[],
+  ): Promise<void> {
+    try {
+      await this.removeOwned(username, mine, ownedKeys);
+    } catch (error) {
+      this.logger.warn(
+        { acquisitionId, username, err: error },
+        'transfer teardown failed after the outcome settled; ledger rows stay live for the sweep',
+      );
+    }
   }
 
   /**

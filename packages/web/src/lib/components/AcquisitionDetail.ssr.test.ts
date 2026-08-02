@@ -22,8 +22,9 @@ const working = {
   currentCandidate: candidate,
   attempts: 2,
   rejectedCount: 1,
-  // The transfer is live: the recorded start is what lets the view claim "downloading" with a
-  // progress bar rather than the not-yet-started "preparing" row.
+  // The transfer is live (the decided flag): what lets the view claim "downloading" with a
+  // progress bar rather than the not-yet-started "preparing" row. The history still narrates.
+  transferStarted: true,
   history: [
     { kind: 'selected' as const, at: T(0), candidate },
     { kind: 'download-started' as const, at: T(1), candidate },

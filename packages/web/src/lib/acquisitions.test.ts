@@ -22,25 +22,13 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
 }
 
 describe('isTransferStarted', () => {
-  const candidate = { username: 'u', path: 'p', sizeBytes: 1 };
-  const at = '2026-08-01T10:00:00Z';
-
-  it('walks past non-attempt entries to find the live start', () => {
-    expect(
-      isTransferStarted(
-        acquisition({
-          history: [
-            { kind: 'selected', at, candidate },
-            { kind: 'download-started', at, candidate },
-            { kind: 'download-failed', at, candidate, reason: 'Stalled' },
-          ],
-        }),
-      ),
-    ).toBe(true);
+  it('reads the decided flag, not the history', () => {
+    expect(isTransferStarted(acquisition({ transferStarted: true }))).toBe(true);
+    expect(isTransferStarted(acquisition({ transferStarted: false }))).toBe(false);
   });
 
-  it('reports no live transfer for an empty history', () => {
-    expect(isTransferStarted(acquisition({ history: [] }))).toBe(false);
+  it('degrades an absent flag (older producer) to not-yet-live', () => {
+    expect(isTransferStarted(acquisition({}))).toBe(false);
   });
 });
 

@@ -17,10 +17,10 @@ import type { Clock } from '../ports/system-ports.js';
  * as an empty event list (no append), protocol violations as a `DomainError`.
  *
  * A lost optimistic-concurrency race re-runs the command against the fresh stream (bounded): with
- * asynchronous download outcomes, a reactor follow-on and the outcome consumer lawfully append
- * concurrently, and the benign loser must re-decide — where the stale guards absorb it — rather
- * than surface a retryable fault that parks its stream for nothing
- * (nonblocking-download-observation D2). Persistent contention still surfaces as the conflict.
+ * asynchronous download outcomes (nonblocking-download-observation D2), a reactor follow-on and
+ * the outcome consumer lawfully append concurrently, and the benign loser must re-decide — where
+ * the stale guards absorb it — rather than surface a retryable fault that parks its stream for
+ * nothing. Persistent contention still surfaces as the conflict.
  */
 export type CommandError = DomainError | AppendError;
 

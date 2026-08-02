@@ -62,16 +62,8 @@ describe('acquisition detail load', () => {
     });
   });
 
-  const startedHistory = [
-    {
-      kind: 'download-started',
-      at: '2026-08-01T10:00:00Z',
-      candidate: { username: 'u', path: 'p', sizeBytes: 1 },
-    },
-  ];
-
   it('adds live progress while the transfer is live', () => {
-    const downloading = { ...base, status: 'Downloading', history: startedHistory };
+    const downloading = { ...base, status: 'Downloading', transferStarted: true };
     const progress = { percent: 40, bytesTransferred: 4, bytesTotal: 10 };
     const facade = {
       getAcquisition: () => ({ ok: true, value: downloading }),
@@ -104,7 +96,7 @@ describe('acquisition detail load', () => {
   });
 
   it('flags progress unavailable and logs the inconsistency when the progress read fails on a live transfer', () => {
-    const downloading = { ...base, status: 'Downloading', history: startedHistory };
+    const downloading = { ...base, status: 'Downloading', transferStarted: true };
     const facade = {
       getAcquisition: () => ({ ok: true, value: downloading }),
       getAcquisitionProgress: () => ({ ok: false, error: { kind: 'NotFound' } }),

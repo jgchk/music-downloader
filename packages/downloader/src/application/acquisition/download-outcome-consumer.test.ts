@@ -37,7 +37,7 @@ describe('deliverDownloadOutcome', () => {
   it('records a completed outcome through the normal decision path', async () => {
     const store = await seeded(startedHistory([candidate]));
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'completed',
       files: sampleFiles,
     });
@@ -49,7 +49,7 @@ describe('deliverDownloadOutcome', () => {
   it('records a failed outcome as the rejection-and-advance batch', async () => {
     const store = await seeded(startedHistory([candidate, matchingCandidate('b')]));
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'failed',
       reason: 'Stalled',
       files: sampleFiles,
@@ -76,7 +76,7 @@ describe('deliverDownloadOutcome', () => {
     ]);
     const before = types(store);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'failed',
       reason: 'Stalled',
     });
@@ -91,7 +91,7 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(validatingHistory([candidate]));
     const before = types(store);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'completed',
       files: sampleFiles,
     });
@@ -103,7 +103,7 @@ describe('deliverDownloadOutcome', () => {
   it('settles a cancelled in-flight candidate so its staging is cleaned', async () => {
     const store = await seeded([...startedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'failed',
       reason: 'Cancelled',
       files: sampleFiles,
@@ -117,7 +117,7 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(selectedHistory([candidate]));
     store.failAppends = true;
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'completed',
       files: sampleFiles,
     });
@@ -129,7 +129,7 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(selectedHistory([candidate]));
     store.conflictAppends = true;
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate, {
+    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
       kind: 'completed',
       files: sampleFiles,
     });

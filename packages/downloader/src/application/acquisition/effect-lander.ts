@@ -28,12 +28,25 @@ function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
       return { type: 'RecordMetadataFailed' };
     }
     case 'Download': {
-      // Hours without progress IS a stalled download; the rejection advances the candidate ladder.
-      return { type: 'RecordDownloadFailed', reason: 'Stalled' };
+      // A spent budget here means the short ensure-start itself kept faulting (the source's
+      // enqueue/start API down for the whole retry window) — the transfer may never have begun.
+      // 'Stalled' is the closest modeled reason and advances the candidate ladder; genuine
+      // transfer stalls are the supervisor's watch's to detect and arrive through the outcome
+      // consumer, never through this landing. The candidate is named so a landing that fires
+      // after the ladder has already moved on is absorbed as stale, not mis-attached.
+      return {
+        type: 'RecordDownloadFailed',
+        reason: 'Stalled',
+        candidate: effect.candidate.identity,
+      };
     }
     case 'AbortDownload': {
       // The abort's settlement: reject the pending candidate as the interpreter would have.
-      return { type: 'RecordDownloadFailed', reason: 'Cancelled' };
+      return {
+        type: 'RecordDownloadFailed',
+        reason: 'Cancelled',
+        candidate: effect.candidate.identity,
+      };
     }
     case 'Search':
     case 'Validate':

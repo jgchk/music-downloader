@@ -34,19 +34,19 @@ export type AcquisitionCommand =
     }
   | { readonly type: 'RecordSearchResults'; readonly candidates: readonly Candidate[] }
   | {
-      // The source accepted the enqueue: the download supervisor's watch is live. Duplicate or
-      // stale reports (redelivery, ensure-start re-dispatch) are absorbed by `decide`.
+      // The source accepted the enqueue: the transfer is live. Reports may repeat or arrive
+      // late; `decide` absorbs duplicates and reports naming a candidate no longer in flight.
       readonly type: 'RecordDownloadStarted';
       readonly candidate: CandidateIdentity;
     }
   | {
       readonly type: 'RecordDownloadCompleted';
       readonly files: readonly DownloadedFile[];
-      // The candidate this outcome settles. Outcomes arrive asynchronously from the download
-      // supervisor, so a re-emitted outcome can name a candidate the ladder has already moved
-      // past — `decide` absorbs the mismatch. Optional: a candidate-less outcome (the pre-async
-      // shape) is guarded by phase alone.
-      readonly candidate?: CandidateIdentity;
+      // The candidate this outcome settles. Reports of a download's outcome may arrive late or
+      // repeat (they are records of external work, not synchronous returns), so every producer
+      // names the candidate it is reporting on and `decide` absorbs a report naming one the
+      // ladder has already moved past.
+      readonly candidate: CandidateIdentity;
     }
   | {
       readonly type: 'RecordDownloadFailed';
@@ -55,8 +55,11 @@ export type AcquisitionCommand =
       // adapter so `decide` can stamp them onto the rejection for cleanup (design D2). Optional:
       // a download that failed before staging (or with an unresolvable subset) carries none.
       readonly files?: readonly DownloadedFile[];
-      // The candidate this outcome settles — the same asynchronous stale-guard as on completion.
-      readonly candidate?: CandidateIdentity;
+      // The candidate this outcome settles — the same late-or-repeated-report guard as on
+      // completion. Required: every producer (interpreter, outcome consumer, effect lander) has
+      // the candidate in hand, and a candidate-less report would attach by phase alone — to
+      // whichever candidate happens to be current.
+      readonly candidate: CandidateIdentity;
     }
   | { readonly type: 'RecordValidationPassed'; readonly verdict: ValidationVerdict }
   | { readonly type: 'RecordValidationFailed'; readonly verdict: ValidationVerdict }

@@ -89,6 +89,7 @@ describe('statusViewToDto', () => {
     const view: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
+      transferStarted: true,
       currentCandidate: candidate,
       attempts: 2,
       rejectedCount: 1,
@@ -169,6 +170,7 @@ describe('statusViewToDto', () => {
     const view: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'MetadataFailed',
+      transferStarted: false,
       requestedTarget: request,
       attempts: 0,
       rejectedCount: 0,
@@ -183,6 +185,7 @@ describe('statusViewToDto', () => {
     const view: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'Pending',
+      transferStarted: false,
       attempts: 0,
       rejectedCount: 0,
       history: [],
@@ -197,6 +200,7 @@ describe('statusViewToDto', () => {
     const view: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
+      transferStarted: false,
       attempts: 0,
       rejectedCount: 0,
       history: [],
@@ -212,6 +216,7 @@ describe('statusViewToDto', () => {
     const cancellableAwaiting: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'AwaitingManualSelection',
+      transferStarted: false,
       attempts: 0,
       rejectedCount: 0,
       history: [],
@@ -225,6 +230,7 @@ describe('statusViewToDto', () => {
     const terminal: AcquisitionStatusView = {
       acquisitionId: 'acq-2',
       status: 'Fulfilled',
+      transferStarted: false,
       attempts: 0,
       rejectedCount: 0,
       history: [],
