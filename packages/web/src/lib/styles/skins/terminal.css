@@ -57,3 +57,18 @@
 :root[data-skin='terminal'] .chip {
   border-radius: 0;
 }
+
+/* Timeline as a log: square phosphor markers, dashed date rules, tight rows. */
+:root[data-skin='terminal'] .timeline-marker {
+  border-radius: 0;
+}
+:root[data-skin='terminal'] ol.timeline > li[data-state='pending'] .timeline-marker {
+  animation-duration: 1s;
+}
+:root[data-skin='terminal'] li.timeline-date {
+  border-bottom: 1px dashed var(--border);
+  padding-left: 0;
+}
+:root[data-skin='terminal'] .timeline-detail dd {
+  color: var(--accent);
+}

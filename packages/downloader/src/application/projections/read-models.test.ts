@@ -202,7 +202,7 @@ describe('projectStatus — lifecycle history coverage', () => {
 
   it('keeps noise events out of the history', () => {
     const view = projectStatus('acq-1', stored(history));
-    const kinds = new Set(view.history.map((entry) => entry.kind));
+    const kinds = new Set<string>(view.history.map((entry) => entry.kind));
     expect(kinds.has('requested')).toBe(true);
     for (const noisy of [
       'SearchCompleted',

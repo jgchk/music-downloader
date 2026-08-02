@@ -1,9 +1,14 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
+import type { ImportStatusResponseDto } from '@music/importer';
 import AcquisitionDetail from './AcquisitionDetail.svelte';
 import type { DownloaderHistoryEntry, ImporterHistoryEntry, TimelineEntry } from '$lib/timeline.js';
 
-const candidate = { username: 'u', path: '/files/a.flac', sizeBytes: 9 };
+const candidate = { username: 'xronin', path: '/files/a.flac', sizeBytes: 9 };
+
+const NOW = '2026-08-01T12:00:00Z';
+const T = (offsetMinutes: number): string =>
+  new Date(Date.parse('2026-08-01T10:00:00Z') + offsetMinutes * 60_000).toISOString();
 
 const working = {
   acquisitionId: 'acq-1',
@@ -12,10 +17,12 @@ const working = {
   currentCandidate: candidate,
   attempts: 2,
   rejectedCount: 1,
-  history: [{ kind: 'selected' as const, at: 't', candidate }],
+  history: [{ kind: 'selected' as const, at: T(0), candidate }],
   // A non-terminal acquisition: the downloader decides it cancellable, and the detail renders that.
   cancellable: true,
 };
+
+const base = { nowIso: NOW, timeZone: 'UTC' };
 
 function dl(entry: DownloaderHistoryEntry): TimelineEntry {
   return { module: 'downloader', at: entry.at, entry };
@@ -25,59 +32,88 @@ function im(entry: ImporterHistoryEntry): TimelineEntry {
   return { module: 'importer', at: entry.at, entry };
 }
 
+function imports(over: Partial<ImportStatusResponseDto>): ImportStatusResponseDto {
+  return {
+    importId: 'imp-1',
+    status: 'requested',
+    history: [],
+    ...over,
+  };
+}
+
 describe('AcquisitionDetail (SSR)', () => {
-  it('renders a cancellable in-flight acquisition with progress, current candidate, and a timeline', () => {
+  it('renders an in-flight acquisition with a pending download row carrying the progress', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: working,
-        timeline: [dl({ kind: 'selected', at: 't', candidate })],
+        timeline: [dl({ kind: 'selected', at: T(0), candidate })],
         importState: 'none',
         progress: { percent: 50, bytesTransferred: 5, bytesTotal: 10 },
       },
     });
     expect(body).toContain('A — T');
     expect(body).toContain('data-testid="cancel"');
+    expect(body).toContain('data-testid="pending-row"');
+    expect(body).toContain('Downloading from xronin…');
     expect(body).toContain('data-testid="progress"');
-    expect(body).toContain('data-testid="current-candidate"');
-    expect(body).toContain('Selected /files/a.flac');
-    expect(body).toContain('data-testid="import-none"');
-    expect(body).not.toContain('data-testid="outcome"');
+    expect(body).toContain('Chose a download from xronin');
+    // The unified voice: no module tag text, no import-none note, no architecture nouns.
+    expect(body).not.toContain('data-testid="import-none"');
+    expect(body).not.toContain('Handed off');
     expect(body).not.toContain('data-testid="action-error"');
   });
 
-  it('renders every downloader timeline kind, labelling the hand-off apart from a library import', () => {
+  it('renders the whole downloader story in the unified voice with codes behind disclosure', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
-          status: 'Fulfilled' as const,
+          status: 'Exhausted' as const,
           currentCandidate: undefined,
           cancellable: false,
         },
-        importState: 'present',
+        importState: 'none',
         timeline: [
-          dl({ kind: 'selected', at: 't0', candidate }),
-          dl({ kind: 'download-failed', at: 't1', candidate, reason: 'Stalled' }),
-          dl({ kind: 'validation-failed', at: 't2', candidate, reasons: ['DurationMismatch'] }),
-          dl({ kind: 'imported', at: 't3', candidate, location: '/stage/x' }),
-          dl({ kind: 'fulfillment-rejected', at: 't4', candidate, reasons: ['bad rip'] }),
+          dl({
+            kind: 'requested',
+            at: T(0),
+            request: { kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T' },
+          }),
+          dl({ kind: 'resolved', at: T(1), artist: 'A', title: 'T', year: 1975 }),
+          dl({ kind: 'search-started', at: T(2), round: 1 }),
+          dl({ kind: 'selected', at: T(3), candidate }),
+          dl({ kind: 'download-failed', at: T(4), candidate, reason: 'Stalled' }),
+          dl({ kind: 'validation-failed', at: T(5), candidate, reasons: ['DurationMismatch'] }),
+          dl({ kind: 'exhausted', at: T(6) }),
         ],
       },
     });
-    expect(body).not.toContain('data-testid="cancel"');
-    expect(body).toContain('data-module="downloader"');
-    expect(body).toContain('Download failed (Stalled)');
-    expect(body).toContain('Validation failed (DurationMismatch)');
-    expect(body).toContain('Handed off to importer — staged at /stage/x');
-    // The hand-off must not read as a completed library import (the old ambiguous label).
-    expect(body).not.toContain('Deposited at');
-    expect(body).toContain('Rejected after delivery (bad rip)');
+    expect(body).toContain('Requested');
+    expect(body).toContain('Matched to MusicBrainz — A, T (1975)');
+    expect(body).toContain('Started searching for a download');
+    expect(body).toContain('Download failed — the download stalled. Trying the next source.');
+    expect(body).toContain(
+      'The files failed quality checks — track lengths didn’t match the release. Trying the next source.',
+    );
+    expect(body).toContain('Gave up — every source failed or came up empty');
+    // Raw codes live in the per-entry disclosure, not the visible line.
+    expect(body).toContain('<details class="timeline-detail"');
+    expect(body).toContain('Stalled');
+    expect(body).not.toContain('Download failed (Stalled)');
+    expect(body).not.toContain('Validation failed (DurationMismatch)');
+    // A settled story has no pending row and its status line is a human phrase.
+    expect(body).not.toContain('data-testid="pending-row"');
+    expect(body).toContain('No usable download found');
+    expect(body).not.toContain('>Exhausted<');
   });
 
-  it('renders every importer timeline kind, attributed to the import', () => {
+  it('renders the import story without a module prefix and with the glossed match', () => {
     const reference = { dataSource: 'MusicBrainz', albumId: 'a1' };
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
           status: 'Fulfilled' as const,
@@ -85,95 +121,212 @@ describe('AcquisitionDetail (SSR)', () => {
           cancellable: false,
         },
         importState: 'present',
+        importStatus: imports({ status: 'applied', location: '/lib/x' }),
         timeline: [
-          im({ kind: 'requested', at: 'i0' }),
-          im({ kind: 'proposed', at: 'i1', candidateCount: 2 }),
-          im({ kind: 'proposed', at: 'i2', candidateCount: 1 }),
-          im({ kind: 'auto-apply-selected', at: 'i3', candidate: reference, distance: 0.05 }),
-          im({ kind: 'review-required', at: 'i4', reviewKind: 'match-review' }),
-          im({ kind: 'review-resolved', at: 'i5', resolution: 'reject' }),
-          im({ kind: 'applied', at: 'i6', location: '/lib/x' }),
-          im({ kind: 'remediation-required', at: 'i7', failures: [] }),
-          im({ kind: 'rejected', at: 'i8', reason: 'wrong rip', filesDeleted: true }),
+          im({ kind: 'requested', at: T(10) }),
+          im({ kind: 'proposed', at: T(11), candidateCount: 2 }),
+          im({ kind: 'proposed', at: T(12), candidateCount: 1 }),
+          im({ kind: 'auto-apply-selected', at: T(13), candidate: reference, distance: 0.05 }),
+          im({ kind: 'review-required', at: T(14), reviewKind: 'match-review' }),
+          im({ kind: 'review-resolved', at: T(15), resolution: 'reject' }),
+          im({ kind: 'applied', at: T(16), location: '/lib/x' }),
+          im({ kind: 'remediation-required', at: T(17), failures: [] }),
+          im({ kind: 'rejected', at: T(18), reason: 'wrong rip', filesDeleted: true }),
           im({
             kind: 'release-verdict-recorded',
-            at: 'i9',
+            at: T(19),
             acquisitionId: 'acq-1',
             reasons: ['corrupt rip'],
           }),
         ],
       },
     });
-    expect(body).toContain('data-testid="import-entry"');
+    // No module tag: the fixed "Import Import requested" stutter is structurally impossible now.
+    expect(body).not.toContain('data-testid="import-entry"');
     expect(body).toContain('data-module="importer"');
-    expect(body).toContain('Import requested');
-    expect(body).toContain('Matched 2 candidates against the library');
-    expect(body).toContain('Matched 1 candidate against the library');
-    expect(body).toContain('Auto-selected a confident match (distance 0.05)');
-    expect(body).toContain('Review required (match-review)');
-    expect(body).toContain('Review resolved (reject)');
-    expect(body).toContain('Imported into the library at /lib/x');
-    expect(body).toContain('Applied, but needs remediation');
-    expect(body).toContain('Import rejected (wrong rip)');
-    expect(body).toContain('Recorded a retry-download verdict (corrupt rip)');
+    expect(body).toContain('Import started');
+    expect(body).toContain('Compared against the library — 2 candidate matches');
+    expect(body).toContain('Compared against the library — 1 candidate match');
+    expect(body).toContain('Confident match — importing automatically (95% match)');
+    expect(body).toContain('Needs your review');
+    expect(body).toContain('Review resolved — you rejected the import');
+    expect(body).toContain('Added to the library');
+    expect(body).toContain('Added to the library, but needs attention');
+    expect(body).toContain('Import rejected — wrong rip. A new download will be tried.');
+    expect(body).toContain('Marked this delivery unusable — retrying the download');
+    expect(body).not.toContain('retry-download verdict');
+    expect(body).toContain('data-testid="location"');
+    expect(body).toContain('In library at');
+  });
+
+  it('renders every entry with its occurrence time and a hover timestamp', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: working,
+        timeline: [dl({ kind: 'selected', at: '2026-08-01T11:56:00Z', candidate })],
+      },
+    });
+    expect(body).toContain('datetime="2026-08-01T11:56:00Z"');
+    expect(body).toContain('title="1 Aug 2026, 11:56:00"');
+    expect(body).toContain('4 min ago');
+  });
+
+  it('inserts a date divider when the calendar date changes', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: working,
+        timeline: [
+          dl({ kind: 'selected', at: '2026-07-31T23:50:00Z', candidate }),
+          dl({ kind: 'download-failed', at: '2026-08-01T00:10:00Z', candidate, reason: 'Stalled' }),
+        ],
+      },
+    });
+    expect(body).toContain('data-testid="date-divider"');
+    expect(body).toContain('31 July 2026');
+    expect(body).toContain('1 August 2026');
+  });
+
+  it('appends the whole-story duration to the closing row once settled', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, status: 'Exhausted' as const, cancellable: false },
+        importState: 'none',
+        timeline: [
+          dl({
+            kind: 'requested',
+            at: T(0),
+            request: { kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T' },
+          }),
+          dl({ kind: 'exhausted', at: T(6) }),
+        ],
+      },
+    });
+    expect(body).toContain('data-testid="duration"');
+    expect(body).toContain('6 min from request');
+  });
+
+  it('a just-submitted acquisition shows the requested entry plus a pending row, never empty', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, status: 'Pending' as const, currentCandidate: undefined },
+        timeline: [
+          dl({
+            kind: 'requested',
+            at: T(0),
+            request: { kind: 'musicbrainz', targetType: 'album', mbid: 'm-1' },
+          }),
+        ],
+      },
+    });
+    expect(body).toContain('Requested');
+    expect(body).toContain('Identifying the release…');
+    expect(body).not.toContain('data-testid="no-history"');
+  });
+
+  it('waits on the user read as attention rows, not spinners', () => {
+    const awaiting = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: {
+          ...working,
+          status: 'AwaitingManualSelection' as const,
+          currentCandidate: undefined,
+          history: [],
+          candidates: [{ releaseMbid: 'boot-1', title: 'Live at Budokan', trackCount: 12 }],
+        },
+        timeline: [],
+      },
+    });
+    expect(awaiting.body).toContain('data-testid="pending-row"');
+    expect(awaiting.body).toContain('data-state="attention"');
+    expect(awaiting.body).toContain('Waiting for you to choose an edition');
+
+    const review = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, status: 'Fulfilled' as const, cancellable: false },
+        importState: 'present',
+        importStatus: imports({ status: 'awaiting-review' }),
+        timeline: [],
+      },
+    });
+    expect(review.body).toContain('Waiting for your review');
+    expect(review.body).toContain('href="/reviews"');
+  });
+
+  it('the fulfilled downloader entry is curated out — applied is the story ending', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, status: 'Fulfilled' as const, cancellable: false },
+        importState: 'present',
+        importStatus: imports({ status: 'applied', location: '/lib/x' }),
+        timeline: [
+          dl({ kind: 'imported', at: T(0), candidate, location: '/stage/x' }),
+          dl({ kind: 'fulfilled', at: T(0), location: '/stage/x' }),
+          im({ kind: 'applied', at: T(5), location: '/lib/x' }),
+        ],
+      },
+    });
+    expect(body).toContain('Download complete — preparing to add to the library');
+    expect(body).toContain('Added to the library');
+    // In your library appears as the status phrase; the raw enum never renders.
+    expect(body).toContain('In your library');
+    expect(body).not.toContain('>Fulfilled<');
   });
 
   it('renders the import section as unavailable while still showing the downloader timeline', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: working,
         importState: 'unavailable',
-        timeline: [dl({ kind: 'selected', at: 't', candidate })],
+        timeline: [dl({ kind: 'selected', at: T(0), candidate })],
       },
     });
     expect(body).toContain('data-testid="import-unavailable"');
-    expect(body).not.toContain('data-testid="import-none"');
-    expect(body).toContain('Selected /files/a.flac');
-  });
-
-  it('renders no import note once the import is present', () => {
-    const { body } = render(AcquisitionDetail, {
-      props: {
-        acquisition: working,
-        importState: 'present',
-        timeline: [dl({ kind: 'selected', at: 't', candidate })],
-      },
-    });
-    expect(body).not.toContain('data-testid="import-none"');
-    expect(body).not.toContain('data-testid="import-unavailable"');
+    expect(body).toContain('Chose a download from xronin');
   });
 
   it('withholds the cancel affordance when the decided flag is absent (older producer)', () => {
     const { cancellable, ...absent } = working;
     void cancellable;
     const { body } = render(AcquisitionDetail, {
-      props: { acquisition: absent, importState: 'none', timeline: [] },
+      props: { ...base, acquisition: absent, importState: 'none', timeline: [] },
     });
     // No re-derivation from the status enum: an absent flag degrades to no cancel button.
     expect(body).not.toContain('data-testid="cancel"');
   });
 
-  it('renders a fulfilled acquisition without a cancel affordance', () => {
+  it('labels a legacy fulfilled acquisition with its delivered location', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
           status: 'Fulfilled' as const,
           currentCandidate: undefined,
-          location: '/lib/x',
+          location: '/stage/x',
           cancellable: false,
         },
-        importState: 'present',
+        importState: 'none',
         timeline: [],
       },
     });
     expect(body).not.toContain('data-testid="cancel"');
-    expect(body).toContain('/lib/x');
+    expect(body).toContain('data-testid="location"');
+    expect(body).toContain('Delivered to');
+    expect(body).toContain('/stage/x');
   });
 
   it('lists the candidate editions with a choose action while awaiting manual selection', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
           status: 'AwaitingManualSelection' as const,
@@ -213,6 +366,7 @@ describe('AcquisitionDetail (SSR)', () => {
   it('explains an awaiting-selection acquisition that carries no candidates instead of a dead end', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
           status: 'AwaitingManualSelection' as const,
@@ -230,6 +384,7 @@ describe('AcquisitionDetail (SSR)', () => {
   it('headlines the awaited edition choice when no target is resolved yet', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: {
           ...working,
           status: 'AwaitingManualSelection' as const,
@@ -242,50 +397,93 @@ describe('AcquisitionDetail (SSR)', () => {
       },
     });
     expect(body).toContain('<h1>Live at Budokan — awaiting your edition choice</h1>');
-    expect(body).not.toContain('(resolving…)');
+    expect(body).not.toContain('resolving…');
   });
 
-  it('renders no edition-candidates section outside the awaiting-selection state', () => {
+  it('says progress is momentarily unavailable inside the pending row when the read failed', () => {
     const { body } = render(AcquisitionDetail, {
-      props: { acquisition: working, timeline: [] },
-    });
-    expect(body).not.toContain('data-testid="edition-candidates"');
-  });
-
-  it('says progress is momentarily unavailable when downloading but the progress read failed', () => {
-    const { body } = render(AcquisitionDetail, {
-      props: { acquisition: working, timeline: [], progressUnavailable: true },
+      props: { ...base, acquisition: working, timeline: [], progressUnavailable: true },
     });
     expect(body).not.toContain('data-testid="progress"');
     expect(body).toContain('data-testid="progress-unavailable"');
+    expect(body).toContain('data-testid="pending-row"');
   });
 
-  it('renders unknown history kinds through generic fallbacks instead of mislabeling them', () => {
+  it('renders unknown history kinds through neutral fallbacks instead of mislabeling them', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
+        ...base,
         acquisition: working,
         importState: 'present',
         timeline: [
-          dl({ kind: 'teleported', at: 't' } as never),
-          im({ kind: 'zapped', at: 'i' } as never),
+          dl({ kind: 'teleported', at: T(0) } as never),
+          im({ kind: 'zapped', at: T(1) } as never),
         ],
       },
     });
-    expect(body).toContain('Something happened in this acquisition');
-    expect(body).toContain('Something happened in the import');
-    expect(body).not.toContain('Rejected after delivery');
+    expect(body).toContain('Something happened that this page can’t describe yet');
+    expect(body).toContain('Something happened during import that this page can’t describe yet');
+    expect(body).not.toContain('Delivery rejected');
   });
 
-  it('renders an action failure and an empty history', () => {
+  it('renders an action failure, and the defensive no-history line only when truly empty', () => {
     const { body } = render(AcquisitionDetail, {
       props: {
-        acquisition: { ...working, history: [], currentCandidate: undefined },
+        ...base,
+        acquisition: {
+          ...working,
+          status: 'Cancelled' as const,
+          history: [],
+          currentCandidate: undefined,
+          cancellable: false,
+        },
         timeline: [],
-        importState: 'present',
+        importState: 'none',
         error: 'Something went wrong (store). Try again.',
       },
     });
     expect(body).toContain('data-testid="action-error"');
     expect(body).toContain('data-testid="no-history"');
+    expect(body).not.toContain('Nothing has happened yet');
+  });
+
+  it('a settled story whose only entries are curated out renders the defensive line, no duration', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: {
+          ...working,
+          status: 'Fulfilled' as const,
+          currentCandidate: undefined,
+          cancellable: false,
+        },
+        importState: 'none',
+        timeline: [dl({ kind: 'fulfilled', at: T(0), location: '/stage/x' })],
+      },
+    });
+    expect(body).toContain('data-testid="no-history"');
+    expect(body).not.toContain('data-testid="duration"');
+  });
+
+  it('pluralizes the status meta and omits zero counts', () => {
+    const single = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, attempts: 1, rejectedCount: 0 },
+        timeline: [],
+      },
+    });
+    expect(single.body).toContain('1 attempt');
+    expect(single.body).not.toContain('1 attempts');
+    expect(single.body).not.toContain('rejected');
+
+    const none = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: { ...working, attempts: 0, rejectedCount: 0 },
+        timeline: [],
+      },
+    });
+    expect(none.body).not.toContain('data-testid="status-meta"');
   });
 });

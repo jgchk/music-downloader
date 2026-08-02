@@ -4,7 +4,10 @@ import { guardedRead } from '$lib/server/facade-reads.js';
 
 /**
  * The pending-attention count for the site navigation, computed by the same composition as the
- * queue itself (design D3) — no polling endpoint; freshness is page-navigation freshness. The
+ * queue itself (design D3) — no polling endpoint. Freshness is page-navigation freshness for the
+ * chrome; the acquisition detail page is the one revision (legible-acquisition-history D8): while
+ * its acquisition is unsettled it re-runs its own load on an interval behind a swappable
+ * freshness-driver seam, with SSE as the intended successor — still no new wire endpoint. The
  * badge is discovery, not truth: a failing module read is logged and contributes zero here
  * rather than breaking every page; the queue page models the failure per section.
  *

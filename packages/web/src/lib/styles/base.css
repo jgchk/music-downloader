@@ -591,3 +591,116 @@ nav.primary a[aria-current='page'] {
     flex-wrap: wrap;
   }
 }
+
+/* -- Timeline: the acquisition history (legible-acquisition-history D11).
+   The anatomy is structural and defined once: a marker/body/time row grid, an
+   animated in-progress state, date dividers, and the per-entry disclosure.
+   Skins theme it via the --marker-* tokens plus focused rules of their own;
+   the marker is reinforcement only — the entry text carries the meaning. */
+ol.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+ol.timeline > li.timeline-entry {
+  display: grid;
+  grid-template-columns: var(--step-3) minmax(0, 1fr) auto;
+  column-gap: var(--inline-gap);
+  padding: var(--step-1) 0;
+}
+.timeline-marker {
+  width: var(--marker-size);
+  height: var(--marker-size);
+  border-radius: 50%;
+  background: var(--marker-routine);
+  justify-self: center;
+  margin-top: calc((1rem * var(--lh) - var(--marker-size)) / 2);
+}
+ol.timeline > li[data-state='pending'] .timeline-marker {
+  background: var(--marker-pending);
+  animation: marker-pulse 1.6s ease-in-out infinite;
+}
+ol.timeline > li[data-state='attention'] .timeline-marker {
+  background: var(--marker-attention);
+}
+ol.timeline > li[data-state='failure'] .timeline-marker {
+  background: var(--marker-failure);
+}
+ol.timeline > li[data-state='success'] .timeline-marker {
+  background: var(--marker-success);
+}
+@keyframes marker-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ol.timeline > li[data-state='pending'] .timeline-marker {
+    animation: none;
+  }
+}
+.timeline-body {
+  min-width: 0;
+}
+.timeline-entry > time {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+  line-height: calc(1rem * var(--lh));
+}
+.timeline-duration {
+  color: var(--text-muted);
+}
+.timeline-link {
+  margin-left: var(--inline-gap);
+}
+li.timeline-date {
+  padding: var(--step-2) 0 var(--step-0) calc(var(--step-3) + var(--inline-gap));
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-label);
+  text-transform: var(--tt-label);
+}
+.timeline-detail {
+  margin-top: var(--step-0);
+}
+.timeline-detail summary {
+  cursor: pointer;
+  width: max-content;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.timeline-detail dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--inline-gap);
+  margin: var(--step-0) 0 0;
+  font-size: var(--fs-small);
+}
+.timeline-detail dt {
+  color: var(--text-muted);
+}
+.timeline-detail dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* -- Detail header: the status phrase + counters, and the labeled location. */
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: var(--inline-gap);
+  flex-wrap: wrap;
+}
+.status-meta {
+  color: var(--text-muted);
+}
+.location-line {
+  color: var(--text-muted);
+}
+.location-path {
+  font-family: var(--font-mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

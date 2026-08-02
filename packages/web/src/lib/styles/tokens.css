@@ -69,6 +69,16 @@
   --shadow: 0 1px 2px rgba(15, 40, 50, 0.06), 0 8px 24px rgba(15, 40, 50, 0.08);
   --surface-blur: 0px;
 
+  /* -- Timeline marker tokens (acquisition history anatomy): semantic states
+        the skins theme. State colors ride the skin's own palette remap; the
+        marker is reinforcement only — entry text carries the meaning. ------- */
+  --marker-size: 0.55rem;
+  --marker-routine: #9fadb4;
+  --marker-pending: var(--info);
+  --marker-attention: var(--warn);
+  --marker-failure: var(--danger);
+  --marker-success: var(--ok);
+
   /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
   --nav-dir: row; /* row = topbar, column = sidebar */
   --shell-cols: 1fr;

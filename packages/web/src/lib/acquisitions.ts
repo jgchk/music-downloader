@@ -52,6 +52,12 @@ export function isTerminal(acquisition: AcquisitionStatusResponseDto): boolean {
   return acquisition.cancellable === false;
 }
 
+/**
+ * The acquisition's display title, falling through resolved target → the request as given → a
+ * neutral unknown-release label. A resolving placeholder appears only while resolution is
+ * genuinely pending — never as the permanent title of a terminally failed acquisition (web-ui:
+ * never-resolved acquisitions are titled by their request).
+ */
 export function targetDescription(acquisition: AcquisitionStatusResponseDto): string {
   if (acquisition.target) return `${acquisition.target.artist} — ${acquisition.target.title}`;
   if (acquisition.status === 'AwaitingManualSelection') {
@@ -62,21 +68,11 @@ export function targetDescription(acquisition: AcquisitionStatusResponseDto): st
       ? 'Awaiting your edition choice'
       : `${title} — awaiting your edition choice`;
   }
-  return '(resolving…)';
-}
-
-/** The terminal outcome line: where it landed, or why it failed (web-ui spec). */
-export function outcomeSummary(acquisition: AcquisitionStatusResponseDto): string | undefined {
-  if (acquisition.status === 'Fulfilled') return acquisition.location ?? 'Fulfilled';
-  if (!isTerminal(acquisition)) return undefined;
-  const failures = acquisition.history.flatMap((entry) => {
-    if (entry.kind === 'download-failed') return [entry.reason];
-    if (entry.kind === 'validation-failed') return entry.reasons;
-    if (entry.kind === 'fulfillment-rejected') return entry.reasons;
-    return [];
-  });
-  const detail = failures.length > 0 ? ` (${[...new Set(failures)].join(', ')})` : '';
-  return `${acquisition.status}${detail}`;
+  if (acquisition.requestedTarget?.kind === 'descriptor') {
+    return `${acquisition.requestedTarget.artist} — ${acquisition.requestedTarget.title}`;
+  }
+  if (acquisition.status === 'Pending' || acquisition.status === 'Empty') return 'Resolving…';
+  return 'Unknown release';
 }
 
 /** The offered editions, non-optionally, once the DTO is known to carry them. */
