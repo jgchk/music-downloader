@@ -115,7 +115,50 @@ export const candidateIdentitySchema = z.object({
 
 // Every entry carries `at`, the ISO-8601 occurrence time of the event it projects, so a consumer
 // can order this acquisition's history against another context's history in real time (additive).
+// The lifecycle kinds (requested/resolved/search-started and the terminal outcomes) are additive
+// members (legible-acquisition-history): an older consumer's tolerant reader ignores them.
 export const historyEntrySchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('requested'),
+    at: z.iso.datetime(),
+    // The request as the user gave it — the same shape the submit endpoint accepts.
+    request: acquisitionRequestSchema,
+  }),
+  z.object({
+    kind: z.literal('resolved'),
+    at: z.iso.datetime(),
+    artist: z.string(),
+    title: z.string(),
+    year: z.number().optional(),
+  }),
+  z.object({
+    kind: z.literal('search-started'),
+    at: z.iso.datetime(),
+    round: z.number(),
+  }),
+  z.object({
+    kind: z.literal('fulfilled'),
+    at: z.iso.datetime(),
+    location: z.string(),
+  }),
+  z.object({
+    kind: z.literal('exhausted'),
+    at: z.iso.datetime(),
+  }),
+  z.object({
+    // The delivery's destination directory was already occupied; nothing was overwritten.
+    kind: z.literal('conflicted'),
+    at: z.iso.datetime(),
+    location: z.string(),
+  }),
+  z.object({
+    kind: z.literal('metadata-failed'),
+    at: z.iso.datetime(),
+  }),
+  z.object({
+    kind: z.literal('cancelled'),
+    at: z.iso.datetime(),
+  }),
   z.object({
     kind: z.literal('selected'),
     at: z.iso.datetime(),
@@ -169,6 +212,9 @@ export const acquisitionStatusResponseSchema = z.object({
   status: acquisitionStatusSchema,
   // Present once metadata has resolved the request into an artist/title (absent while Pending).
   target: acquisitionTargetSchema.optional(),
+  // The request as the user gave it (additive echo): lets a consumer describe an acquisition whose
+  // metadata never resolved — where `target` stays absent — by what was asked for.
+  requestedTarget: acquisitionRequestSchema.optional(),
   // Present only while a candidate is in flight (Selecting through Importing); absent once terminal.
   currentCandidate: candidateIdentitySchema.optional(),
   attempts: z.number(),

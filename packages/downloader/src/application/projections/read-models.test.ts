@@ -75,12 +75,15 @@ describe('projectStatus', () => {
     // candidate that succeeded is recorded in the history's 'imported' entry below.
     expect(view.currentCandidate).toBeUndefined();
     expect(view.history.map((entry) => entry.kind)).toEqual([
+      'requested',
+      'resolved',
       'selected',
       'download-failed',
       'selected',
       'validation-failed',
       'selected',
       'imported',
+      'fulfilled',
     ]);
   });
 
@@ -102,6 +105,128 @@ describe('projectStatus', () => {
       '2026-01-01T00:00:00Z',
       '2026-01-01T00:00:01Z',
     ]);
+  });
+});
+
+describe('projectStatus — lifecycle history coverage', () => {
+  it('a fresh acquisition already has a requested entry carrying the request as given', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+      ]),
+    );
+    expect(view.history).toEqual([{ kind: 'requested', request: sampleRequest, at: 't' }]);
+  });
+
+  it('records resolution with the resolved artist, title, and year', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'TargetResolved', target: sampleTarget },
+      ]),
+    );
+    expect(view.history.at(-1)).toEqual({
+      kind: 'resolved',
+      artist: sampleTarget.artist,
+      title: sampleTarget.title,
+      year: sampleTarget.year,
+      at: 't',
+    });
+  });
+
+  it('records each search round', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'TargetResolved', target: sampleTarget },
+        { type: 'SearchRequested', round: 1 },
+        { type: 'SearchCompleted', round: 1, candidates: [] },
+        { type: 'SearchRequested', round: 2 },
+      ]),
+    );
+    expect(view.history.filter((entry) => entry.kind === 'search-started')).toEqual([
+      { kind: 'search-started', round: 1, at: 't' },
+      { kind: 'search-started', round: 2, at: 't' },
+    ]);
+  });
+
+  it('ends an exhausted story with its terminal entry', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'TargetResolved', target: sampleTarget },
+        { type: 'SearchRequested', round: 1 },
+        { type: 'SearchCompleted', round: 1, candidates: [] },
+        { type: 'AcquisitionExhausted' },
+      ]),
+    );
+    expect(view.history.at(-1)).toEqual({ kind: 'exhausted', at: 't' });
+  });
+
+  it('ends a failed resolution with a metadata-failed entry', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'MetadataResolutionFailed' },
+      ]),
+    );
+    expect(view.history.at(-1)).toEqual({ kind: 'metadata-failed', at: 't' });
+  });
+
+  it('ends a cancelled story with a cancelled entry', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'AcquisitionCancelled' },
+      ]),
+    );
+    expect(view.history.at(-1)).toEqual({ kind: 'cancelled', at: 't' });
+  });
+
+  it('ends a conflicted delivery with the conflicting location', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        ...importingHistory([a, b, c]),
+        { type: 'ImportConflicted', location: '/lib/occupied', files: [] },
+      ]),
+    );
+    expect(view.history.at(-1)).toEqual({ kind: 'conflicted', location: '/lib/occupied', at: 't' });
+  });
+
+  it('keeps noise events out of the history', () => {
+    const view = projectStatus('acq-1', stored(history));
+    const kinds = new Set(view.history.map((entry) => entry.kind));
+    expect(kinds.has('requested')).toBe(true);
+    for (const noisy of [
+      'SearchCompleted',
+      'CandidatesRanked',
+      'CandidateRejected',
+      'DownloadCompleted',
+      'ValidationPassed',
+    ]) {
+      expect(kinds.has(noisy)).toBe(false);
+    }
+  });
+});
+
+describe('projectStatus — requested target exposure', () => {
+  it('exposes the request as given even when resolution failed', () => {
+    const view = projectStatus(
+      'acq-1',
+      stored([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'MetadataResolutionFailed' },
+      ]),
+    );
+    expect(view.requestedTarget).toEqual(sampleRequest);
+    expect(view.target).toBeUndefined();
   });
 });
 

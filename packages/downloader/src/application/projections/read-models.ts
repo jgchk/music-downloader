@@ -3,6 +3,7 @@ import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionPhase } from '../../domain/acquisition/acquisition.js';
 import type {
   AcquisitionEvent,
+  AcquisitionRequest,
   DownloadFailureReason,
   EditionCandidate,
 } from '../../domain/acquisition/events.js';
@@ -25,6 +26,14 @@ import type { Logger } from '../logging/logger.js';
  * with the occurrence time of the event it projects (see {@link StatusHistoryEntry}).
  */
 type HistoryPayload =
+  | { readonly kind: 'requested'; readonly request: AcquisitionRequest }
+  | {
+      readonly kind: 'resolved';
+      readonly artist: string;
+      readonly title: string;
+      readonly year?: number;
+    }
+  | { readonly kind: 'search-started'; readonly round: number }
   | { readonly kind: 'selected'; readonly candidate: CandidateIdentity }
   | {
       readonly kind: 'download-failed';
@@ -43,7 +52,12 @@ type HistoryPayload =
       readonly kind: 'fulfillment-rejected';
       readonly candidate: CandidateIdentity;
       readonly reasons: readonly string[];
-    };
+    }
+  | { readonly kind: 'fulfilled'; readonly location: string }
+  | { readonly kind: 'exhausted' }
+  | { readonly kind: 'conflicted'; readonly location: string }
+  | { readonly kind: 'metadata-failed' }
+  | { readonly kind: 'cancelled' };
 
 /**
  * A history entry: its kind-specific payload plus `at`, the ISO-8601 occurrence time of the
@@ -57,6 +71,11 @@ export interface AcquisitionStatusView {
   readonly status: AcquisitionPhase;
   /** The human description of what is being acquired: resolved metadata, or the descriptor. */
   readonly target?: { readonly artist: string; readonly title: string };
+  /**
+   * The request as the user gave it, present from the first event on. Lets a consumer describe an
+   * acquisition whose metadata never resolved (where `target` stays absent) by what was asked for.
+   */
+  readonly requestedTarget?: AcquisitionRequest;
   readonly currentCandidate?: CandidateIdentity;
   readonly attempts: number;
   readonly rejectedCount: number;
@@ -83,9 +102,44 @@ export interface AcquisitionStatusView {
   readonly stalled?: boolean;
 }
 
-/** The kind-specific payload for the events that surface as history — others yield nothing. */
+/**
+ * The kind-specific payload for the events that surface as history — others yield nothing. The
+ * curation covers the whole lifecycle (request → resolution → search rounds → attempts → every
+ * terminal outcome) while deliberately keeping bookkeeping events out: a candidate rejection is
+ * implied by the failure entry that precedes it, and ranking/validation-success/download-completion
+ * are advancement mechanics, not milestones.
+ */
 function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
   switch (event.type) {
+    case 'AcquisitionRequested': {
+      return { kind: 'requested', request: event.request };
+    }
+    case 'TargetResolved': {
+      return {
+        kind: 'resolved',
+        artist: event.target.artist,
+        title: event.target.title,
+        year: event.target.year,
+      };
+    }
+    case 'SearchRequested': {
+      return { kind: 'search-started', round: event.round };
+    }
+    case 'AcquisitionFulfilled': {
+      return { kind: 'fulfilled', location: event.location };
+    }
+    case 'AcquisitionExhausted': {
+      return { kind: 'exhausted' };
+    }
+    case 'ImportConflicted': {
+      return { kind: 'conflicted', location: event.location };
+    }
+    case 'MetadataResolutionFailed': {
+      return { kind: 'metadata-failed' };
+    }
+    case 'AcquisitionCancelled': {
+      return { kind: 'cancelled' };
+    }
     case 'CandidateSelected': {
       return { kind: 'selected', candidate: event.candidate.identity };
     }
@@ -108,21 +162,13 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     // Every other event contributes no history entry. Enumerated exhaustively (no `default`) so a
     // newly-added event variant is a compile error here — forcing a decision on whether it surfaces
     // in the timeline — rather than silently defaulting to invisible.
-    case 'AcquisitionRequested':
-    case 'TargetResolved':
     case 'EditionSelected':
     case 'ManualSelectionRequested':
-    case 'MetadataResolutionFailed':
-    case 'SearchRequested':
     case 'SearchCompleted':
     case 'CandidatesRanked':
     case 'CandidateRejected':
     case 'DownloadCompleted':
-    case 'ValidationPassed':
-    case 'AcquisitionFulfilled':
-    case 'ImportConflicted':
-    case 'AcquisitionCancelled':
-    case 'AcquisitionExhausted': {
+    case 'ValidationPassed': {
       return undefined;
     }
   }
@@ -137,9 +183,13 @@ export function projectStatus(
   const snapshot = acquisition.snapshot;
   const history: StatusHistoryEntry[] = [];
   let target: { artist: string; title: string } | undefined;
+  let requestedTarget: AcquisitionRequest | undefined;
   for (const event of events) {
-    if (event.type === 'AcquisitionRequested' && event.request.kind === 'descriptor') {
-      target = { artist: event.request.artist, title: event.request.title };
+    if (event.type === 'AcquisitionRequested') {
+      requestedTarget = event.request;
+      if (event.request.kind === 'descriptor') {
+        target = { artist: event.request.artist, title: event.request.title };
+      }
     } else if (event.type === 'TargetResolved') {
       target = { artist: event.target.artist, title: event.target.title };
     }
@@ -152,6 +202,7 @@ export function projectStatus(
     acquisitionId,
     status: snapshot.phase,
     target,
+    requestedTarget,
     currentCandidate: snapshot.currentCandidate,
     attempts: snapshot.attempts,
     rejectedCount: snapshot.rejectedCount,

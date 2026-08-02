@@ -5,20 +5,20 @@ at every commit; `pnpm check` gates each commit. Facade work lands before web wo
 
 ## 1. Downloader facade: lifecycle history kinds (D1, D2)
 
-- [ ] 1.1 Extend the history projection (`application/projections/read-models.ts`) to emit
+- [x] 1.1 Extend the history projection (`application/projections/read-models.ts`) to emit
   `requested` (carrying the request target as given), `resolved` (artist/title/year),
   `search-started` (round), and terminal kinds `fulfilled` (location), `exhausted`, `conflicted`
   (location), `metadata-failed`, `cancelled` — tests first, including: fresh acquisition has a
   `requested` entry; each terminal story ends with its terminal entry; noise events
   (`CandidatesRanked`, `ValidationPassed`, `DownloadCompleted`, `CandidateRejected`) still
   surface nothing; entries carry `at` from the stored event.
-- [ ] 1.2 Add the new kinds to the facade schema (`facade/schemas.ts`) as additive
+- [x] 1.2 Add the new kinds to the facade schema (`facade/schemas.ts`) as additive
   discriminated-union members and map them (`facade/mapping.ts`); schema + mapping tests; confirm
   the additive-only compatibility posture (existing DTO fixtures still parse).
-- [ ] 1.3 Additively expose the requested target on the acquisition list read model + list DTO
+- [x] 1.3 Additively expose the requested target on the acquisition list read model + list DTO
   (for titling never-resolved acquisitions, D10); tests for a metadata-failed, never-resolved
   acquisition carrying its descriptor.
-- [ ] 1.4 Verify a pre-existing recorded stream (fixture from a real event sequence) folds into
+- [x] 1.4 Verify a pre-existing recorded stream (fixture from a real event sequence) folds into
   the full new history with no migration — regression test pinning retroactivity.
 
 ## 2. Web: copy system (D3, D4)

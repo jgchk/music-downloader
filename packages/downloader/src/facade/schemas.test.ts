@@ -83,6 +83,68 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(parsed.history[0]).toMatchObject({ at: '2026-01-01T00:00:00Z' });
   });
 
+  it('validates the additive lifecycle history kinds (legible-acquisition-history)', () => {
+    const at = '2026-01-01T00:00:00Z';
+    const parsed = acquisitionStatusResponseSchema.parse({
+      acquisitionId: 'acq-1',
+      status: 'Fulfilled',
+      attempts: 1,
+      rejectedCount: 0,
+      history: [
+        {
+          kind: 'requested',
+          at,
+          request: { kind: 'musicbrainz', mbid: 'rel-1', targetType: 'album' },
+        },
+        { kind: 'resolved', at, artist: 'Artist', title: 'Album', year: 1975 },
+        { kind: 'search-started', at, round: 1 },
+        { kind: 'fulfilled', at, location: '/lib/a' },
+        { kind: 'exhausted', at },
+        { kind: 'conflicted', at, location: '/lib/occupied' },
+        { kind: 'metadata-failed', at },
+        { kind: 'cancelled', at },
+      ],
+    });
+
+    expect(parsed.history.map((entry) => entry.kind)).toEqual([
+      'requested',
+      'resolved',
+      'search-started',
+      'fulfilled',
+      'exhausted',
+      'conflicted',
+      'metadata-failed',
+      'cancelled',
+    ]);
+  });
+
+  it('accepts a resolved entry without a year', () => {
+    const parsed = acquisitionStatusResponseSchema.parse({
+      acquisitionId: 'acq-1',
+      status: 'Searching',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [{ kind: 'resolved', at: '2026-01-01T00:00:00Z', artist: 'A', title: 'T' }],
+    });
+    expect(parsed.history[0]).toMatchObject({ kind: 'resolved', artist: 'A' });
+  });
+
+  it('accepts the additive requestedTarget echo and its absence', () => {
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'MetadataFailed',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    expect(acquisitionStatusResponseSchema.parse(base).requestedTarget).toBeUndefined();
+    const parsed = acquisitionStatusResponseSchema.parse({
+      ...base,
+      requestedTarget: { kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T' },
+    });
+    expect(parsed.requestedTarget).toMatchObject({ kind: 'descriptor', artist: 'A' });
+  });
+
   it('accepts the additive stalled flag and its absence (reactor-durability D2)', () => {
     const base = {
       acquisitionId: 'acq-1',

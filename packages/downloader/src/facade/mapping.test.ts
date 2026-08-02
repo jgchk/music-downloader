@@ -80,6 +80,7 @@ describe('statusViewToDto', () => {
   const candidate = asCandidateIdentity({ username: 'u1', path: 'p', sizeBytes: 100 });
 
   it('maps every history-entry kind and the current candidate', () => {
+    const request = { kind: 'descriptor' as const, targetType: 'album' as const, artist: 'A', title: 'T' };
     const view: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
@@ -88,11 +89,19 @@ describe('statusViewToDto', () => {
       rejectedCount: 1,
       location: '/lib/a',
       history: [
+        { kind: 'requested', at: 'r0', request },
+        { kind: 'resolved', at: 'r1', artist: 'A', title: 'T', year: 1975 },
+        { kind: 'search-started', at: 'r2', round: 1 },
         { kind: 'selected', at: 't0', candidate },
         { kind: 'download-failed', at: 't1', candidate, reason: 'Stalled' },
         { kind: 'validation-failed', at: 't2', candidate, reasons: ['Unplayable'] },
         { kind: 'imported', at: 't3', candidate, location: '/lib/a' },
         { kind: 'fulfillment-rejected', at: 't4', candidate, reasons: ['corrupt stub'] },
+        { kind: 'fulfilled', at: 'z0', location: '/lib/a' },
+        { kind: 'exhausted', at: 'z1' },
+        { kind: 'conflicted', at: 'z2', location: '/lib/occupied' },
+        { kind: 'metadata-failed', at: 'z3' },
+        { kind: 'cancelled', at: 'z4' },
       ],
       cancellable: true,
       awaitingSelection: false,
@@ -102,13 +111,53 @@ describe('statusViewToDto', () => {
 
     expect(dto.currentCandidate).toEqual(candidate);
     expect(dto.history.map((entry) => entry.kind)).toEqual([
+      'requested',
+      'resolved',
+      'search-started',
       'selected',
       'download-failed',
       'validation-failed',
       'imported',
       'fulfillment-rejected',
+      'fulfilled',
+      'exhausted',
+      'conflicted',
+      'metadata-failed',
+      'cancelled',
     ]);
-    expect(dto.history.map((entry) => entry.at)).toEqual(['t0', 't1', 't2', 't3', 't4']);
+    expect(dto.history.map((entry) => entry.at)).toEqual([
+      'r0',
+      'r1',
+      'r2',
+      't0',
+      't1',
+      't2',
+      't3',
+      't4',
+      'z0',
+      'z1',
+      'z2',
+      'z3',
+      'z4',
+    ]);
+    expect(dto.history[0]).toEqual({ kind: 'requested', at: 'r0', request });
+    expect(dto.history[1]).toEqual({ kind: 'resolved', at: 'r1', artist: 'A', title: 'T', year: 1975 });
+    expect(dto.history[10]).toEqual({ kind: 'conflicted', at: 'z2', location: '/lib/occupied' });
+  });
+
+  it('echoes the requested target onto the wire when present', () => {
+    const request = { kind: 'descriptor' as const, targetType: 'album' as const, artist: 'A', title: 'T' };
+    const view: AcquisitionStatusView = {
+      acquisitionId: 'acq-1',
+      status: 'MetadataFailed',
+      requestedTarget: request,
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+      cancellable: false,
+      awaitingSelection: false,
+    };
+    expect(statusViewToDto(view).requestedTarget).toEqual(request);
   });
 
   it('omits an absent current candidate', () => {
