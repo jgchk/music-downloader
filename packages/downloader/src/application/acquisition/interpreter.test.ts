@@ -6,7 +6,6 @@ import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import { infraError } from '../ports/errors.js';
 import { createMatchPolicy, DEFAULT_DOWNLOAD_POLICY } from '../../domain/policy/policies.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
-import type { DownloadProgress } from '../ports/outbound-ports.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import {
   awaitingSelectionHistory,
@@ -21,6 +20,7 @@ import {
   sampleRequest,
   sampleTarget,
   selectedHistory,
+  startedHistory,
   validatingHistory,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 
@@ -28,7 +28,7 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
   return {
     metadata: { resolve: vi.fn() },
     search: { search: vi.fn() },
-    download: { download: vi.fn(), abort: vi.fn() },
+    download: { start: vi.fn(), abort: vi.fn() },
     probe: { probe: vi.fn() },
     library: { import: vi.fn(), discardStaging: vi.fn() },
     ...overrides,
@@ -36,10 +36,9 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
 }
 
 let store: FakeEventStore;
-const onProgress = vi.fn();
 
 function dependencies(ports: EffectPorts): InterpreterDependencies {
-  return { store, clock: fixedClock(), ports, onProgress };
+  return { store, clock: fixedClock(), ports };
 }
 
 async function seed(history: readonly AcquisitionEvent[]): Promise<void> {
@@ -52,7 +51,6 @@ function appendedTypes(): string[] {
 
 beforeEach(() => {
   store = new FakeEventStore();
-  onProgress.mockClear();
 });
 
 describe('interpretEffect — metadata resolution', () => {
@@ -163,32 +161,42 @@ describe('interpretEffect — search', () => {
 });
 
 describe('interpretEffect — download', () => {
-  it('reports progress and records a completed download', async () => {
-    await seed(selectedHistory([matchingCandidate('a')]));
+  it('starts the watch and records the downloading fact once the source accepts', async () => {
+    const candidate = matchingCandidate('a');
+    await seed(selectedHistory([candidate]));
+    const start = vi.fn(() => okAsync({ kind: 'started' as const }));
+    const ports = stubPorts({ download: { start, abort: vi.fn() } });
+    await interpretEffect(dependencies(ports), 'acq-1', {
+      type: 'Download',
+      candidate,
+      policy: DEFAULT_DOWNLOAD_POLICY,
+    });
+    expect(start).toHaveBeenCalledWith('acq-1', candidate, DEFAULT_DOWNLOAD_POLICY);
+    expect(appendedTypes()).toContain('DownloadStarted');
+    // The start returns promptly — no outcome is recorded here; that arrives asynchronously.
+    expect(appendedTypes()).not.toContain('DownloadCompleted');
+  });
+
+  it('absorbs a redelivered start report without appending twice (ensure-start)', async () => {
+    const candidate = matchingCandidate('a');
+    await seed(startedHistory([candidate]));
     const ports = stubPorts({
-      download: {
-        download: vi.fn((_a, _c, _p, callback: (progress: DownloadProgress) => void) => {
-          callback({ percent: 50, bytesTransferred: 5, bytesTotal: 10 });
-          return okAsync({ kind: 'completed' as const, files: sampleFiles });
-        }),
-        abort: vi.fn(),
-      },
+      download: { start: vi.fn(() => okAsync({ kind: 'started' as const })), abort: vi.fn() },
     });
     await interpretEffect(dependencies(ports), 'acq-1', {
       type: 'Download',
-      candidate: matchingCandidate('a'),
+      candidate,
       policy: DEFAULT_DOWNLOAD_POLICY,
     });
-    expect(appendedTypes()).toContain('DownloadCompleted');
-    expect(onProgress).toHaveBeenCalledOnce();
+    expect(appendedTypes().filter((type) => type === 'DownloadStarted')).toHaveLength(1);
   });
 
-  it('records a failed download', async () => {
+  it('records a source-refused enqueue as a failed download for the retry ladder', async () => {
     await seed(selectedHistory([matchingCandidate('a')]));
     const ports = stubPorts({
       download: {
-        download: vi.fn(() =>
-          okAsync({ kind: 'failed' as const, reason: 'PeerUnavailable' as const }),
+        start: vi.fn(() =>
+          okAsync({ kind: 'rejected' as const, reason: 'PeerUnavailable' as const }),
         ),
         abort: vi.fn(),
       },
@@ -205,7 +213,7 @@ describe('interpretEffect — download', () => {
     const candidate = matchingCandidate('a');
     await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
     const abort = vi.fn(() => okAsync([]));
-    const ports = stubPorts({ download: { download: vi.fn(), abort } });
+    const ports = stubPorts({ download: { start: vi.fn(), abort } });
 
     await interpretEffect(dependencies(ports), 'acq-1', { type: 'AbortDownload', candidate });
 
@@ -214,33 +222,13 @@ describe('interpretEffect — download', () => {
     expect(appendedTypes()).toContain('CandidateRejected');
   });
 
-  it('threads a failed download’s partial files into the rejection for cleanup', async () => {
-    await seed(selectedHistory([matchingCandidate('a')]));
-    const ports = stubPorts({
-      download: {
-        download: vi.fn(() =>
-          okAsync({ kind: 'failed' as const, reason: 'Stalled' as const, files: sampleFiles }),
-        ),
-        abort: vi.fn(),
-      },
-    });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Download',
-      candidate: matchingCandidate('a'),
-      policy: DEFAULT_DOWNLOAD_POLICY,
-    });
-    const rejected = store.all().find((entry) => entry.type === 'CandidateRejected')?.event as
-      Extract<AcquisitionEvent, { type: 'CandidateRejected' }> | undefined;
-    expect(rejected?.files).toEqual(sampleFiles);
-  });
-
   it('cleans an aborted candidate’s already-completed files reported by the abort', async () => {
     const candidate = matchingCandidate('a');
     await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
     const abort = vi.fn(() => okAsync(sampleFiles));
     const discardStaging = vi.fn(() => okAsync(undefined));
     const ports = stubPorts({
-      download: { download: vi.fn(), abort },
+      download: { start: vi.fn(), abort },
       library: { import: vi.fn(), discardStaging },
     });
 
@@ -256,7 +244,7 @@ describe('interpretEffect — download', () => {
     await seed([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
     const ports = stubPorts({
       download: {
-        download: vi.fn(),
+        start: vi.fn(),
         abort: vi.fn(() => errAsync(infraError('slskd.abort', 'boom'))),
       },
     });

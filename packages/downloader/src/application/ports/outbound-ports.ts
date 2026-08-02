@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { Candidate } from '../../domain/candidate/candidate.js';
+import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { Target } from '../../domain/target/target.js';
 import type { ProbedAudio } from '../../domain/validation/validators.js';
@@ -65,13 +65,49 @@ export type DownloadResult =
       readonly files?: readonly DownloadedFile[];
     };
 
+/** Start's synchronous answer: the source accepted the enqueue, or refused THIS candidate. */
+export type DownloadStart =
+  | { readonly kind: 'started' }
+  | { readonly kind: 'rejected'; readonly reason: DownloadFailureReason };
+
+/**
+ * The application-owned face the download supervisor reports through
+ * (nonblocking-download-observation D1/D2): live progress ticks, the single candidate-level
+ * outcome fact once the watch settles, and the watch's end (so ephemeral progress is retired).
+ * Implemented by the application, injected into the adapter at composition — the inbound half of
+ * the download conversation, mirroring how another context's verdicts are consumed.
+ */
+export interface DownloadObserverPort {
+  progress(acquisitionId: string, candidate: CandidateIdentity, progress: DownloadProgress): void;
+  /**
+   * Deliver the settled outcome. An `Err` means the delivery could not land (infrastructure);
+   * the supervisor retries on its cadence. Domain-level staleness is the consumer's to absorb —
+   * it resolves `Ok` for an outcome it recorded-and-skipped.
+   */
+  outcome(
+    acquisitionId: string,
+    candidate: Candidate,
+    result: DownloadResult,
+  ): ResultAsync<void, InfraError>;
+  /** The watch ended — settled, or aborted. Live progress for the acquisition is retired. */
+  finished(acquisitionId: string): void;
+}
+
 export interface DownloadPort {
-  download(
+  /**
+   * Ensure the candidate is enqueued at the source and being watched
+   * (nonblocking-download-observation D1): reconcile/re-attach against the ownership ledger,
+   * enqueue when the source holds nothing, register the watch, and return promptly. Idempotent —
+   * starting an already-watched candidate is a no-op answer of `started`, which is what lets the
+   * reactor re-dispatch it level-triggered (live redelivery and startup re-drive alike). The
+   * outcome arrives later through the {@link DownloadObserverPort}; only an enqueue the source
+   * itself refused is answered synchronously as `rejected`.
+   */
+  start(
     acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
-    onProgress: (progress: DownloadProgress) => void,
-  ): ResultAsync<DownloadResult, InfraError>;
+  ): ResultAsync<DownloadStart, InfraError>;
 
   /**
    * Cancel a candidate's in-flight transfers at the source and remove their records, so a cancelled

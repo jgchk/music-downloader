@@ -29,6 +29,8 @@ import type {
   EffectPorts,
   InterpreterDependencies,
 } from '../application/acquisition/interpreter.js';
+import { deliverDownloadOutcome } from '../application/acquisition/download-outcome-consumer.js';
+import type { DownloadObserverPort } from '../application/ports/outbound-ports.js';
 import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
 import type { Clock, IdGenerator } from '../application/ports/system-ports.js';
@@ -72,7 +74,12 @@ export interface DownloaderRuntimeConfig {
 }
 
 export interface DownloaderRuntimeOverrides {
-  readonly ports?: EffectPorts;
+  /**
+   * Test seam for the effect ports. A factory: fakes receive the runtime's download observer so a
+   * fake download port can deliver asynchronous outcomes through the real consumer wiring, the
+   * way the slskd supervisor does (nonblocking-download-observation D2).
+   */
+  readonly ports?: (observer: DownloadObserverPort) => EffectPorts;
   readonly clock?: Clock;
   readonly ids?: IdGenerator;
   /** Test seam: swap the dead-letter store (e.g. to prove boot survives its faults). */
@@ -155,7 +162,20 @@ export async function createDownloaderRuntime(
     baseUrl: config.slskd.baseUrl,
     apiKey: config.slskd.apiKey,
   });
-  const ports: EffectPorts = overrides.ports ?? {
+  // The download observer: the supervisor's asynchronous reports re-entering the core — progress
+  // into the ephemeral read model, outcomes through the download-outcome consumer (the appended
+  // events publish on the bus, waking the reactor), and watch-end retiring live progress.
+  const downloadObserver: DownloadObserverPort = {
+    progress: (acquisitionId, _candidate, progress) => {
+      progressModel.update(acquisitionId, progress);
+    },
+    outcome: (acquisitionId, candidate, result) =>
+      deliverDownloadOutcome({ store, clock, logger }, acquisitionId, candidate, result),
+    finished: (acquisitionId) => {
+      progressModel.clear(acquisitionId);
+    },
+  };
+  const ports: EffectPorts = overrides.ports?.(downloadObserver) ?? {
     metadata: new MusicBrainzMetadata(logger, fetchHttpClient, {
       baseUrl: config.musicbrainz.baseUrl,
       userAgent: config.musicbrainz.userAgent,
@@ -165,6 +185,7 @@ export async function createDownloaderRuntime(
       logger,
       ledger,
       { stagingRoot: config.stagingRoot },
+      downloadObserver,
       slskdClient,
       realTimer,
     ),
@@ -182,14 +203,7 @@ export async function createDownloaderRuntime(
     logger,
   }).run();
 
-  const interpreter: InterpreterDependencies = {
-    store,
-    clock,
-    ports,
-    onProgress: (acquisitionId, _candidate, progress) => {
-      progressModel.update(acquisitionId, progress);
-    },
-  };
+  const interpreter: InterpreterDependencies = { store, clock, ports };
   const reactor = new Reactor({
     store,
     checkpoints,

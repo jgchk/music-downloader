@@ -1,11 +1,17 @@
 import path from 'node:path';
 import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-identity.js';
 import { describe, expect, it } from 'vitest';
+import { errAsync, okAsync } from 'neverthrow';
 import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
-import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
+import { infraError } from '../../application/ports/errors.js';
+import type {
+  DownloadObserverPort,
+  DownloadProgress,
+  DownloadResult,
+} from '../../application/ports/outbound-ports.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { SlskdClient } from './client.js';
 import { SlskdDownload } from './download.js';
@@ -85,6 +91,33 @@ function fakeTimer(): Timer {
   };
 }
 
+/**
+ * A timer whose sleeps park until the test ticks them — for watches that must stay in flight
+ * while the test body acts (an abort, a second start). The instant {@link fakeTimer} would let
+ * a never-settling watch monopolize the microtask queue instead of yielding to the test.
+ */
+function manualTimer(): { timer: Timer; tick: () => Promise<void> } {
+  let current = 0;
+  const waiters: (() => void)[] = [];
+  return {
+    timer: {
+      now: () => current,
+      sleep: (ms) =>
+        new Promise<void>((resolve) => {
+          waiters.push(() => {
+            current += ms;
+            resolve();
+          });
+        }),
+    },
+    tick: async () => {
+      waiters.shift()?.();
+      // Yield a few microtask turns so the woken watch can run to its next await.
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    },
+  };
+}
+
 const bothSucceeded = poll([
   transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
   transfer('02.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
@@ -95,20 +128,33 @@ const bothCompleted = eventsPage([
   { id: '02.flac', local: localOf('02.flac') },
 ]);
 
+const emptyEvents = eventsPage([]);
+
 interface Options {
   enqueue?: HttpResponse;
   enqueueThrows?: boolean; // transport-level failure: slskd itself unreachable
   polls: HttpResponse[];
   events?: HttpResponse[];
-  options?: HttpResponse;
+  options?: HttpResponse[];
   deleteStatus?: number; // status returned for record-removal DELETEs (default 204)
+  deliverFailures?: number; // the first N outcome deliveries fail with an InfraError
+  timer?: Timer;
+}
+
+interface Delivered {
+  readonly acquisitionId: string;
+  readonly candidate: Candidate;
+  readonly result: DownloadResult;
 }
 
 interface Harness {
   adapter: SlskdDownload;
   deletes: string[];
   ledger: FakeResourceLedger;
-  counts: { options: number; events: number; posts: number };
+  counts: { options: number; events: number; posts: number; deliveries: number };
+  outcomes: Delivered[];
+  progress: DownloadProgress[];
+  finished: string[];
 }
 
 function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
@@ -118,11 +164,16 @@ function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
 function downloader(options: Options): Harness {
   const deletes: string[] = [];
   const ledger = new FakeResourceLedger();
-  const counts = { options: 0, events: 0, posts: 0 };
+  const counts = { options: 0, events: 0, posts: 0, deliveries: 0 };
+  const outcomes: Delivered[] = [];
+  const progress: DownloadProgress[] = [];
+  const finished: string[] = [];
   const polls = [...options.polls];
   // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
   // its staged files without every test having to spell out the events stub.
   const events = [...(options.events ?? [bothCompleted])];
+  const optionsQueue = [...(options.options ?? [optionsResponse()])];
+  let deliverFailures = options.deliverFailures ?? 0;
   const http: HttpClient = {
     send: ({ method, url }) => {
       if (method === 'POST') {
@@ -136,29 +187,58 @@ function downloader(options: Options): Harness {
       }
       if (url.includes('/api/v0/options')) {
         counts.options += 1;
-        return Promise.resolve(options.options ?? optionsResponse());
+        return Promise.resolve(drain(optionsQueue, optionsResponse()));
       }
       if (url.includes('/api/v0/events')) {
         counts.events += 1;
-        return Promise.resolve(drain(events, eventsPage([])));
+        return Promise.resolve(drain(events, emptyEvents));
       }
       return Promise.resolve(drain(polls, { status: 200, body: '{"directories":[]}' }));
+    },
+  };
+  const observer: DownloadObserverPort = {
+    progress: (_acquisitionId, _candidate, snapshot) => {
+      progress.push(snapshot);
+    },
+    outcome: (acquisitionId, delivered, result) => {
+      counts.deliveries += 1;
+      if (deliverFailures > 0) {
+        deliverFailures -= 1;
+        return errAsync(infraError('outcome.deliver', 'store busy'));
+      }
+      outcomes.push({ acquisitionId, candidate: delivered, result });
+      return okAsync(undefined);
+    },
+    finished: (acquisitionId) => {
+      finished.push(acquisitionId);
     },
   };
   const adapter = new SlskdDownload(
     silentLogger(),
     ledger,
     { stagingRoot: STAGING, pollIntervalMs: 100 },
+    observer,
     new SlskdClient(http),
-    fakeTimer(),
+    options.timer ?? fakeTimer(),
   );
-  return { adapter, deletes, ledger, counts };
+  return { adapter, deletes, ledger, counts, outcomes, progress, finished };
+}
+
+/** Start the candidate and drive the watch to its delivered outcome (the common happy shape). */
+async function run(
+  harness: Harness,
+  downloadPolicy: DownloadPolicy = policy(1000, 1000),
+): Promise<DownloadResult> {
+  const started = await harness.adapter.start(ACQ, candidate, downloadPolicy);
+  expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+  await harness.adapter.settled();
+  expect(harness.outcomes).toHaveLength(1);
+  return harness.outcomes[0]!.result;
 }
 
 describe('SlskdDownload', () => {
   it('reports a completed multi-file candidate at the slskd-reported on-disk location', async () => {
-    const progress: DownloadProgress[] = [];
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
@@ -169,23 +249,22 @@ describe('SlskdDownload', () => {
       events: [bothCompleted],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), (p) => {
-      progress.push(p);
-    });
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'completed',
       files: [
         { name: '01.flac', path: stagedPath('01.flac') },
         { name: '02.flac', path: stagedPath('02.flac') },
       ],
     });
-    expect(progress.at(-1)?.percent).toBe(100);
+    expect(harness.progress.at(-1)?.percent).toBe(100);
+    expect(harness.finished).toEqual([ACQ]); // the watch retired its live progress
   });
 
   it('keeps the clean candidate name while pointing at slskd’s renamed on-disk file', async () => {
     // slskd sanitized/de-duplicated 01.flac to 01_123456.flac; the event carries the real name.
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [bothSucceeded],
       events: [
         eventsPage([
@@ -195,9 +274,9 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'completed',
       files: [
         { name: '01.flac', path: stagedPath('01_123456.flac') },
@@ -207,7 +286,7 @@ describe('SlskdDownload', () => {
   });
 
   it('pages older events until every completed transfer id resolves', async () => {
-    const { adapter, counts } = downloader({
+    const harness = downloader({
       polls: [bothSucceeded],
       events: [
         eventsPage([{ id: '01.flac', local: localOf('01.flac') }]), // offset 0 — only one of ours
@@ -215,61 +294,66 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
-    expect(counts.events).toBe(2);
+    expect(result.kind).toBe('completed');
+    expect(harness.counts.events).toBe(2);
   });
 
   it('re-polls the events log when a completion event lags the transfer-state flip', async () => {
-    const { adapter, counts } = downloader({
+    const harness = downloader({
       polls: [bothSucceeded],
-      events: [eventsPage([]), bothCompleted], // empty on first poll, complete on the next
+      events: [emptyEvents, bothCompleted], // empty on first poll, complete on the next
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
-    expect(counts.events).toBe(2);
+    expect(result.kind).toBe('completed');
+    expect(harness.counts.events).toBe(2);
   });
 
-  it('gives up as an InfraError when the events log never reports the completion', async () => {
-    const { adapter } = downloader({ polls: [bothSucceeded], events: [eventsPage([])] });
-
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
-
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      kind: 'InfraError',
-      operation: 'slskd.download',
+  it('keeps retrying the settle when the events log lags past the resolver’s budget', async () => {
+    // Attempt 1 exhausts the resolver's five bounded re-polls on empty pages and throws; the
+    // watch logs, sleeps, and retries the settle — attempt 2 then finds the completions. The
+    // watch is self-healing: a lagging log delays the outcome, it never loses it.
+    const harness = downloader({
+      polls: [bothSucceeded],
+      events: [emptyEvents, emptyEvents, emptyEvents, emptyEvents, emptyEvents, bothCompleted],
     });
+
+    const result = await run(harness);
+
+    expect(result.kind).toBe('completed');
+    expect(harness.counts.events).toBe(6);
   });
 
   it('reads the downloads root once and caches it across downloads', async () => {
-    const { adapter, counts } = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+    const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
 
-    await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
-    await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    await run(harness);
+    const again = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    expect(again._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await harness.adapter.settled();
 
-    expect(counts.options).toBe(1);
+    expect(harness.counts.options).toBe(1);
+    expect(harness.outcomes).toHaveLength(2);
   });
 
-  it('surfaces a contract-violating options body as an InfraError', async () => {
-    const { adapter } = downloader({
+  it('retries the settle when the options body violates the contract, then heals', async () => {
+    const harness = downloader({
       polls: [bothSucceeded],
       events: [bothCompleted],
-      options: { status: 200, body: JSON.stringify({ directories: {} }) },
+      options: [{ status: 200, body: JSON.stringify({ directories: {} }) }, optionsResponse()],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      kind: 'InfraError',
-      operation: 'slskd.download',
-    });
+    expect(result.kind).toBe('completed');
+    expect(harness.counts.options).toBe(2); // the bad body was not cached
   });
 
   it('fails the whole candidate when a file does not transfer', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
@@ -278,10 +362,10 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
     // 01 completed before the doom, so its staged path is surfaced for cleanup (default events stub).
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'failed',
       reason: 'TransferError',
       files: [{ name: '01.flac', path: stagedPath('01.flac') }],
@@ -289,7 +373,7 @@ describe('SlskdDownload', () => {
   });
 
   it('normalizes an offline peer to a peer-unavailable outcome', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Errored', exception: 'User is offline' }),
@@ -298,10 +382,10 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
     // Neither file completed, so there is nothing staged to clean up.
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'failed',
       reason: 'PeerUnavailable',
       files: [],
@@ -319,23 +403,23 @@ describe('SlskdDownload', () => {
       { id: 'foreign', filename: String.raw`@@a\Other\9.flac`, state: 'InProgress' }, // another candidate
       { id: 'nameless', state: 'InProgress' }, // a transfer with no filename
     ]);
-    const { adapter, deletes, ledger } = downloader({
+    const harness = downloader({
       // Two identical in-flight polls advance the clock to the stall; the teardown then re-polls a
       // cancelled-terminal set, and a final empty poll confirms the records are gone.
       polls: [inFlight, inFlight, cancelled, poll([])],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(50, 100_000), () => {});
+    const result = await run(harness, policy(50, 100_000));
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
+    expect(result).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
     // Each transfer is cancelled (remove=false), then removed once terminal (remove=true).
-    expect(deletes).toEqual([
+    expect(harness.deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
-    expect(ledger.removed).toHaveLength(2); // both confirmed gone
+    expect(harness.ledger.removed).toHaveLength(2); // both confirmed gone
   });
 
   describe('reconcile-before-enqueue (reactor-durability D3)', () => {
@@ -364,10 +448,23 @@ describe('SlskdDownload', () => {
       const harness = downloader({ polls: [inFlight, bothSucceeded], events: [bothCompleted] });
       seedLedgeredTransfers(harness.ledger);
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+      const result = await run(harness);
 
-      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(result.kind).toBe('completed');
       expect(harness.counts.posts).toBe(0); // never enqueued again — polling resumed
+    });
+
+    it('re-emits the outcome straight away when the source already settled the transfers', async () => {
+      // The boot re-derivation shape (level-triggered): the process died between the transfers
+      // settling and the outcome being recorded. Starting again re-attaches to the settled
+      // records and delivers the outcome on the first tick — no second download.
+      const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+      seedLedgeredTransfers(harness.ledger);
+
+      const result = await run(harness);
+
+      expect(result.kind).toBe('completed');
+      expect(harness.counts.posts).toBe(0);
     });
 
     it('re-enqueues when the source retains only a subset of the ledgered transfers', async () => {
@@ -379,9 +476,9 @@ describe('SlskdDownload', () => {
       const harness = downloader({ polls: [onlyFirst, bothSucceeded], events: [bothCompleted] });
       seedLedgeredTransfers(harness.ledger);
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+      const result = await run(harness);
 
-      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(result.kind).toBe('completed');
       expect(harness.counts.posts).toBe(1);
     });
 
@@ -389,9 +486,9 @@ describe('SlskdDownload', () => {
       const harness = downloader({ polls: [poll([]), bothSucceeded], events: [bothCompleted] });
       seedLedgeredTransfers(harness.ledger);
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+      const result = await run(harness);
 
-      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(result.kind).toBe('completed');
       expect(harness.counts.posts).toBe(1);
     });
 
@@ -403,18 +500,18 @@ describe('SlskdDownload', () => {
       const harness = downloader({ polls: [queued, queued, queued, poll([])] });
       seedLedgeredTransfers(harness.ledger);
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(100_000, 50), () => {});
+      const result = await run(harness, policy(100_000, 50));
 
-      expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
+      expect(result).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
       expect(harness.counts.posts).toBe(0);
     });
 
     it('a fresh download consults no listing before its enqueue (no prior ledger rows)', async () => {
       const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+      const result = await run(harness);
 
-      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(result.kind).toBe('completed');
       expect(harness.counts.posts).toBe(1);
     });
 
@@ -423,9 +520,9 @@ describe('SlskdDownload', () => {
       seedLedgeredTransfers(harness.ledger);
       harness.ledger.fail = true;
 
-      const result = await harness.adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+      const result = await run(harness);
 
-      expect(result._unsafeUnwrap().kind).toBe('completed');
+      expect(result.kind).toBe('completed');
       expect(harness.counts.posts).toBe(1);
     });
   });
@@ -435,26 +532,25 @@ describe('SlskdDownload', () => {
       transfer('01.flac', { state: 'Queued, Remotely', size: 100, placeInQueue: 4 }),
       { filename: String.raw`@@a\Album\02.flac`, state: 'Queued, Remotely', size: 100 }, // no id
     ]);
-    const { adapter, deletes, ledger } = downloader({
+    const harness = downloader({
       // Two identical queued polls advance the clock past the queue wait; the teardown then finds
       // the cancelled transfers already gone on its re-poll.
       polls: [queued, queued, poll([])],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 50), () => {});
+    const result = await run(harness, policy(100_000, 50));
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
+    expect(result).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
     // Both queued (non-terminal) transfers are cancelled; the re-poll then finds them gone.
-    expect(deletes).toEqual([
+    expect(harness.deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=false',
     ]);
-    expect(ledger.removed).toHaveLength(2);
+    expect(harness.ledger.removed).toHaveLength(2);
   });
 
   it('surfaces live progress while transferring and completes on the next poll', async () => {
-    const progress: DownloadProgress[] = [];
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', {
@@ -470,16 +566,15 @@ describe('SlskdDownload', () => {
       events: [bothCompleted],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 100_000), (p) => {
-      progress.push(p);
-    });
+    const result = await run(harness, policy(100_000, 100_000));
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
-    expect(progress[0]).toMatchObject({ percent: 25, queuePosition: 3 });
-    expect(progress.at(-1)?.percent).toBe(100);
+    expect(result.kind).toBe('completed');
+    expect(harness.progress[0]).toMatchObject({ percent: 25, queuePosition: 3 });
+    expect(harness.progress.at(-1)?.percent).toBe(100);
   });
 
   it('falls back to the default poll interval when unconfigured', async () => {
+    const outcomes: DownloadResult[] = [];
     const http: HttpClient = {
       send: ({ method, url }) => {
         if (method === 'POST') return Promise.resolve({ status: 200, body: '' });
@@ -492,16 +587,26 @@ describe('SlskdDownload', () => {
       silentLogger(),
       new FakeResourceLedger(),
       { stagingRoot: STAGING },
+      {
+        progress: () => {},
+        outcome: (_acquisitionId, _candidate, result) => {
+          outcomes.push(result);
+          return okAsync(undefined);
+        },
+        finished: () => {},
+      },
       new SlskdClient(http),
     );
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await adapter.start(ACQ, candidate, policy(1000, 1000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await adapter.settled();
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(outcomes[0]?.kind).toBe('completed');
   });
 
-  it('fails the candidate when a live slskd rejects the enqueue for an unreachable peer', async () => {
-    const { adapter, ledger } = downloader({
+  it('rejects the candidate when a live slskd refuses the enqueue for an unreachable peer', async () => {
+    const harness = downloader({
       enqueue: {
         status: 400,
         body: 'Failed to establish a direct or indirect message connection to user',
@@ -509,109 +614,173 @@ describe('SlskdDownload', () => {
       polls: [],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
     // slskd answered with a 4xx, so the infrastructure is up: the candidate failed, and the retry
     // ladder advances to the next peer instead of retrying this one forever (prod 2026-07-22).
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'PeerUnavailable' });
+    // The rejection is start's own synchronous answer — no watch, no outcome delivery.
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'PeerUnavailable' });
+    await harness.adapter.settled();
+    expect(harness.outcomes).toEqual([]);
     // the write-ahead rows are released: nothing was created at the source
-    expect(ledger.removed).toHaveLength(candidate.files.length);
+    expect(harness.ledger.removed).toHaveLength(candidate.files.length);
   });
 
-  it('fails the candidate as a generic transfer error for other enqueue rejections', async () => {
-    const { adapter } = downloader({ enqueue: { status: 400, body: 'boom' }, polls: [] });
+  it('rejects the candidate as a generic transfer error for other enqueue refusals', async () => {
+    const harness = downloader({ enqueue: { status: 400, body: 'boom' }, polls: [] });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError' });
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
   });
 
   it('surfaces a 5xx enqueue response as a retryable InfraError, not a candidate defeat', async () => {
     // A 503 is slskd itself faulting/overloaded — transient infrastructure. Marking it a candidate
     // failure would manufacture AcquisitionExhausted from a passing slskd hiccup; the reactor must
-    // hold and retry instead.
-    const { adapter } = downloader({
+    // hold and retry the short start effect instead.
+    const harness = downloader({
       enqueue: { status: 503, body: 'Service Unavailable' },
       polls: [],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
+    expect(started._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'slskd.download',
     });
   });
 
   it('surfaces a 429 enqueue response as a retryable InfraError', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       enqueue: { status: 429, body: 'Too Many Requests' },
       polls: [],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
+    expect(started._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'slskd.download',
     });
   });
 
   it('surfaces a transport fault during enqueue as an InfraError (slskd itself unreachable)', async () => {
-    const { adapter } = downloader({ enqueueThrows: true, polls: [] });
+    const harness = downloader({ enqueueThrows: true, polls: [] });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
+    expect(started._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'slskd.download',
     });
   });
 
   it('treats a 404 mid-download poll as vanished transfers and stalls out, not an infra fault', async () => {
-    const { adapter } = downloader({ polls: [{ status: 404, body: '' }] });
+    const harness = downloader({ polls: [{ status: 404, body: '' }] });
 
-    const result = await adapter.download(ACQ, candidate, policy(200, 1000), () => {});
+    const result = await run(harness, policy(200, 1000));
 
-    expect(result._unsafeUnwrap()).toMatchObject({ kind: 'failed', reason: 'Stalled' });
+    expect(result).toMatchObject({ kind: 'failed', reason: 'Stalled' });
   });
 
-  it('surfaces a contract-violating poll body as an InfraError', async () => {
-    const { adapter } = downloader({
-      polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
+  it('retries a contract-violating poll body on the next tick instead of dying (self-healing)', async () => {
+    const harness = downloader({
+      polls: [
+        { status: 200, body: JSON.stringify({ directories: 'not-an-array' }) },
+        bothSucceeded,
+      ],
+      events: [bothCompleted],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      kind: 'InfraError',
-      operation: 'slskd.download',
+    expect(result.kind).toBe('completed');
+  });
+
+  it('starting an already-watched candidate is an idempotent no-op (level-triggered ensure)', async () => {
+    const control = manualTimer();
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+    ]);
+    const harness = downloader({
+      polls: [inFlight, bothSucceeded, poll([])], // the final empty poll confirms the teardown
+      events: [bothCompleted],
+      timer: control.timer,
     });
+
+    const first = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
+    // The ensure re-dispatch (a DownloadStarted reaction, or a redelivery): no second enqueue,
+    // no second watch — the live watch is the answer.
+    const second = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    expect(second._unsafeUnwrap()).toEqual({ kind: 'started' });
+    expect(harness.counts.posts).toBe(1);
+
+    // Wake the parked watch and keep ticking through the settle's own waits until it delivers.
+    while (harness.outcomes.length === 0) await control.tick();
+    await harness.adapter.settled();
+    expect(harness.outcomes).toHaveLength(1);
+  });
+
+  it('stops retrying delivery once the candidate is aborted (the abort owns the settlement)', async () => {
+    const control = manualTimer();
+    const harness = downloader({
+      polls: [bothSucceeded, poll([])],
+      deliverFailures: 99, // delivery never lands; only the abort can end the watch
+      timer: control.timer,
+    });
+
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    while (harness.counts.deliveries === 0) await control.tick(); // first delivery attempt failed
+
+    const aborted = await harness.adapter.abort(ACQ, candidate);
+    expect(aborted._unsafeUnwrap()).toEqual([]);
+
+    while (harness.finished.length === 0) await control.tick(); // the parked retry wakes and exits
+    await harness.adapter.settled();
+    expect(harness.outcomes).toEqual([]); // no outcome was ever delivered for the aborted watch
+  });
+
+  it('retries a failed outcome delivery on the watch cadence until it lands, exactly once', async () => {
+    const harness = downloader({
+      polls: [bothSucceeded],
+      events: [bothCompleted],
+      deliverFailures: 1,
+    });
+
+    const result = await run(harness);
+
+    expect(result.kind).toBe('completed');
+    expect(harness.counts.deliveries).toBe(2); // one failed attempt, one landed — never a duplicate
+    expect(harness.outcomes).toHaveLength(1);
   });
 
   it('records transfers write-ahead, captures their ids, and removes records on completion', async () => {
-    const { adapter, deletes, ledger } = downloader({
+    const harness = downloader({
       polls: [bothSucceeded],
       events: [bothCompleted],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
-    expect(ledger.created.map((r) => r.resourceKey)).toEqual([
+    expect(result.kind).toBe('completed');
+    expect(harness.ledger.created.map((r) => r.resourceKey)).toEqual([
       String.raw`u1|@@a\Album\01.flac`,
       String.raw`u1|@@a\Album\02.flac`,
     ]);
-    expect(ledger.ids.map((entry) => entry.id)).toEqual(['01.flac', '02.flac']);
-    expect(deletes).toEqual([
+    expect(harness.ledger.ids.map((entry) => entry.id)).toEqual(['01.flac', '02.flac']);
+    expect(harness.deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
-    expect(ledger.removed).toHaveLength(2);
+    expect(harness.ledger.removed).toHaveLength(2);
   });
 
   it('dooms the candidate and cancels the remainder the moment one file fails', async () => {
-    const { adapter, deletes, ledger } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Errored', size: 100, bytesTransferred: 0 }),
@@ -624,17 +793,17 @@ describe('SlskdDownload', () => {
     });
 
     // Generous policy timeouts: the failure — not a stall — is what ends the download.
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 100_000), () => {});
+    const result = await run(harness, policy(100_000, 100_000));
 
     // Neither file succeeded, so there is no partial subset to clean.
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
+    expect(result).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
     // The failed file (terminal) is removed at once; the in-flight one is cancelled then removed.
-    expect(deletes).toEqual([
+    expect(harness.deletes).toEqual([
       'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=true',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
-    expect(ledger.removed).toHaveLength(2);
+    expect(harness.ledger.removed).toHaveLength(2);
   });
 
   it('leaves a row live when a cancelled transfer never turns removable', async () => {
@@ -643,19 +812,19 @@ describe('SlskdDownload', () => {
       transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
       transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
     ]);
-    const { adapter, deletes, ledger } = downloader({ polls: [inFlight] });
+    const harness = downloader({ polls: [inFlight] });
 
-    const result = await adapter.download(ACQ, candidate, policy(50, 100_000), () => {});
+    const result = await run(harness, policy(50, 100_000));
 
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
+    expect(result).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
     // Cancelled each round but never confirmed terminal, so no row is marked removed — the startup
     // sweep converges them next boot. Only cancels (remove=false) are ever issued.
-    expect(deletes.every((url) => url.endsWith('?remove=false'))).toBe(true);
-    expect(ledger.removed).toHaveLength(0);
+    expect(harness.deletes.every((url) => url.endsWith('?remove=false'))).toBe(true);
+    expect(harness.ledger.removed).toHaveLength(0);
   });
 
   it('reports the completed subset when a candidate is doomed mid-download', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
@@ -666,10 +835,10 @@ describe('SlskdDownload', () => {
       events: [eventsPage([{ id: '01.flac', local: localOf('01.flac') }])],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 100_000), () => {});
+    const result = await run(harness, policy(100_000, 100_000));
 
     // The already-staged file is surfaced for cleanup; the reported reason is the original failure.
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'failed',
       reason: 'TransferError',
       files: [{ name: '01.flac', path: stagedPath('01.flac') }],
@@ -677,7 +846,7 @@ describe('SlskdDownload', () => {
   });
 
   it('still fails without files when the completed subset cannot be resolved (best-effort)', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           transfer('01.flac', { state: 'Completed, Succeeded', size: 100, bytesTransferred: 100 }),
@@ -685,13 +854,13 @@ describe('SlskdDownload', () => {
         ]),
         poll([]),
       ],
-      events: [eventsPage([])], // the events log never reports the completed file's location
+      events: [emptyEvents], // the events log never reports the completed file's location
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 100_000), () => {});
+    const result = await run(harness, policy(100_000, 100_000));
 
     // Resolution failing does not turn the doomed failure into an infra fault — just no files.
-    expect(result._unsafeUnwrap()).toEqual({
+    expect(result).toEqual({
       kind: 'failed',
       reason: 'TransferError',
       files: [],
@@ -699,7 +868,7 @@ describe('SlskdDownload', () => {
   });
 
   it('skips a completed file whose transfer id was never captured', async () => {
-    const { adapter } = downloader({
+    const harness = downloader({
       polls: [
         poll([
           { filename: String.raw`@@a\Album\01.flac`, state: 'Completed, Succeeded' }, // succeeded, but no id
@@ -709,35 +878,35 @@ describe('SlskdDownload', () => {
       ],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(100_000, 100_000), () => {});
+    const result = await run(harness, policy(100_000, 100_000));
 
     // Without an id the staged path cannot be resolved, so it is left out rather than mis-reported.
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
+    expect(result).toEqual({ kind: 'failed', reason: 'TransferError', files: [] });
   });
 
   it('still completes when removing a settled record fails, leaving the rows for the sweep', async () => {
-    const { adapter, ledger } = downloader({
+    const harness = downloader({
       deleteStatus: 500, // the cancel+remove DELETE errors, but the download already succeeded
       polls: [bothSucceeded],
       events: [bothCompleted],
     });
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
+    expect(result.kind).toBe('completed');
     // The records were never confirmed gone, so the rows stay live for the startup sweep to retire —
     // never falsely marked removed while a record lingers at the source (the bug this change fixes).
-    expect(ledger.removed).toHaveLength(0);
+    expect(harness.ledger.removed).toHaveLength(0);
   });
 
   it('completes even when ledger bookkeeping fails, leaving the ledger untouched', async () => {
-    const { adapter, ledger } = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
-    ledger.fail = true;
+    const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+    harness.ledger.fail = true;
 
-    const result = await adapter.download(ACQ, candidate, policy(1000, 1000), () => {});
+    const result = await run(harness);
 
-    expect(result._unsafeUnwrap().kind).toBe('completed');
-    expect(ledger.created).toEqual([]);
+    expect(result.kind).toBe('completed');
+    expect(harness.ledger.created).toEqual([]);
   });
 
   it('drives an abandoned candidate’s in-flight transfers to fully removed at the source', async () => {
@@ -786,17 +955,28 @@ describe('SlskdDownload', () => {
       },
     };
     const ledger = new FakeResourceLedger();
+    const outcomes: DownloadResult[] = [];
     const adapter = new SlskdDownload(
       silentLogger(),
       ledger,
       { stagingRoot: STAGING, pollIntervalMs: 1 },
+      {
+        progress: () => {},
+        outcome: (_acquisitionId, _candidate, result) => {
+          outcomes.push(result);
+          return okAsync(undefined);
+        },
+        finished: () => {},
+      },
       new SlskdClient(http),
       fakeTimer(),
     );
 
-    const result = await adapter.download(ACQ, candidate, policy(1, 100_000), () => {});
+    const started = await adapter.start(ACQ, candidate, policy(1, 100_000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await adapter.settled();
 
-    expect(result._unsafeUnwrap()).toMatchObject({ kind: 'failed', reason: 'Stalled' });
+    expect(outcomes[0]).toMatchObject({ kind: 'failed', reason: 'Stalled' });
     // The source double is queried for residual records after teardown — none linger.
     expect(store.size).toBe(0);
     expect(ledger.removed).toHaveLength(2);
@@ -804,7 +984,7 @@ describe('SlskdDownload', () => {
 
   describe('abort', () => {
     it('cancels the candidate’s transfers, tolerating missing ids, then confirms them gone', async () => {
-      const { adapter, deletes, ledger } = downloader({
+      const harness = downloader({
         polls: [
           poll([
             transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
@@ -816,19 +996,19 @@ describe('SlskdDownload', () => {
         ],
       });
 
-      const result = await adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate);
 
       expect(result._unsafeUnwrap()).toEqual([]); // nothing had completed into staging
       // In-flight transfers are cancelled (remove=false); the re-poll then finds them gone.
-      expect(deletes).toEqual([
+      expect(harness.deletes).toEqual([
         'http://localhost:5030/api/v0/transfers/downloads/u1/01.flac?remove=false',
         'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=false',
       ]);
-      expect(ledger.removed).toHaveLength(2);
+      expect(harness.ledger.removed).toHaveLength(2);
     });
 
     it('reports the subset already completed into staging so it can be cleaned', async () => {
-      const { adapter, ledger } = downloader({
+      const harness = downloader({
         polls: [
           poll([
             transfer('01.flac', { state: 'Completed, Succeeded' }), // already staged
@@ -839,44 +1019,70 @@ describe('SlskdDownload', () => {
         events: [eventsPage([{ id: '01.flac', local: localOf('01.flac') }])],
       });
 
-      const result = await adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate);
 
       // The completed file's source-reported staged path is returned for the domain to discard.
       expect(result._unsafeUnwrap()).toEqual([{ name: '01.flac', path: stagedPath('01.flac') }]);
-      expect(ledger.removed).toHaveLength(2);
+      expect(harness.ledger.removed).toHaveLength(2);
     });
 
     it('treats a 404 transfer listing as already-gone: nothing to abort, success (prod 2026-07-22)', async () => {
       // slskd 404s the downloads collection for a user with no transfers; for an abort that IS
       // the desired end state — converge instead of wedging the reactor on a retryable fault.
-      const { adapter, deletes } = downloader({ polls: [{ status: 404, body: '' }] });
+      const harness = downloader({ polls: [{ status: 404, body: '' }] });
 
-      const result = await adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate);
 
       expect(result._unsafeUnwrap()).toEqual([]);
-      expect(deletes).toEqual([]);
+      expect(harness.deletes).toEqual([]);
     });
 
     it('is a no-op when the candidate has no transfers left', async () => {
-      const { adapter, deletes } = downloader({ polls: [poll([])] });
+      const harness = downloader({ polls: [poll([])] });
 
-      const result = await adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate);
 
       expect(result._unsafeUnwrap()).toEqual([]);
-      expect(deletes).toEqual([]);
+      expect(harness.deletes).toEqual([]);
     });
 
     it('surfaces a contract-violating poll body as an InfraError', async () => {
-      const { adapter } = downloader({
+      const harness = downloader({
         polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
       });
 
-      const result = await adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate);
 
       expect(result._unsafeUnwrapErr()).toMatchObject({
         kind: 'InfraError',
         operation: 'slskd.abort',
       });
+    });
+
+    it('ends an in-flight watch promptly: no outcome is emitted for an aborted candidate', async () => {
+      const control = manualTimer();
+      const inFlight = poll([
+        transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+        transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      ]);
+      const harness = downloader({
+        // The watch's first tick sees the in-flight pair and parks on its sleep; the abort's own
+        // listing then finds the transfers already gone (nothing to cancel, no teardown waits).
+        polls: [inFlight, poll([])],
+        timer: control.timer,
+      });
+
+      const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+      expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+
+      const aborted = await harness.adapter.abort(ACQ, candidate);
+      expect(aborted._unsafeUnwrap()).toEqual([]);
+
+      await control.tick(); // wake the parked watch — it sees the abort and exits
+      await harness.adapter.settled();
+
+      expect(harness.outcomes).toEqual([]); // the abort path owns the settlement, not the watch
+      expect(harness.finished).toEqual([ACQ]); // live progress is still retired
     });
   });
 });

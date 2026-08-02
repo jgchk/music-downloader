@@ -422,6 +422,13 @@ describe('ProgressReadModel', () => {
     expect(model.get('acq-1')?.percent).toBe(42);
     expect(model.get('unknown')).toBeUndefined();
   });
+
+  it('retires progress when the watch ends — a settled or aborted download reports none', () => {
+    const model = new ProgressReadModel();
+    model.update('acq-1', { percent: 42, bytesTransferred: 42, bytesTotal: 100 });
+    model.clear('acq-1');
+    expect(model.get('acq-1')).toBeUndefined();
+  });
 });
 
 describe('LibraryViewProjection', () => {

@@ -15,7 +15,12 @@ import type {
 import { Reactor } from '../application/acquisition/reactor.js';
 import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import { fixedClock, sequentialIds, silentLogger } from '../application/__fixtures__/fakes.js';
-import type { DownloadResult, ImportResult } from '../application/ports/outbound-ports.js';
+import { deliverDownloadOutcome } from '../application/acquisition/download-outcome-consumer.js';
+import type {
+  DownloadProgress,
+  DownloadResult,
+  ImportResult,
+} from '../application/ports/outbound-ports.js';
 import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
@@ -97,28 +102,53 @@ function wire(options: E2EOptions) {
     libraryView.apply(stored);
   });
 
+  // The supervisor shape (nonblocking-download-observation): start answers promptly and the
+  // outcome re-enters asynchronously through the real download-outcome consumer, waking the
+  // reactor via the store's bus publication — the composed loop under test is the shipped one.
+  const downloadObserver = {
+    progress: (id: string, _candidate: unknown, progress: DownloadProgress) =>
+      progressModel.update(id, progress),
+    outcome: (id: string, candidate: Candidate, result: DownloadResult) =>
+      deliverDownloadOutcome(
+        { store, clock: fixedClock(), logger: silentLogger() },
+        id,
+        candidate,
+        result,
+      ),
+    finished: (id: string) => progressModel.clear(id),
+  };
   const ports: EffectPorts = {
     metadata: { resolve: () => okAsync({ kind: 'resolved', target: sampleTarget }) },
     search: { search: (_acquisitionId, _target, round) => okAsync(options.searchByRound(round)) },
     download: {
-      download: (_acquisitionId, candidate, _policy, onProgress) => {
+      start: (acquisitionId, candidate, _policy) => {
         const result = options.downloadByUser[candidate.identity.username] ?? FAILED;
-        if (result.kind === 'completed') {
-          onProgress({ percent: 100, bytesTransferred: 1, bytesTotal: 1 });
-        }
-        return okAsync(result);
+        // Deliver like the real watch: at-least-once, retrying until the consumer lands it (a
+        // concurrency conflict with the reactor's own follow-on append is expected and benign).
+        const deliver = async (): Promise<void> => {
+          if (result.kind === 'completed') {
+            downloadObserver.progress(acquisitionId, candidate.identity, {
+              percent: 100,
+              bytesTransferred: 1,
+              bytesTotal: 1,
+            });
+          }
+          for (;;) {
+            const delivered = await downloadObserver.outcome(acquisitionId, candidate, result);
+            if (delivered.isOk()) break;
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          }
+          downloadObserver.finished(acquisitionId);
+        };
+        queueMicrotask(() => void deliver());
+        return okAsync({ kind: 'started' });
       },
       abort: () => okAsync([]),
     },
     probe: { probe: (path) => okAsync(PROBES[path]!) },
     library: { import: () => okAsync(options.importResult), discardStaging },
   };
-  const interpreter: InterpreterDependencies = {
-    store,
-    clock: fixedClock(),
-    ports,
-    onProgress: (id, _candidate, progress) => progressModel.update(id, progress),
-  };
+  const interpreter: InterpreterDependencies = { store, clock: fixedClock(), ports };
   const reactor = new Reactor({
     store,
     checkpoints,
@@ -210,8 +240,10 @@ describe('acquisition E2E', () => {
     const status = facade.getAcquisition({ id });
     expect(status.ok && status.value.location).toBe(IMPORTED.location);
 
+    // The watch settled and retired its live progress: a fulfilled acquisition reports none
+    // (progress is an ephemeral read model for in-flight downloads only).
     const progress = facade.getAcquisitionProgress({ id });
-    expect(progress.ok && progress.value.percent).toBe(100);
+    expect(progress.ok).toBe(false);
     expect(w.libraryView.list()).toHaveLength(1);
   });
 

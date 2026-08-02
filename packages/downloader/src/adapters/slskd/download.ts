@@ -1,13 +1,15 @@
 import { ResultAsync } from 'neverthrow';
 import type { Candidate } from '../../domain/candidate/candidate.js';
+import { candidateKey } from '../../domain/candidate/candidate.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadFailureReason, DownloadedFile } from '../../domain/acquisition/events.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
+  DownloadObserverPort,
   DownloadPort,
-  DownloadProgress,
   DownloadResult,
+  DownloadStart,
 } from '../../application/ports/outbound-ports.js';
 import type {
   ResourceLedgerStore,
@@ -27,11 +29,21 @@ import { aggregate, enqueueRejectionReason } from './transfers.js';
 import type { OwnedTransfer } from './transfers.js';
 
 /**
- * The slskd `DownloadPort` adapter (D10). It enqueues a candidate's files, polls slskd for progress
- * (surfaced live via `onProgress`, never as events — D1), and aggregates the per-file transfers into
- * a single candidate-level outcome. It owns the *detection* of stalls and hopeless queues against the
- * policy's thresholds (the policy stays source-agnostic), and dooms the whole candidate the moment
- * any file fails rather than downloading the rest of a release it will reject.
+ * The slskd `DownloadPort` adapter — the download supervisor (nonblocking-download-observation
+ * D1). `start` reconciles/re-attaches against the ownership ledger, enqueues when the source
+ * holds nothing, registers an in-memory watch, and returns promptly; the watch then observes the
+ * transfers on its own cadence — never inside a reactor dispatch — and reports one candidate-level
+ * outcome through the {@link DownloadObserverPort} when it settles. Progress is surfaced live via
+ * the observer (never as events — D1). The supervisor owns the *detection* of stalls and hopeless
+ * queues against the caller-supplied policy (the policy stays source-agnostic), and dooms the
+ * whole candidate the moment any file fails rather than downloading the rest of a release it will
+ * reject.
+ *
+ * The watch is deliberately storeless and level-triggered: slskd plus the ownership ledger hold
+ * the durable transfer truth, so a watch lost with the process is rebuilt by re-dispatching
+ * `start` (the reactor's startup re-drive), which re-attaches to live transfers — or finds them
+ * settled and re-emits the outcome immediately. Tick errors (a lagging events log, a malformed
+ * poll body) are logged and retried on the next tick — self-healing, never a lost download.
  *
  * The orthogonal concerns are collaborators, composed here from the adapter's own dependencies:
  * completed files are reported at the actual on-disk location slskd wrote them by the
@@ -54,17 +66,25 @@ export interface SlskdDownloadConfig extends SlskdConfig {
   readonly stagingRoot: string;
 }
 
+/** One live watch: its abort latch and the running loop's completion promise. */
+interface Watch {
+  aborted: boolean;
+  done: Promise<void>;
+}
+
 export class SlskdDownload implements DownloadPort {
   private readonly client: SlskdClient;
   private readonly pollIntervalMs: number;
   private readonly transferLedger: TransferLedger;
   private readonly teardown: TransferTeardown;
   private readonly staged: StagedFileResolver;
+  private readonly watches = new Map<string, Watch>();
 
   constructor(
     private readonly logger: Logger,
     ledger: ResourceLedgerStore,
     config: SlskdDownloadConfig,
+    private readonly observer: DownloadObserverPort,
     client: SlskdClient = new SlskdClient(),
     private readonly timer: Timer = realTimer,
   ) {
@@ -81,24 +101,31 @@ export class SlskdDownload implements DownloadPort {
     );
   }
 
-  download(
+  start(
     acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
-    onProgress: (progress: DownloadProgress) => void,
-  ): ResultAsync<DownloadResult, InfraError> {
-    return ResultAsync.fromPromise(
-      this.doDownload(acquisitionId, candidate, policy, onProgress),
-      (cause) => infraError('slskd.download', String(cause), cause),
+  ): ResultAsync<DownloadStart, InfraError> {
+    return ResultAsync.fromPromise(this.doStart(acquisitionId, candidate, policy), (cause) =>
+      infraError('slskd.download', String(cause), cause),
     );
   }
 
-  private async doDownload(
+  /** Every watch has run to completion — the test seam and the graceful-shutdown drain. */
+  async settled(): Promise<void> {
+    while (this.watches.size > 0) {
+      await Promise.all(this.watches.values().map((watch) => watch.done));
+    }
+  }
+
+  private async doStart(
     acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
-    onProgress: (progress: DownloadProgress) => void,
-  ): Promise<DownloadResult> {
+  ): Promise<DownloadStart> {
+    const key = this.watchKey(acquisitionId, candidate);
+    if (this.watches.has(key)) return { kind: 'started' }; // level-triggered ensure: already live
+
     const { username } = candidate.identity;
     const requests = candidate.files.map((file) => ({
       filename: remoteFilename(candidate.identity.path, file.name),
@@ -110,8 +137,8 @@ export class SlskdDownload implements DownloadPort {
     );
 
     // Reconcile before enqueue (reactor-durability D3): live ledgered rows are evidence of a
-    // prior attempt whose poller died with the process. If the source still holds those
-    // transfers, re-attach — resume polling with fresh stall/queue budgets — rather than
+    // prior attempt whose watch died with the process. If the source still holds those
+    // transfers, re-attach — resume watching with fresh stall/queue budgets — rather than
     // download the candidate a second time; if the source lost them, fall through and re-enqueue.
     const prior = await this.transferLedger.liveTransferFilenames(acquisitionId, username, wanted);
     await this.transferLedger.recordCreated(ownedKeys);
@@ -122,9 +149,9 @@ export class SlskdDownload implements DownloadPort {
       if (enqueue.status >= 500 || [429, 401, 403].includes(enqueue.status)) {
         // A 5xx/429/401/403 is slskd itself faulting, throttling, or refusing auth — transient or
         // operational infrastructure, not this candidate's defeat. Throw so `ResultAsync.fromPromise`
-        // maps it to a retryable InfraError (the reactor holds and retries), matching every other
-        // GET/POST path in this adapter. Marking it a candidate failure would manufacture
-        // AcquisitionExhausted from a transient slskd overload.
+        // maps it to a retryable InfraError (the reactor parks and retries the short start effect),
+        // matching every other GET/POST path in this adapter. Marking it a candidate failure would
+        // manufacture AcquisitionExhausted from a transient slskd overload.
         throw new Error(`slskd responded ${enqueue.status} for POST ${downloadsPath(username)}`);
       }
       if (enqueue.status < 200 || enqueue.status >= 300) {
@@ -139,53 +166,117 @@ export class SlskdDownload implements DownloadPort {
           'slskd rejected the enqueue; failing the candidate',
         );
         await this.transferLedger.release(ownedKeys);
-        return { kind: 'failed', reason };
+        return { kind: 'rejected', reason };
       }
     }
 
+    const watch: Watch = { aborted: false, done: Promise.resolve() };
+    watch.done = this.runWatch(watch, key, acquisitionId, candidate, policy, wanted, ownedKeys);
+    this.watches.set(key, watch);
+    return { kind: 'started' };
+  }
+
+  /**
+   * The watch loop — the observation the reactor used to block on, now on the supervisor's own
+   * cadence. Each tick samples the source, surfaces progress, judges the caller's stall/queue
+   * budgets, and either settles (delivering the single outcome fact) or sleeps. A tick that
+   * throws is logged and retried next tick; an aborted watch exits without an outcome — the
+   * abort path owns that settlement.
+   */
+  private async runWatch(
+    watch: Watch,
+    key: string,
+    acquisitionId: string,
+    candidate: Candidate,
+    policy: DownloadPolicy,
+    wanted: ReadonlySet<string>,
+    ownedKeys: readonly SourceResourceKey[],
+  ): Promise<void> {
+    const { username } = candidate.identity;
     const start = this.timer.now();
     let lastBytes = 0;
     let lastProgressAt = start;
     const captured = new Set<string>();
+    try {
+      for (;;) {
+        if (watch.aborted) return;
+        let result: DownloadResult | undefined;
+        try {
+          const mine = await pollOwnedTransfers(this.client, username, wanted);
+          await this.transferLedger.captureIds(acquisitionId, username, mine, captured);
+          const status = aggregate(mine);
+          this.observer.progress(acquisitionId, candidate.identity, status.progress);
+
+          if (status.succeeded) {
+            this.logger.debug({ username }, 'slskd download completed');
+            const files = await this.staged.stagedFiles(mine, candidate);
+            await this.removeOwned(username, mine, ownedKeys);
+            result = { kind: 'completed', files };
+          } else if (status.hasFailure) {
+            // One failed file dooms the candidate: cancel the rest (confirming their records are
+            // gone) and report the original failure, not the cancellation it triggers. Files that
+            // succeeded before the doom are reported so their staging is cleaned (design D2).
+            this.logger.warn({ username, reason: status.failureReason }, 'slskd download failed');
+            const files = await this.staged.completedStagedFiles(mine, candidate);
+            await this.removeOwned(username, mine, ownedKeys);
+            result = { kind: 'failed', reason: status.failureReason, files };
+          } else {
+            const now = this.timer.now();
+            if (status.progress.bytesTransferred > lastBytes) {
+              lastBytes = status.progress.bytesTransferred;
+              lastProgressAt = now;
+            }
+            if (status.allQueued && now - start >= policy.maxQueueWaitMs) {
+              result = await this.abandon(username, mine, ownedKeys, 'QueueTimeout', candidate);
+            } else if (!status.allQueued && now - lastProgressAt >= policy.stallTimeoutMs) {
+              result = await this.abandon(username, mine, ownedKeys, 'Stalled', candidate);
+            }
+          }
+        } catch (error) {
+          // Self-healing (level-triggered): a failed observation delays the outcome, it never
+          // loses it — the next tick re-samples current state and re-attempts any settle.
+          this.logger.warn(
+            { acquisitionId, username, err: error },
+            'download watch tick failed; retrying on the next tick',
+          );
+        }
+        if (result !== undefined) {
+          await this.deliver(watch, acquisitionId, candidate, result);
+          return;
+        }
+        await this.timer.sleep(this.pollIntervalMs);
+      }
+    } finally {
+      this.watches.delete(key);
+      this.observer.finished(acquisitionId);
+    }
+  }
+
+  /** Deliver the settled outcome, retrying on the watch cadence until it lands — exactly once. */
+  private async deliver(
+    watch: Watch,
+    acquisitionId: string,
+    candidate: Candidate,
+    result: DownloadResult,
+  ): Promise<void> {
     for (;;) {
-      const mine = await pollOwnedTransfers(this.client, username, wanted);
-      await this.transferLedger.captureIds(acquisitionId, username, mine, captured);
-      const status = aggregate(mine);
-      onProgress(status.progress);
-
-      if (status.succeeded) {
-        this.logger.debug({ username }, 'slskd download completed');
-        const files = await this.staged.stagedFiles(mine, candidate);
-        await this.removeOwned(username, mine, ownedKeys);
-        return { kind: 'completed', files };
-      }
-      if (status.hasFailure) {
-        // One failed file dooms the candidate: cancel the rest (confirming their records are gone)
-        // and report the original failure, not the cancellation it triggers. Files that succeeded
-        // before the doom are reported so their staging is cleaned (design D2).
-        this.logger.warn({ username, reason: status.failureReason }, 'slskd download failed');
-        const files = await this.staged.completedStagedFiles(mine, candidate);
-        await this.removeOwned(username, mine, ownedKeys);
-        return { kind: 'failed', reason: status.failureReason, files };
-      }
-
-      const now = this.timer.now();
-      if (status.progress.bytesTransferred > lastBytes) {
-        lastBytes = status.progress.bytesTransferred;
-        lastProgressAt = now;
-      }
-      if (status.allQueued && now - start >= policy.maxQueueWaitMs) {
-        return this.abandon(username, mine, ownedKeys, 'QueueTimeout', candidate);
-      }
-      if (!status.allQueued && now - lastProgressAt >= policy.stallTimeoutMs) {
-        return this.abandon(username, mine, ownedKeys, 'Stalled', candidate);
-      }
+      if (watch.aborted) return;
+      const delivered = await this.observer.outcome(acquisitionId, candidate, result);
+      if (delivered.isOk()) return;
+      this.logger.warn(
+        { acquisitionId, err: delivered.error },
+        'download outcome delivery failed; retrying',
+      );
       await this.timer.sleep(this.pollIntervalMs);
     }
   }
 
+  private watchKey(acquisitionId: string, candidate: Candidate): string {
+    return `${acquisitionId}|${candidateKey(candidate.identity)}`;
+  }
+
   /**
-   * True only when the source still lists EVERY wanted transfer — polling resumes on them. A
+   * True only when the source still lists EVERY wanted transfer — the watch resumes on them. A
    * partial survival must re-enqueue: resuming over a subset would settle `aggregate` on the
    * present files alone and surface an under-delivered candidate as a completed one.
    */
@@ -205,13 +296,17 @@ export class SlskdDownload implements DownloadPort {
 
   /**
    * Cancel the acquisition's in-flight transfers at the source and remove their records (D:
-   * cancellation). Called when a downloading acquisition is cancelled; idempotent, so a transfer
-   * already settled or absent is tolerated and a redelivered abort is safe.
+   * cancellation). Ends the candidate's watch first — promptly, without waiting for the transfer
+   * to settle on its own — so no outcome is emitted for a candidate the caller abandoned; the
+   * abort's own settlement (fed back by the interpreter) owns the staging cleanup. Idempotent, so
+   * a transfer already settled or absent is tolerated and a redelivered abort is safe.
    */
   abort(
     acquisitionId: string,
     candidate: Candidate,
   ): ResultAsync<readonly DownloadedFile[], InfraError> {
+    const watch = this.watches.get(this.watchKey(acquisitionId, candidate));
+    if (watch !== undefined) watch.aborted = true;
     return ResultAsync.fromPromise(this.doAbort(acquisitionId, candidate), (cause) =>
       infraError('slskd.abort', String(cause), cause),
     );

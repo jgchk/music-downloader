@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { okAsync } from 'neverthrow';
 import { FakeResourceLedger, silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { SlskdClient } from '../../src/adapters/slskd/client.js';
 import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
+import type { DownloadResult } from '../../src/application/ports/outbound-ports.js';
 import { baseName } from '../../src/adapters/slskd/mapping.js';
 import {
   slskdDownloadFileCompleteSchema,
@@ -104,17 +106,27 @@ describe('slskd contract (tier 1)', () => {
     // maxQueueWaitMs 0 bounds the poll loop: were the recorded transfer ever not yet settled,
     // the adapter abandons on the first poll rather than looping the test.
     const policy: DownloadPolicy = { stallTimeoutMs: 100_000, maxQueueWaitMs: 0 };
+    const outcomes: DownloadResult[] = [];
     const download = new SlskdDownload(
       silentLogger(),
       new FakeResourceLedger(),
       { stagingRoot: '/tmp/contract-staging' },
+      {
+        progress: () => undefined,
+        outcome: (_acquisitionId, _candidate, delivered) => {
+          outcomes.push(delivered);
+          return okAsync(undefined);
+        },
+        finished: () => undefined,
+      },
       client(),
       fakeTimer(),
     );
 
-    const result = (
-      await download.download('acq-contract', candidate, policy, () => undefined)
-    )._unsafeUnwrap();
+    const started = (await download.start('acq-contract', candidate, policy))._unsafeUnwrap();
+    expect(started).toEqual({ kind: 'started' });
+    await download.settled();
+    const result = outcomes[0]!;
 
     const downloadsPath = `/api/v0/transfers/downloads/${body.username}`;
     const enqueue = server.requests.find((r) => r.method === 'POST' && r.path === downloadsPath)!;
