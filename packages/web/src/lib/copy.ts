@@ -1,5 +1,5 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
-import { formatBytes, isTerminal, statusTone } from './acquisitions.js';
+import { formatBytes, isTerminal, isTransferStarted, statusTone } from './acquisitions.js';
 import { RESOLUTION_ACTIONS } from './resolution-actions.js';
 import type { BadgePhase } from './phase-label.js';
 import type {
@@ -493,6 +493,18 @@ export function pendingRowFor(
       }
       case 'Downloading': {
         const from = acquisition.currentCandidate?.username;
+        if (!isTransferStarted(acquisition)) {
+          // Selected, but the source has not yet accepted the enqueue: there is nothing to
+          // measure, so say "preparing" instead of claiming a download with a blank bar.
+          return {
+            text:
+              from === undefined
+                ? 'Preparing the transfer\u{2026}'
+                : `Preparing the transfer from ${from}\u{2026}`,
+            state: 'pending',
+            showProgress: false,
+          };
+        }
         return {
           text: from === undefined ? 'Downloading\u{2026}' : `Downloading from ${from}\u{2026}`,
           state: 'pending',

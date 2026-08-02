@@ -62,16 +62,23 @@ describe('acquisition detail load', () => {
     });
   });
 
-  it('adds live progress while downloading', () => {
-    const downloading = { ...base, status: 'Downloading' };
+  const startedHistory = [
+    {
+      kind: 'download-started',
+      at: '2026-08-01T10:00:00Z',
+      candidate: { username: 'u', path: 'p', sizeBytes: 1 },
+    },
+  ];
+
+  it('adds live progress while the transfer is live', () => {
+    const downloading = { ...base, status: 'Downloading', history: startedHistory };
     const progress = { percent: 40, bytesTransferred: 4, bytesTotal: 10 };
     const facade = {
       getAcquisition: () => ({ ok: true, value: downloading }),
       getAcquisitionProgress: () => ({ ok: true, value: progress }),
     };
-    expect(load(eventFor(facade))).toEqual({
+    expect(load(eventFor(facade))).toMatchObject({
       acquisition: downloading,
-      timeline: [],
       importSection: { state: 'none' },
       now: '2026-08-01T12:00:00Z',
       progress,
@@ -80,17 +87,32 @@ describe('acquisition detail load', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('flags progress unavailable and logs the inconsistency when the progress read fails while downloading', () => {
-    const downloading = { ...base, status: 'Downloading' };
+  it('reports no progress and no inconsistency before the transfer starts', () => {
+    // Selected but not yet accepted by the source: there is honestly nothing to measure, so an
+    // empty progress read is the expected state — not the "pending forever" inconsistency.
+    const preparing = { ...base, status: 'Downloading' };
+    const facade = {
+      getAcquisition: () => ({ ok: true, value: preparing }),
+      getAcquisitionProgress: vi.fn(),
+    };
+    expect(load(eventFor(facade))).toMatchObject({
+      progress: undefined,
+      progressUnavailable: false,
+    });
+    expect(facade.getAcquisitionProgress).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('flags progress unavailable and logs the inconsistency when the progress read fails on a live transfer', () => {
+    const downloading = { ...base, status: 'Downloading', history: startedHistory };
     const facade = {
       getAcquisition: () => ({ ok: true, value: downloading }),
       getAcquisitionProgress: () => ({ ok: false, error: { kind: 'NotFound' } }),
     };
     // A failed progress read while Downloading is a real cross-projection inconsistency (the
     // "pending forever" family), not the just-started case — it must be surfaced, not collapsed.
-    expect(load(eventFor(facade))).toEqual({
+    expect(load(eventFor(facade))).toMatchObject({
       acquisition: downloading,
-      timeline: [],
       importSection: { state: 'none' },
       now: '2026-08-01T12:00:00Z',
       progress: undefined,

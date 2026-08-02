@@ -53,6 +53,21 @@ export function isTerminal(acquisition: AcquisitionStatusResponseDto): boolean {
 }
 
 /**
+ * True when the current attempt's transfer is live at the source: the history holds a
+ * `download-started` entry not superseded by a later `selected` (a later selection is a new
+ * attempt whose own start has not been recorded yet). The decided fact the downloading views
+ * read instead of inferring liveness from a progress read's success
+ * (nonblocking-download-observation).
+ */
+export function isTransferStarted(acquisition: AcquisitionStatusResponseDto): boolean {
+  for (const entry of acquisition.history.toReversed()) {
+    if (entry.kind === 'download-started') return true;
+    if (entry.kind === 'selected') return false;
+  }
+  return false;
+}
+
+/**
  * The acquisition's display title, falling through resolved target → the request as given → a
  * neutral unknown-release label. A resolving placeholder appears only while resolution is
  * genuinely pending — never as the permanent title of a terminally failed acquisition (web-ui:

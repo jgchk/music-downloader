@@ -55,7 +55,7 @@ folded into each item, not batched at the end.
 - [x] 4.1 Facade schema: failing contract-tier tests first for the additive status phase and
       `download-started` history entry; tolerant-reader compatibility of existing consumers
       asserted.
-- [ ] 4.2 BFF/UI: failing SSR/component tests first — downloading phase renders with live
+- [x] 4.2 BFF/UI: failing SSR/component tests first — downloading phase renders with live
       progress; history narrates the start in the established copy register; detail and list
       views distinguish transferring from selected.
 
