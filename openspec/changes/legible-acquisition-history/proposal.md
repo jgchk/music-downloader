@@ -26,6 +26,7 @@ None — every change lands in an existing capability.
 
 - `acquisition-lifecycle`: the acquisition status read model's history requirement changes from "the five attempt-level entries" to curated lifecycle coverage — new additive entry kinds for request, resolution, search start, and every terminal outcome; the existing "history entries carry occurrence time" requirement's "SHALL NOT change which events surface" constraint is superseded by this change.
 - `web-ui`: the timeline requirement changes — module attribution becomes non-textual (unified narrator voice), a synthesized in-progress row is required while active, hybrid timestamps are required, terminal rows are required, copy register requirements are introduced, the failure-reason presentation requirement is revised (human reason stays in the visible row; raw diagnostic codes move behind per-entry disclosure — distinct content, so no duplicated-reveal), and the detail page gains a liveness requirement (interval re-fetch behind a swappable freshness seam).
+- `import-management`: the import status read model additively exposes decided settledness (`settled`), so the web layer paces the detail page's liveness off the importer's own terminality instead of re-deriving it from the phase enum.
 - `web-ui-presentation`: the semantic skeleton gains timeline anatomy (marker slot, meta alignment, pending-row state, per-entry disclosure) defined at the token/skeleton layer, with all three skins theming it.
 
 ## Impact
@@ -35,5 +36,5 @@ None — every change lands in an existing capability.
 - `packages/web/src/lib/components/AcquisitionDetail.svelte`, `src/lib/timeline.ts`, `src/lib/acquisitions.ts`, detail route — copy system, pending row, timestamps, disclosure, liveness driver, status-line/queue fixes.
 - Skin CSS in `packages/web` (token layer + forum/glass/terminal).
 - Evidence base: `docs/research/timeline-ux-best-practices.md` (cited UX research backing register, timestamps, disclosure, and in-progress affordance decisions).
-- No importer facade changes; no cross-module contract is introduced (web-side composition unchanged in principle).
+- One additive importer facade field (`settled` on the import status DTO — review finding: the BFF must not re-derive the importer's terminality); no cross-module contract is introduced (web-side composition unchanged in principle).
 - Out of scope: `/reviews` surface, SSE push (explicit future change), role-split rendering.

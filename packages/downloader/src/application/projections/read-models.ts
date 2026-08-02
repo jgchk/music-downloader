@@ -106,8 +106,9 @@ export interface AcquisitionStatusView {
  * The kind-specific payload for the events that surface as history — others yield nothing. The
  * curation covers the whole lifecycle (request → resolution → search rounds → attempts → every
  * terminal outcome) while deliberately keeping bookkeeping events out: a candidate rejection is
- * implied by the failure entry that precedes it, and ranking/validation-success/download-completion
- * are advancement mechanics, not milestones.
+ * implied by the failure (or cancellation) entry near it, and the remaining exclusions —
+ * ranking, validation success, download completion, search results, edition selection — are
+ * advancement mechanics or facts presented elsewhere, not milestones.
  */
 function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
   switch (event.type) {

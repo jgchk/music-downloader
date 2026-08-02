@@ -1,22 +1,16 @@
 <script lang="ts">
   import type { AcquisitionStatusResponseDto, ProgressResponseDto } from '@music/downloader';
-  import type { ImportStatusResponseDto } from '@music/importer';
-  import {
-    isCancellable,
-    isTerminal,
-    parseAcquisitionView,
-    targetDescription,
-  } from '$lib/acquisitions.js';
+  import { isCancellable, parseAcquisitionView, targetDescription } from '$lib/acquisitions.js';
   import {
     entryCopy,
-    isImportSettled,
+    isStorySettled,
     metaSummary,
     overallStatus,
     pendingRowFor,
     type EntryCopy,
   } from '$lib/copy.js';
   import { dateKey, dateLabel, durationGloss, entryTime, fullTime } from '$lib/time.js';
-  import type { TimelineEntry } from '$lib/timeline.js';
+  import type { ImportSection, TimelineEntry } from '$lib/timeline.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
   import ProgressBar from './ProgressBar.svelte';
 
@@ -29,17 +23,18 @@
      */
     timeline?: TimelineEntry[];
     /**
-     * The import section's state: `present` once handed off, `none` before, `unavailable` when the
-     * importer read failed. `none`/`unavailable` still render the downloader timeline (web-ui).
+     * The import side as one discriminated value: `present` carries the status, `none`/`unavailable`
+     * still render the downloader timeline (web-ui). One prop, so a statusless "present" is
+     * unrepresentable.
      */
-    importState?: 'present' | 'none' | 'unavailable';
-    /** The import's status read, present alongside `importState === 'present'`. */
-    importStatus?: ImportStatusResponseDto;
+    importSection?: ImportSection;
     progress?: ProgressResponseDto;
     /** Downloading, but the progress read failed — say so rather than render a blank bar. */
     progressUnavailable?: boolean;
     /** Cancel-action failure to surface. */
     error?: string;
+    /** A liveness re-fetch just failed; the page shows its data may be stale (design D8). */
+    refreshFailed?: boolean;
     /** The load's clock — time rendering stays a pure function of props, no wall-clock reads here. */
     nowIso: string;
     /** Test seam for deterministic absolute times; production renders in the host zone. */
@@ -49,11 +44,11 @@
   let {
     acquisition,
     timeline = [],
-    importState = 'none',
-    importStatus,
+    importSection = { state: 'none' },
     progress,
     progressUnavailable = false,
     error,
+    refreshFailed = false,
     nowIso,
     timeZone,
   }: Properties = $props();
@@ -63,17 +58,26 @@
   // "awaiting but candidates undefined" combo inline.
   const view = $derived(parseAcquisitionView(acquisition));
 
-  const overall = $derived(overallStatus(acquisition, importState, importStatus));
+  const overall = $derived(overallStatus(acquisition, importSection));
   const meta = $derived(metaSummary(acquisition.attempts, acquisition.rejectedCount));
-  const pending = $derived(pendingRowFor(acquisition, importState, importStatus));
-  const settled = $derived(isTerminal(acquisition) && isImportSettled(importState, importStatus));
+  const pending = $derived(pendingRowFor(acquisition, importSection));
+  const settled = $derived(isStorySettled(acquisition, importSection));
 
-  /** The one labeled location line: the library once applied, else the delivered staging drop. */
+  /**
+   * The one labeled location line: the library once the import applied; else, when no import
+   * section exists at all, the delivered staging drop (a present-but-unapplied import shows
+   * neither — its state is the timeline's story, not a location).
+   */
   const locationLine = $derived.by(() => {
-    if (importStatus?.location !== undefined && importStatus.status === 'applied') {
-      return { label: 'In library at', location: importStatus.location };
+    if (importSection.state === 'present' && importSection.status.status === 'applied') {
+      const location = importSection.status.location;
+      if (location !== undefined) return { label: 'In library at', location };
     }
-    if (importState !== 'present' && acquisition.status === 'Fulfilled' && acquisition.location) {
+    if (
+      importSection.state !== 'present' &&
+      acquisition.status === 'Fulfilled' &&
+      acquisition.location
+    ) {
       return { label: 'Delivered to', location: acquisition.location };
     }
     return;
@@ -95,8 +99,9 @@
       const copy = entryCopy(item);
       if (copy === undefined) continue;
       const key = dateKey(item.at, timeZone);
-      const divider = key !== '' && key !== lastDate ? dateLabel(item.at, timeZone) : undefined;
-      if (key !== '') lastDate = key;
+      const divider =
+        key !== undefined && key !== lastDate ? dateLabel(item.at, timeZone) : undefined;
+      if (key !== undefined) lastDate = key;
       rendered.push({ item, copy, divider });
     }
     const first = timeline[0];
@@ -179,7 +184,12 @@
 {/if}
 
 <h2>History</h2>
-{#if importState === 'unavailable'}
+{#if refreshFailed}
+  <p class="refresh-warning" role="status" data-testid="refresh-failed">
+    Couldn’t refresh just now — retrying.
+  </p>
+{/if}
+{#if importSection.state === 'unavailable'}
   <p data-testid="import-unavailable">
     The import side of this acquisition is momentarily unavailable.
   </p>
@@ -193,7 +203,9 @@
   <ol class="timeline" data-testid="history">
     {#each rows as row, index (index)}
       {#if row.divider !== undefined}
-        <li class="timeline-date" data-testid="date-divider">{row.divider}</li>
+        <!-- role=presentation: a divider is chrome, not one of the history's items, so assistive
+             tech should not count it in the list. -->
+        <li class="timeline-date" role="presentation" data-testid="date-divider">{row.divider}</li>
       {/if}
       <li class="timeline-entry" data-module={row.item.module} data-state={row.copy.state}>
         <span class="timeline-marker" aria-hidden="true"></span>

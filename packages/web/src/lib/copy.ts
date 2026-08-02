@@ -1,15 +1,21 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
-import type { ImportStatusResponseDto } from '@music/importer';
-import { formatBytes } from './acquisitions.js';
+import { formatBytes, isTerminal, statusTone } from './acquisitions.js';
 import type { BadgePhase } from './phase-label.js';
-import type { DownloaderHistoryEntry, ImporterHistoryEntry, TimelineEntry } from './timeline.js';
+import type {
+  DownloaderHistoryEntry,
+  ImporterHistoryEntry,
+  ImportSection,
+  TimelineEntry,
+} from './timeline.js';
 
 /**
  * The acquisition detail's copy system — every timeline and status string in one place, written to
  * the register (design D3): completed entries are past-tense verb-led fragments, the pending row is
  * present-progressive, no first person, no internal vocabulary in visible text (enum codes and raw
  * paths live in the per-entry disclosure), numbers human-formatted. Unknown kinds and codes degrade
- * to neutral lines with the raw value in the disclosure — the tolerant reader stays honest.
+ * to neutral lines with the raw value in the disclosure — the tolerant reader stays honest, and
+ * every closed union is matched exhaustively so a new kind, code, or phase is a compile error
+ * demanding its copy before it can ship.
  */
 
 export type EntryState = 'routine' | 'attention' | 'failure' | 'success';
@@ -32,33 +38,48 @@ export interface EntryCopy {
 
 // --- Glosses -----------------------------------------------------------------------------------
 
-const DOWNLOAD_FAILURE_GLOSS: Readonly<Record<string, string>> = {
+type DownloadFailureReason = Extract<DownloaderHistoryEntry, { kind: 'download-failed' }>['reason'];
+type ValidationReason = Extract<
+  DownloaderHistoryEntry,
+  { kind: 'validation-failed' }
+>['reasons'][number];
+type ResolutionVerb = Extract<ImporterHistoryEntry, { kind: 'review-resolved' }>['resolution'];
+
+// `satisfies` keeps each map total over its wire enum — a new code is a compile error demanding a
+// gloss — while lookups widen to `Partial<Record<string, string>>` so a runtime value from beyond
+// the compiled enum still degrades to the honest generic line instead of crashing.
+const DOWNLOAD_FAILURE_GLOSS = {
   PeerUnavailable: 'the source went offline',
   Stalled: 'the download stalled',
   QueueTimeout: 'it waited too long in the source’s queue',
   TransferError: 'the transfer was cut off',
   FileUnavailable: 'the files were no longer available',
   Cancelled: 'the download was cancelled',
-};
+} satisfies Record<DownloadFailureReason, string>;
 
-const VALIDATION_REASON_GLOSS: Readonly<Record<string, string>> = {
+const VALIDATION_REASON_GLOSS = {
   Unplayable: 'some files were unplayable',
   WrongTrackCount: 'the track count didn’t match the release',
   DurationMismatch: 'track lengths didn’t match the release',
   RecordingMismatch: 'the audio didn’t match the release’s recordings',
   QualityNotAuthentic: 'the audio quality wasn’t what it claimed',
-};
+} satisfies Record<ValidationReason, string>;
 
-const RESOLUTION_GLOSS: Readonly<Record<string, string>> = {
+const RESOLUTION_GLOSS = {
   'apply-candidate': 'you approved the match',
   'supply-id': 'you supplied the release id',
   'refresh-candidates': 'you asked for fresh matches',
   'manual-tags': 'you supplied tags by hand',
   'import-as-is': 'you chose to import the files as they are',
   reject: 'you rejected the import',
-  'reject-unusable-delivery': 'you rejected the files. A new download will be tried.',
+  'retry-enrichment': 'you asked for the release data to be fetched again',
+  'reject-unusable-delivery': 'you rejected the files. A new download may be tried.',
   accept: 'you accepted it',
-};
+} satisfies Record<ResolutionVerb, string>;
+
+function glossOf(map: Record<string, string>, code: string): string | undefined {
+  return (map as Partial<Record<string, string>>)[code];
+}
 
 /** The auto-apply distance inverted to a whole match percentage (extends the v3.8.0 gloss). */
 export function matchPercent(distance: number): number {
@@ -115,7 +136,7 @@ function downloaderEntryCopy(entry: DownloaderHistoryEntry): EntryCopy | undefin
       };
     }
     case 'download-failed': {
-      const gloss = DOWNLOAD_FAILURE_GLOSS[entry.reason];
+      const gloss = glossOf(DOWNLOAD_FAILURE_GLOSS, entry.reason);
       return {
         text:
           gloss === undefined
@@ -129,7 +150,9 @@ function downloaderEntryCopy(entry: DownloaderHistoryEntry): EntryCopy | undefin
       };
     }
     case 'validation-failed': {
-      const glosses = entry.reasons.map((reason) => VALIDATION_REASON_GLOSS[reason] ?? reason);
+      const glosses = entry.reasons.map(
+        (reason) => glossOf(VALIDATION_REASON_GLOSS, reason) ?? reason,
+      );
       return {
         text: `The files failed quality checks — ${glosses.join('; ')}. Trying the next source.`,
         state: 'failure',
@@ -184,14 +207,21 @@ function downloaderEntryCopy(entry: DownloaderHistoryEntry): EntryCopy | undefin
       return { text: 'Cancelled', state: 'routine', detail: [] };
     }
     default: {
-      // Tolerant reader: a downloader history kind added later lands here rather than mislabeling.
-      return {
-        text: 'Something happened that this page can’t describe yet',
-        state: 'routine',
-        detail: [],
-      };
+      // Exhaustiveness: a new history kind is a compile error here (`satisfies never`) so its copy
+      // must exist before the build passes. At runtime the arm still degrades honestly — with the
+      // raw kind traced in the disclosure — for data this compiled page cannot know.
+      entry satisfies never;
+      return unknownEntryCopy('Something happened that this page can’t describe yet', entry);
     }
   }
+}
+
+function unknownEntryCopy(text: string, entry: unknown): EntryCopy {
+  return {
+    text,
+    state: 'routine',
+    detail: [{ label: 'Event kind', value: String((entry as { kind?: unknown }).kind) }],
+  };
 }
 
 function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
@@ -223,7 +253,7 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
       };
     }
     case 'review-resolved': {
-      const gloss = RESOLUTION_GLOSS[entry.resolution];
+      const gloss = glossOf(RESOLUTION_GLOSS, entry.resolution);
       return gloss === undefined
         ? {
             text: 'Review resolved',
@@ -248,25 +278,25 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
     }
     case 'rejected': {
       return {
-        text: `Import rejected — ${entry.reason}. A new download will be tried.`,
+        text: `Import rejected — ${entry.reason}. A new download may be tried.`,
         state: 'failure',
         detail: [],
       };
     }
     case 'release-verdict-recorded': {
       return {
-        text: 'Marked this delivery unusable — retrying the download',
+        text: 'Marked this delivery unusable — a new download may be tried',
         state: 'routine',
         detail: [{ label: 'Reasons', value: entry.reasons.join(', ') }],
       };
     }
     default: {
-      // Tolerant reader: an importer history kind added later lands here safely.
-      return {
-        text: 'Something happened during import that this page can’t describe yet',
-        state: 'routine',
-        detail: [],
-      };
+      // Same regime as the downloader switch: compile pressure plus a traced runtime degrade.
+      entry satisfies never;
+      return unknownEntryCopy(
+        'Something happened during import that this page can’t describe yet',
+        entry,
+      );
     }
   }
 }
@@ -288,16 +318,20 @@ export interface OverallStatus {
   readonly phrase: string;
 }
 
-const IMPORT_TERMINAL = new Set(['applied', 'rejected']);
-
-/** Whether the import side has settled (or never existed), so nothing more is coming. */
-export function isImportSettled(
-  importState: 'present' | 'none' | 'unavailable',
-  importStatus?: ImportStatusResponseDto,
+/**
+ * Whether the whole story — download and import — has settled, so the page may rest (no pending
+ * row, no refresh, the closing entry carries the duration). A failed downloader ending needs no
+ * import; a delivery (`Fulfilled`) is settled only once its import reports its own decided
+ * settledness — the import is created asynchronously after the hand-off, so an absent or
+ * unavailable import read on a delivered acquisition means "keep watching", never "done".
+ */
+export function isStorySettled(
+  acquisition: AcquisitionStatusResponseDto,
+  importSection: ImportSection,
 ): boolean {
-  return importState !== 'present' || importStatus === undefined
-    ? true
-    : IMPORT_TERMINAL.has(importStatus.status);
+  if (!isTerminal(acquisition)) return false;
+  if (acquisition.status !== 'Fulfilled') return true;
+  return importSection.state === 'present' && importSection.status.settled === true;
 }
 
 const STATUS_PHRASE: Readonly<Record<AcquisitionStatusResponseDto['status'], string>> = {
@@ -312,24 +346,8 @@ const STATUS_PHRASE: Readonly<Record<AcquisitionStatusResponseDto['status'], str
   Fulfilled: 'In your library',
   Exhausted: 'No usable download found',
   Cancelled: 'Cancelled',
-  MetadataFailed: 'Couldn’t identify the release',
-  Conflicted: 'Stopped — destination occupied',
-};
-
-const STATUS_TONE: Readonly<Record<AcquisitionStatusResponseDto['status'], BadgePhase>> = {
-  Empty: 'pending',
-  Pending: 'pending',
-  AwaitingManualSelection: 'attention',
-  Searching: 'pending',
-  Selecting: 'pending',
-  Downloading: 'pending',
-  Validating: 'pending',
-  Importing: 'pending',
-  Fulfilled: 'fulfilled',
-  Exhausted: 'failed',
-  Cancelled: 'failed',
-  MetadataFailed: 'failed',
-  Conflicted: 'failed',
+  MetadataFailed: 'Couldn\u{2019}t identify the release',
+  Conflicted: 'Stopped \u{2014} destination occupied',
 };
 
 /** The human phrase for a downloader status on its own (the queue list, which has no import read). */
@@ -338,39 +356,48 @@ export function statusPhrase(status: AcquisitionStatusResponseDto['status']): st
 }
 
 /**
- * The page's one status account, honest across both halves of the story: while a delivered
- * acquisition's import is still working, the phrase follows the import (a "Fulfilled" enum would
- * claim a library the files haven't reached); once everything settles, the ending speaks.
+ * The page's one status account, honest across both halves of the story: a delivered acquisition
+ * speaks with its import's voice — including the async window where the import does not exist yet
+ * (or its read failed), which must never be presented as "in your library". Tones reuse the list's
+ * own `statusTone` map so the two surfaces cannot drift. The import-phase switch is exhaustive: a
+ * new phase is a compile error demanding its phrase.
  */
 export function overallStatus(
   acquisition: AcquisitionStatusResponseDto,
-  importState: 'present' | 'none' | 'unavailable',
-  importStatus?: ImportStatusResponseDto,
+  importSection: ImportSection,
 ): OverallStatus {
-  if (
-    importStatus !== undefined &&
-    importState === 'present' &&
-    acquisition.status === 'Fulfilled'
-  ) {
-    switch (importStatus.status) {
-      case 'awaiting-review': {
-        return { tone: 'attention', phrase: 'Waiting for your review' };
+  if (acquisition.status === 'Fulfilled') {
+    switch (importSection.state) {
+      case 'none': {
+        return { tone: 'pending', phrase: 'Delivered \u{2014} confirming the import' };
       }
-      case 'applying': {
-        return { tone: 'pending', phrase: 'Adding to the library' };
+      case 'unavailable': {
+        return { tone: 'pending', phrase: 'Delivered \u{2014} import status unavailable' };
       }
-      case 'applied': {
-        return { tone: 'fulfilled', phrase: 'In your library' };
-      }
-      case 'rejected': {
-        return { tone: 'failed', phrase: 'Import rejected' };
-      }
-      default: {
-        return { tone: 'pending', phrase: 'Matching against the library' };
+      case 'present': {
+        switch (importSection.status.status) {
+          case 'empty':
+          case 'requested':
+          case 'proposing': {
+            return { tone: 'pending', phrase: 'Matching against the library' };
+          }
+          case 'awaiting-review': {
+            return { tone: 'attention', phrase: 'Waiting for your review' };
+          }
+          case 'applying': {
+            return { tone: 'pending', phrase: 'Adding to the library' };
+          }
+          case 'applied': {
+            return { tone: 'fulfilled', phrase: 'In your library' };
+          }
+          case 'rejected': {
+            return { tone: 'failed', phrase: 'Import rejected' };
+          }
+        }
       }
     }
   }
-  return { tone: STATUS_TONE[acquisition.status], phrase: STATUS_PHRASE[acquisition.status] };
+  return { tone: statusTone(acquisition.status), phrase: STATUS_PHRASE[acquisition.status] };
 }
 
 /** Correctly-pluralized counters with zero-count segments omitted (design D9). */
@@ -380,32 +407,50 @@ export function metaSummary(attempts: number, rejectedCount: number): string {
   if (rejectedCount > 0) {
     parts.push(`${rejectedCount} source${rejectedCount === 1 ? '' : 's'} rejected`);
   }
-  return parts.join(' · ');
+  return parts.join(' \u{B7} ');
 }
 
 // --- The synthesized in-progress row (design D5) -----------------------------------------------
 
+export type PendingState = 'pending' | 'attention';
+
 export interface PendingRow {
   readonly text: string;
-  readonly state: 'pending' | 'attention';
+  readonly state: PendingState;
   readonly link?: { readonly href: string; readonly label: string };
   /** Whether live download progress belongs inside this row. */
   readonly showProgress: boolean;
 }
 
+const SEARCHING_ROW: PendingRow = {
+  text: 'Searching for a download\u{2026}',
+  state: 'pending',
+  showProgress: false,
+};
+
+const ADDING_ROW: PendingRow = {
+  text: 'Adding to the library\u{2026}',
+  state: 'pending',
+  showProgress: false,
+};
+
 /**
- * Exactly one in-progress row while the story is unsettled, derived from the status read models the
- * page already loads (never a new wire contract). Downloader-active phases win (a revival returns
- * here); after delivery the import's phase speaks; a settled story has no pending row — its closing
- * entry ends it.
+ * Exactly one in-progress row while the story is unsettled, derived from the status read models
+ * the page already loads (never a new wire contract). Liveness gates on the decided terminality
+ * (`isTerminal`), NOT the cancel affordance, so an older producer omitting `cancellable` still
+ * narrates. Both inner switches are exhaustive: a new downloader status or importer phase is a
+ * compile error demanding a row (or an explicit "no row").
  */
 export function pendingRowFor(
   acquisition: AcquisitionStatusResponseDto,
-  importState: 'present' | 'none' | 'unavailable',
-  importStatus?: ImportStatusResponseDto,
+  importSection: ImportSection,
 ): PendingRow | undefined {
-  if (acquisition.cancellable === true) {
+  if (!isTerminal(acquisition)) {
     switch (acquisition.status) {
+      case 'Empty':
+      case 'Pending': {
+        return { text: 'Identifying the release\u{2026}', state: 'pending', showProgress: false };
+      }
       case 'AwaitingManualSelection': {
         return {
           text: 'Waiting for you to choose an edition',
@@ -413,47 +458,70 @@ export function pendingRowFor(
           showProgress: false,
         };
       }
+      case 'Searching':
+      case 'Selecting': {
+        return SEARCHING_ROW;
+      }
       case 'Downloading': {
         const from = acquisition.currentCandidate?.username;
         return {
-          text: from === undefined ? 'Downloading…' : `Downloading from ${from}…`,
+          text: from === undefined ? 'Downloading\u{2026}' : `Downloading from ${from}\u{2026}`,
           state: 'pending',
           showProgress: true,
         };
       }
       case 'Validating': {
-        return { text: 'Checking audio quality…', state: 'pending', showProgress: false };
+        return { text: 'Checking audio quality\u{2026}', state: 'pending', showProgress: false };
       }
       case 'Importing': {
-        return { text: 'Adding to the library…', state: 'pending', showProgress: false };
+        return ADDING_ROW;
       }
-      case 'Searching':
-      case 'Selecting': {
-        return { text: 'Searching for a download…', state: 'pending', showProgress: false };
-      }
-      default: {
-        return { text: 'Identifying the release…', state: 'pending', showProgress: false };
+      case 'Fulfilled':
+      case 'Exhausted':
+      case 'Cancelled':
+      case 'MetadataFailed':
+      case 'Conflicted': {
+        // The enum says terminal while the decided flag says otherwise (an absent flag, or a
+        // drifted producer): claim nothing rather than narrate a phase that is over.
+        return undefined;
       }
     }
   }
-  if (
-    importStatus !== undefined &&
-    importState === 'present' &&
-    acquisition.status === 'Fulfilled' &&
-    !IMPORT_TERMINAL.has(importStatus.status)
-  ) {
-    if (importStatus.status === 'awaiting-review') {
-      return {
-        text: 'Waiting for your review',
-        state: 'attention',
-        link: { href: '/reviews', label: 'Open the review' },
-        showProgress: false,
-      };
+  if (acquisition.status !== 'Fulfilled') return undefined;
+  switch (importSection.state) {
+    case 'none':
+    case 'unavailable': {
+      // The importer picks the delivery up asynchronously; keep narrating (and let the page poll)
+      // instead of presenting the async gap as a finished story.
+      return ADDING_ROW;
     }
-    if (importStatus.status === 'applying') {
-      return { text: 'Adding to the library…', state: 'pending', showProgress: false };
+    case 'present': {
+      switch (importSection.status.status) {
+        case 'empty':
+        case 'requested':
+        case 'proposing': {
+          return {
+            text: 'Matching against the library\u{2026}',
+            state: 'pending',
+            showProgress: false,
+          };
+        }
+        case 'awaiting-review': {
+          return {
+            text: 'Waiting for your review',
+            state: 'attention',
+            link: { href: '/reviews', label: 'Open the review' },
+            showProgress: false,
+          };
+        }
+        case 'applying': {
+          return ADDING_ROW;
+        }
+        case 'applied':
+        case 'rejected': {
+          return undefined;
+        }
+      }
     }
-    return { text: 'Matching against the library…', state: 'pending', showProgress: false };
   }
-  return undefined;
 }

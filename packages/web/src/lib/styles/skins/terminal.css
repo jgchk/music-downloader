@@ -72,3 +72,6 @@
 :root[data-skin='terminal'] .timeline-detail dd {
   color: var(--accent);
 }
+:root[data-skin='terminal'] ol.timeline > li.timeline-entry {
+  padding: 2px 0;
+}

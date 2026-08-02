@@ -107,6 +107,33 @@ export const submitAcquisitionRequestSchema = z.object({
 
 // --- Responses ---------------------------------------------------------------------------------
 
+/**
+ * The request echoed on responses (status DTO + the `requested` history entry). A deliberate
+ * response-side copy of the submit shape rather than a reuse of `acquisitionRequestSchema`: the
+ * echo's contract is "whatever any historical AcquisitionRequested event carried" — a set that only
+ * grows and is replayed from the log — so it must not inherit inbound validation (`min(1)`) or the
+ * inbound shape's freedom to tighten. Same fields, no input constraints.
+ */
+export const requestedTargetEchoSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('musicbrainz'),
+    mbid: z.string(),
+    targetType: targetTypeSchema,
+  }),
+  z.object({
+    kind: z.literal('release-group'),
+    mbid: z.string(),
+    targetType: z.literal('album'),
+  }),
+  z.object({
+    kind: z.literal('descriptor'),
+    targetType: targetTypeSchema,
+    artist: z.string(),
+    title: z.string(),
+    album: z.string().optional(),
+  }),
+]);
+
 export const candidateIdentitySchema = z.object({
   username: z.string(),
   path: z.string(),
@@ -116,13 +143,16 @@ export const candidateIdentitySchema = z.object({
 // Every entry carries `at`, the ISO-8601 occurrence time of the event it projects, so a consumer
 // can order this acquisition's history against another context's history in real time (additive).
 // The lifecycle kinds (requested/resolved/search-started and the terminal outcomes) are additive
-// members (legible-acquisition-history): an older consumer's tolerant reader ignores them.
+// members (legible-acquisition-history). Evolution note: this discriminated union is CLOSED — its
+// single consumer (the in-process web BFF) compiles against it, so growing it is a compile-checked
+// atomic change, not a tolerated-skew one; an out-of-process binding would need a genuinely
+// tolerant consumer encoding before this union could grow safely across a version boundary.
 export const historyEntrySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('requested'),
     at: z.iso.datetime(),
-    // The request as the user gave it — the same shape the submit endpoint accepts.
-    request: acquisitionRequestSchema,
+    // The request as the user gave it, in the response-side echo shape.
+    request: requestedTargetEchoSchema,
   }),
   z.object({
     kind: z.literal('resolved'),
@@ -214,7 +244,7 @@ export const acquisitionStatusResponseSchema = z.object({
   target: acquisitionTargetSchema.optional(),
   // The request as the user gave it (additive echo): lets a consumer describe an acquisition whose
   // metadata never resolved — where `target` stays absent — by what was asked for.
-  requestedTarget: acquisitionRequestSchema.optional(),
+  requestedTarget: requestedTargetEchoSchema.optional(),
   // Present only while a candidate is in flight (Selecting through Importing); absent once terminal.
   currentCandidate: candidateIdentitySchema.optional(),
   attempts: z.number(),
@@ -270,6 +300,7 @@ export const errorResponseSchema = z.object({
 // --- Inferred DTO types (the interface layer's public vocabulary) ------------------------------
 
 export type AcquisitionRequestDto = z.infer<typeof acquisitionRequestSchema>;
+export type RequestedTargetEchoDto = z.infer<typeof requestedTargetEchoSchema>;
 export type SubmitAcquisitionRequestDto = z.infer<typeof submitAcquisitionRequestSchema>;
 export type SubmitAcquisitionResponseDto = z.infer<typeof submitAcquisitionResponseSchema>;
 export type AcquisitionStatusResponseDto = z.infer<typeof acquisitionStatusResponseSchema>;

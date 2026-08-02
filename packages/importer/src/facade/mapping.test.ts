@@ -168,6 +168,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
     directory: DIRECTORY,
     phase: 'rejected',
     rejection: { reason: 'r', filesDeleted: true },
+    settled: true,
     history: [{ kind: 'rejected', at: 't', reason: 'r', filesDeleted: true }],
   };
 
@@ -180,8 +181,14 @@ describe('statusViewToDto / pendingReviewToDto', () => {
       location: undefined,
       review: undefined,
       rejection: { reason: 'r', filesDeleted: true },
+      settled: true,
       history: [{ kind: 'rejected', at: 't', reason: 'r', filesDeleted: true }],
     });
+  });
+
+  it('carries the decided settledness through to the wire in both directions', () => {
+    expect(statusViewToDto(view).settled).toBe(true);
+    expect(statusViewToDto({ ...view, phase: 'proposing', settled: false }).settled).toBe(false);
   });
 
   it('omits the acquisition id for a manually-submitted import', () => {
@@ -193,6 +200,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
       importId: toImportId('imp-2'),
       directory: DIRECTORY,
       phase: 'awaiting-review',
+      settled: false,
       openReview: {
         cause: { kind: 'no-match' },
         candidates: [],

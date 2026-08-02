@@ -108,7 +108,7 @@ Layer 1 = always-visible row text. Layer 2 = per-entry `<details>` payload (D7).
 | `resolved` | `Matched to MusicBrainz — {artist}, {title} ({year})` | — |
 | `search-started` (round 1) | `Started searching for a download` | — |
 | `search-started` (round > 1) | `Searched again for another source` | round |
-| `selected` | `Chose a download from {username}` | full remote path, file count/format where known |
+| `selected` | `Chose a download from {username}` | full remote path, size |
 | `download-failed` | `Download failed — {gloss(reason)}. Trying the next source.` | raw reason code, remote path |
 | `validation-failed` | `The files failed quality checks — {gloss(reasons)}. Trying the next source.` | verbatim reason list, remote path |
 | `imported` (hand-off) | `Download complete — preparing to add to the library` | staged path |
@@ -116,9 +116,9 @@ Layer 1 = always-visible row text. Layer 2 = per-entry `<details>` payload (D7).
 | `fulfilled` | *(curated out of the view — see note)* | — |
 | `exhausted` (closing) | `Gave up — every source failed or came up empty. Request it again to search anew.` | — |
 | `conflicted` (closing) | `Stopped — the destination already had files for this release. Nothing was overwritten.` | conflicting location |
-| `metadata-failed` (closing) | `Couldn't identify this release. Check the artist and title, then request it again.` | request detail |
+| `metadata-failed` (closing) | `Couldn't identify this release. Check the artist and title, then request it again.` | — |
 | `cancelled` (closing) | `Cancelled` | — |
-| unknown kind (tolerant reader) | `Something happened that this page can't describe yet` | — |
+| unknown kind (tolerant reader) | `Something happened that this page can't describe yet` | raw event kind |
 
 Note: the downloader's `AcquisitionFulfilled` is co-emitted with the hand-off (`Imported`) in the
 same decide batch — it marks the staging deposit, not the library import — so a rendered
@@ -139,14 +139,13 @@ acquisition.
 | `proposed` | `Compared against the library — {n} candidate match{es}` | — |
 | `auto-apply-selected` | `Confident match — importing automatically ({pct}% match)` | raw distance |
 | `review-required` | `Needs your review` + link to the review | review kind |
-| `review-resolved` (apply-candidate) | `Review resolved — you approved the match` | resolution code |
-| `review-resolved` (reject-unusable-delivery) | `Review resolved — you rejected the files. A new download will be tried.` | resolution code |
-| `review-resolved` (other/unknown resolution) | `Review resolved` | resolution code |
+| `review-resolved` (glossed verbs) | `Review resolved — {gloss(resolution)}` (e.g. "you approved the match"; reject-unusable-delivery → "you rejected the files. A new download may be tried.") | — |
+| `review-resolved` (unknown resolution) | `Review resolved` | resolution code |
 | `applied` | `Added to the library` | library path |
-| `remediation-required` | `Added to the library, but needs attention` | — |
-| `rejected` | `Import rejected — {gloss(reason)}. A new download will be tried.` | raw reason |
-| `release-verdict-recorded` | `Marked this delivery unusable — retrying the download` | verbatim reasons |
-| unknown kind | `Something happened during import that this page can't describe yet` | — |
+| `remediation-required` | `Added to the library, but needs attention` | per-stage failure list |
+| `rejected` | `Import rejected — {reason}. A new download may be tried.` | — |
+| `release-verdict-recorded` | `Marked this delivery unusable — a new download may be tried` | verbatim reasons |
+| unknown kind | `Something happened during import that this page can't describe yet` | raw event kind |
 
 This also clears the recorded "retry-download verdict" label loose end.
 
@@ -167,7 +166,16 @@ reader honest):
 from validation; they render verbatim in the gloss slot (they are already sentences), with the
 raw list in layer 2.
 
+Cross-context reaction copy is hedged: an importer-originated row states the importer's fact and
+says a new download **may** be tried — the revival is the downloader's policy, and the copy must
+not promise the other context's behavior (review finding; the v3.11.0 verb rename made the same
+decoupling in the contract).
+
 All strings live in one web-layer copy module so review and future edits happen in one place.
+Every closed union the module consumes is matched exhaustively (`satisfies`-checked gloss maps,
+no bare `default` arms — the tolerant runtime fallback rides behind a `satisfies never` compile
+check and always traces the raw value in the disclosure), so a new kind, code, or phase is a
+build break demanding copy, mirroring the projection's own no-default regime.
 
 ### D5 — The synthesized pending row
 
@@ -185,7 +193,16 @@ tail (NN/g progress-indicator guidance: named-step determinate over spinner; Ant
 | `Importing` (downloader) | `Adding to the library…` |
 | import in flight (importer non-terminal after hand-off) | derived from the importer's status: matching → `Matching against the library…`; awaiting review → `Waiting for your review` (attention-styled, links to the review) |
 
-Terminal status ⇒ no pending row; the closing row from D4 ends the story. With `requested` now a
+Settledness gates the pending row and the liveness loop as one decided story-level fact
+(`isStorySettled`): a failed downloader ending settles immediately; a delivery (`Fulfilled`)
+settles only when its import reports its own decided `settled` flag (an additive importer facade
+field — D12). The asynchronous hand-off window — downloader fulfilled, import not yet created (or
+its read momentarily failed) — is UNsettled: the page keeps refreshing, the pending row says
+"Adding to the library…", and the status line says "Delivered — confirming the import" (never "In
+your library"). The pending row's downloader arm gates on decided terminality (`isTerminal`), not
+the cancel affordance, so an older producer omitting `cancellable` still narrates; a
+contradictory enum-vs-flag state claims nothing. Once settled ⇒ no pending row; the closing row
+from D4 ends the story. With `requested` now a
 real first entry, an empty timeline is unreachable for any real acquisition (Stripe's
 creation-event-is-entry-#1 property). The defensive `no-history` fallback copy becomes
 `No history recorded yet — this page updates as the acquisition progresses.` and the string
@@ -223,7 +240,10 @@ Architecture: the trigger lives behind one small seam (a freshness-driver module
 of page data. A future SSE change replaces the driver implementation, not the views — this
 forward-compatibility intent is explicit and owner-directed. No new wire endpoint is introduced
 (the page-load path is reused); the layout's "freshness is page-navigation freshness" design
-comment is amended to record the revision.
+comment is amended to record the revision. A failed re-fetch is caught into a modeled
+`refreshFailed` state rendered beside the timeline ("Couldn't refresh just now — retrying."),
+never a silently stale page; a load that *throws* during a poll still falls to SvelteKit's error
+boundary — accepted, since the in-process facade read has no transient network failure mode.
 
 ### D9 — The rest of the detail page (same register)
 
@@ -260,10 +280,25 @@ priority) as a clean receipt-like list, glass with soft dot-and-connector treatm
 an intentional log aesthetic. Cost stays near 1.5× because structure is shared — the skin
 system's designed use (v3.6.0).
 
+### D12 — The importer publishes its settledness (review finding)
+
+Which import phases are terminal is the importer's decided fact. The import status read model and
+DTO additively expose `settled` (decided from the import domain's own `isTerminal`), and the web
+layer paces the detail page's liveness off that flag — never off pattern-matching the phase enum
+(the v3.12.0 decided-lifecycle-flags pattern). An absent flag (older producer) degrades
+conservatively to unsettled. The import-phase *phrase* maps in the web layer remain presentation
+and are exhaustively typed, so a new phase is a compile error, not a silent "Matching against the
+library".
+
 ## Risks / Trade-offs
 
-- [Interval refresh loads the full page data every ~5s while active] → single-user scale;
-  driver stops on terminal status; interval chosen ≥ 5s; future SSE swap point designed in (D8).
+- [Interval refresh loads the full page data every ~5s while unsettled] → single-user scale;
+  the driver rests once the story settles; interval chosen ≥ 5s; future SSE swap point designed
+  in (D8).
+- [A delivered acquisition whose import never materializes (a permanently skipped intake) polls
+  while its page is open] → accepted: the intake catch-up subscription processes every delivery,
+  so the state is pathological; the honest "confirming the import" presentation beats a false
+  "in your library".
 - [Curation judges some events unworthy — a user might want the full log someday] → the event
   store keeps everything; adding a kind later is additive by construction.
 - [Copy glosses can drift from domain truth as reasons evolve] → glosses live in one module with

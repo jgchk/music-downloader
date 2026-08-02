@@ -26,6 +26,7 @@ function eventFor(facade: Record<string, unknown>, importer: Record<string, unkn
         importer: importer as unknown as ImporterFacade,
       },
       logger,
+      now: () => '2026-08-01T12:00:00Z',
     },
   } as never;
 }
@@ -54,9 +55,8 @@ describe('acquisition detail load', () => {
     expect(load(eventFor(facade))).toEqual({
       acquisition: base,
       timeline: [],
-      importState: 'none',
-      importStatus: undefined,
-      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
+      importSection: { state: 'none' },
+      now: '2026-08-01T12:00:00Z',
       progress: undefined,
       progressUnavailable: false,
     });
@@ -72,9 +72,8 @@ describe('acquisition detail load', () => {
     expect(load(eventFor(facade))).toEqual({
       acquisition: downloading,
       timeline: [],
-      importState: 'none',
-      importStatus: undefined,
-      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
+      importSection: { state: 'none' },
+      now: '2026-08-01T12:00:00Z',
       progress,
       progressUnavailable: false,
     });
@@ -92,9 +91,8 @@ describe('acquisition detail load', () => {
     expect(load(eventFor(facade))).toEqual({
       acquisition: downloading,
       timeline: [],
-      importState: 'none',
-      importStatus: undefined,
-      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
+      importSection: { state: 'none' },
+      now: '2026-08-01T12:00:00Z',
       progress: undefined,
       progressUnavailable: true,
     });
@@ -132,13 +130,12 @@ describe('acquisition detail load', () => {
     const importer = { getImportForAcquisition: () => ({ ok: true, value: importStatus }) };
 
     const result = load(eventFor(facade, importer)) as unknown as {
-      importState: string;
-      importStatus?: { importId: string };
+      importSection: { state: string; status?: { importId: string } };
       timeline: { module: string; at: string }[];
     };
 
-    expect(result.importState).toBe('present');
-    expect(result.importStatus?.importId).toBe('imp-1');
+    expect(result.importSection.state).toBe('present');
+    expect(result.importSection.status?.importId).toBe('imp-1');
     expect(result.timeline.map((t) => [t.module, t.at])).toEqual([
       ['downloader', '2026-01-01T00:00:00Z'],
       ['downloader', '2026-01-01T00:00:04Z'],
@@ -155,8 +152,10 @@ describe('acquisition detail load', () => {
         error: { kind: 'InfraError', operation: 'read', message: 'x' },
       }),
     };
-    const result = load(eventFor(facade, importer)) as unknown as { importState: string };
-    expect(result.importState).toBe('unavailable');
+    const result = load(eventFor(facade, importer)) as unknown as {
+      importSection: { state: string };
+    };
+    expect(result.importSection.state).toBe('unavailable');
     expect(logger.warn).toHaveBeenCalledWith(
       { acquisitionId: 'acq-1', err: { kind: 'InfraError', operation: 'read', message: 'x' } },
       expect.stringMatching(/import/),
@@ -170,8 +169,10 @@ describe('acquisition detail load', () => {
         throw new Error('boom');
       },
     };
-    const result = load(eventFor(facade, importer)) as unknown as { importState: string };
-    expect(result.importState).toBe('unavailable');
+    const result = load(eventFor(facade, importer)) as unknown as {
+      importSection: { state: string };
+    };
+    expect(result.importSection.state).toBe('unavailable');
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ acquisitionId: 'acq-1' }),
       expect.stringMatching(/import/),

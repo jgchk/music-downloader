@@ -126,25 +126,40 @@ tolerant-reader line in the same register.
 - **WHEN** the timeline renders an automatic confident-match selection
 - **THEN** the visible text carries a whole-number match percentage and the raw distance appears only in the entry's disclosure
 
-### Requirement: The acquisition detail refreshes itself while active
+### Requirement: The acquisition detail refreshes itself while the story is unsettled
 
-While the displayed acquisition is not terminal, the detail page SHALL periodically re-fetch its
-own data and re-render without user action, so the timeline and its in-progress entry track
-reality; refreshing SHALL stop once the acquisition is terminal and on leaving the page. The
-refresh trigger SHALL sit behind a single swappable seam owned by the page layer, with the
-timeline presentation consuming page data only, so a future push-based freshness source replaces
-the trigger without touching the presentation. The refresh SHALL reuse the page's existing load
-path and SHALL NOT introduce a new wire endpoint.
+While the displayed acquisition's story is unsettled — the acquisition is not terminal, OR it was
+delivered (fulfilled) and its import has not yet reported its own decided settledness (including
+the asynchronous window where no import exists yet, and a failed importer read) — the detail page
+SHALL periodically re-fetch its own data and re-render without user action, so the timeline and
+its in-progress entry track reality; refreshing SHALL stop once the whole story has settled and
+on leaving the page. A delivered acquisition whose import side is absent or unreadable SHALL NOT
+be presented as in the library. A failed re-fetch SHALL be surfaced as a modeled indication
+beside the timeline, never a silently stale page. The refresh trigger SHALL sit behind a single
+swappable seam owned by the page layer, with the timeline presentation consuming page data only,
+so a future push-based freshness source replaces the trigger without touching the presentation.
+The refresh SHALL reuse the page's existing load path and SHALL NOT introduce a new wire
+endpoint.
 
 #### Scenario: An active acquisition's page advances by itself
 
 - **WHEN** a user keeps the detail of an active acquisition open while the acquisition progresses
 - **THEN** the timeline gains the new entries and the in-progress entry advances without a manual reload
 
-#### Scenario: A terminal acquisition's page rests
+#### Scenario: A delivered acquisition keeps refreshing until its import settles
 
-- **WHEN** the displayed acquisition reaches a terminal state
+- **WHEN** a user views a fulfilled acquisition whose import does not exist yet or has not settled
+- **THEN** the page keeps refreshing, presents an in-progress entry, and does not claim the release is in the library
+
+#### Scenario: A settled story's page rests
+
+- **WHEN** the displayed acquisition's story has fully settled (a failed ending, or a delivery whose import reports itself settled)
 - **THEN** periodic refreshing stops
+
+#### Scenario: A failed refresh is visible
+
+- **WHEN** a periodic re-fetch fails while the page stays open
+- **THEN** the page indicates its data may be momentarily stale instead of silently freezing
 
 ### Requirement: Never-resolved acquisitions are titled by their request
 

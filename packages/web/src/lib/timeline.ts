@@ -6,11 +6,23 @@ import type { ImportStatusResponseDto } from '@music/importer';
  * the downloader's own steps and, once it was handed off, the importer's — into one list ordered
  * by occurrence time (web-ui spec). This is a web-owned join over the two module facades' read
  * models; it introduces no contract between the bounded contexts (the same principle as the
- * attention queue). Each entry keeps its originating module so the view can attribute it.
+ * attention queue). Each entry keeps its originating module — it drives copy dispatch and skin
+ * styling (`data-module`), never rendered attribution text (the timeline speaks in one voice).
  */
 
 export type DownloaderHistoryEntry = AcquisitionStatusResponseDto['history'][number];
 export type ImporterHistoryEntry = ImportStatusResponseDto['history'][number];
+
+/**
+ * The import side of an acquisition as the detail page reads it: `present` carries the import's
+ * status; `none` means no import exists yet (the normal state before — and briefly after — the
+ * hand-off, since the importer picks the delivery up asynchronously); `unavailable` means the read
+ * failed and was logged. One discriminated value, so "present but statusless" is unrepresentable.
+ */
+export type ImportSection =
+  | { readonly state: 'present'; readonly status: ImportStatusResponseDto }
+  | { readonly state: 'none' }
+  | { readonly state: 'unavailable' };
 
 export type TimelineEntry =
   | { readonly module: 'downloader'; readonly at: string; readonly entry: DownloaderHistoryEntry }

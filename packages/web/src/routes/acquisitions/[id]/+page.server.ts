@@ -1,7 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { ImportStatusResponseDto } from '@music/importer';
 import { messageOf, statusOf } from '$lib/server/facade-errors.js';
-import { mergeTimeline } from '$lib/timeline.js';
+import { mergeTimeline, type ImportSection } from '$lib/timeline.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -10,10 +9,6 @@ import type { Actions, PageServerLoad } from './$types';
  * for an acquisition not yet handed off; `unavailable` is a read that failed and is logged — both
  * keep the page up rather than failing it.
  */
-type ImportSection =
-  | { readonly state: 'present'; readonly status: ImportStatusResponseDto }
-  | { readonly state: 'none' }
-  | { readonly state: 'unavailable' };
 
 function importSectionFor(locals: App.Locals, acquisitionId: string): ImportSection {
   try {
@@ -56,11 +51,11 @@ export const load: PageServerLoad = ({ locals, params }) => {
   const base = {
     acquisition,
     timeline,
-    importState: importSection.state,
-    importStatus: importSection.state === 'present' ? importSection.status : undefined,
-    // The load's clock: time rendering downstream stays a pure function of its inputs, and the
-    // liveness re-fetch (design D8) refreshes this stamp along with everything else.
-    now: new Date().toISOString(),
+    importSection,
+    // The load's clock (injected via locals — the one impure edge): time rendering downstream
+    // stays a pure function of its inputs, and the liveness re-fetch (design D8) refreshes this
+    // stamp along with everything else.
+    now: locals.now(),
   };
 
   if (acquisition.status !== 'Downloading') {

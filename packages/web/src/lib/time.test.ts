@@ -67,11 +67,28 @@ describe('durationGloss — the closing-row summary', () => {
   });
 });
 
-describe('malformed timestamps degrade instead of throwing (tolerant reader)', () => {
-  it('renders empty strings for an unparseable timestamp', () => {
-    expect(entryTime('not-a-date', NOW, 'UTC')).toBe('');
-    expect(fullTime('not-a-date', 'UTC')).toBe('');
-    expect(dateKey('not-a-date', 'UTC')).toBe('');
-    expect(dateLabel('not-a-date', 'UTC')).toBe('');
+describe('malformed timestamps degrade visibly instead of throwing (tolerant reader)', () => {
+  it('renders the raw value for an unparseable timestamp — never a silent blank', () => {
+    expect(entryTime('not-a-date', NOW, 'UTC')).toBe('not-a-date');
+    expect(fullTime('not-a-date', 'UTC')).toBe('not-a-date');
+    expect(dateLabel('not-a-date', 'UTC')).toBe('not-a-date');
+  });
+
+  it('suppresses the date divider (typed undefined) for an unparseable timestamp', () => {
+    expect(dateKey('not-a-date', 'UTC')).toBeUndefined();
+  });
+
+  it('a malformed clock still renders each entry’s own absolute time', () => {
+    expect(entryTime('2026-07-23T14:41:00Z', 'not-a-clock', 'UTC')).toBe('23 Jul 2026, 14:41');
+  });
+});
+
+describe('boundaries', () => {
+  it('a full day exactly reads as absolute, not hours', () => {
+    expect(entryTime('2026-07-31T12:00:00Z', NOW, 'UTC')).toBe('31 Jul 2026, 12:00');
+  });
+
+  it('a zero-length story span yields no duration gloss', () => {
+    expect(durationGloss('2026-08-01T10:00:00Z', '2026-08-01T10:00:00Z')).toBeUndefined();
   });
 });

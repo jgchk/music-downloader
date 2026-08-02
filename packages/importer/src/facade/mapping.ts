@@ -143,6 +143,7 @@ export function statusViewToDto(view: ImportStatusView): ImportStatusResponseDto
     location: view.location,
     review: view.openReview === undefined ? undefined : reviewToDto(view.openReview),
     rejection: view.rejection === undefined ? undefined : { ...view.rejection },
+    settled: view.settled,
     stalled: view.stalled,
     history: view.history.map(
       (entry) => ({ ...entry }) as ImportStatusResponseDto['history'][number],

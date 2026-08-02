@@ -2,7 +2,12 @@ import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import type { ImportStatusResponseDto } from '@music/importer';
 import AcquisitionDetail from './AcquisitionDetail.svelte';
-import type { DownloaderHistoryEntry, ImporterHistoryEntry, TimelineEntry } from '$lib/timeline.js';
+import type {
+  DownloaderHistoryEntry,
+  ImporterHistoryEntry,
+  ImportSection,
+  TimelineEntry,
+} from '$lib/timeline.js';
 
 const candidate = { username: 'xronin', path: '/files/a.flac', sizeBytes: 9 };
 
@@ -32,12 +37,10 @@ function im(entry: ImporterHistoryEntry): TimelineEntry {
   return { module: 'importer', at: entry.at, entry };
 }
 
-function imports(over: Partial<ImportStatusResponseDto>): ImportStatusResponseDto {
+function imports(over: Partial<ImportStatusResponseDto>): ImportSection {
   return {
-    importId: 'imp-1',
-    status: 'requested',
-    history: [],
-    ...over,
+    state: 'present',
+    status: { importId: 'imp-1', status: 'requested', settled: false, history: [], ...over },
   };
 }
 
@@ -48,7 +51,7 @@ describe('AcquisitionDetail (SSR)', () => {
         ...base,
         acquisition: working,
         timeline: [dl({ kind: 'selected', at: T(0), candidate })],
-        importState: 'none',
+        importSection: { state: 'none' },
         progress: { percent: 50, bytesTransferred: 5, bytesTotal: 10 },
       },
     });
@@ -74,7 +77,7 @@ describe('AcquisitionDetail (SSR)', () => {
           currentCandidate: undefined,
           cancellable: false,
         },
-        importState: 'none',
+        importSection: { state: 'none' },
         timeline: [
           dl({
             kind: 'requested',
@@ -120,8 +123,7 @@ describe('AcquisitionDetail (SSR)', () => {
           currentCandidate: undefined,
           cancellable: false,
         },
-        importState: 'present',
-        importStatus: imports({ status: 'applied', location: '/lib/x' }),
+        importSection: imports({ status: 'applied', location: '/lib/x', settled: true }),
         timeline: [
           im({ kind: 'requested', at: T(10) }),
           im({ kind: 'proposed', at: T(11), candidateCount: 2 }),
@@ -152,8 +154,8 @@ describe('AcquisitionDetail (SSR)', () => {
     expect(body).toContain('Review resolved — you rejected the import');
     expect(body).toContain('Added to the library');
     expect(body).toContain('Added to the library, but needs attention');
-    expect(body).toContain('Import rejected — wrong rip. A new download will be tried.');
-    expect(body).toContain('Marked this delivery unusable — retrying the download');
+    expect(body).toContain('Import rejected — wrong rip. A new download may be tried.');
+    expect(body).toContain('Marked this delivery unusable — a new download may be tried');
     expect(body).not.toContain('retry-download verdict');
     expect(body).toContain('data-testid="location"');
     expect(body).toContain('In library at');
@@ -193,7 +195,7 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: { ...working, status: 'Exhausted' as const, cancellable: false },
-        importState: 'none',
+        importSection: { state: 'none' },
         timeline: [
           dl({
             kind: 'requested',
@@ -249,8 +251,7 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: { ...working, status: 'Fulfilled' as const, cancellable: false },
-        importState: 'present',
-        importStatus: imports({ status: 'awaiting-review' }),
+        importSection: imports({ status: 'awaiting-review' }),
         timeline: [],
       },
     });
@@ -263,8 +264,7 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: { ...working, status: 'Fulfilled' as const, cancellable: false },
-        importState: 'present',
-        importStatus: imports({ status: 'applied', location: '/lib/x' }),
+        importSection: imports({ status: 'applied', location: '/lib/x', settled: true }),
         timeline: [
           dl({ kind: 'imported', at: T(0), candidate, location: '/stage/x' }),
           dl({ kind: 'fulfilled', at: T(0), location: '/stage/x' }),
@@ -284,7 +284,7 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: working,
-        importState: 'unavailable',
+        importSection: { state: 'unavailable' },
         timeline: [dl({ kind: 'selected', at: T(0), candidate })],
       },
     });
@@ -296,7 +296,7 @@ describe('AcquisitionDetail (SSR)', () => {
     const { cancellable, ...absent } = working;
     void cancellable;
     const { body } = render(AcquisitionDetail, {
-      props: { ...base, acquisition: absent, importState: 'none', timeline: [] },
+      props: { ...base, acquisition: absent, importSection: { state: 'none' }, timeline: [] },
     });
     // No re-derivation from the status enum: an absent flag degrades to no cancel button.
     expect(body).not.toContain('data-testid="cancel"');
@@ -313,7 +313,7 @@ describe('AcquisitionDetail (SSR)', () => {
           location: '/stage/x',
           cancellable: false,
         },
-        importState: 'none',
+        importSection: { state: 'none' },
         timeline: [],
       },
     });
@@ -414,7 +414,7 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: working,
-        importState: 'present',
+        importSection: imports({}),
         timeline: [
           dl({ kind: 'teleported', at: T(0) } as never),
           im({ kind: 'zapped', at: T(1) } as never),
@@ -438,7 +438,7 @@ describe('AcquisitionDetail (SSR)', () => {
           cancellable: false,
         },
         timeline: [],
-        importState: 'none',
+        importSection: { state: 'none' },
         error: 'Something went wrong (store). Try again.',
       },
     });
@@ -457,12 +457,43 @@ describe('AcquisitionDetail (SSR)', () => {
           currentCandidate: undefined,
           cancellable: false,
         },
-        importState: 'none',
+        importSection: imports({ status: 'applied', settled: true }),
         timeline: [dl({ kind: 'fulfilled', at: T(0), location: '/stage/x' })],
       },
     });
     expect(body).toContain('data-testid="no-history"');
     expect(body).not.toContain('data-testid="duration"');
+  });
+
+  it('a delivery whose import has not appeared yet keeps narrating instead of claiming the library', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: {
+        ...base,
+        acquisition: {
+          ...working,
+          status: 'Fulfilled' as const,
+          currentCandidate: undefined,
+          location: '/stage/x',
+          cancellable: false,
+        },
+        importSection: { state: 'none' },
+        timeline: [dl({ kind: 'imported', at: T(0), candidate, location: '/stage/x' })],
+      },
+    });
+    // The async hand-off window: honest status, a live pending row, no duration, no library claim.
+    expect(body).toContain('Delivered — confirming the import');
+    expect(body).toContain('data-testid="pending-row"');
+    expect(body).toContain('Adding to the library…');
+    expect(body).not.toContain('In your library');
+    expect(body).not.toContain('data-testid="duration"');
+  });
+
+  it('surfaces a failed liveness refresh instead of silently going stale', () => {
+    const { body } = render(AcquisitionDetail, {
+      props: { ...base, acquisition: working, timeline: [], refreshFailed: true },
+    });
+    expect(body).toContain('data-testid="refresh-failed"');
+    expect(body).toContain('Couldn’t refresh just now — retrying.');
   });
 
   it('pluralizes the status meta and omits zero counts', () => {

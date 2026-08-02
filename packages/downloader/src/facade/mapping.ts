@@ -21,6 +21,7 @@ import type {
   AcquisitionRequestDto,
   AcquisitionStatusResponseDto,
   ProgressResponseDto,
+  RequestedTargetEchoDto,
   SubmitAcquisitionRequestDto,
 } from './schemas.js';
 
@@ -64,9 +65,29 @@ export function resolvePolicies(
     .mapErr(() => 'InvalidPolicy' as const);
 }
 
-/** The request echoed as the submit endpoint's own wire shape (the domain's branded mbid decays to its string). */
-function requestToWire(request: AcquisitionRequest): AcquisitionRequestDto {
-  return request.kind === 'descriptor' ? { ...request } : { ...request };
+/**
+ * The request echoed onto the wire as an explicit field projection — never a spread, so a future
+ * domain-only field on `AcquisitionRequest` cannot leak into a response (the anti-corruption copy
+ * is real). The domain's branded mbid decays to its string here.
+ */
+function requestToWire(request: AcquisitionRequest): RequestedTargetEchoDto {
+  switch (request.kind) {
+    case 'musicbrainz': {
+      return { kind: 'musicbrainz', mbid: request.mbid, targetType: request.targetType };
+    }
+    case 'release-group': {
+      return { kind: 'release-group', mbid: request.mbid, targetType: request.targetType };
+    }
+    case 'descriptor': {
+      return {
+        kind: 'descriptor',
+        targetType: request.targetType,
+        artist: request.artist,
+        title: request.title,
+        album: request.album,
+      };
+    }
+  }
 }
 
 function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
