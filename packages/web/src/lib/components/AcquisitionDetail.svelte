@@ -1,12 +1,21 @@
 <script lang="ts">
   import type { AcquisitionStatusResponseDto, ProgressResponseDto } from '@music/downloader';
+  import type { ImportStatusResponseDto } from '@music/importer';
   import {
     isCancellable,
-    outcomeSummary,
+    isTerminal,
     parseAcquisitionView,
-    statusTone,
     targetDescription,
   } from '$lib/acquisitions.js';
+  import {
+    entryCopy,
+    isImportSettled,
+    metaSummary,
+    overallStatus,
+    pendingRowFor,
+    type EntryCopy,
+  } from '$lib/copy.js';
+  import { dateKey, dateLabel, durationGloss, entryTime, fullTime } from '$lib/time.js';
   import type { TimelineEntry } from '$lib/timeline.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
   import ProgressBar from './ProgressBar.svelte';
@@ -15,7 +24,8 @@
     acquisition: AcquisitionStatusResponseDto;
     /**
      * The download-through-import history as one timeline, composed web-side and ordered by
-     * occurrence time — each entry tagged with its originating module (web-ui).
+     * occurrence time — each entry tagged with its originating module (web-ui). The module shapes
+     * the copy but is never rendered as text: one narrator tells the whole story.
      */
     timeline?: TimelineEntry[];
     /**
@@ -23,26 +33,79 @@
      * importer read failed. `none`/`unavailable` still render the downloader timeline (web-ui).
      */
     importState?: 'present' | 'none' | 'unavailable';
+    /** The import's status read, present alongside `importState === 'present'`. */
+    importStatus?: ImportStatusResponseDto;
     progress?: ProgressResponseDto;
     /** Downloading, but the progress read failed — say so rather than render a blank bar. */
     progressUnavailable?: boolean;
     /** Cancel-action failure to surface. */
     error?: string;
+    /** The load's clock — time rendering stays a pure function of props, no wall-clock reads here. */
+    nowIso: string;
+    /** Test seam for deterministic absolute times; production renders in the host zone. */
+    timeZone?: string;
   }
 
   let {
     acquisition,
     timeline = [],
     importState = 'none',
+    importStatus,
     progress,
     progressUnavailable = false,
     error,
+    nowIso,
+    timeZone,
   }: Properties = $props();
 
   // Parse the status DTO into a discriminated view at the boundary, so the template branches on a
   // view variant (whose `editions` case carries candidates) instead of re-deriving the impossible
   // "awaiting but candidates undefined" combo inline.
   const view = $derived(parseAcquisitionView(acquisition));
+
+  const overall = $derived(overallStatus(acquisition, importState, importStatus));
+  const meta = $derived(metaSummary(acquisition.attempts, acquisition.rejectedCount));
+  const pending = $derived(pendingRowFor(acquisition, importState, importStatus));
+  const settled = $derived(isTerminal(acquisition) && isImportSettled(importState, importStatus));
+
+  /** The one labeled location line: the library once applied, else the delivered staging drop. */
+  const locationLine = $derived.by(() => {
+    if (importStatus?.location !== undefined && importStatus.status === 'applied') {
+      return { label: 'In library at', location: importStatus.location };
+    }
+    if (importState !== 'present' && acquisition.status === 'Fulfilled' && acquisition.location) {
+      return { label: 'Delivered to', location: acquisition.location };
+    }
+    return;
+  });
+
+  interface RenderRow {
+    readonly item: TimelineEntry;
+    readonly copy: EntryCopy;
+    /** A date label rendered before this row when the calendar date changes. */
+    readonly divider?: string;
+    /** The whole-story duration, carried by the closing row once everything has settled. */
+    readonly duration?: string;
+  }
+
+  const rows: readonly RenderRow[] = $derived.by(() => {
+    const rendered: RenderRow[] = [];
+    let lastDate: string | undefined;
+    for (const item of timeline) {
+      const copy = entryCopy(item);
+      if (copy === undefined) continue;
+      const key = dateKey(item.at, timeZone);
+      const divider = key !== '' && key !== lastDate ? dateLabel(item.at, timeZone) : undefined;
+      if (key !== '') lastDate = key;
+      rendered.push({ item, copy, divider });
+    }
+    const first = timeline[0];
+    const last = rendered.at(-1);
+    if (settled && first !== undefined && last !== undefined) {
+      rendered[rendered.length - 1] = { ...last, duration: durationGloss(first.at, last.item.at) };
+    }
+    return rendered;
+  });
 </script>
 
 <h1>{targetDescription(acquisition)}</h1>
@@ -51,27 +114,17 @@
   <p class="error" role="alert" data-testid="action-error">{error}</p>
 {/if}
 
-<p>
-  <AcquisitionBadge phase={statusTone(acquisition.status)} />
-  <span data-testid="status">{acquisition.status}</span>
-  — {acquisition.attempts} attempts, {acquisition.rejectedCount} candidates rejected
+<p class="status-line">
+  <AcquisitionBadge phase={overall.tone} />
+  <span data-testid="status">{overall.phrase}</span>
+  {#if meta !== ''}
+    <span class="status-meta" data-testid="status-meta">· {meta}</span>
+  {/if}
 </p>
 
-{#if progress}
-  <ProgressBar {progress} />
-{:else if progressUnavailable}
-  <p data-testid="progress-unavailable">
-    This download is in progress, but its live progress is momentarily unavailable.
-  </p>
-{/if}
-
-{#if outcomeSummary(acquisition) !== undefined}
-  <p data-testid="outcome">{outcomeSummary(acquisition)}</p>
-{/if}
-
-{#if acquisition.currentCandidate}
-  <p data-testid="current-candidate">
-    Trying {acquisition.currentCandidate.path} from {acquisition.currentCandidate.username}
+{#if locationLine}
+  <p class="location-line" data-testid="location">
+    {locationLine.label} <span class="location-path">{locationLine.location}</span>
   </p>
 {/if}
 
@@ -128,64 +181,72 @@
 <h2>History</h2>
 {#if importState === 'unavailable'}
   <p data-testid="import-unavailable">
-    The import side of this acquisition is currently unavailable.
+    The import side of this acquisition is momentarily unavailable.
   </p>
-{:else if importState === 'none'}
-  <p data-testid="import-none">Not yet handed off to the importer.</p>
 {/if}
-{#if timeline.length === 0}
-  <p data-testid="no-history">Nothing has happened yet.</p>
+{#if rows.length === 0 && pending === undefined}
+  <!-- Defensive only: a real acquisition always has at least its requested entry. -->
+  <p data-testid="no-history">
+    No history recorded yet — this page updates as the acquisition progresses.
+  </p>
 {:else}
-  <ol data-testid="history">
-    {#each timeline as item, index (index)}
-      <li data-module={item.module}>
-        {#if item.module === 'downloader'}
-          {#if item.entry.kind === 'selected'}
-            Selected {item.entry.candidate.path} from {item.entry.candidate.username}
-          {:else if item.entry.kind === 'download-failed'}
-            Download failed ({item.entry.reason}) — {item.entry.candidate.path}
-          {:else if item.entry.kind === 'validation-failed'}
-            Validation failed ({item.entry.reasons.join(', ')}) — {item.entry.candidate.path}
-          {:else if item.entry.kind === 'imported'}
-            <!-- The downloader's "imported" is the hand-off/staging deposit, NOT the library import;
-                 the importer's `applied` below is the real library import. Label them apart. -->
-            Handed off to importer — staged at {item.entry.location}
-          {:else if item.entry.kind === 'fulfillment-rejected'}
-            Rejected after delivery ({item.entry.reasons.join(', ')})
-          {:else}
-            <!-- Tolerant reader: a downloader history kind added later lands here rather than
-                 mislabeling and dereferencing a field it may not carry. -->
-            Something happened in this acquisition.
+  <ol class="timeline" data-testid="history">
+    {#each rows as row, index (index)}
+      {#if row.divider !== undefined}
+        <li class="timeline-date" data-testid="date-divider">{row.divider}</li>
+      {/if}
+      <li class="timeline-entry" data-module={row.item.module} data-state={row.copy.state}>
+        <span class="timeline-marker" aria-hidden="true"></span>
+        <div class="timeline-body">
+          <span class="timeline-text">{row.copy.text}</span>
+          {#if row.duration !== undefined}
+            <span class="timeline-duration" data-testid="duration">· {row.duration}</span>
           {/if}
-        {:else}
-          <span class="module-tag" data-testid="import-entry">Import</span>
-          {#if item.entry.kind === 'requested'}
-            Import requested
-          {:else if item.entry.kind === 'proposed'}
-            Matched {item.entry.candidateCount} candidate{item.entry.candidateCount === 1
-              ? ''
-              : 's'} against the library
-          {:else if item.entry.kind === 'auto-apply-selected'}
-            Auto-selected a confident match (distance {item.entry.distance})
-          {:else if item.entry.kind === 'review-required'}
-            Review required ({item.entry.reviewKind})
-          {:else if item.entry.kind === 'review-resolved'}
-            Review resolved ({item.entry.resolution})
-          {:else if item.entry.kind === 'applied'}
-            Imported into the library at {item.entry.location}
-          {:else if item.entry.kind === 'remediation-required'}
-            Applied, but needs remediation
-          {:else if item.entry.kind === 'rejected'}
-            Import rejected ({item.entry.reason})
-          {:else if item.entry.kind === 'release-verdict-recorded'}
-            Recorded a retry-download verdict ({item.entry.reasons.join(', ')})
-          {:else}
-            <!-- Tolerant reader: an importer history kind added later lands here safely. -->
-            Something happened in the import.
+          {#if row.copy.link}
+            <a class="timeline-link" href={row.copy.link.href}>{row.copy.link.label}</a>
           {/if}
-        {/if}
+          {#if row.copy.detail.length > 0}
+            <details class="timeline-detail">
+              <summary>Details</summary>
+              <dl>
+                {#each row.copy.detail as detailItem, detailIndex (detailIndex)}
+                  <dt>{detailItem.label}</dt>
+                  <dd>{detailItem.value}</dd>
+                {/each}
+              </dl>
+            </details>
+          {/if}
+        </div>
+        <time datetime={row.item.at} title={fullTime(row.item.at, timeZone)}>
+          {entryTime(row.item.at, nowIso, timeZone)}
+        </time>
       </li>
     {/each}
+    {#if pending}
+      <li
+        class="timeline-entry timeline-pending"
+        data-state={pending.state}
+        data-testid="pending-row"
+      >
+        <span class="timeline-marker" aria-hidden="true"></span>
+        <div class="timeline-body">
+          <span class="timeline-text">{pending.text}</span>
+          {#if pending.link}
+            <a class="timeline-link" href={pending.link.href}>{pending.link.label}</a>
+          {/if}
+          {#if pending.showProgress}
+            {#if progress}
+              <ProgressBar {progress} />
+            {:else if progressUnavailable}
+              <span data-testid="progress-unavailable">
+                This download is in progress, but its live progress is momentarily unavailable.
+              </span>
+            {/if}
+          {/if}
+        </div>
+        <time datetime={nowIso}>now</time>
+      </li>
+    {/if}
   </ol>
 {/if}
 

@@ -113,12 +113,19 @@ Layer 1 = always-visible row text. Layer 2 = per-entry `<details>` payload (D7).
 | `validation-failed` | `The files failed quality checks — {gloss(reasons)}. Trying the next source.` | verbatim reason list, remote path |
 | `imported` (hand-off) | `Download complete — preparing to add to the library` | staged path |
 | `fulfillment-rejected` | `Delivery rejected — {gloss(reasons)}. Searching for a replacement.` | verbatim reasons |
-| `fulfilled` (closing) | `Done — in your library` + duration gloss (D6) | library location (also labeled in header, D9) |
+| `fulfilled` | *(curated out of the view — see note)* | — |
 | `exhausted` (closing) | `Gave up — every source failed or came up empty. Request it again to search anew.` | — |
 | `conflicted` (closing) | `Stopped — the destination already had files for this release. Nothing was overwritten.` | conflicting location |
 | `metadata-failed` (closing) | `Couldn't identify this release. Check the artist and title, then request it again.` | request detail |
 | `cancelled` (closing) | `Cancelled` | — |
 | unknown kind (tolerant reader) | `Something happened that this page can't describe yet` | — |
+
+Note: the downloader's `AcquisitionFulfilled` is co-emitted with the hand-off (`Imported`) in the
+same decide batch — it marks the staging deposit, not the library import — so a rendered
+`fulfilled` row would duplicate the hand-off's moment and falsely read as the story's ending
+mid-timeline. The web view curates the `fulfilled` kind out (the facade still carries it); the
+true happy ending is the import's `applied` row, and the whole-story duration gloss attaches to
+the final rendered row once the story has settled (downloader terminal + import settled).
 
 Note: `conflicted` copy is corrected against the domain (`library.ts` D13): a conflict means the
 destination directory was already occupied and was left untouched — *not* a concurrent

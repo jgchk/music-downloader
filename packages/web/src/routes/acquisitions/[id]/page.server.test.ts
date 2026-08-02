@@ -55,6 +55,8 @@ describe('acquisition detail load', () => {
       acquisition: base,
       timeline: [],
       importState: 'none',
+      importStatus: undefined,
+      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       progress: undefined,
       progressUnavailable: false,
     });
@@ -71,6 +73,8 @@ describe('acquisition detail load', () => {
       acquisition: downloading,
       timeline: [],
       importState: 'none',
+      importStatus: undefined,
+      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       progress,
       progressUnavailable: false,
     });
@@ -89,6 +93,8 @@ describe('acquisition detail load', () => {
       acquisition: downloading,
       timeline: [],
       importState: 'none',
+      importStatus: undefined,
+      now: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       progress: undefined,
       progressUnavailable: true,
     });
@@ -127,10 +133,12 @@ describe('acquisition detail load', () => {
 
     const result = load(eventFor(facade, importer)) as unknown as {
       importState: string;
+      importStatus?: { importId: string };
       timeline: { module: string; at: string }[];
     };
 
     expect(result.importState).toBe('present');
+    expect(result.importStatus?.importId).toBe('imp-1');
     expect(result.timeline.map((t) => [t.module, t.at])).toEqual([
       ['downloader', '2026-01-01T00:00:00Z'],
       ['downloader', '2026-01-01T00:00:04Z'],

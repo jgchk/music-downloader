@@ -100,7 +100,12 @@ function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
       return { kind: 'selected', at, candidate: { ...entry.candidate } };
     }
     case 'download-failed': {
-      return { kind: 'download-failed', at, candidate: { ...entry.candidate }, reason: entry.reason };
+      return {
+        kind: 'download-failed',
+        at,
+        candidate: { ...entry.candidate },
+        reason: entry.reason,
+      };
     }
     case 'validation-failed': {
       return {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AcquisitionStatusResponseDto } from '@music/downloader';
   import { statusTone, targetDescription } from '$lib/acquisitions.js';
+  import { statusPhrase } from '$lib/copy.js';
   import AcquisitionBadge from './AcquisitionBadge.svelte';
 
   interface Properties {
@@ -39,10 +40,12 @@
               {#if statusTone(acquisition.status) === 'pending'}
                 <!-- The tone badge collapses every in-progress state to "Working"; show the
                      granular phase so a queue you monitor still reads at a glance. -->
-                <span class="phase">{acquisition.status}</span>
+                <span class="phase">{statusPhrase(acquisition.status)}</span>
               {/if}
               {#if acquisition.attempts > 0}
-                <span class="attempts">{acquisition.attempts} attempts</span>
+                <span class="attempts">
+                  {acquisition.attempts} attempt{acquisition.attempts === 1 ? '' : 's'}
+                </span>
               {/if}
             </span>
           {/if}

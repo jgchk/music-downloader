@@ -62,3 +62,26 @@
 :root[data-skin='glass'] dl.stats > div {
   backdrop-filter: blur(var(--surface-blur));
 }
+
+/* Timeline as soft dots on a hairline spine, frosted disclosure surfaces. */
+:root[data-skin='glass'] ol.timeline {
+  position: relative;
+}
+:root[data-skin='glass'] ol.timeline::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--step-3) / 2);
+  top: var(--step-2);
+  bottom: var(--step-2);
+  width: 1px;
+  background: var(--border);
+}
+:root[data-skin='glass'] ol.timeline > li.timeline-entry {
+  position: relative;
+}
+:root[data-skin='glass'] .timeline-marker {
+  box-shadow: 0 0 0 3px var(--bg);
+}
+:root[data-skin='glass'] li.timeline-date {
+  padding-left: calc(var(--step-3) + var(--inline-gap));
+}

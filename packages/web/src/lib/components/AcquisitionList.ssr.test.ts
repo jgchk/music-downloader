@@ -28,8 +28,13 @@ describe('AcquisitionList (SSR)', () => {
     const { body } = render(AcquisitionList, {
       props: {
         acquisitions: [
-          // In-progress, target not yet resolved → the "(resolving…)" placeholder.
-          acquisition({ acquisitionId: 'acq-1', status: 'Searching', attempts: 1 }),
+          // In-progress, target not yet resolved → titled by the request as given.
+          acquisition({
+            acquisitionId: 'acq-1',
+            status: 'Searching',
+            attempts: 1,
+            requestedTarget: { kind: 'descriptor', targetType: 'album', artist: 'R', title: 'Q' },
+          }),
           // Terminal with a resolved target; its failure reason must NOT leak into the list.
           acquisition({
             acquisitionId: 'acq-2',
@@ -42,9 +47,11 @@ describe('AcquisitionList (SSR)', () => {
         ],
       },
     });
-    // The in-progress row shows its granular phase + attempts and the resolving placeholder…
-    expect(body).toContain('(resolving…)');
-    expect(body).toContain('Searching'); // granular phase for the in-progress row
+    // The in-progress row shows its granular phase + attempts, titled by the request as given…
+    expect(body).toContain('R — Q');
+    expect(body).toContain('Searching'); // granular phase phrase for the in-progress row
+    expect(body).toContain('1 attempt');
+    expect(body).not.toContain('1 attempts');
     expect(body).toContain('data-phase="pending"');
     expect(body).toContain('/acquisitions/acq-1');
     // …the terminal row shows its target, a Failed badge, and its attempts…

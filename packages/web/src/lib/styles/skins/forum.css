@@ -243,3 +243,32 @@
   box-shadow: inset 1px 1px 0 #ffffff;
   color: #333;
 }
+
+/* Timeline as a forum thread (the finishing pass): hairline-separated rows,
+   square bevel markers, a subSilver bar for date dividers. */
+:root[data-skin='forum'] {
+  --marker-routine: #98aab1;
+}
+:root[data-skin='forum'] ol.timeline > li.timeline-entry {
+  border-bottom: 1px solid var(--surface-2);
+  padding: var(--cell-pad-y) var(--cell-pad-x);
+}
+:root[data-skin='forum'] ol.timeline > li.timeline-entry:last-child {
+  border-bottom: none;
+}
+:root[data-skin='forum'] .timeline-marker {
+  border-radius: 0;
+  border: 1px solid var(--border);
+}
+:root[data-skin='forum'] li.timeline-date {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 2px var(--cell-pad-x);
+  font-weight: var(--fw-head);
+  color: var(--text);
+}
+:root[data-skin='forum'] .timeline-detail dl {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: var(--step-1) var(--step-2);
+}

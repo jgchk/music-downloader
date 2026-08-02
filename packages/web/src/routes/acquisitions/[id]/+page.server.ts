@@ -53,7 +53,15 @@ export const load: PageServerLoad = ({ locals, params }) => {
     acquisition.history,
     importSection.state === 'present' ? importSection.status.history : [],
   );
-  const base = { acquisition, timeline, importState: importSection.state };
+  const base = {
+    acquisition,
+    timeline,
+    importState: importSection.state,
+    importStatus: importSection.state === 'present' ? importSection.status : undefined,
+    // The load's clock: time rendering downstream stays a pure function of its inputs, and the
+    // liveness re-fetch (design D8) refreshes this stamp along with everything else.
+    now: new Date().toISOString(),
+  };
 
   if (acquisition.status !== 'Downloading') {
     return { ...base, progress: undefined, progressUnavailable: false };

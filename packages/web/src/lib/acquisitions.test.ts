@@ -4,7 +4,6 @@ import {
   formatBytes,
   isCancellable,
   isTerminal,
-  outcomeSummary,
   parseAcquisitionView,
   statusTone,
   targetDescription,
@@ -63,8 +62,36 @@ describe('targetDescription', () => {
     expect(targetDescription(acquisition({ target: { artist: 'A', title: 'T' } }))).toBe('A — T');
   });
 
-  it('renders a resolving placeholder before a target is known', () => {
-    expect(targetDescription(acquisition({}))).toBe('(resolving…)');
+  it('renders a resolving placeholder only while resolution is genuinely pending', () => {
+    expect(targetDescription(acquisition({ status: 'Pending' }))).toBe('Resolving…');
+    expect(targetDescription(acquisition({ status: 'Empty' }))).toBe('Resolving…');
+  });
+
+  it('falls back to the request as given when metadata never resolved', () => {
+    expect(
+      targetDescription(
+        acquisition({
+          status: 'MetadataFailed',
+          cancellable: false,
+          requestedTarget: { kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T' },
+        }),
+      ),
+    ).toBe('A — T');
+  });
+
+  it('labels a never-resolved id-only request neutrally, never a resolving placeholder', () => {
+    expect(
+      targetDescription(
+        acquisition({
+          status: 'MetadataFailed',
+          cancellable: false,
+          requestedTarget: { kind: 'musicbrainz', targetType: 'album', mbid: 'm-1' },
+        }),
+      ),
+    ).toBe('Unknown release');
+    expect(targetDescription(acquisition({ status: 'Exhausted', cancellable: false }))).toBe(
+      'Unknown release',
+    );
   });
 
   it('names the awaited edition choice after the offered editions, never "(resolving…)"', () => {
@@ -104,52 +131,6 @@ describe('targetDescription', () => {
         acquisition({ status: 'AwaitingManualSelection', target: { artist: 'A', title: 'T' } }),
       ),
     ).toBe('A — T');
-  });
-});
-
-describe('outcomeSummary', () => {
-  it('is undefined while working', () => {
-    expect(outcomeSummary(acquisition({ status: 'Searching' }))).toBeUndefined();
-  });
-
-  it('reports the deposit location when fulfilled', () => {
-    expect(outcomeSummary(acquisition({ status: 'Fulfilled', location: '/lib/x' }))).toBe('/lib/x');
-  });
-
-  it('falls back to the bare status when fulfilled without a location', () => {
-    expect(outcomeSummary(acquisition({ status: 'Fulfilled' }))).toBe('Fulfilled');
-  });
-
-  it('collects deduped failure reasons for a failed terminal state', () => {
-    const candidate = { username: 'u', path: 'p', sizeBytes: 1 };
-    expect(
-      outcomeSummary(
-        acquisition({
-          status: 'Exhausted',
-          cancellable: false,
-          history: [
-            { kind: 'selected', at: 't', candidate },
-            { kind: 'download-failed', at: 't', candidate, reason: 'Stalled' },
-            { kind: 'validation-failed', at: 't', candidate, reasons: ['DurationMismatch'] },
-            { kind: 'download-failed', at: 't', candidate, reason: 'Stalled' },
-            { kind: 'fulfillment-rejected', at: 't', candidate, reasons: ['bad rip'] },
-            { kind: 'imported', at: 't', candidate, location: '/x' },
-          ],
-        }),
-      ),
-    ).toBe('Exhausted (Stalled, DurationMismatch, bad rip)');
-  });
-
-  it('renders a failed terminal state without reasons plainly', () => {
-    expect(outcomeSummary(acquisition({ status: 'Cancelled', cancellable: false }))).toBe(
-      'Cancelled',
-    );
-  });
-
-  it('shows no outcome for a failed status when the decided flag is absent (older producer)', () => {
-    // The terminal gate reads the flag, so an absent flag degrades to no outcome line — never a
-    // re-derivation from the status enum.
-    expect(outcomeSummary(acquisition({ status: 'Exhausted' }))).toBeUndefined();
   });
 });
 
