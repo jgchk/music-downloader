@@ -130,7 +130,8 @@ tolerant-reader line in the same register.
 
 While the displayed acquisition's story is unsettled — the acquisition is not terminal, OR it was
 delivered (fulfilled) and its import has not yet reported its own decided settledness (including
-the asynchronous window where no import exists yet, and a failed importer read) — the detail page
+the asynchronous window where no import exists yet, and a failed importer read), OR its import
+rejected the delivery (which the downloader may still consume and revive) — the detail page
 SHALL periodically re-fetch its own data and re-render without user action, so the timeline and
 its in-progress entry track reality; refreshing SHALL stop once the whole story has settled and
 on leaving the page. A delivered acquisition whose import side is absent or unreadable SHALL NOT
@@ -153,8 +154,13 @@ endpoint.
 
 #### Scenario: A settled story's page rests
 
-- **WHEN** the displayed acquisition's story has fully settled (a failed ending, or a delivery whose import reports itself settled)
+- **WHEN** the displayed acquisition's story has fully settled (a failed ending, or a delivery whose import reports itself settled and did not reject)
 - **THEN** periodic refreshing stops
+
+#### Scenario: A rejected import keeps the page watching for the revival
+
+- **WHEN** a user views a fulfilled acquisition whose import rejected the delivery
+- **THEN** the page keeps refreshing, so the downloader's asynchronous revival (when the rejection warrants one) appears without a manual reload
 
 #### Scenario: A failed refresh is visible
 

@@ -449,8 +449,10 @@ const ADDING_ROW: PendingRow = {
 };
 
 /**
- * Exactly one in-progress row while the story is unsettled, derived from the status read models
- * the page already loads (never a new wire contract). Liveness gates on the decided terminality
+ * At most one in-progress row while the story is unsettled, derived from the status read models
+ * the page already loads (never a new wire contract). One unsettled state deliberately has no
+ * row: a rejected import (the page keeps watching for a revival, but the rejection row itself is
+ * the current truth to display). Liveness gates on the decided terminality
  * (`isTerminal`), NOT the cancel affordance, so an older producer omitting `cancellable` still
  * narrates. Both inner switches are exhaustive: a new downloader status or importer phase is a
  * compile error demanding a row (or an explicit "no row").
