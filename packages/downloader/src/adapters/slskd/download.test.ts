@@ -180,6 +180,7 @@ interface Harness {
   progress: DownloadProgress[];
   finished: string[];
   errorLogs: string[];
+  warnLogs: string[];
 }
 
 function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
@@ -194,6 +195,7 @@ function downloader(options: Options): Harness {
   const progress: DownloadProgress[] = [];
   const finished: string[] = [];
   const errorLogs: string[] = [];
+  const warnLogs: string[] = [];
   const polls = [...options.polls];
   // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
   // its staged files without every test having to spell out the events stub.
@@ -249,6 +251,9 @@ function downloader(options: Options): Harness {
   };
   const recordingLogger = {
     ...silentLogger(),
+    warn: (_context: unknown, message?: string) => {
+      warnLogs.push(message ?? '');
+    },
     error: (_context: unknown, message?: string) => {
       errorLogs.push(message ?? '');
     },
@@ -261,7 +266,7 @@ function downloader(options: Options): Harness {
     new SlskdClient(http),
     options.timer ?? fakeTimer(),
   );
-  return { adapter, deletes, ledger, counts, outcomes, progress, finished, errorLogs };
+  return { adapter, deletes, ledger, counts, outcomes, progress, finished, errorLogs, warnLogs };
 }
 
 /** Start the candidate and drive the watch to its delivered outcome (the common happy shape). */
@@ -1155,8 +1160,8 @@ describe('SlskdDownload', () => {
 
   it('contains an observer that throws: the watch dies loudly, nothing rejects unhandled', async () => {
     // A throw from the consumer wiring is a bug, not a modeled Err — the outer containment logs
-    // it and lets the watch die (the startup re-drive re-derives it); `watch.done` never rejects,
-    // so no unhandled rejection can take the process down.
+    // it and lets the watch die (the next boot's re-drive re-drives the candidate); `watch.done`
+    // never rejects, so no unhandled rejection can take the process down.
     const harness = downloader({
       polls: [bothSucceeded],
       events: [bothCompleted],
@@ -1344,6 +1349,9 @@ describe('SlskdDownload', () => {
     await tickUntil(control, () => harness.finished.length > 0, 'the latched watch to exit');
     await harness.adapter.settled();
     expect(harness.outcomes).toEqual([]);
+    // The "quietly" claim, falsifiably: without the latch-recognition branch the tick catch
+    // would log its phantom "retrying" warn for a retry the latch guarantees never happens.
+    expect(harness.warnLogs).not.toContain('download watch tick failed; retrying on the next tick');
   });
 
   describe('abort', () => {
