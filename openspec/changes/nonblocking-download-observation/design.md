@@ -97,6 +97,30 @@ start/abort port; the outcome consumer sees only the outcome port. Watch loops s
 deterministic timer, so every time-based judgment stays unit-testable by advancing fake time
 (same technique as today's stall tests), keeping the 100% gate feasible without fiction tests.
 
+### D7 — Review-driven refinements (cycle 1)
+
+- **Outcome commands name their candidate, required.** Every producer (interpreter, outcome
+  consumer, effect lander) has the candidate in hand; a candidate-less report would attach by
+  phase alone to whichever candidate is current — precisely the mis-rejection the late-report
+  guard exists to prevent. Commands are ephemeral, so no compat shape is needed.
+- **The status view exposes the decided `transferStarted` flag.** The BFF must not re-derive
+  attempt-ladder liveness from the history wire (the v3.12.0 decided-lifecycle-flags rule); the
+  fold already decides it.
+- **`applyCommand` re-runs a lost optimistic-concurrency race (bounded, 3 attempts).** The
+  reactor's follow-on append and the outcome consumer lawfully race on one stream; the benign
+  loser re-decides against the fresh stream (where the stale guards absorb it) instead of
+  parking the stream on a retryable fault. Persistent contention still surfaces.
+- **The settle verdict is pinned before source teardown.** Once teardown mutates the source's
+  records, a retried tick would mis-read the emptied listing as a stall — so teardown faults are
+  logged and left to the startup sweep (the existing backstop), never allowed to rewrite a
+  settled outcome.
+- **Shutdown latches the watches.** `runtime.stop()` marks every watch aborted before closing
+  the store (composition holds the supervisor concretely for exactly this seam); watches are
+  storeless, so dying promptly IS the graceful shutdown — the re-drive rebuilds them.
+- **Persistent-failure loops escalate.** Watch-tick and delivery retries promote every tenth
+  consecutive warn to an error, so a wedged watch is loud; full stalled-read-model surfacing of
+  undeliverable outcomes is deferred.
+
 ## Risks / Trade-offs
 
 - [Duplicate outcome delivery (crash window, boot re-emit)] → arbitration already exists:

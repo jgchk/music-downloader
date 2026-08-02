@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
   MBID,
@@ -30,13 +30,35 @@ import {
 const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
 const DOWNLOADS_PATH = '/api/v0/transfers/downloads/peer1';
 
-async function admin(method: string, path: string, body?: unknown): Promise<void> {
+async function admin(method: string, path: string, body?: unknown): Promise<Response> {
   const res = await fetch(`${SLSKD_ADMIN}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${method} ${path} returned ${res.status}`);
+  return res;
+}
+
+/** The stub's request journal: DELETE cancels the app issued against the held transfer. */
+async function cancelDeletesSeen(): Promise<number> {
+  const res = await admin('GET', '/requests');
+  const body = (await res.json()) as { requests: { request: { method: string; url: string } }[] };
+  return body.requests
+    .map((entry) => entry.request)
+    .filter(
+      (request) =>
+        request.method === 'DELETE' && request.url.startsWith(`${DOWNLOADS_PATH}/transfer-1`),
+    ).length;
+}
+
+async function pollUntil(check: () => Promise<boolean>, what: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    if (await check()) return;
+    if (Date.now() >= deadline) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 }
 
 /** The held transfer: every poll reports it in progress while the scenario stays `Hold`. */
@@ -99,6 +121,16 @@ describe('non-blocking download observation (head-of-line isolation, prompt canc
     await waitForOk(BASE_URL);
   });
 
+  afterAll(async () => {
+    // The Hold mapping is registered ad hoc and survives a scenario reset — remove it so a
+    // future phase after this one inherits a clean stub.
+    const res = await admin('GET', '/mappings');
+    const body = (await res.json()) as { mappings: { id: string; scenarioName?: string }[] };
+    for (const mapping of body.mappings) {
+      if (mapping.scenarioName === 'transfer') await admin('DELETE', `/mappings/${mapping.id}`);
+    }
+  });
+
   it('resolves, searches, and downloads a second acquisition while one transfer holds — and cancels the held one promptly', async () => {
     // Acquisition A: its transfer holds mid-flight indefinitely (the slow healthy album).
     const held = await submitAcquisition(MBID);
@@ -111,9 +143,15 @@ describe('non-blocking download observation (head-of-line isolation, prompt canc
     expect(await readStatus(held)).toBe('Downloading'); // A is still mid-transfer, unharmed
 
     // Cancel A while its transfer is provably un-settled: the abort must land promptly instead
-    // of waiting out the transfer (pre-change it serialized behind the blocking dispatch).
+    // of waiting out the transfer (pre-change it serialized behind the blocking dispatch). The
+    // status flip alone would not discriminate — the cancel command appends outside the reactor —
+    // so the stub's journal must show the abort's DELETE actually reaching the source promptly.
     await cancelAcquisition(held);
     await pollForStatus(held, new Set(['Cancelled']), 30_000);
+    await pollUntil(
+      async () => (await cancelDeletesSeen()) > 0,
+      'the abort’s cancel DELETE to reach the source',
+    );
 
     // Release the held scenario: B's watch observes the settle and the freed pipeline carries it
     // through validation, deposit, the seam, and beets to the library.

@@ -650,14 +650,7 @@ describe('pendingRowFor', () => {
   it('names the source and carries progress while the transfer is live', () => {
     expect(
       pendingRowFor(
-        acquisition({
-          status: 'Downloading',
-          currentCandidate: candidate,
-          history: [
-            { kind: 'selected', at: AT, candidate },
-            { kind: 'download-started', at: AT, candidate },
-          ],
-        }),
+        acquisition({ status: 'Downloading', currentCandidate: candidate, transferStarted: true }),
         NO_IMPORT,
       ),
     ).toEqual({ text: 'Downloading from xronin…', state: 'pending', showProgress: true });
@@ -665,13 +658,7 @@ describe('pendingRowFor', () => {
 
   it('live transfers without a known source still read as downloading', () => {
     expect(
-      pendingRowFor(
-        acquisition({
-          status: 'Downloading',
-          history: [{ kind: 'download-started', at: AT, candidate }],
-        }),
-        NO_IMPORT,
-      ),
+      pendingRowFor(acquisition({ status: 'Downloading', transferStarted: true }), NO_IMPORT),
     ).toEqual({
       text: 'Downloading…',
       state: 'pending',
@@ -687,7 +674,7 @@ describe('pendingRowFor', () => {
         acquisition({
           status: 'Downloading',
           currentCandidate: candidate,
-          history: [{ kind: 'selected', at: AT, candidate }],
+          transferStarted: false,
         }),
         NO_IMPORT,
       ),
@@ -703,21 +690,9 @@ describe('pendingRowFor', () => {
     });
   });
 
-  it('a re-attempt after an earlier started transfer reads as preparing again', () => {
+  it('an absent decided flag (older producer) degrades to the preparing row', () => {
     expect(
-      pendingRowFor(
-        acquisition({
-          status: 'Downloading',
-          currentCandidate: candidate,
-          history: [
-            { kind: 'selected', at: AT, candidate },
-            { kind: 'download-started', at: AT, candidate },
-            { kind: 'download-failed', at: AT, candidate, reason: 'Stalled' },
-            { kind: 'selected', at: AT, candidate },
-          ],
-        }),
-        NO_IMPORT,
-      ),
+      pendingRowFor(acquisition({ status: 'Downloading', currentCandidate: candidate }), NO_IMPORT),
     ).toEqual({
       text: 'Preparing the transfer from xronin…',
       state: 'pending',

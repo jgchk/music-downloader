@@ -27,19 +27,22 @@ acquisition.
 
 The system SHALL record, as a fact in the acquisition's history, that a selected candidate's
 download started — once the source has accepted the enqueue. The acquisition status read model
-SHALL expose a downloading phase while the download is in flight, and the history SHALL narrate
-the start as an additive entry kind (`download-started`), so a consumer can tell a transferring
-acquisition from one that merely selected a candidate. These SHALL be additive facade schema
-members; existing consumers remain valid tolerant readers. Live transfer progress remains a read
-model and SHALL NOT appear in history (existing requirement, unchanged).
+SHALL expose a downloading phase while the download is in flight together with the decided
+`transferStarted` flag — the acquisition's own determination that the current attempt's transfer
+is live, so a consumer reads it rather than re-deriving liveness from the history (the decided
+lifecycle-flags rule) — and the history SHALL narrate the start as an additive entry kind
+(`download-started`), so a consumer can tell a transferring acquisition from one that merely
+selected a candidate. These SHALL be additive facade schema members; existing consumers remain
+valid tolerant readers. Live transfer progress remains a read model and SHALL NOT appear in
+history (existing requirement, unchanged).
 
 #### Scenario: A transferring acquisition is distinguishable from a selected one
 
 - **GIVEN** an acquisition whose selected candidate's files the source has accepted and begun
   transferring
 - **WHEN** its status is read
-- **THEN** the status reflects a downloading phase and the history contains a
-  `download-started` entry after the selection
+- **THEN** the status reflects a downloading phase with the decided `transferStarted` flag set,
+  and the history contains a `download-started` entry after the selection
 
 #### Scenario: Pre-existing acquisitions need no migration
 

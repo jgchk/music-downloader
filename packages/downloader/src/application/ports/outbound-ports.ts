@@ -72,24 +72,29 @@ export type DownloadStart =
 
 /**
  * The application-owned face the download supervisor reports through
- * (nonblocking-download-observation D1/D2): live progress ticks, the single candidate-level
- * outcome fact once the watch settles, and the watch's end (so ephemeral progress is retired).
+ * (nonblocking-download-observation D1/D2; progress stays ephemeral per D4): live progress
+ * ticks, the single candidate-level outcome fact once the watch settles, and the watch's end
+ * (so ephemeral progress is retired).
  * Implemented by the application, injected into the adapter at composition — the inbound half of
  * the download conversation, mirroring how another context's verdicts are consumed.
  */
 export interface DownloadObserverPort {
-  progress(acquisitionId: string, candidate: CandidateIdentity, progress: DownloadProgress): void;
+  progress(acquisitionId: string, progress: DownloadProgress): void;
   /**
-   * Deliver the settled outcome. An `Err` means the delivery could not land (infrastructure);
-   * the supervisor retries on its cadence. Domain-level staleness is the consumer's to absorb —
-   * it resolves `Ok` for an outcome it recorded-and-skipped.
+   * Deliver the settled outcome, named with the candidate it settles (the consumer threads it
+   * into the decision path's late-report guard). An `Err` means the delivery could not land
+   * (infrastructure); the supervisor retries on its cadence. Domain-level staleness is the
+   * consumer's to absorb — it resolves `Ok` for an outcome it recorded-and-skipped.
    */
   outcome(
     acquisitionId: string,
-    candidate: Candidate,
+    candidate: CandidateIdentity,
     result: DownloadResult,
   ): ResultAsync<void, InfraError>;
-  /** The watch ended — settled, or aborted. Live progress for the acquisition is retired. */
+  /**
+   * Every watch for the acquisition has ended — settled, or aborted. Live progress for the
+   * acquisition is retired.
+   */
   finished(acquisitionId: string): void;
 }
 
@@ -111,7 +116,9 @@ export interface DownloadPort {
 
   /**
    * Cancel a candidate's in-flight transfers at the source and remove their records, so a cancelled
-   * acquisition stops downloading rather than running to completion (D: cancellation). Idempotent:
+   * acquisition stops downloading rather than running to completion (D: cancellation). Ends the
+   * candidate's watch promptly — no outcome is emitted for an aborted candidate; the abort's own
+   * settlement (this method's return, fed back as a command) owns the cleanup. Idempotent:
    * transfers already settled or absent are tolerated, so a redelivered abort is safe. The
    * `acquisitionId` scopes the transfers to the ones this acquisition owns in the ledger.
    *

@@ -53,18 +53,14 @@ export function isTerminal(acquisition: AcquisitionStatusResponseDto): boolean {
 }
 
 /**
- * True when the current attempt's transfer is live at the source: the history holds a
- * `download-started` entry not superseded by a later `selected` (a later selection is a new
- * attempt whose own start has not been recorded yet). The decided fact the downloading views
- * read instead of inferring liveness from a progress read's success
- * (nonblocking-download-observation).
+ * True when the current attempt's transfer is live at the source — read from the downloader's
+ * decided `transferStarted` flag (nonblocking-download-observation), never re-derived from the
+ * history wire (the decided-lifecycle-flags rule, as with `cancellable`). An absent flag (an
+ * older producer) degrades to "not yet live" — the conservative read: a preparing row and no
+ * progress bar, never a downloading claim the producer didn't make.
  */
 export function isTransferStarted(acquisition: AcquisitionStatusResponseDto): boolean {
-  for (const entry of acquisition.history.toReversed()) {
-    if (entry.kind === 'download-started') return true;
-    if (entry.kind === 'selected') return false;
-  }
-  return false;
+  return acquisition.transferStarted === true;
 }
 
 /**

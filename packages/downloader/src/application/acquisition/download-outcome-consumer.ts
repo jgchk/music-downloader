@@ -1,6 +1,6 @@
 import { errAsync, okAsync } from 'neverthrow';
 import type { ResultAsync } from 'neverthrow';
-import type { Candidate } from '../../domain/candidate/candidate.js';
+import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
 import { infraError } from '../ports/errors.js';
 import type { InfraError } from '../ports/errors.js';
 import type { DownloadResult } from '../ports/outbound-ports.js';
@@ -26,7 +26,7 @@ export interface DownloadOutcomeDependencies extends CommandDependencies {
 export function deliverDownloadOutcome(
   dependencies: DownloadOutcomeDependencies,
   acquisitionId: string,
-  candidate: Candidate,
+  candidate: CandidateIdentity,
   result: DownloadResult,
 ): ResultAsync<void, InfraError> {
   return applyCommand(
@@ -35,12 +35,12 @@ export function deliverDownloadOutcome(
     result.kind === 'completed'
       ? {
           type: 'RecordDownloadCompleted',
-          candidate: candidate.identity,
+          candidate,
           files: result.files,
         }
       : {
           type: 'RecordDownloadFailed',
-          candidate: candidate.identity,
+          candidate,
           reason: result.reason,
           files: result.files,
         },

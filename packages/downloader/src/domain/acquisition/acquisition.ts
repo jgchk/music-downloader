@@ -31,6 +31,12 @@ export type { AcquisitionPhase } from './state.js';
  */
 export interface AcquisitionSnapshot {
   readonly phase: AcquisitionPhase;
+  /**
+   * The transfer is live at the source: the current attempt's enqueue was accepted
+   * (`DownloadStarted` folded). The acquisition's own determination — consumers read it instead
+   * of re-deriving liveness from the history (nonblocking-download-observation).
+   */
+  readonly transferStarted: boolean;
   readonly currentCandidate?: CandidateIdentity;
   readonly attempts: number;
   readonly rejectedCount: number;
@@ -81,6 +87,7 @@ export class Acquisition {
     const state = this.state;
     return {
       phase: state.phase,
+      transferStarted: state.phase === 'Downloading' && state.started,
       currentCandidate: currentIdentityOf(state),
       attempts: 'attempts' in state ? state.attempts : 0,
       rejectedCount: 'rejected' in state ? state.rejected.length : 0,

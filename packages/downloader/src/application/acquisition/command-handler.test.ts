@@ -3,6 +3,7 @@ import { applyCommand } from './command-handler.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import {
   defaultPolicies,
+  matchingCandidate,
   resolvedHistory,
   sampleRequest,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
@@ -37,6 +38,7 @@ describe('applyCommand', () => {
     const result = await applyCommand(d, 'acq-1', {
       type: 'RecordDownloadFailed',
       reason: 'Stalled',
+      candidate: matchingCandidate('a').identity,
     });
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'IllegalTransition' });
   });
@@ -48,7 +50,11 @@ describe('applyCommand', () => {
       occurredAt: clock.now().toISOString(),
     });
     const before = d.store.all().length;
-    const result = await applyCommand(d, 'acq-1', { type: 'RecordDownloadCompleted', files: [] });
+    const result = await applyCommand(d, 'acq-1', {
+      type: 'RecordDownloadCompleted',
+      files: [],
+      candidate: matchingCandidate('a').identity,
+    });
     expect(result._unsafeUnwrap()).toEqual([]);
     expect(d.store.all().length).toBe(before);
   });
@@ -67,6 +73,30 @@ describe('applyCommand', () => {
     const result = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
 
     expect(result._unsafeUnwrap().map((entry) => entry.type)).toContain('SearchCompleted');
+  });
+
+  it('absorbs up to two lost races and surfaces the third (the retry bound)', async () => {
+    const d = dependencies();
+    await d.store.append('acq-1', 0, resolvedHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: clock.now().toISOString(),
+    });
+
+    d.store.conflictNextAppends = 2; // attempts 1–2 lose, attempt 3 lands
+    const landed = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
+    expect(landed.isOk()).toBe(true);
+
+    const d2 = dependencies();
+    await d2.store.append('acq-1', 0, resolvedHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: clock.now().toISOString(),
+    });
+    d2.store.conflictNextAppends = 3; // every attempt loses — the bound surfaces the conflict
+    const exhausted = await applyCommand(d2, 'acq-1', {
+      type: 'RecordSearchResults',
+      candidates: [],
+    });
+    expect(exhausted._unsafeUnwrapErr()).toMatchObject({ kind: 'ConcurrencyConflict' });
   });
 
   it('surfaces persistent append contention as the retryable conflict it is', async () => {

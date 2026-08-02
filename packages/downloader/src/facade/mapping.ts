@@ -157,6 +157,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
   return {
     acquisitionId: view.acquisitionId,
     status: view.status,
+    transferStarted: view.transferStarted,
     target: view.target ? { ...view.target } : undefined,
     requestedTarget: view.requestedTarget ? requestToWire(view.requestedTarget) : undefined,
     currentCandidate: view.currentCandidate ? { ...view.currentCandidate } : undefined,

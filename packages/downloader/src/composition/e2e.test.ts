@@ -32,7 +32,7 @@ import {
   matchingCandidate,
   sampleTarget,
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
-import type { Candidate } from '../domain/candidate/candidate.js';
+import type { Candidate, CandidateIdentity } from '../domain/candidate/candidate.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamEvent } from '../application/events/catch-up-subscription.js';
@@ -106,9 +106,8 @@ function wire(options: E2EOptions) {
   // outcome re-enters asynchronously through the real download-outcome consumer, waking the
   // reactor via the store's bus publication — the composed loop under test is the shipped one.
   const downloadObserver = {
-    progress: (id: string, _candidate: unknown, progress: DownloadProgress) =>
-      progressModel.update(id, progress),
-    outcome: (id: string, candidate: Candidate, result: DownloadResult) =>
+    progress: (id: string, progress: DownloadProgress) => progressModel.update(id, progress),
+    outcome: (id: string, candidate: CandidateIdentity, result: DownloadResult) =>
       deliverDownloadOutcome(
         { store, clock: fixedClock(), logger: silentLogger() },
         id,
@@ -127,18 +126,27 @@ function wire(options: E2EOptions) {
         // concurrency conflict with the reactor's own follow-on append is expected and benign).
         const deliver = async (): Promise<void> => {
           if (result.kind === 'completed') {
-            downloadObserver.progress(acquisitionId, candidate.identity, {
+            downloadObserver.progress(acquisitionId, {
               percent: 100,
               bytesTransferred: 1,
               bytesTotal: 1,
             });
           }
-          for (;;) {
-            const delivered = await downloadObserver.outcome(acquisitionId, candidate, result);
-            if (delivered.isOk()) break;
+          // At-least-once like the real watch, but BOUNDED so a regression fails fast instead of
+          // hanging the suite (the expected loser is one benign concurrency conflict).
+          for (let attempt = 1; attempt <= 100; attempt += 1) {
+            const delivered = await downloadObserver.outcome(
+              acquisitionId,
+              candidate.identity,
+              result,
+            );
+            if (delivered.isOk()) {
+              downloadObserver.finished(acquisitionId);
+              return;
+            }
             await new Promise((resolve) => setTimeout(resolve, 1));
           }
-          downloadObserver.finished(acquisitionId);
+          throw new Error('fake supervisor could not deliver the outcome in 100 attempts');
         };
         queueMicrotask(() => void deliver());
         return okAsync({ kind: 'started' });
