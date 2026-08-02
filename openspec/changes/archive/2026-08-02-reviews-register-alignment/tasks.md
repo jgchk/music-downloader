@@ -74,7 +74,7 @@ References: design.md D1–D12; delta specs under `specs/`; research
 - [x] 7.1 Sweep for leftover banned vocabulary in visible strings (enums, module nouns, tool
       names, parenthesized asides, lower-is-better numbers) across the web package
 - [x] 7.2 `pnpm check` green (format, lint, typecheck, build, 100% coverage)
-- [ ] 7.3 Local `pnpm test:e2e` (Docker + NAT modules) — mandatory: user-visible strings in
+- [x] 7.3 Local `pnpm test:e2e` (Docker + NAT modules) — mandatory: user-visible strings in
       the diff (ship.md Phase 5 step 1)
-- [ ] 7.4 Walk the live surfaces once in the dev app: queue chips/titles, a match review's
+- [x] 7.4 Walk the live surfaces once in the dev app: queue chips/titles, a match review's
       diff and disclosure, both destructive confirms, corrected timeline strings
