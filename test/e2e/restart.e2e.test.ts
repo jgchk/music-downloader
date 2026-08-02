@@ -47,7 +47,7 @@ describe('restart resilience (durable stores + subscription checkpoint)', () => 
     // Fulfilment committed (observable over the interface) and the seam handoff durably recorded
     // in the importer's own store — while the blocked bridge guarantees the import cannot finish.
     const status = await pollUntilTerminal(acquisitionId);
-    expect(status).toBe('Fulfilled');
+    expect(status).toBe('In your library');
     await pollForEvent(IMPORTER_DB, 'ImportRequested');
     expect(countEvents(IMPORTER_DB, 'ImportApplied')).toBe(0);
 
@@ -64,7 +64,7 @@ describe('restart resilience (durable stores + subscription checkpoint)', () => 
     expect(countEvents(IMPORTER_DB, 'ImportApplied')).toBe(1);
 
     // And the interface still tells the same story after the restart.
-    expect(await pollUntilTerminal(acquisitionId)).toBe('Fulfilled');
+    expect(await pollUntilTerminal(acquisitionId)).toBe('In your library');
     expect(await reviewQueueEmpty()).toBe(true);
   });
 });

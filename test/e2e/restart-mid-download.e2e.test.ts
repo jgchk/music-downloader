@@ -119,7 +119,7 @@ describe('restart resumption mid-download (reactor-durability)', () => {
 
     // The startup re-drive re-derives the Download effect and the adapter re-attaches to the
     // source's transfer: the acquisition reaches its terminal outcome instead of orphaning.
-    expect(await pollUntilTerminal(acquisitionId, 180_000)).toBe('Fulfilled');
+    expect(await pollUntilTerminal(acquisitionId, 180_000)).toBe('In your library');
 
     // The candidate was never downloaded a second time: one enqueue across both process lives.
     expect(await enqueueCount()).toBe(1);

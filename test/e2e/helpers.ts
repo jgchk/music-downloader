@@ -109,7 +109,18 @@ export async function readStatus(id: string): Promise<string | undefined> {
   return /data-testid="status"[^>]*>([^<]+)</.exec(html)?.[1]?.trim();
 }
 
-const TERMINAL = new Set(['Fulfilled', 'Exhausted', 'Conflicted', 'Cancelled']);
+// The detail page's status marker speaks the human status phrases (legible-acquisition-history),
+// and a delivery only reads as settled once its import applied — so "terminal" here means the
+// story's true endings, not the downloader enum: the loop now proves the WHOLE pipeline through
+// beets before it returns.
+const TERMINAL = new Set([
+  'In your library',
+  'No usable download found',
+  'Stopped \u{2014} destination occupied',
+  'Cancelled',
+  'Couldn\u{2019}t identify the release',
+  'Import rejected',
+]);
 
 export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;

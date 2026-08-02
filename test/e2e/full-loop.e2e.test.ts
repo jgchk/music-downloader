@@ -67,10 +67,11 @@ describe('out-of-process full loop (web interface, real socket)', () => {
   it('drives intent → download → deposit → seam → beets import to a terminal outcome', async () => {
     const acquisitionId = await submitAcquisition(MBID);
 
-    // Downloader side: resolve (MB stub) → search/rank/download (slskd stub, stateful poll) →
-    // real ffmpeg probe of the seeded FLAC → real filesystem deposit → Fulfilled over the UI.
+    // The whole loop over the UI's own language: resolve (MB stub) → search/rank/download (slskd
+    // stub, stateful poll) → real ffmpeg probe of the seeded FLAC → real filesystem deposit →
+    // seam → beets auto-apply — settled only when the page says "In your library".
     const status = await pollUntilTerminal(acquisitionId);
-    expect(status).toBe('Fulfilled');
+    expect(status).toBe('In your library');
     expect(existsSync(join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)'))).toBe(true);
 
     // Seam handoff: the importer's catch-up subscription consumed acquisition.fulfilled and
