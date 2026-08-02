@@ -29,3 +29,36 @@ export const DETAIL_REFRESH_MS = 5000;
  * export (and nothing else); the page and views never learn how freshness arrives.
  */
 export const detailFreshness: FreshnessDriver = intervalFreshness(DETAIL_REFRESH_MS);
+
+/**
+ * The liveness policy the detail page's `$effect` delegates to, kept here as a pure-enough unit so
+ * the whole decision — rest when settled (clearing any stale failure banner), tick the refresh,
+ * surface a failure, recover on success — is directly testable; the `$effect` itself shrinks to a
+ * one-line wiring that SSR compiles out.
+ *
+ * Returns the driver's stop function while watching, or undefined when resting.
+ */
+export function startLiveness(
+  isSettled: boolean,
+  driver: FreshnessDriver,
+  hooks: {
+    readonly refresh: () => Promise<unknown>;
+    /** Reports each tick's outcome — and the rest state, which clears a stale failure. */
+    readonly onRefreshFailed: (didFail: boolean) => void;
+  },
+): (() => void) | undefined {
+  if (isSettled) {
+    hooks.onRefreshFailed(false);
+    return undefined;
+  }
+  return driver.start(() => {
+    void (async () => {
+      try {
+        await hooks.refresh();
+        hooks.onRefreshFailed(false);
+      } catch {
+        hooks.onRefreshFailed(true);
+      }
+    })();
+  });
+}

@@ -90,7 +90,8 @@ type RequestedEcho = Extract<DownloaderHistoryEntry, { kind: 'requested' }>['req
 
 function requestDescription(request: RequestedEcho): string {
   if (request.kind === 'descriptor') {
-    return `${request.artist} — ${request.title} (${request.targetType})`;
+    const album = request.album === undefined ? '' : `, from ${request.album}`;
+    return `${request.artist} — ${request.title} (${request.targetType}${album})`;
   }
   const noun =
     request.kind === 'release-group' ? 'MusicBrainz release group' : 'MusicBrainz release';
@@ -274,6 +275,7 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
         text: 'Added to the library, but needs attention',
         state: 'attention',
         detail: entry.failures.map((failure) => ({ label: failure.stage, value: failure.message })),
+        link: { href: '/reviews', label: 'Open the review' },
       };
     }
     case 'rejected': {
