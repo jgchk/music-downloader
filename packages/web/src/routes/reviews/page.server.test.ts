@@ -4,7 +4,12 @@ import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
 import { load } from './+page.server.js';
 
-function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: () => unknown }): {
+function locals(over: {
+  listPendingReviews?: () => unknown;
+  listAcquisitions?: () => unknown;
+  getImport?: (input: unknown) => unknown;
+  getAcquisition?: (input: unknown) => unknown;
+}): {
   locals: App.Locals;
   warnings: unknown[];
 } {
@@ -15,9 +20,12 @@ function locals(over: { listPendingReviews?: () => unknown; listAcquisitions?: (
       facades: {
         importer: {
           listPendingReviews: over.listPendingReviews ?? (() => ({ reviews: [] })),
+          getImport: over.getImport ?? (() => ({ ok: false, error: { kind: 'NotFound' } })),
         } as unknown as ImporterFacade,
         downloader: {
           listAcquisitions: over.listAcquisitions ?? (() => ({ acquisitions: [] })),
+          getAcquisition:
+            over.getAcquisition ?? (() => ({ ok: false, error: { kind: 'NotFound' } })),
         } as unknown as DownloaderFacade,
       },
       logger: { warn: (context: unknown) => void warnings.push(context) } as unknown as Logger,
@@ -40,7 +48,8 @@ const reviewItem = {
   module: 'importer',
   kind: 'match-review',
   id: 'imp-1',
-  title: '/intake/a',
+  title: 'a',
+  ask: 'No match found',
   waitingSince: undefined,
   href: '/reviews/imp-1',
 };
@@ -50,6 +59,7 @@ const editionItem = {
   kind: 'edition-selection',
   id: 'acq-1',
   title: 'OK Computer — awaiting your edition choice',
+  ask: 'Choose an edition',
   waitingSince: undefined,
   href: '/acquisitions/acq-1',
 };
@@ -65,6 +75,26 @@ describe('attention queue load', () => {
       errors: { importer: undefined, downloader: undefined },
     });
     expect(warnings).toEqual([]);
+  });
+
+  it('titles a correlated review by its musical intent (design D3)', () => {
+    const { locals: event } = locals({
+      listPendingReviews: () => ({ reviews: [pendingReview] }),
+      getImport: () => ({ ok: true, value: { importId: 'imp-1', acquisitionId: 'acq-9' } }),
+      getAcquisition: () => ({
+        ok: true,
+        value: {
+          acquisitionId: 'acq-9',
+          status: 'Fulfilled',
+          attempts: 1,
+          rejectedCount: 0,
+          history: [],
+          target: { artist: 'Artist', title: 'Album' },
+        },
+      }),
+    });
+    const result = load({ locals: event } as never) as { items: { title: string }[] };
+    expect(result.items[0]?.title).toBe('Artist — Album');
   });
 
   it('yields the downloader items plus a modeled and logged importer section error when the importer read throws', () => {

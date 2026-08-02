@@ -272,3 +272,26 @@
   border: 1px solid var(--border);
   padding: var(--step-1) var(--step-2);
 }
+
+/* Review decision surface (the finishing pass): a bevelled notice panel for the
+   destructive confirm, subSilver-muted unchanged rows, and a highlighter-style
+   diff mark that reads on the light table background. */
+:root[data-skin='forum'] .confirm-destructive {
+  border: 1px solid color-mix(in oklab, var(--danger) 55%, #9aa0a6);
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 #ffffff;
+  background: #f6e8e4;
+}
+:root[data-skin='forum'] .track-diff mark {
+  border-radius: 0;
+  background: #f3e2b3;
+}
+:root[data-skin='forum'] .track-diff tr.unchanged {
+  color: #7a8a92;
+}
+:root[data-skin='forum'] .candidate-details dl,
+:root[data-skin='forum'] .review-detail-disclosure dl {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: var(--step-1) var(--step-2);
+}

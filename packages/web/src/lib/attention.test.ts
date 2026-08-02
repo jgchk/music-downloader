@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import type { PendingReviewDto } from '@music/importer';
-import {
-  attentionItems,
-  attentionKindLabel,
-  moduleLabel,
-  orderByLongestWaiting,
-  type AttentionItem,
-} from './attention.js';
+import { attentionItems, orderByLongestWaiting, type AttentionItem } from './attention.js';
 
 function review(over: Partial<PendingReviewDto>): PendingReviewDto {
   return {
@@ -36,26 +30,48 @@ function item(over: Partial<AttentionItem>): AttentionItem {
     kind: 'match-review',
     id: 'x',
     title: 't',
+    ask: 'Choose a match',
     href: '/reviews/x',
     ...over,
   };
 }
 
 describe('attentionItems', () => {
-  it('maps a pending review to an importer match-review item linking to its review', () => {
+  it('maps a pending review to an item whose ask names the decision, titled by its basename', () => {
     expect(attentionItems([review({})], [])).toEqual([
       {
         module: 'importer',
         kind: 'match-review',
         id: 'imp-1',
-        title: '/intake/album',
+        title: 'album',
+        ask: 'No match found',
         waitingSince: undefined,
         href: '/reviews/imp-1',
       },
     ]);
   });
 
-  it('maps an awaiting-selection acquisition to a downloader edition-selection item', () => {
+  it('titles a review by the composed musical intent when one is supplied', () => {
+    const titles = new Map([['imp-1', 'Artist — Album']]);
+    const items = attentionItems([review({})], [], titles);
+    expect(items[0]?.title).toBe('Artist — Album');
+  });
+
+  it('speaks each review kind’s own ask', () => {
+    const items = attentionItems(
+      [
+        review({
+          importId: 'imp-m',
+          review: { kind: 'match-review', hinted: false, candidates: [] },
+        }),
+        review({ importId: 'imp-r', review: { kind: 'remediation-review', failures: [] } }),
+      ],
+      [],
+    );
+    expect(items.map((entry) => entry.ask)).toEqual(['Choose a match', 'Fix after import']);
+  });
+
+  it('maps an awaiting-selection acquisition to an edition-choice ask', () => {
     const awaiting = acquisition({
       candidates: [{ releaseMbid: 'r1', title: 'OK Computer', trackCount: 12 }],
     });
@@ -65,6 +81,7 @@ describe('attentionItems', () => {
         kind: 'edition-selection',
         id: 'acq-1',
         title: 'OK Computer — awaiting your edition choice',
+        ask: 'Choose an edition',
         waitingSince: undefined,
         href: '/acquisitions/acq-1',
       },
@@ -126,21 +143,5 @@ describe('orderByLongestWaiting', () => {
       'first',
       'second',
     ]);
-  });
-});
-
-describe('labels', () => {
-  it.each([
-    ['match-review', 'Match review'],
-    ['edition-selection', 'Edition selection'],
-  ] as const)('labels kind %s as %s', (kind, label) => {
-    expect(attentionKindLabel(kind)).toBe(label);
-  });
-
-  it.each([
-    ['importer', 'Importer'],
-    ['downloader', 'Downloader'],
-  ] as const)('labels module %s as %s', (module, label) => {
-    expect(moduleLabel(module)).toBe(label);
   });
 });

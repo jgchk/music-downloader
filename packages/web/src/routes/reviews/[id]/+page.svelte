@@ -5,4 +5,9 @@
   let { data, form }: PageProperties = $props();
 </script>
 
-<ReviewDetail pending={data.pending} error={form?.message} />
+<ReviewDetail
+  pending={data.pending}
+  title={data.title}
+  error={form?.message}
+  confirm={form?.confirm}
+/>

@@ -79,6 +79,12 @@
   --marker-failure: var(--danger);
   --marker-success: var(--ok);
 
+  /* -- Decision-surface tokens (review anatomy): the word-level diff mark.
+        Skins remap; color is reinforcement only — the direction cue and row
+        text carry the meaning on their own. --------------------------------- */
+  --diff-mark-bg: color-mix(in oklab, var(--warn) 22%, transparent);
+  --diff-mark-fg: var(--text);
+
   /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
   --nav-dir: row; /* row = topbar, column = sidebar */
   --shell-cols: 1fr;
