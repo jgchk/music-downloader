@@ -177,8 +177,9 @@ The penalty gloss map from v3.8.0 carries over unchanged.
 The two file-deleting verbs submit into an SSR-modeled confirm step: the resolve action, when
 the form lacks a `confirmed` marker, does not dispatch — it re-renders the page with a modeled
 pending-confirmation state carrying the verb and its form values. The confirm block restates the
-specific consequence (`This deletes the downloaded files from staging.` + the D2 determinism
-clause for that verb) and offers exactly two outcome-named submits: `Delete the files` (carries
+specific consequence (`This deletes the downloaded files.` + the D2 determinism clause for that
+verb — "staging" stays out of visible copy per the register's internal-vocabulary ban) and
+offers exactly two outcome-named submits: `Delete the files` (carries
 `confirmed`, dispatches) and `Keep the files` (returns to the review unchanged). No JS, no
 browser dialog (GOV.UK additional-step pattern, NN/g outcome-named options). Non-destructive
 verbs dispatch directly — no habituation (§1.4 "cry wolf").
