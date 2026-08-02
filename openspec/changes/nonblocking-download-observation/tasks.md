@@ -61,12 +61,12 @@ folded into each item, not batched at the end.
 
 ## 5. Cross-tier verification
 
-- [ ] 5.1 Blast-radius audit before the merge checkpoint: sweep `test/e2e` and Playwright parity
+- [x] 5.1 Blast-radius audit before the merge checkpoint: sweep `test/e2e` and Playwright parity
       specs for scraped copy/state-timing the new phase changes; update expectations.
-- [ ] 5.2 E2E: extend the out-of-process scenario so a submitted acquisition is observed in the
+- [x] 5.2 E2E: extend the out-of-process scenario so a submitted acquisition is observed in the
       downloading phase while a second acquisition completes end-to-end (the head-of-line
       regression, black-box); cancellation mid-transfer verified prompt.
-- [ ] 5.3 Local out-of-process e2e run against live slskd (`pnpm test:e2e`) green before PR
+- [x] 5.3 Local out-of-process e2e run against live slskd (`pnpm test:e2e`) green before PR
       (ship.md mandate).
-- [ ] 5.4 Full gate (`pnpm check`) at every commit; 100% coverage with no fiction tests — timer
+- [x] 5.4 Full gate (`pnpm check`) at every commit; 100% coverage with no fiction tests — timer
       determinism carries the time-based branches.

@@ -10,6 +10,7 @@
 #                                    image is proven to boot and serve while third parties are down
 #   phase 1  full-loop.e2e.test.ts   intent → download → deposit → seam → real beets → applied
 #   phase 2  restart.e2e.test.ts     kill between fulfilment and import; durable resume, exactly once
+#   (phases 3–4 below: mid-download restart resumption; non-blocking observation + prompt cancel)
 #
 # Path topology (host ./.e2e-tmp ⇄ container):
 #   music/staging  ⇄ /music/staging   STAGING_ROOT — the harness seeds the fixture at the location
@@ -214,5 +215,13 @@ curl -fsS -X DELETE "http://localhost:$SLSKD_PORT/__admin/requests" >/dev/null
 fresh_env
 start_app
 run_phase test/e2e/restart-mid-download.e2e.test.ts
+docker rm -f "$APP" >/dev/null
+
+echo "── phase 4: non-blocking download observation"
+curl -fsS -X POST "http://localhost:$SLSKD_PORT/__admin/scenarios/reset" >/dev/null
+curl -fsS -X DELETE "http://localhost:$SLSKD_PORT/__admin/requests" >/dev/null
+fresh_env
+start_app
+run_phase test/e2e/nonblocking.e2e.test.ts
 
 echo "── e2e green"
