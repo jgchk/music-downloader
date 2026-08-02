@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.15.1](https://github.com/jgchk/music-downloader/compare/v3.15.0...v3.15.1) (2026-08-02)
+
+### Bug Fixes
+
+* **importer:** complete the beets image environment — flac binary + discogs extra ([f89d559](https://github.com/jgchk/music-downloader/commit/f89d559d36d265e6a40df349687757450d587ffe))
 ## [3.15.0](https://github.com/jgchk/music-downloader/compare/v3.14.0...v3.15.0) (2026-08-02)
 
 ### Features
