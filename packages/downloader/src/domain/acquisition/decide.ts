@@ -1,6 +1,6 @@
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
-import type { Candidate } from '../candidate/candidate.js';
+import type { Candidate, CandidateIdentity } from '../candidate/candidate.js';
 import { candidateKey, isReferringTo } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import { rankCandidates } from '../ranking/ranking.js';
@@ -88,6 +88,17 @@ function selectNext(state: LadderContext): AcquisitionEvent {
     return { type: 'SearchRequested', round: state.searchRounds + 1 };
   }
   return { type: 'AcquisitionExhausted' };
+}
+
+/**
+ * The asynchronous-outcome stale-guard (nonblocking-download-observation): an outcome or start
+ * report that names a candidate is judged against the one actually in flight; a candidate-less
+ * report (the pre-async shape) is guarded by phase alone. Outcomes arrive from the download
+ * supervisor's own cadence, so a boot re-emit can lawfully name a candidate the ladder has
+ * already rejected — absorbing the mismatch, never mis-attaching it, is the contract.
+ */
+function isNaming(named: CandidateIdentity | undefined, inFlight: CandidateIdentity): boolean {
+  return named === undefined || candidateKey(named) === candidateKey(inFlight);
 }
 
 /**
@@ -201,21 +212,41 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       return ok(events);
     }
 
+    case 'RecordDownloadStarted': {
+      if (isTerminal(state)) return ok([]); // e.g. a cancellation won the race with the enqueue
+      if (state.phase !== 'Downloading') return err(illegal(command.type, state));
+      if (!isNaming(command.candidate, state.current.identity)) return ok([]); // stale
+      if (state.started) return ok([]); // duplicate (ensure-start redelivery)
+      return ok([{ type: 'DownloadStarted', candidate: state.current.identity }]);
+    }
+
     case 'RecordDownloadCompleted': {
-      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
-        return ok(settleCancelled(state.staging.pending, command.files));
+      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight') {
+        return ok(
+          isNaming(command.candidate, state.staging.pending.identity)
+            ? settleCancelled(state.staging.pending, command.files)
+            : [],
+        );
+      }
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
+      if (!isNaming(command.candidate, state.current.identity)) return ok([]); // stale
       return ok([
         { type: 'DownloadCompleted', candidate: state.current.identity, files: command.files },
       ]);
     }
 
     case 'RecordDownloadFailed': {
-      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight')
-        return ok(settleCancelled(state.staging.pending, command.files ?? []));
+      if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight') {
+        return ok(
+          isNaming(command.candidate, state.staging.pending.identity)
+            ? settleCancelled(state.staging.pending, command.files ?? [])
+            : [],
+        );
+      }
       if (isTerminal(state)) return ok([]);
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
+      if (!isNaming(command.candidate, state.current.identity)) return ok([]); // stale
       return ok(
         rejectAndAdvance(
           state,

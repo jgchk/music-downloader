@@ -137,6 +137,13 @@ function downloaderEntryCopy(entry: DownloaderHistoryEntry): EntryCopy | undefin
         ],
       };
     }
+    case 'download-started': {
+      return {
+        text: `Downloading from ${entry.candidate.username}`,
+        state: 'routine',
+        detail: [{ label: 'Source path', value: entry.candidate.path }],
+      };
+    }
     case 'download-failed': {
       const gloss = glossOf(DOWNLOAD_FAILURE_GLOSS, entry.reason);
       return {

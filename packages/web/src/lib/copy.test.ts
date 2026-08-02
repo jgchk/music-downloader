@@ -164,6 +164,15 @@ describe('entryCopy — downloader entries', () => {
     ]);
   });
 
+  it('renders a download start as the transfer beginning, with the path in the disclosure', () => {
+    const copy = entryCopy(dl({ kind: 'download-started', candidate }));
+    expect(copy?.text).toBe('Downloading from xronin');
+    expect(copy?.state).toBe('routine');
+    expect(copy?.detail).toEqual([
+      { label: 'Source path', value: String.raw`@@ygcrs\MUSIC\RAM (2013)` },
+    ]);
+  });
+
   it('glosses a known download-failure reason and keeps the code in the disclosure', () => {
     const copy = entryCopy(dl({ kind: 'download-failed', candidate, reason: 'TransferError' }));
     expect(copy?.text).toBe('Download failed — the transfer was cut off. Trying the next source.');
@@ -368,6 +377,7 @@ describe('entryCopy — register conformance', () => {
     dl({ kind: 'search-started', round: 1 }),
     dl({ kind: 'search-started', round: 2 }),
     dl({ kind: 'selected', candidate }),
+    dl({ kind: 'download-started', candidate }),
     dl({ kind: 'download-failed', candidate, reason: 'Stalled' }),
     dl({ kind: 'validation-failed', candidate, reasons: ['Unplayable'] }),
     dl({ kind: 'imported', candidate, location: '/s' }),

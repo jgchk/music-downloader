@@ -98,6 +98,7 @@ describe('statusViewToDto', () => {
         { kind: 'resolved', at: 'r1', artist: 'A', title: 'T', year: 1975 },
         { kind: 'search-started', at: 'r2', round: 1 },
         { kind: 'selected', at: 't0', candidate },
+        { kind: 'download-started', at: 't0b', candidate },
         { kind: 'download-failed', at: 't1', candidate, reason: 'Stalled' },
         { kind: 'validation-failed', at: 't2', candidate, reasons: ['Unplayable'] },
         { kind: 'imported', at: 't3', candidate, location: '/lib/a' },
@@ -120,6 +121,7 @@ describe('statusViewToDto', () => {
       'resolved',
       'search-started',
       'selected',
+      'download-started',
       'download-failed',
       'validation-failed',
       'imported',
@@ -135,6 +137,7 @@ describe('statusViewToDto', () => {
       'r1',
       'r2',
       't0',
+      't0b',
       't1',
       't2',
       't3',
@@ -153,7 +156,7 @@ describe('statusViewToDto', () => {
       title: 'T',
       year: 1975,
     });
-    expect(dto.history[10]).toEqual({ kind: 'conflicted', at: 'z2', location: '/lib/occupied' });
+    expect(dto.history[11]).toEqual({ kind: 'conflicted', at: 'z2', location: '/lib/occupied' });
   });
 
   it('echoes the requested target onto the wire when present', () => {

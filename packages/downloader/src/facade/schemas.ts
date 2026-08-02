@@ -195,6 +195,13 @@ export const historyEntrySchema = z.discriminatedUnion('kind', [
     candidate: candidateIdentitySchema,
   }),
   z.object({
+    // The source accepted the enqueue: the transfer is live (additive member; tolerant readers
+    // of earlier versions remain valid — nonblocking-download-observation).
+    kind: z.literal('download-started'),
+    at: z.iso.datetime(),
+    candidate: candidateIdentitySchema,
+  }),
+  z.object({
     kind: z.literal('download-failed'),
     at: z.iso.datetime(),
     candidate: candidateIdentitySchema,

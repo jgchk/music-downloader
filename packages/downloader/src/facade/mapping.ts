@@ -120,6 +120,9 @@ function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
     case 'selected': {
       return { kind: 'selected', at, candidate: { ...entry.candidate } };
     }
+    case 'download-started': {
+      return { kind: 'download-started', at, candidate: { ...entry.candidate } };
+    }
     case 'download-failed': {
       return {
         kind: 'download-failed',

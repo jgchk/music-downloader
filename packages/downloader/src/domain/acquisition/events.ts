@@ -87,6 +87,13 @@ export type AcquisitionEvent =
   | { readonly type: 'CandidatesRanked'; readonly ranked: readonly RankedCandidate[] }
   | { readonly type: 'CandidateSelected'; readonly candidate: Candidate }
   | {
+      // The source accepted the enqueue: the transfer is in flight. Recorded so the lifecycle has
+      // an honest downloading phase — a transferring acquisition is distinguishable from one that
+      // merely selected a candidate (nonblocking-download-observation).
+      readonly type: 'DownloadStarted';
+      readonly candidate: CandidateIdentity;
+    }
+  | {
       readonly type: 'DownloadCompleted';
       readonly candidate: CandidateIdentity;
       readonly files: readonly DownloadedFile[];

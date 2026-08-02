@@ -137,6 +137,18 @@ export function selectedHistory(
   ];
 }
 
+/** History through the source accepting the enqueue — a Downloading state whose transfer started. */
+export function startedHistory(
+  candidates: readonly Candidate[],
+  policies: AcquisitionPolicies = defaultPolicies(),
+): AcquisitionEvent[] {
+  const selected = rankedOf(candidates, policies)[0]!.candidate;
+  return [
+    ...selectedHistory(candidates, policies),
+    { type: 'DownloadStarted', candidate: selected.identity },
+  ];
+}
+
 /** History through a completed download of the best candidate — a Validating state. */
 export function validatingHistory(
   candidates: readonly Candidate[],

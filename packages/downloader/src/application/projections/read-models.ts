@@ -36,6 +36,12 @@ type HistoryPayload =
   | { readonly kind: 'search-started'; readonly round: number }
   | { readonly kind: 'selected'; readonly candidate: CandidateIdentity }
   | {
+      // The source accepted the enqueue: the transfer is live. Distinguishes a transferring
+      // acquisition from one that merely selected a candidate (nonblocking-download-observation).
+      readonly kind: 'download-started';
+      readonly candidate: CandidateIdentity;
+    }
+  | {
       readonly kind: 'download-failed';
       readonly candidate: CandidateIdentity;
       readonly reason: DownloadFailureReason;
@@ -143,6 +149,9 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     }
     case 'CandidateSelected': {
       return { kind: 'selected', candidate: event.candidate.identity };
+    }
+    case 'DownloadStarted': {
+      return { kind: 'download-started', candidate: event.candidate };
     }
     case 'DownloadFailed': {
       return { kind: 'download-failed', candidate: event.candidate, reason: event.reason };

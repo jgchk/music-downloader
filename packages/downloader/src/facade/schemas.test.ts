@@ -62,6 +62,7 @@ describe('acquisitionStatusResponseSchema', () => {
       rejectedCount: 1,
       history: [
         { kind: 'selected', at: '2026-01-01T00:00:00Z', candidate },
+        { kind: 'download-started', at: '2026-01-01T00:00:00.500Z', candidate },
         { kind: 'download-failed', at: '2026-01-01T00:00:01Z', candidate, reason: 'Stalled' },
         {
           kind: 'validation-failed',
@@ -79,7 +80,7 @@ describe('acquisitionStatusResponseSchema', () => {
       ],
     });
 
-    expect(parsed.history).toHaveLength(5);
+    expect(parsed.history).toHaveLength(6);
     expect(parsed.history[0]).toMatchObject({ at: '2026-01-01T00:00:00Z' });
   });
 
