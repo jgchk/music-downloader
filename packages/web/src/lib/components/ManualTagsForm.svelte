@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { actionButtonText } from '$lib/resolution-actions.js';
+
   interface Row {
     path: string;
     title: string;
@@ -83,6 +85,6 @@
     {/each}
 
     <button type="button" data-testid="add-track" onclick={addRow}>Add track</button>
-    <button type="submit">Import with these tags</button>
+    <button type="submit">{actionButtonText('manual-tags')}</button>
   </form>
 </details>

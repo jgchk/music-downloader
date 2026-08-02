@@ -1,26 +1,36 @@
 import type { PendingReviewDto } from '@music/importer';
 
 /**
- * The resolution verb inventory (design D1.6/D11): one entry per verb carrying the imperative
- * button copy AND the timeline's past-tense retelling, so a verb cannot diverge its two tellings.
- * Labels follow the affordance register: verb-led sentence-case fragments naming their object,
- * consequence after an em-dash (never a parenthesized aside), stated as the composed system's
- * actual contract — rejecting a delivery as unusable resumes the search; a plain rejection ends
- * the story (the importer never publishes it, so nothing more is tried).
+ * The resolution verb inventory (reviews-register-alignment D1.6/D11): one entry per verb
+ * carrying the imperative button copy, the destructive confirm step's consequence, and the
+ * timeline's past-tense retelling, so a verb cannot diverge its tellings. Labels follow the
+ * affordance register: verb-led sentence-case fragments naming their object, consequence after
+ * an em-dash (never a parenthesized aside), stated as the composed system's actual contract —
+ * rejecting a delivery as unusable resumes the search; a plain rejection ends the story (the
+ * importer never publishes it, so nothing more is tried — reviews-register-alignment D2).
  */
 
 export type ResolutionVerb = NonNullable<PendingReviewDto['availableActions']>[number];
 
-export interface ResolutionAction {
+interface ResolutionTelling {
   /** Imperative verb-led label; the object is named where the verb alone is ambiguous. */
   readonly label: string;
   /** The em-dash consequence clause — the system's actual contract, not a hedge. */
   readonly consequence?: string;
   /** The timeline's past-tense retelling — same verb, tense-shifted (one verb per action). */
   readonly echo: string;
-  /** File-deleting verbs render low-emphasis danger and confirm in-page before dispatch. */
-  readonly destructive: boolean;
 }
+
+/**
+ * File-deleting verbs render low-emphasis danger and confirm in-page before dispatch
+ * (reviews-register-alignment D5); the shape compile-forces each destructive entry to carry the
+ * confirm step's consequence copy, and only those entries to carry it.
+ */
+export type ResolutionAction = ResolutionTelling &
+  (
+    | { readonly destructive: false }
+    | { readonly destructive: true; readonly confirmConsequence: string }
+  );
 
 export const RESOLUTION_ACTIONS = {
   'apply-candidate': {
@@ -55,6 +65,8 @@ export const RESOLUTION_ACTIONS = {
     consequence: 'delete the files; nothing more will be tried',
     echo: 'you rejected the import',
     destructive: true,
+    confirmConsequence:
+      'This deletes the downloaded files. Nothing more will be tried — request the release again for another attempt.',
   },
   'retry-enrichment': {
     label: 'Retry the failed steps',
@@ -66,6 +78,8 @@ export const RESOLUTION_ACTIONS = {
     consequence: 'delete them and search for a replacement',
     echo: 'you rejected the files — the search resumed',
     destructive: true,
+    confirmConsequence:
+      'This deletes the downloaded files. The search for a replacement continues.',
   },
   accept: {
     label: 'Accept it as-is',
@@ -73,7 +87,21 @@ export const RESOLUTION_ACTIONS = {
     echo: 'you accepted it despite the failed steps',
     destructive: false,
   },
-} satisfies Record<ResolutionVerb, ResolutionAction>;
+} as const satisfies Record<ResolutionVerb, ResolutionAction>;
+
+/**
+ * The destructive subset, DERIVED from the inventory's own flags — never a hand-kept literal
+ * list (review finding: a parallel list would let a future destructive verb silently bypass the
+ * confirmation gate). A new `destructive: true` entry widens this union and breaks every
+ * exhaustive consumer at compile time.
+ */
+export type DestructiveVerb = {
+  [K in ResolutionVerb]: (typeof RESOLUTION_ACTIONS)[K] extends { destructive: true } ? K : never;
+}[ResolutionVerb];
+
+export function isDestructive(verb: ResolutionVerb): verb is DestructiveVerb {
+  return RESOLUTION_ACTIONS[verb].destructive;
+}
 
 /** The rendered button text: label, with its consequence joined by an em-dash when one exists. */
 export function actionButtonText(verb: ResolutionVerb): string {
@@ -83,13 +111,21 @@ export function actionButtonText(verb: ResolutionVerb): string {
     : `${action.label} \u{2014} ${action.consequence}`;
 }
 
-export function isDestructive(verb: ResolutionVerb): boolean {
-  return RESOLUTION_ACTIONS[verb].destructive;
+/** The confirm step's consequence line — inventory-owned, so the three tellings share one home. */
+export function confirmConsequence(verb: DestructiveVerb): string {
+  return RESOLUTION_ACTIONS[verb].confirmConsequence;
 }
 
-/** The timeline echoes keyed by verb — the narration side of the single verb inventory. */
-export function resolutionEchoes(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(RESOLUTION_ACTIONS).map(([verb, action]) => [verb, action.echo]),
-  );
-}
+/**
+ * The pending destructive resolution awaiting its in-page confirmation
+ * (reviews-register-alignment D5). Discriminated per verb so an arm can only carry its own
+ * echoed payload — a plain reject with `reasons` is unrepresentable. The verb arms intersect the
+ * inventory-derived destructive set, so a new destructive verb breaks the route's exhaustive
+ * construction at compile time rather than silently skipping confirmation.
+ */
+export type ConfirmState =
+  | { verb: DestructiveVerb & 'reject'; reason?: string }
+  | { verb: DestructiveVerb & 'reject-unusable-delivery'; reasons?: string };
+
+/** The known verbs as a runtime set, for narrowing an untrusted form value. */
+export const KNOWN_VERBS: ReadonlySet<string> = new Set(Object.keys(RESOLUTION_ACTIONS));

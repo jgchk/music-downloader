@@ -76,8 +76,9 @@
                   <td><span data-testid="retag" class="tag retag">retag</span></td>
                 </tr>
               {:else}
-                <!-- Unchanged (or not-yet-tagged) rows stay visible as coverage evidence, but
-                     de-emphasized so the differences carry the eye (design D7). -->
+                <!-- Unchanged rows stay visible as coverage evidence but de-emphasized so the
+                     differences carry the eye; not-yet-tagged rows stay plain — gaining tags IS
+                     a change (reviews-register-alignment D7). -->
                 <tr class={track.current ? 'unchanged' : undefined}>
                   <td>{track.index}</td>
                   <td>{track.current ? track.current.title : pathBasename(track.path)}</td>
@@ -113,7 +114,7 @@
         {#each candidate.penalties as penalty (penalty.name)}
           <span class="chip">{penaltyLabel(penalty.name)}</span>
         {:else}
-          <span>clean match</span>
+          <span>no penalties recorded</span>
         {/each}
       </p>
 

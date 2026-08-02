@@ -38,8 +38,10 @@ describe('AttentionQueue (SSR)', () => {
 
   it('never names the machinery: no visible module words, machine-readable attribute kept', () => {
     const { body } = render(AttentionQueue, { props: { items: [reviewItem, editionItem] } });
-    expect(body).not.toContain('>Importer<');
-    expect(body).not.toContain('>Downloader<');
+    // Strip markup so the ban covers the *visible text* regardless of tag boundaries.
+    const visibleText = body.replaceAll(/<[^>]+>/gu, ' ');
+    expect(visibleText).not.toContain('Importer');
+    expect(visibleText).not.toContain('Downloader');
     expect(body).toContain('data-module="importer"');
     expect(body).toContain('data-module="downloader"');
   });

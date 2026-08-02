@@ -66,10 +66,12 @@ const VALIDATION_REASON_GLOSS = {
   QualityNotAuthentic: 'the audio quality wasn’t what it claimed',
 } satisfies Record<ValidationReason, string>;
 
-// The narration side of the single verb inventory (design D1.6/D11): the resolution echo is the
-// resolving action's own verb, tense-shifted — sourced from the same entry as the button label so
-// the two tellings cannot diverge. The `satisfies` here re-proves totality against the history
-// entry's own verb union, so inventory/wire drift is a compile error in this module too.
+// The narration side of the single verb inventory (reviews-register-alignment D1.6/D11): the
+// resolution echo is the resolving action's own verb, tense-shifted — sourced from the same entry
+// as the button label so the two tellings cannot diverge. The `satisfies` re-proves the covering
+// direction against the history entry's own verb union: a new wire verb without an inventory
+// entry is a compile error here too (the inverse direction rides the importer's single
+// resolutionVerbSchema feeding both unions).
 const RESOLUTION_GLOSS: Record<string, string> = Object.fromEntries(
   Object.entries(RESOLUTION_ACTIONS satisfies Record<ResolutionVerb, { echo: string }>).map(
     ([verb, action]) => [verb, action.echo],
@@ -278,8 +280,9 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
       };
     }
     case 'rejected': {
-      // The importer never publishes a plain rejection, so no revival can follow (design D2):
-      // state the composed contract, never a hedge that reads as "wait for a retry".
+      // The importer never publishes a plain rejection, so no revival can follow
+      // (reviews-register-alignment D2): state the composed contract, never a hedge that reads
+      // as "wait for a retry".
       return {
         text: `Import rejected — ${entry.reason}. Nothing more will be tried — request the release again for another attempt.`,
         state: 'failure',
@@ -287,7 +290,8 @@ function importerEntryCopy(entry: ImporterHistoryEntry): EntryCopy | undefined {
       };
     }
     case 'release-verdict-recorded': {
-      // The published verdict deterministically revives the acquisition (design D2).
+      // The published verdict revives the acquisition in every non-pathological case
+      // (reviews-register-alignment D2; a real revival narrates itself via its own next entries).
       return {
         text: 'Marked this delivery unusable — searching for a replacement',
         state: 'routine',
