@@ -1083,6 +1083,23 @@ describe('Acquisition.execute — the downloading phase is a recorded fact', () 
     ).toEqual([]);
   });
 
+  it('absorbs a start report that the outcome outran (re-attach settled first)', () => {
+    // The watch re-attached to already-settled transfers and its outcome landed before the
+    // reactor's own start report — lawful ordering, absorbed without an event or an error.
+    expect(
+      Acquisition.fromHistory(validatingHistory([candidate]))
+        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+    // A start report naming some OTHER candidate in that state stays a protocol violation.
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(validatingHistory([candidate]))
+        .execute({ type: 'RecordDownloadStarted', candidate: other.identity })
+        ._unsafeUnwrapErr(),
+    ).toMatchObject({ kind: 'IllegalTransition' });
+  });
+
   it('rejects a start report outside the downloading phase as a protocol violation', () => {
     const error = Acquisition.fromHistory(resolvedHistory())
       .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })

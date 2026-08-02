@@ -199,9 +199,10 @@ describe('createDownloaderRuntime', () => {
     expect(runtime.facade.getAcquisitionProgress({ id }).ok).toBe(false); // retired on finish
   });
 
-  it('boots and stops cleanly with the real adapters (no overrides), latching the supervisor', async () => {
-    // No acquisitions are submitted, so nothing dispatches — this pins construction plus the
-    // stop seam that latches supervisor watches before the store closes.
+  it('boots the real adapter wiring and stops cleanly (no overrides)', async () => {
+    // No acquisitions are submitted, so nothing dispatches — this pins real-adapter construction
+    // and executes the stop seam (`slskdDownload.stop()` before the store closes); the latch
+    // BEHAVIOR itself is owned by the adapter tier's "stop() latches every watch" test.
     const runtime = await createDownloaderRuntime(
       {
         databaseFile: ':memory:',
@@ -212,8 +213,8 @@ describe('createDownloaderRuntime', () => {
       },
       silentLogger(),
     );
-    await runtime.stop();
     expect(runtime.readiness()).toEqual({ status: 'up' });
+    await runtime.stop();
   });
 
   it('consumes importer verdicts over the connected feed and revives the acquisition', async () => {

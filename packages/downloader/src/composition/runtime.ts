@@ -176,33 +176,36 @@ export async function createDownloaderRuntime(
     },
   };
   // Held concretely (not via the port) so stop() can latch its watches — the shutdown seam only
-  // composition needs; fake ports have no floating watches to latch.
-  const slskdDownload =
-    overrides.ports === undefined
-      ? new SlskdDownload(
-          logger,
-          ledger,
-          { stagingRoot: config.stagingRoot },
-          downloadObserver,
-          slskdClient,
-          realTimer,
-        )
-      : undefined;
-  const ports: EffectPorts =
-    overrides.ports?.(downloadObserver) ??
-    ({
+  // composition needs; fake ports have no floating watches to latch. Built in one branch with
+  // the default ports so "the supervisor exists exactly when the real adapter is in play" is
+  // structural, not an assertion.
+  let slskdDownload: SlskdDownload | undefined;
+  let ports: EffectPorts;
+  if (overrides.ports === undefined) {
+    slskdDownload = new SlskdDownload(
+      logger,
+      ledger,
+      { stagingRoot: config.stagingRoot },
+      downloadObserver,
+      slskdClient,
+      realTimer,
+    );
+    ports = {
       metadata: new MusicBrainzMetadata(logger, fetchHttpClient, {
         baseUrl: config.musicbrainz.baseUrl,
         userAgent: config.musicbrainz.userAgent,
       }),
       search: new SlskdSearch(logger, ledger, slskdClient, realTimer),
-      download: slskdDownload!,
+      download: slskdDownload,
       probe: new FfmpegAudioProbe(logger),
       library: new FilesystemLibrary(
         { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
         logger,
       ),
-    } satisfies EffectPorts);
+    };
+  } else {
+    ports = overrides.ports(downloadObserver);
+  }
 
   await new SourceResourceSweep({
     ledger,
@@ -291,8 +294,8 @@ export async function createDownloaderRuntime(
       reactor.stop();
       // Latch every supervisor watch before closing the store: a watch settling after close
       // would otherwise retry its delivery against the closed handle forever — the same error
-      // loop the verdict poller's stop guards against. Watches are storeless; the next boot's
-      // re-drive rebuilds them (level-triggered).
+      // loop the verdict poller's stop guards against. A latched-away outcome costs at most a
+      // repeated transfer next boot (the re-drive re-drives the candidate), never the acquisition.
       slskdDownload?.stop();
       database.close();
       return Promise.resolve();

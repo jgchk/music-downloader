@@ -14,7 +14,7 @@ import type {
 } from '../../application/ports/outbound-ports.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { SlskdClient } from './client.js';
-import { SlskdDownload } from './download.js';
+import { ESCALATE_EVERY, SlskdDownload } from './download.js';
 import type { Timer } from './timer.js';
 
 const STAGING = '/staging';
@@ -149,6 +149,10 @@ const emptyEvents = eventsPage([]);
 
 interface Options {
   enqueue?: HttpResponse;
+  /** Per-POST gates, in order; an undefined slot falls through to the default response. */
+  enqueueGates?: (Promise<HttpResponse> | undefined)[];
+  /** Per-transfers-GET gates, in order; an undefined slot falls through to the polls queue. */
+  pollGates?: (Promise<HttpResponse> | undefined)[];
   enqueueThrows?: boolean; // transport-level failure: slskd itself unreachable
   polls: HttpResponse[];
   events?: HttpResponse[];
@@ -157,6 +161,7 @@ interface Options {
   deleteThrows?: boolean; // transport-level failure on record-removal DELETEs
   deliverFailures?: number; // the first N outcome deliveries fail with an InfraError
   deliverThrows?: boolean; // the observer itself throws (a consumer bug, not a modeled Err)
+  finishedThrows?: boolean; // the observer's finished() hook throws (cleanup containment)
   timer?: Timer;
 }
 
@@ -170,10 +175,11 @@ interface Harness {
   adapter: SlskdDownload;
   deletes: string[];
   ledger: FakeResourceLedger;
-  counts: { options: number; events: number; posts: number; deliveries: number };
+  counts: { options: number; events: number; posts: number; deliveries: number; polls: number };
   outcomes: Delivered[];
   progress: DownloadProgress[];
   finished: string[];
+  errorLogs: string[];
 }
 
 function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
@@ -183,10 +189,11 @@ function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
 function downloader(options: Options): Harness {
   const deletes: string[] = [];
   const ledger = new FakeResourceLedger();
-  const counts = { options: 0, events: 0, posts: 0, deliveries: 0 };
+  const counts = { options: 0, events: 0, posts: 0, deliveries: 0, polls: 0 };
   const outcomes: Delivered[] = [];
   const progress: DownloadProgress[] = [];
   const finished: string[] = [];
+  const errorLogs: string[] = [];
   const polls = [...options.polls];
   // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
   // its staged files without every test having to spell out the events stub.
@@ -198,6 +205,8 @@ function downloader(options: Options): Harness {
       if (method === 'POST') {
         counts.posts += 1;
         if (options.enqueueThrows) return Promise.reject(new Error('socket hang up'));
+        const gate = options.enqueueGates?.shift();
+        if (gate !== undefined) return gate;
         return Promise.resolve(options.enqueue ?? { status: 200, body: '' });
       }
       if (method === 'DELETE') {
@@ -213,6 +222,9 @@ function downloader(options: Options): Harness {
         counts.events += 1;
         return Promise.resolve(drain(events, emptyEvents));
       }
+      counts.polls += 1;
+      const pollGate = options.pollGates?.shift();
+      if (pollGate !== undefined) return pollGate;
       return Promise.resolve(drain(polls, { status: 200, body: '{"directories":[]}' }));
     },
   };
@@ -231,18 +243,25 @@ function downloader(options: Options): Harness {
       return okAsync(undefined);
     },
     finished: (acquisitionId) => {
+      if (options.finishedThrows) throw new Error('observer bug: finished exploded');
       finished.push(acquisitionId);
     },
   };
+  const recordingLogger = {
+    ...silentLogger(),
+    error: (_context: unknown, message?: string) => {
+      errorLogs.push(message ?? '');
+    },
+  };
   const adapter = new SlskdDownload(
-    silentLogger(),
+    recordingLogger,
     ledger,
     { stagingRoot: STAGING, pollIntervalMs: 100 },
     observer,
     new SlskdClient(http),
     options.timer ?? fakeTimer(),
   );
-  return { adapter, deletes, ledger, counts, outcomes, progress, finished };
+  return { adapter, deletes, ledger, counts, outcomes, progress, finished, errorLogs };
 }
 
 /** Start the candidate and drive the watch to its delivered outcome (the common happy shape). */
@@ -1039,31 +1058,35 @@ describe('SlskdDownload', () => {
   });
 
   it('keeps delivering through escalated persistent delivery failures, still exactly once', async () => {
-    // Ten straight failures cross the escalation threshold (every tenth is promoted to error);
-    // the eleventh attempt lands, and only one outcome was ever recorded.
+    // ESCALATE_EVERY straight failures cross the threshold (the Nth is promoted to error); the
+    // next attempt lands, and only one outcome was ever recorded.
     const harness = downloader({
       polls: [bothSucceeded],
       events: [bothCompleted],
-      deliverFailures: 10,
+      deliverFailures: ESCALATE_EVERY,
     });
 
     const result = await run(harness);
 
     expect(result.kind).toBe('completed');
-    expect(harness.counts.deliveries).toBe(11);
+    expect(harness.counts.deliveries).toBe(ESCALATE_EVERY + 1);
     expect(harness.outcomes).toHaveLength(1);
+    expect(harness.errorLogs).toContain(
+      'download outcome delivery failed; retrying on the watch cadence',
+    );
   });
 
   it('self-heals through escalated persistent tick failures', async () => {
     const badPoll = { status: 200, body: JSON.stringify({ directories: 'not-an-array' }) };
     const harness = downloader({
-      polls: [...Array.from({ length: 10 }, () => badPoll), bothSucceeded],
+      polls: [...Array.from({ length: ESCALATE_EVERY }, () => badPoll), bothSucceeded],
       events: [bothCompleted],
     });
 
     const result = await run(harness);
 
     expect(result.kind).toBe('completed');
+    expect(harness.errorLogs).toContain('download watch tick failed; retrying on the next tick');
   });
 
   it('watches two acquisitions independently and delivers each outcome to its owner', async () => {
@@ -1222,6 +1245,105 @@ describe('SlskdDownload', () => {
     await harness.adapter.settled();
     expect(harness.outcomes).toHaveLength(1);
     expect(harness.outcomes[0]!.result.kind).toBe('completed');
+  });
+
+  it('reserves the watch key before any I/O: concurrent ensures cause one enqueue, one outcome', async () => {
+    // Two starts for the same key issued WITHOUT awaiting the first — the concurrent window the
+    // synchronous reservation exists for. Late registration would double-enqueue and double-watch.
+    const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+
+    const [first, second] = await Promise.all([
+      harness.adapter.start(ACQ, candidate, policy(1000, 1000)),
+      harness.adapter.start(ACQ, candidate, policy(1000, 1000)),
+    ]);
+    await harness.adapter.settled();
+
+    expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
+    expect(second._unsafeUnwrap()).toEqual({ kind: 'started' });
+    expect(harness.counts.posts).toBe(1);
+    expect(harness.outcomes).toHaveLength(1);
+  });
+
+  it('a failed successor start still retires progress once it was the last hope', async () => {
+    // Watch A winds down seeing successor B's reservation (so A skips retirement); B's enqueue
+    // is then refused and B releases LAST — B's guard path must retire the progress, or the bar
+    // freezes forever for an acquisition whose ladder has already moved on.
+    const control = manualTimer();
+    const gate = Promise.withResolvers<HttpResponse>();
+    const successor: Candidate = {
+      identity: asCandidateIdentity({ username: 'u1', path: String.raw`@@a\Other`, sizeBytes: 9 }),
+      files: [{ name: '9.flac', sizeBytes: 9 }],
+      source: { speedBytesPerSec: 0, freeSlots: 1, queueLength: 0 },
+    };
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+    ]);
+    const harness = downloader({
+      polls: [inFlight, poll([])],
+      enqueueGates: [undefined, gate.promise], // A's enqueue answers normally; B's parks on the gate
+      timer: control.timer,
+    });
+    // A enqueues normally (no gate yet), ticks once, parks.
+    const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await harness.adapter.abort(ACQ, candidate); // latch A; its listing found nothing to tear down
+
+    // B reserves, then parks on its gated enqueue.
+    const successorStart = harness.adapter.start(ACQ, successor, policy(100_000, 100_000));
+    await control.tick(); // A wakes, exits — sees B's reservation, skips retirement
+    expect(harness.finished).toEqual([]);
+
+    gate.resolve({ status: 400, body: 'peer gone' }); // B's enqueue refused — B releases last
+    const rejected = await successorStart;
+    expect(rejected._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
+    await harness.adapter.settled();
+    expect(harness.finished).toEqual([ACQ]); // the guard path retired the acquisition's progress
+  });
+
+  it('contains a throwing finished() hook: the registry entry is still released', async () => {
+    const harness = downloader({
+      polls: [bothSucceeded],
+      events: [bothCompleted],
+      finishedThrows: true,
+    });
+
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await harness.adapter.settled(); // resolves — the entry was released despite the throw
+
+    expect(harness.outcomes).toHaveLength(1);
+    expect(harness.errorLogs).toContain('watch cleanup failed');
+  });
+
+  it('an abort landing mid-tick winds the watch down quietly, not as a phantom retry', async () => {
+    // The tick's poll is in flight when the abort latches; the poll then fails (at shutdown this
+    // is the torn-down store/socket). The catch must recognize the latch and exit as wind-down —
+    // never log the "retrying on the next tick" line for a retry that will not happen.
+    const control = manualTimer();
+    const pollGate = Promise.withResolvers<HttpResponse>();
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+    ]);
+    const harness = downloader({
+      polls: [inFlight, poll([])],
+      pollGates: [undefined, pollGate.promise, undefined],
+      timer: control.timer,
+    });
+
+    const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    // Drive until tick 2's poll is provably parked on the gate (the second transfers GET).
+    await tickUntil(control, () => harness.counts.polls >= 2, 'tick 2 to park on the gated poll');
+
+    const aborted = await harness.adapter.abort(ACQ, candidate); // latches mid-tick
+    expect(aborted.isOk()).toBe(true);
+    pollGate.reject(new Error('socket torn down'));
+
+    await tickUntil(control, () => harness.finished.length > 0, 'the latched watch to exit');
+    await harness.adapter.settled();
+    expect(harness.outcomes).toEqual([]);
   });
 
   describe('abort', () => {
