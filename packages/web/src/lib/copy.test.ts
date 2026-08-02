@@ -502,6 +502,15 @@ describe('isStorySettled', () => {
       isStorySettled(delivered, importPresent({ status: 'applied', settled: undefined })),
     ).toBe(false);
   });
+
+  it('keeps watching a delivery whose import was rejected — the downloader may still revive it', () => {
+    // The unusable-delivery verdict reaches the downloader asynchronously; resting on the
+    // rejection would freeze the page right before the revival its own copy promises.
+    const delivered = acquisition({ status: 'Fulfilled', cancellable: false });
+    expect(isStorySettled(delivered, importPresent({ status: 'rejected', settled: true }))).toBe(
+      false,
+    );
+  });
 });
 
 describe('overallStatus', () => {

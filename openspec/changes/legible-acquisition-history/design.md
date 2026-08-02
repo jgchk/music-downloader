@@ -299,6 +299,10 @@ library".
   while its page is open] → accepted: the intake catch-up subscription processes every delivery,
   so the state is pathological; the honest "confirming the import" presentation beats a false
   "in your library".
+- [A plain no-retry import rejection keeps its page polling while open, with no pending row and
+  no whole-story duration gloss] → accepted: the page cannot distinguish it from an
+  unusable-delivery rejection whose revival is milliseconds away, and resting on the wrong one
+  freezes a live story; the cost matches the legacy-delivery case above.
 - [Curation judges some events unworthy — a user might want the full log someday] → the event
   store keeps everything; adding a kind later is additive by construction.
 - [Copy glosses can drift from domain truth as reasons evolve] → glosses live in one module with
