@@ -28,6 +28,16 @@ Patterns are a shared vocabulary, reached for when a problem calls for one — n
 - **Factory** — encapsulate construction when it's non-trivial or must guarantee invariants.
 - **Decorator** — layer behavior (caching, retry, logging) around a type without modifying it.
 
+## Simple over easy
+
+Rich Hickey's _Simple Made Easy_ distinction, adopted as a design value:
+
+- **Simplicity is objective.** Simple means un-braided: one concern per construct. Its opposite is _complected_ — concerns interleaved so that none can be reasoned about, changed, or tested alone. Measure a design by its entanglement, not its size.
+- **Ease is subjective.** Easy means near-at-hand: familiar, already installed, like what we wrote last time. Ease is a fact about us, not about the design.
+- **They are different axes.** A familiar pattern can braid concerns together; an unfamiliar one can separate them cleanly. Judging a design by its familiarity answers the wrong question.
+- **We target the simplest design that models the problem** — and we accept hard changes (unfamiliar patterns, invasive refactors) to reach or restore it. Hard-but-simple beats easy-but-complected: the cost of hard is paid once, in learning; the cost of complected is paid on every change after.
+- **The reviewer's question** is "what is braided together here?" — not "how would we usually do this?"
+
 ## Guidance
 
 - Prefer **composition over inheritance**. Use inheritance only for genuine substitutable is-a relationships.
