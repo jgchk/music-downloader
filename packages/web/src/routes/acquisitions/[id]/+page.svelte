@@ -17,7 +17,12 @@
   // fresh interval keeps ticking from now. Client-only by construction ($effect is compiled out of
   // SSR); the interval driver itself is unit-tested in $lib/freshness.
   $effect(() => {
-    if (isStorySettled(data.acquisition, data.importSection)) return;
+    if (isStorySettled(data.acquisition, data.importSection)) {
+      // A settled story rests — and a stale failure banner must not outlive the retries it
+      // promises (the flag would otherwise absorb: nothing ever clears it once polling stops).
+      refreshFailed = false;
+      return;
+    }
     return detailFreshness.start(() => {
       void (async () => {
         try {

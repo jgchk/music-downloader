@@ -331,7 +331,13 @@ export function isStorySettled(
 ): boolean {
   if (!isTerminal(acquisition)) return false;
   if (acquisition.status !== 'Fulfilled') return true;
-  return importSection.state === 'present' && importSection.status.settled === true;
+  if (importSection.state !== 'present') return false;
+  // A rejected import is terminal on the importer's side, yet the downloader may consume the
+  // verdict moments later and revive the acquisition (Fulfilled is stable-but-defeasible). That
+  // cross-context race is the BFF's to sequence — the import's own settled flag cannot express
+  // it — so a rejection keeps the page watching; a plain no-retry rejection then merely polls
+  // while its page is open, the same accepted cost as a legacy delivery.
+  return importSection.status.settled === true && importSection.status.status !== 'rejected';
 }
 
 const STATUS_PHRASE: Readonly<Record<AcquisitionStatusResponseDto['status'], string>> = {
@@ -392,6 +398,12 @@ export function overallStatus(
           }
           case 'rejected': {
             return { tone: 'failed', phrase: 'Import rejected' };
+          }
+          default: {
+            // Physically unreachable in-process (closed enum), but a drifted runtime value must
+            // degrade to the honest unconfirmed claim — never fall through to "In your library".
+            importSection.status.status satisfies never;
+            return { tone: 'pending', phrase: 'Delivered \u{2014} confirming the import' };
           }
         }
       }
@@ -520,6 +532,11 @@ export function pendingRowFor(
         case 'applied':
         case 'rejected': {
           return undefined;
+        }
+        default: {
+          // Same regime as overallStatus: a drifted phase keeps the honest narration.
+          importSection.status.status satisfies never;
+          return ADDING_ROW;
         }
       }
     }

@@ -551,6 +551,16 @@ describe('overallStatus', () => {
   });
 });
 
+describe('overallStatus — drifted import phase', () => {
+  it('degrades a phase this page cannot know to the honest unconfirmed claim', () => {
+    const delivered = acquisition({ status: 'Fulfilled', cancellable: false });
+    expect(overallStatus(delivered, importPresent({ status: 'remediating' as never }))).toEqual({
+      tone: 'pending',
+      phrase: 'Delivered — confirming the import',
+    });
+  });
+});
+
 describe('pendingRowFor', () => {
   it('names the current downloader phase while active', () => {
     expect(pendingRowFor(acquisition({ status: 'Pending' }), NO_IMPORT)).toEqual({
@@ -657,6 +667,15 @@ describe('pendingRowFor', () => {
       showProgress: false,
     });
     expect(pendingRowFor(delivered, importPresent({ status: 'applying' }))).toEqual({
+      text: 'Adding to the library…',
+      state: 'pending',
+      showProgress: false,
+    });
+  });
+
+  it('keeps honest narration for a drifted import phase', () => {
+    const delivered = acquisition({ status: 'Fulfilled', cancellable: false });
+    expect(pendingRowFor(delivered, importPresent({ status: 'remediating' as never }))).toEqual({
       text: 'Adding to the library…',
       state: 'pending',
       showProgress: false,
