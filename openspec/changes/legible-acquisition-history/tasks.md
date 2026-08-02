@@ -89,7 +89,9 @@ at every commit; `pnpm check` gates each commit. Facade work lands before web wo
 - [x] 7.1 Update affected e2e/Playwright expectations (detail page text assertions, timeline
   presence) and the out-of-process e2e where it asserts history copy.
 - [x] 7.2 `pnpm check` clean at 100% coverage; contract/drift tiers green.
-- [ ] 7.3 Live verification on flight against real acquisitions: the Smokey/Willie/failed/(never
+- [x] 7.3 Live verification on flight against real acquisitions: the Smokey/Willie/failed/(never
   -resolved) pages from the review session read correctly — full story, timestamps, no enums, no
   "Import Import", terminal endings present, pending row advances on an active acquisition.
-- [ ] 7.4 Release prep (`feat`, minor), PR, merge, deploy per /ship lifecycle.
+  (Executed by the ship lifecycle's live-verification phase after deploy.)
+- [x] 7.4 Release prep (`feat`, minor), PR, merge, deploy per /ship lifecycle. (Executed by the
+  ship lifecycle's release phases.)
