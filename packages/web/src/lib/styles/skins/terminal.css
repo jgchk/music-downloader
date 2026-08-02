@@ -77,7 +77,7 @@
 }
 
 /* Review decision surface as console output: inverse-video diff marks, a
-   bracketed hazard block for the destructive confirm, dimmed unchanged rows. */
+   dashed hazard border for the destructive confirm, dimmed unchanged rows. */
 :root[data-skin='terminal'] .track-diff mark {
   background: var(--accent);
   color: var(--accent-contrast);

@@ -18,13 +18,31 @@ describe('wordDiff', () => {
     expect(result.to).toEqual([{ text: 'The Last One Standing', changed: false }]);
   });
 
-  it('highlights only the inserted word in a near-identical pair', () => {
+  it('highlights only the inserted word — the mark hugs the word, not its whitespace', () => {
     const result = wordDiff('Last One Standing', 'The Last One Standing');
     expect(result.from).toEqual([{ text: 'Last One Standing', changed: false }]);
     expect(result.to).toEqual([
-      { text: 'The ', changed: true },
-      { text: 'Last One Standing', changed: false },
+      { text: 'The', changed: true },
+      { text: ' Last One Standing', changed: false },
     ]);
+  });
+
+  it('hugs an appended word: the joining space stays unmarked ahead of the mark', () => {
+    const result = wordDiff('Intro', 'Intro Live');
+    expect(result.to).toEqual([
+      { text: 'Intro ', changed: false },
+      { text: 'Live', changed: true },
+    ]);
+  });
+
+  it('keeps a whitespace-only divergence marked (there is no word to hug)', () => {
+    const result = wordDiff('A B', 'A  B');
+    expect(joined(result.to)).toBe('A  B');
+    expect(result.to.some((segment) => segment.changed)).toBe(true);
+  });
+
+  it('handles two empty inputs', () => {
+    expect(wordDiff('', '')).toEqual({ from: [], to: [] });
   });
 
   it('highlights a replaced word on both sides and keeps the shared remainder plain', () => {

@@ -46,7 +46,7 @@ const awaitingAcquisition = {
 
 const reviewItem = {
   module: 'importer',
-  kind: 'match-review',
+  kind: 'no-match',
   id: 'imp-1',
   title: 'a',
   ask: 'No match found',

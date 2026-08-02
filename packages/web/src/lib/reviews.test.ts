@@ -37,6 +37,10 @@ describe('kindLabel', () => {
   ] as const)('speaks the ask, never the machinery: %s -> %s', (kind, label) => {
     expect(kindLabel(kind)).toBe(label);
   });
+
+  it('degrades a runtime-unknown kind to a neutral ask instead of an empty chip', () => {
+    expect(kindLabel('quarantine-review' as never)).toBe('Needs your attention');
+  });
 });
 
 describe('matchQuality', () => {
@@ -70,7 +74,7 @@ describe('contextSummary', () => {
   it('summarizes a match review with candidate count and coarse best quality', () => {
     expect(
       contextSummary(pending({ kind: 'match-review', hinted: false, candidates: [candidate] })),
-    ).toBe('1 candidate match — best: Good match — 88%');
+    ).toBe('1 candidate match — best: Good match (88%)');
   });
 
   it('names a contradicted hint honestly when the best candidate is a different release', () => {
@@ -85,7 +89,7 @@ describe('contextSummary', () => {
         }),
       ),
     ).toBe(
-      '2 candidate matches — best: Good match — 88% — the release you pinned was not the best match',
+      '2 candidate matches — best: Good match (88%) — the release you pinned was not the best match',
     );
   });
 
@@ -101,14 +105,14 @@ describe('contextSummary', () => {
         }),
       ),
     ).toBe(
-      '1 candidate match — best: Good match — 88% — matched your pinned release, but low confidence',
+      '1 candidate match — best: Good match (88%) — matched your pinned release, but low confidence',
     );
   });
 
   it('falls back to a neutral note for a legacy hinted review with no pinned id', () => {
     expect(
       contextSummary(pending({ kind: 'match-review', hinted: true, candidates: [candidate] })),
-    ).toBe('1 candidate match — best: Good match — 88% — a release was hinted');
+    ).toBe('1 candidate match — best: Good match (88%) — a release was hinted');
   });
 
   it('handles a match review with no candidates', () => {
@@ -155,6 +159,12 @@ describe('contextSummary', () => {
   it('falls back when remediation carries no failures', () => {
     expect(contextSummary(pending({ kind: 'remediation-review', failures: [] }))).toBe(
       'Added to the library, but a finishing step failed',
+    );
+  });
+
+  it('degrades a runtime-unknown kind to a neutral summary', () => {
+    expect(contextSummary(pending({ kind: 'quarantine-review' } as never))).toBe(
+      'Awaiting your decision',
     );
   });
 });

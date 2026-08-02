@@ -9,7 +9,12 @@ import { matchPercent } from './copy.js';
  * deliberately distinct from low confidence (match-review spec).
  */
 
-/** The chip names the decision waiting on the user — the ask, never the machinery (design D8). */
+/**
+ * The chip names the decision waiting on the user — the ask, never the machinery
+ * (reviews-register-alignment D8). Exhaustive over the compiled union (a new kind is a compile
+ * error demanding its ask) with a tolerant runtime degrade for drifted data, mirroring the
+ * detail page's unknown-kind arm — never an empty chip.
+ */
 export function kindLabel(kind: ReviewDto['kind']): string {
   switch (kind) {
     case 'match-review': {
@@ -23,6 +28,10 @@ export function kindLabel(kind: ReviewDto['kind']): string {
     }
     case 'remediation-review': {
       return 'Fix after import';
+    }
+    default: {
+      kind satisfies never;
+      return 'Needs your attention';
     }
   }
 }
@@ -134,7 +143,12 @@ export function contextSummary(pending: PendingReviewDto): string {
   switch (review.kind) {
     case 'match-review': {
       const best = review.candidates[0];
-      const detail = best === undefined ? '' : ` \u{2014} best: ${matchQualityText(best.distance)}`;
+      // The percent qualifies its own category word in a compact metadata line, so it sits in
+      // parentheses (the affordance register's aside ban is about consequence copy on actions).
+      const detail =
+        best === undefined
+          ? ''
+          : ` \u{2014} best: ${matchQuality(best.distance).category} (${matchQuality(best.distance).pct}%)`;
       const note = hintNote(review);
       const hint = note === undefined ? '' : ` \u{2014} ${note}`;
       const plural = review.candidates.length === 1 ? '' : 'es';
@@ -153,6 +167,10 @@ export function contextSummary(pending: PendingReviewDto): string {
       return failure === undefined
         ? 'Added to the library, but a finishing step failed'
         : `Added to the library, but ${stageGloss(failure.stage)} failed`;
+    }
+    default: {
+      review satisfies never;
+      return 'Awaiting your decision';
     }
   }
 }

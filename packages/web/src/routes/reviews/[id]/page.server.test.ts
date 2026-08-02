@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
+import type { Logger } from 'pino';
 import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
+import { RESOLUTION_ACTIONS, isDestructive, type ResolutionVerb } from '$lib/resolution-actions.js';
 import { actions, load } from './+page.server.js';
 
 const pending = {
@@ -19,6 +21,10 @@ const acquisition = {
   target: { artist: 'Artist', title: 'Album' },
 };
 
+const DESTRUCTIVE_VERBS = (Object.keys(RESOLUTION_ACTIONS) as ResolutionVerb[]).filter((verb) =>
+  isDestructive(verb),
+);
+
 function eventFor(
   importer: Record<string, unknown>,
   fields: Record<string, string> = {},
@@ -34,6 +40,7 @@ function eventFor(
         importer: importer as unknown as ImporterFacade,
         downloader: downloader as unknown as DownloaderFacade,
       },
+      logger: { warn: vi.fn() } as unknown as Logger,
     },
   } as never;
 }
@@ -79,24 +86,62 @@ describe('resolve action', () => {
     });
   });
 
-  it('holds an unconfirmed destructive resolution at the confirm step — nothing dispatches', async () => {
+  it.each(DESTRUCTIVE_VERBS)(
+    'holds every inventory-destructive verb at the confirm step — %s dispatches nothing unconfirmed',
+    async (verb) => {
+      const resolveReview = vi.fn();
+      const result = (await actions.resolve!(eventFor({ resolveReview }, { verb }))) as {
+        confirm: { verb: string };
+      };
+      expect(result.confirm.verb).toBe(verb);
+      expect(resolveReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it('echoes the plain rejection’s reason into the pending confirmation', async () => {
     const resolveReview = vi.fn();
     const result = await actions.resolve!(
       eventFor({ resolveReview }, { verb: 'reject', reason: 'bad rip' }),
     );
-    expect(result).toEqual({ confirm: { verb: 'reject', reason: 'bad rip', reasons: undefined } });
+    expect(result).toEqual({ confirm: { verb: 'reject', reason: 'bad rip' } });
     expect(resolveReview).not.toHaveBeenCalled();
   });
 
-  it('holds the unusable-delivery rejection likewise, echoing its reasons', async () => {
+  it('echoes the unusable-delivery rejection’s reasons likewise', async () => {
     const resolveReview = vi.fn();
     const result = await actions.resolve!(
       eventFor({ resolveReview }, { verb: 'reject-unusable-delivery', reasons: 'truncated' }),
     );
     expect(result).toEqual({
-      confirm: { verb: 'reject-unusable-delivery', reason: undefined, reasons: 'truncated' },
+      confirm: { verb: 'reject-unusable-delivery', reasons: 'truncated' },
     });
     expect(resolveReview).not.toHaveBeenCalled();
+  });
+
+  it('reads the verb exactly as the dispatch will: a whitespace-padded destructive verb still confirms', async () => {
+    // The gate and resolveReviewForm must share one trimmed reading — a padded " reject " that
+    // slipped the gate would dispatch a file deletion with no confirmation (review finding).
+    const resolveReview = vi.fn();
+    const result = (await actions.resolve!(
+      eventFor({ resolveReview }, { verb: ' reject ', reason: 'bad rip' }),
+    )) as { confirm: { verb: string } };
+    expect(result.confirm.verb).toBe('reject');
+    expect(resolveReview).not.toHaveBeenCalled();
+  });
+
+  it('passes an unknown verb straight to the facade to refuse — the gate holds nothing', async () => {
+    const resolveReview = vi.fn().mockResolvedValue({ ok: false, error: { kind: 'Validation' } });
+    await actions.resolve!(eventFor({ resolveReview }, { verb: 'brand-new-verb' }));
+    expect(resolveReview).toHaveBeenCalledWith({
+      id: 'imp-1',
+      resolution: { verb: 'brand-new-verb' },
+    });
+  });
+
+  it('treats a missing verb as non-destructive and lets the facade refuse it', async () => {
+    const resolveReview = vi.fn().mockResolvedValue({ ok: false, error: { kind: 'Validation' } });
+    await actions.resolve!(eventFor({ resolveReview }, {}));
+    expect(resolveReview).toHaveBeenCalled();
   });
 
   it('dispatches a confirmed destructive resolution', async () => {

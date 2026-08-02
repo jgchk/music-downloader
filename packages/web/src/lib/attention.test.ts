@@ -41,7 +41,7 @@ describe('attentionItems', () => {
     expect(attentionItems([review({})], [])).toEqual([
       {
         module: 'importer',
-        kind: 'match-review',
+        kind: 'no-match',
         id: 'imp-1',
         title: 'album',
         ask: 'No match found',
@@ -55,6 +55,11 @@ describe('attentionItems', () => {
     const titles = new Map([['imp-1', 'Artist — Album']]);
     const items = attentionItems([review({})], [], titles);
     expect(items[0]?.title).toBe('Artist — Album');
+  });
+
+  it('carries each review kind on the machine channel, matching its ask', () => {
+    const items = attentionItems([review({})], []);
+    expect(items[0]?.kind).toBe('no-match');
   });
 
   it('speaks each review kind’s own ask', () => {

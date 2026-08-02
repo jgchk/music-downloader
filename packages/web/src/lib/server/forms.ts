@@ -6,7 +6,8 @@ import type { SubmitAcquisitionRequestDto } from '@music/downloader';
  * boundary owns validation; this layer only reshapes.
  */
 
-function text(data: FormData, name: string): string | undefined {
+/** The one reading of a form field, shared so no two consumers can parse the same POST apart. */
+export function text(data: FormData, name: string): string | undefined {
   const value = data.get(name);
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }

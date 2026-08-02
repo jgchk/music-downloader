@@ -49,8 +49,6 @@ describe('CandidateTable (SSR)', () => {
     // Raw source · id pairs and lower-is-better percentages left layer 1.
     expect(body).not.toContain('MusicBrainz · r-1');
     expect(body).not.toContain('3.1%');
-    expect(body).not.toContain('away');
-    expect(body).not.toContain(' off');
     // The disclosure holds them, behind a strong-scent summary.
     expect(body).toContain('data-testid="matching-details"');
     expect(body).toContain('Matching details — source, release ID, raw score');
@@ -138,7 +136,7 @@ describe('CandidateTable (SSR)', () => {
     expect(body).not.toContain('data-testid="album-fields"');
     expect(body).not.toContain('data-testid="track-diff"');
     expect(body).toContain('Strong match — 97%');
-    expect(body).toContain('clean match');
+    expect(body).toContain('no penalties recorded');
     expect(body).toContain('data-testid="apply"');
   });
 

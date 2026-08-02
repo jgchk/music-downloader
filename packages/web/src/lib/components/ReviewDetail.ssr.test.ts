@@ -47,9 +47,6 @@ describe('ReviewDetail (SSR)', () => {
       props: renderProperties(
         { kind: 'match-review', hinted: true, candidates: [candidate] },
         MATCH_ACTIONS,
-        {
-          error: 'This review has already been settled.',
-        },
       ),
     });
     expect(body).toContain('<h1>Artist — Album</h1>');
@@ -57,13 +54,24 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).toContain('/intake/x');
     // The chip speaks the ask; the context line is the composed summary.
     expect(body).toContain('Choose a match');
-    expect(body).toContain('1 candidate match — best: Weak match — 80% — a release was hinted');
+    expect(body).toContain('1 candidate match — best: Weak match (80%) — a release was hinted');
     expect(body).toContain('data-testid="hinted"');
     expect(body).toContain('data-testid="candidates"');
     expect(body).toContain('data-testid="supply-id"');
     expect(body).toContain('data-testid="reject-unusable"');
     expect(body).toContain('data-testid="manual-tags"');
+  });
+
+  it('surfaces an action failure banner when an error is supplied', () => {
+    const { body } = render(ReviewDetail, {
+      props: renderProperties(
+        { kind: 'match-review', hinted: true, candidates: [candidate] },
+        MATCH_ACTIONS,
+        { error: 'This review has already been settled.' },
+      ),
+    });
     expect(body).toContain('data-testid="action-error"');
+    expect(body).toContain('This review has already been settled.');
   });
 
   it('renders an unhinted match review without the hint note or error banner', () => {
@@ -153,6 +161,9 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).toContain('data-testid="unknown-review"');
     expect(body).toContain('This needs your attention, but this page can’t describe it yet');
     expect(body).toContain('quarantine-review');
+    // The chip and context line degrade to their neutral phrases, never empty text.
+    expect(body).toContain('Needs your attention');
+    expect(body).toContain('Awaiting your decision');
     expect(body).not.toContain('data-testid="failures"');
   });
 
@@ -193,16 +204,19 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).not.toContain('data-testid="reject-unusable"');
   });
 
-  it('degrades safely when the permitted-action set is absent — no action forms, no crash', () => {
+  it('degrades safely when the permitted-action set is absent — no action forms, an honest note', () => {
     const { body } = render(ReviewDetail, {
       props: renderProperties({ kind: 'match-review', hinted: false, candidates: [candidate] }),
     });
-    // The evidence still renders (the candidate table), but no action affordances are offered.
+    // The evidence still renders (the candidate table), but no action affordances are offered —
+    // and the absence is stated rather than left as a silent dead end.
     expect(body).toContain('data-testid="candidates"');
     expect(body).not.toContain('data-testid="apply"');
     expect(body).not.toContain('data-testid="supply-id"');
     expect(body).not.toContain('data-testid="reject"');
     expect(body).not.toContain('data-testid="manual-tags"');
+    expect(body).toContain('data-testid="no-actions"');
+    expect(body).toContain('No actions are available for this review yet');
   });
 
   it('replaces the action forms with the confirm step while a destructive resolution pends', () => {
@@ -216,21 +230,30 @@ describe('ReviewDetail (SSR)', () => {
       ),
     });
     expect(body).toContain('data-testid="confirm-destructive"');
-    // The specific consequence, restated with the composed contract.
+    // The confirm step leads the document — after a native POST reload it must be the first
+    // thing read, not buried below the evidence — and is reachable in the heading order.
+    expect(body.indexOf('data-testid="confirm-destructive"')).toBeLessThan(
+      body.indexOf('data-testid="candidates"'),
+    );
+    expect(body).toContain('<h2>Delete the downloaded files?</h2>');
+    // The specific consequence, restated with the composed contract from the verb inventory.
     expect(body).toContain('This deletes the downloaded files.');
     expect(body).toContain('Nothing more will be tried');
-    // Exactly two outcome-named choices — never a bare yes/no.
+    // Exactly two outcome-named choices — never a bare yes/no — and declining returns to THIS
+    // review, not the queue.
     expect(body).toContain('data-testid="confirm-delete"');
     expect(body).toContain('Delete the files');
     expect(body).toContain('data-testid="confirm-keep"');
     expect(body).toContain('Keep the files');
+    expect(body).toContain('href="/reviews/imp-1"');
     // The committing form re-posts the verb with its payload and the confirmed marker.
     expect(body).toContain('value="reject"');
     expect(body).toContain('value="bad rip"');
     expect(body).toContain('name="confirmed"');
-    // The ordinary action forms yield to the confirm step.
+    // The ordinary action forms yield to the confirm step — including the per-candidate apply.
     expect(body).not.toContain('data-testid="supply-id"');
     expect(body).not.toContain('data-testid="manual-tags"');
+    expect(body).not.toContain('data-testid="apply"');
   });
 
   it('states the revival consequence when confirming an unusable-delivery rejection', () => {
@@ -246,6 +269,8 @@ describe('ReviewDetail (SSR)', () => {
     expect(body).toContain('data-testid="confirm-destructive"');
     expect(body).toContain('The search for a replacement continues.');
     expect(body).toContain('value="reject-unusable-delivery"');
+    // Multi-line reasons survive the hidden-field echo intact — both lines, not just the first.
     expect(body).toContain('truncated');
+    expect(body).toContain('clipped');
   });
 });

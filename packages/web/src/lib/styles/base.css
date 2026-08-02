@@ -165,10 +165,15 @@ button:hover,
   --btn-fg: var(--accent-contrast);
   --btn-bd: var(--accent);
 }
-.btn.danger {
+.btn.danger,
+button.danger {
   --btn-bg: transparent;
   --btn-fg: var(--danger);
   --btn-bd: color-mix(in oklab, var(--danger) 55%, var(--border));
+}
+.btn.danger:hover,
+button.danger:hover {
+  border-color: var(--danger);
 }
 button[disabled] {
   opacity: 0.5;
@@ -757,14 +762,6 @@ li.timeline-date {
   margin: 0;
   font-family: var(--font-mono);
   overflow-wrap: anywhere;
-}
-button.danger {
-  --btn-bg: transparent;
-  --btn-fg: var(--danger);
-  --btn-bd: color-mix(in oklab, var(--danger) 55%, var(--border));
-}
-button.danger:hover {
-  border-color: var(--danger);
 }
 .confirm-destructive {
   align-self: stretch;

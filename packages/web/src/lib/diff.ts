@@ -1,8 +1,8 @@
 /**
- * Word-level string diff for the match review's tag comparison (design D7): near-identical
- * strings are the common case in music metadata, and an unhighlighted value pair under-serves
- * them (Picard's documented weakness — research §5). Pure and server-computed; the components
- * render the segments, so no client scripting is involved.
+ * Word-level string diff for the match review's tag comparison (reviews-register-alignment D7):
+ * near-identical strings are the common case in music metadata, and an unhighlighted value pair
+ * under-serves them (Picard's documented weakness — research §5). Pure; computed during render
+ * (SSR-complete), so the highlight requires no client scripting.
  */
 
 export interface DiffSegment {
@@ -42,6 +42,31 @@ function mergeSegments(parts: readonly DiffSegment[]): DiffSegment[] {
     }
   }
   return merged;
+}
+
+/**
+ * Boundary whitespace moves out of changed segments so a highlight mark hugs its word rather
+ * than trailing into the gap; a whitespace-only change keeps its mark (there is no word to hug).
+ */
+function hugWords(parts: readonly DiffSegment[]): DiffSegment[] {
+  const out: DiffSegment[] = [];
+  for (const part of parts) {
+    if (!part.changed) {
+      out.push(part);
+      continue;
+    }
+    const lead = part.text.length - part.text.trimStart().length;
+    const trail = part.text.length - part.text.trimEnd().length;
+    const core = part.text.slice(lead, part.text.length - trail);
+    if (core === '') {
+      out.push(part);
+      continue;
+    }
+    if (lead > 0) out.push({ text: part.text.slice(0, lead), changed: false });
+    out.push({ text: core, changed: true });
+    if (trail > 0) out.push({ text: part.text.slice(part.text.length - trail), changed: false });
+  }
+  return mergeSegments(out);
 }
 
 export interface WordDiff {
@@ -84,5 +109,5 @@ export function wordDiff(fromValue: string, toValue: string): WordDiff {
     toParts.push({ text: toTokens[column]!, changed: true });
   }
 
-  return { from: mergeSegments(fromParts), to: mergeSegments(toParts) };
+  return { from: hugWords(mergeSegments(fromParts)), to: hugWords(mergeSegments(toParts)) };
 }

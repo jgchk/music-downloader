@@ -1,14 +1,6 @@
-<script lang="ts" module>
-  /** The pending destructive resolution awaiting its in-page confirmation (design D5). */
-  export interface ConfirmState {
-    verb: 'reject' | 'reject-unusable-delivery';
-    reason?: string;
-    reasons?: string;
-  }
-</script>
-
 <script lang="ts">
   import type { PendingReviewDto } from '@music/importer';
+  import { confirmConsequence, type ConfirmState } from '$lib/resolution-actions.js';
   import { contextSummary, hintNote, kindLabel, stageGloss } from '$lib/reviews.js';
   import CandidateTable from './CandidateTable.svelte';
   import ManualTagsForm from './ManualTagsForm.svelte';
@@ -16,7 +8,7 @@
 
   interface Properties {
     pending: PendingReviewDto;
-    /** The composed display title — musical intent first (design D3). */
+    /** The composed display title — musical intent first (reviews-register-alignment D3). */
     title: string;
     /** Resolve-action failure to surface (incl. the stale-resolution conflict). */
     error?: string;
@@ -40,6 +32,34 @@
 
 {#if error}
   <p class="error" role="alert" data-testid="action-error">{error}</p>
+{/if}
+
+{#if confirm !== undefined}
+  <!-- The in-page confirmation (reviews-register-alignment D5) leads the document: after a
+       native no-JS POST the browser lands at the top of a fresh page, so the decision the user
+       must act on cannot sit below the evidence. Consequence copy comes from the verb inventory
+       — one home for all three tellings — and the two choices are outcome-named, never yes/no. -->
+  <section class="confirm-destructive" data-testid="confirm-destructive">
+    <h2>Delete the downloaded files?</h2>
+    <p>{confirmConsequence(confirm.verb)}</p>
+    <div class="confirm-choices">
+      <form method="POST" action="?/resolve">
+        <input type="hidden" name="verb" value={confirm.verb} />
+        <input type="hidden" name="confirmed" value="true" />
+        {#if confirm.verb === 'reject'}
+          {#if confirm.reason !== undefined}
+            <input type="hidden" name="reason" value={confirm.reason} />
+          {/if}
+        {:else if confirm.reasons !== undefined}
+          <input type="hidden" name="reasons" value={confirm.reasons} />
+        {/if}
+        <button type="submit" class="danger" data-testid="confirm-delete">Delete the files</button>
+      </form>
+      <a class="btn" href={`/reviews/${pending.importId}`} data-testid="confirm-keep">
+        Keep the files
+      </a>
+    </div>
+  </section>
 {/if}
 
 <!-- The kind-specific *evidence* (hint, candidate table, incumbents, failures) stays keyed on the
@@ -81,7 +101,8 @@
   </ul>
 {:else}
   <!-- Tolerant reader: a review kind the importer adds later lands here rather than mislabeling as
-       remediation-review and dereferencing a `failures` field it may not carry. -->
+       remediation-review and dereferencing a `failures` field it may not carry. The chip and
+       context line above degrade through their own neutral fallbacks for the same case. -->
   <p data-testid="unknown-review">This needs your attention, but this page can’t describe it yet</p>
   <details class="review-detail-disclosure">
     <summary>Diagnostic detail</summary>
@@ -94,33 +115,7 @@
   </details>
 {/if}
 
-{#if confirm !== undefined}
-  <!-- The in-page confirmation (design D5): the specific consequence restated with the composed
-       contract, and exactly two outcome-named choices. No dialog, no scripting. -->
-  <section class="confirm-destructive" data-testid="confirm-destructive" aria-live="polite">
-    <p>
-      This deletes the downloaded files. {confirm.verb === 'reject'
-        ? 'Nothing more will be tried — request the release again for another attempt.'
-        : 'The search for a replacement continues.'}
-    </p>
-    <div class="confirm-choices">
-      <form method="POST" action="?/resolve">
-        <input type="hidden" name="verb" value={confirm.verb} />
-        <input type="hidden" name="confirmed" value="true" />
-        {#if confirm.reason !== undefined}
-          <input type="hidden" name="reason" value={confirm.reason} />
-        {/if}
-        {#if confirm.reasons !== undefined}
-          <input type="hidden" name="reasons" value={confirm.reasons} />
-        {/if}
-        <button type="submit" class="danger" data-testid="confirm-delete">Delete the files</button>
-      </form>
-      <a class="btn" href={`/reviews/${pending.importId}`} data-testid="confirm-keep">
-        Keep the files
-      </a>
-    </div>
-  </section>
-{:else}
+{#if confirm === undefined}
   <ResolveForms
     supplyId={actions.has('supply-id')}
     refresh={actions.has('refresh-candidates')}
@@ -132,6 +127,10 @@
   />
   {#if actions.has('manual-tags')}
     <ManualTagsForm />
+  {/if}
+  {#if actions.size === 0}
+    <!-- An absent decided set degrades to no affordances — stated, never a silent dead end. -->
+    <p data-testid="no-actions">No actions are available for this review yet.</p>
   {/if}
 {/if}
 

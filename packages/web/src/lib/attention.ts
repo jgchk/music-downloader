@@ -1,5 +1,5 @@
 import type { AcquisitionStatusResponseDto } from '@music/downloader';
-import type { PendingReviewDto } from '@music/importer';
+import type { PendingReviewDto, ReviewDto } from '@music/importer';
 import { targetDescription } from './acquisitions.js';
 import { kindLabel, reviewTitle } from './reviews.js';
 
@@ -15,7 +15,8 @@ import { kindLabel, reviewTitle } from './reviews.js';
  */
 export interface AttentionItem {
   readonly module: 'importer' | 'downloader';
-  readonly kind: 'match-review' | 'edition-selection';
+  /** The machine channel mirrors the ask: the review's own kind, or the edition pause. */
+  readonly kind: ReviewDto['kind'] | 'edition-selection';
   readonly id: string;
   readonly title: string;
   /** The decision asked of the user, in plain action-oriented language (the chip's text). */
@@ -25,16 +26,20 @@ export interface AttentionItem {
   readonly href: string;
 }
 
-/** Kind determines module — one queue arm per pause kind, each owned by exactly one module. */
+/** Kind determines module — every review kind is the importer's; the edition pause is the
+ * downloader's. Totality over the union means a new review kind demands its owner here. */
 const MODULE_OF = {
   'match-review': 'importer',
+  'no-match': 'importer',
+  'duplicate-review': 'importer',
+  'remediation-review': 'importer',
   'edition-selection': 'downloader',
 } as const satisfies Record<AttentionItem['kind'], AttentionItem['module']>;
 
 export function attentionItems(
   reviews: readonly PendingReviewDto[],
   acquisitions: readonly AcquisitionStatusResponseDto[],
-  /** Composed musical-intent titles keyed by import id (design D3); absent entries degrade. */
+  /** Composed musical-intent titles keyed by import id (reviews-register-alignment D3). */
   reviewTitles?: ReadonlyMap<string, string>,
 ): AttentionItem[] {
   return orderByLongestWaiting([
@@ -50,8 +55,8 @@ export function attentionItems(
 
 function reviewItem(pending: PendingReviewDto, composedTitle: string | undefined): AttentionItem {
   return {
-    module: MODULE_OF['match-review'],
-    kind: 'match-review',
+    module: MODULE_OF[pending.review.kind],
+    kind: pending.review.kind,
     id: pending.importId,
     // Musical intent first, then the staged basename, then the neutral phrase — sparse
     // presentation fields degrade the item, never drop it (web-ui spec).

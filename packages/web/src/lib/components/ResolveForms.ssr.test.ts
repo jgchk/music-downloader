@@ -79,8 +79,14 @@ describe('ResolveForms (SSR)', () => {
 
   it('styles exactly the file-deleting verbs as low-emphasis danger', () => {
     const { body } = render(ResolveForms, { props: ALL_ON });
-    const dangerCount = body.match(/class="[^"]*\bdanger\b[^"]*"/gu)?.length ?? 0;
-    expect(dangerCount).toBe(2);
-    expect(body).not.toContain('class="primary');
+    // Identity, not just cardinality: the danger class sits inside exactly the two deleting
+    // forms and nowhere else (slice the render at each form's testid).
+    const upToReject = body.split('data-testid="reject"', 1)[0] ?? '';
+    const fromReject = body.slice(upToReject.length);
+    expect(upToReject).not.toContain('danger');
+    const rejectSlice = fromReject.split('data-testid="reject-unusable"', 1)[0] ?? '';
+    const unusableSlice = fromReject.slice(rejectSlice.length);
+    expect(rejectSlice).toContain('class="danger"');
+    expect(unusableSlice).toContain('class="danger"');
   });
 });
