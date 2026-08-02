@@ -31,7 +31,9 @@ describe('AcquisitionList (SSR)', () => {
           // In-progress, target not yet resolved → titled by the request as given.
           acquisition({
             acquisitionId: 'acq-1',
-            status: 'Searching',
+            // Validating: its phrase ("Checking quality") differs from the enum identifier, so the
+            // human-phrase assertion below can actually fail on a raw-enum regression.
+            status: 'Validating',
             attempts: 1,
             requestedTarget: { kind: 'descriptor', targetType: 'album', artist: 'R', title: 'Q' },
           }),
@@ -49,7 +51,8 @@ describe('AcquisitionList (SSR)', () => {
     });
     // The in-progress row shows its granular phase + attempts, titled by the request as given…
     expect(body).toContain('R — Q');
-    expect(body).toContain('Searching'); // granular phase phrase for the in-progress row
+    expect(body).toContain('Checking quality'); // the human phrase, not the raw enum
+    expect(body).not.toContain('Validating');
     expect(body).toContain('1 attempt');
     expect(body).not.toContain('1 attempts');
     expect(body).toContain('data-phase="pending"');

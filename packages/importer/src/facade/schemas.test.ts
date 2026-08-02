@@ -109,6 +109,15 @@ describe('response schemas', () => {
     expect(importStatusResponseSchema.parse(payload)).toEqual(payload);
   });
 
+  it('accepts the additive decided settledness present (true/false) and absent', () => {
+    const base = { importId: 'imp-1', status: 'proposing', history: [] };
+    expect(importStatusResponseSchema.parse(base).settled).toBeUndefined();
+    expect(importStatusResponseSchema.parse({ ...base, settled: false }).settled).toBe(false);
+    expect(
+      importStatusResponseSchema.parse({ ...base, status: 'applied', settled: true }).settled,
+    ).toBe(true);
+  });
+
   it('round-trips each review kind on a pending item', () => {
     for (const review of [
       { kind: 'no-match' },

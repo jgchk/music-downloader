@@ -153,6 +153,11 @@ describe('projectStatus — lifecycle history coverage', () => {
     ]);
   });
 
+  it('records the fulfilled ending with its location', () => {
+    const view = projectStatus('acq-1', stored(history));
+    expect(view.history.at(-1)).toEqual({ kind: 'fulfilled', location: '/lib/c', at: 't' });
+  });
+
   it('ends an exhausted story with its terminal entry', () => {
     const view = projectStatus(
       'acq-1',
@@ -201,18 +206,20 @@ describe('projectStatus — lifecycle history coverage', () => {
   });
 
   it('keeps noise events out of the history', () => {
+    // The exact kind set: any additional entry a noise event might grow (ranked, rejected,
+    // completed, passed) fails this, not just a raw event-type passthrough.
     const view = projectStatus('acq-1', stored(history));
-    const kinds = new Set<string>(view.history.map((entry) => entry.kind));
-    expect(kinds.has('requested')).toBe(true);
-    for (const noisy of [
-      'SearchCompleted',
-      'CandidatesRanked',
-      'CandidateRejected',
-      'DownloadCompleted',
-      'ValidationPassed',
-    ]) {
-      expect(kinds.has(noisy)).toBe(false);
-    }
+    expect(new Set(view.history.map((entry) => entry.kind))).toEqual(
+      new Set([
+        'requested',
+        'resolved',
+        'selected',
+        'download-failed',
+        'validation-failed',
+        'imported',
+        'fulfilled',
+      ]),
+    );
   });
 });
 

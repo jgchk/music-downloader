@@ -40,6 +40,7 @@ export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
   event.locals.logger = loggerOf();
   event.locals.access = accessOf();
+  event.locals.now = () => new Date().toISOString();
 
   const cookie = event.cookies.get(SESSION_COOKIE);
   if (cookie !== undefined) {

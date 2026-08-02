@@ -59,6 +59,8 @@ describe('server hooks', () => {
     expect(event.locals.facades).toEqual({ downloader: {}, importer: {} });
     expect(event.locals.logger).toBe(logger);
     expect(event.locals.access).toBe(access);
+    // The injected wall clock — the one impure edge loads read time through.
+    expect(event.locals.now()).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(event.locals.session).toMatchObject({ plexAccountId: '42', username: 'jake' });
     expect(resolve).toHaveBeenCalledWith(event);
     expect(result).toBe(response);

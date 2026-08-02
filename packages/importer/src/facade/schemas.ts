@@ -283,6 +283,10 @@ export const importStatusResponseSchema = z.object({
   review: reviewSchema.optional(),
   // Present only when the import terminated in `rejected` (additive).
   rejection: z.object({ reason: z.string(), filesDeleted: z.boolean() }).optional(),
+  // The import's decided settledness — its own domain terminality, published so a consumer never
+  // re-derives "is anything more coming?" from the phase enum (additive; absent means an older
+  // producer and a consumer should assume unsettled).
+  settled: z.boolean().optional(),
   // Present (true) only when the import's effect dead-lettered and it awaits an operator (additive,
   // tag-or-omit: only ever `true` or absent).
   stalled: z.literal(true).optional(),

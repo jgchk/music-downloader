@@ -15,7 +15,8 @@ function formatAbsolute(
   shouldShowSeconds: boolean,
 ): string {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
+  // A malformed timestamp degrades to its raw value — visible, never a silent blank.
+  if (Number.isNaN(date.getTime())) return iso;
   const day = new Intl.DateTimeFormat('en-GB', {
     timeZone,
     day: 'numeric',
@@ -35,7 +36,9 @@ function formatAbsolute(
 /** The hybrid entry display: "now" < 1 min, minutes < 1 h, hours < 24 h, absolute beyond. */
 export function entryTime(iso: string, nowIso: string, timeZone?: string): string {
   const age = new Date(nowIso).getTime() - new Date(iso).getTime();
-  if (Number.isNaN(age)) return '';
+  // A malformed `iso` falls through to formatAbsolute's raw-value degrade; a malformed clock with
+  // a valid `iso` still renders the entry's own absolute time rather than blanking every row.
+  if (Number.isNaN(age)) return formatAbsolute(iso, timeZone, false);
   if (age < MINUTE_MS) return 'now';
   if (age < HOUR_MS) return `${Math.floor(age / MINUTE_MS)} min ago`;
   if (age < DAY_MS) return `${Math.floor(age / HOUR_MS)} h ago`;
@@ -48,8 +51,9 @@ export function fullTime(iso: string, timeZone?: string): string {
 }
 
 /** The calendar-date key a divider is inserted on when it changes between entries. */
-export function dateKey(iso: string, timeZone?: string): string {
-  if (Number.isNaN(new Date(iso).getTime())) return '';
+export function dateKey(iso: string, timeZone?: string): string | undefined {
+  // Undefined (typed, not a sentinel) suppresses the divider for an unparseable timestamp.
+  if (Number.isNaN(new Date(iso).getTime())) return undefined;
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -60,7 +64,7 @@ export function dateKey(iso: string, timeZone?: string): string {
 
 /** The divider's human label for a calendar date. */
 export function dateLabel(iso: string, timeZone?: string): string {
-  if (Number.isNaN(new Date(iso).getTime())) return '';
+  if (Number.isNaN(new Date(iso).getTime())) return iso;
   return new Intl.DateTimeFormat('en-GB', {
     timeZone,
     day: 'numeric',

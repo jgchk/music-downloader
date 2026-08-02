@@ -61,6 +61,13 @@ export interface ImportStatusView {
   readonly location?: string;
   readonly openReview?: OpenReview;
   readonly rejection?: { readonly reason: string; readonly filesDeleted: boolean };
+  /**
+   * Whether the import has settled — the domain's own terminality, decided here rather than left
+   * for a consumer to re-derive from the phase enum (the decided-lifecycle-flags pattern the
+   * downloader's `cancellable` established). A consumer paces liveness (e.g. page refresh) off
+   * this, not off pattern-matching phases.
+   */
+  readonly settled: boolean;
   readonly history: readonly StatusHistoryEntry[];
   /**
    * Present (`true`) when the import's current effect dead-lettered — its retry budget spent — and
@@ -128,7 +135,8 @@ export function projectStatus(
   stored: readonly StoredEvent[],
 ): ImportStatusView {
   const events = stored.map((entry) => entry.event);
-  const snapshot = Import.fromHistory(events).snapshot;
+  const imported = Import.fromHistory(events);
+  const snapshot = imported.snapshot;
   return {
     importId,
     acquisitionId: acquisitionIdOf(events),
@@ -137,6 +145,7 @@ export function projectStatus(
     location: snapshot.location,
     openReview: snapshot.openReview,
     rejection: snapshot.rejection,
+    settled: imported.isTerminal,
     history: stored.map((entry) => ({
       ...historyEntry(entry.event),
       at: entry.metadata.occurredAt,

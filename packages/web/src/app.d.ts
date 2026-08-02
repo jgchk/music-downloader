@@ -15,6 +15,8 @@ declare global {
       facades: Facades;
       /** The composed process's structured logger, for request-scoped diagnostics. */
       logger: Logger;
+      /** The wall clock, injected here (the one impure edge) so loads stay clock-testable. */
+      now: () => string;
       /** The access-control composition (session secret + PlexAccess port) for the login flow. */
       access: Access;
       /**

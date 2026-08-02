@@ -47,6 +47,16 @@ function storedAll(
   }));
 }
 
+describe('projectStatus — decided settledness', () => {
+  it('reports an in-flight import as unsettled', () => {
+    const view = projectStatus(
+      toImportId('imp-1'),
+      storedAll('imp-1', [requested({ hints: HINTS })]),
+    );
+    expect(view.settled).toBe(false);
+  });
+});
+
 describe('projectStatus', () => {
   it('narrates the full history of an applied import', () => {
     const history: ImportEvent[] = [
@@ -61,6 +71,8 @@ describe('projectStatus', () => {
       directory: DIRECTORY,
       phase: 'applied',
       location: '/library/Artist/Album',
+      // The decided settledness: the domain's own terminality, never a consumer's enum guess.
+      settled: true,
     });
     expect(view.history).toEqual([
       { kind: 'requested', at: 't', hints: HINTS },
