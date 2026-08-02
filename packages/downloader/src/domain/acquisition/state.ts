@@ -79,6 +79,8 @@ export interface DownloadingState extends Targeted {
   readonly phase: 'Downloading';
   readonly working: readonly RankedCandidate[];
   readonly current: Candidate; // the candidate currently in flight
+  /** True once the source accepted the enqueue (`DownloadStarted`) — the transfer is live. */
+  readonly started: boolean;
 }
 export interface ValidatingState extends Targeted {
   readonly phase: 'Validating';
@@ -240,6 +242,7 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       return {
         ...state,
         phase: 'Downloading',
+        started: false,
         current: event.candidate,
         working: state.working.filter(
           (ranked) =>
@@ -248,9 +251,14 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
         attempts: state.attempts + 1,
       };
     }
+    case 'DownloadStarted': {
+      if (state.phase !== 'Downloading') return state;
+      return { ...state, started: true };
+    }
     case 'DownloadCompleted': {
       if (state.phase !== 'Downloading') return state;
-      return { ...state, phase: 'Validating', downloadedFiles: event.files };
+      const { started: _started, ...downloading } = state;
+      return { ...downloading, phase: 'Validating', downloadedFiles: event.files };
     }
     case 'DownloadFailed': {
       return state; // the following CandidateRejected does the state work

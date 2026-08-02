@@ -73,6 +73,15 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
         ? [{ type: 'Download', candidate: event.candidate, policy: state.policies.download }]
         : [];
     }
+    case 'DownloadStarted': {
+      // Level-triggered ensure: the same Download effect the selection fired. Live, the
+      // supervisor's start is an idempotent no-op (the watch is already registered); after a
+      // restart this re-derivation is what rebuilds the watch — the reactor's re-drive keys off
+      // the LAST event, and mid-download that is this one (nonblocking-download-observation D3).
+      return state.phase === 'Downloading'
+        ? [{ type: 'Download', candidate: state.current, policy: state.policies.download }]
+        : [];
+    }
     case 'DownloadCompleted': {
       return state.phase === 'Validating'
         ? [

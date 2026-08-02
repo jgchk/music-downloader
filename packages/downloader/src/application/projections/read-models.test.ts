@@ -23,6 +23,7 @@ import {
   sampleRequest,
   sampleTarget,
   selectedHistory,
+  startedHistory,
   validatingHistory,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 
@@ -220,6 +221,30 @@ describe('projectStatus — lifecycle history coverage', () => {
         'fulfilled',
       ]),
     );
+  });
+});
+
+describe('projectStatus — the downloading phase is visible and narrated', () => {
+  it('a started download keeps the downloading status and narrates the start', () => {
+    const view = projectStatus('acq-1', stored(startedHistory([a])));
+    expect(view.status).toBe('Downloading');
+    expect(view.history.at(-1)).toEqual({
+      kind: 'download-started',
+      candidate: a.identity,
+      at: 't',
+    });
+    expect(view.history.map((entry) => entry.kind)).toEqual([
+      'requested',
+      'resolved',
+      'selected',
+      'download-started',
+    ]);
+  });
+
+  it('an acquisition recorded before the start fact existed folds without the entry', () => {
+    const view = projectStatus('acq-1', stored(selectedHistory([a])));
+    expect(view.status).toBe('Downloading');
+    expect(view.history.map((entry) => entry.kind)).toEqual(['requested', 'resolved', 'selected']);
   });
 });
 

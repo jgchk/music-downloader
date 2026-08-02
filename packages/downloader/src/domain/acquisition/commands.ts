@@ -1,4 +1,4 @@
-import type { Candidate, CandidateReference } from '../candidate/candidate.js';
+import type { Candidate, CandidateIdentity, CandidateReference } from '../candidate/candidate.js';
 import type { AcquisitionPolicies } from '../policy/policies.js';
 import type { Mbid } from '../shared/mbid.js';
 import type { Target } from '../target/target.js';
@@ -33,7 +33,21 @@ export type AcquisitionCommand =
       readonly releaseMbid: Mbid;
     }
   | { readonly type: 'RecordSearchResults'; readonly candidates: readonly Candidate[] }
-  | { readonly type: 'RecordDownloadCompleted'; readonly files: readonly DownloadedFile[] }
+  | {
+      // The source accepted the enqueue: the download supervisor's watch is live. Duplicate or
+      // stale reports (redelivery, ensure-start re-dispatch) are absorbed by `decide`.
+      readonly type: 'RecordDownloadStarted';
+      readonly candidate: CandidateIdentity;
+    }
+  | {
+      readonly type: 'RecordDownloadCompleted';
+      readonly files: readonly DownloadedFile[];
+      // The candidate this outcome settles. Outcomes arrive asynchronously from the download
+      // supervisor, so a re-emitted outcome can name a candidate the ladder has already moved
+      // past — `decide` absorbs the mismatch. Optional: a candidate-less outcome (the pre-async
+      // shape) is guarded by phase alone.
+      readonly candidate?: CandidateIdentity;
+    }
   | {
       readonly type: 'RecordDownloadFailed';
       readonly reason: DownloadFailureReason;
@@ -41,6 +55,8 @@ export type AcquisitionCommand =
       // adapter so `decide` can stamp them onto the rejection for cleanup (design D2). Optional:
       // a download that failed before staging (or with an unresolvable subset) carries none.
       readonly files?: readonly DownloadedFile[];
+      // The candidate this outcome settles — the same asynchronous stale-guard as on completion.
+      readonly candidate?: CandidateIdentity;
     }
   | { readonly type: 'RecordValidationPassed'; readonly verdict: ValidationVerdict }
   | { readonly type: 'RecordValidationFailed'; readonly verdict: ValidationVerdict }

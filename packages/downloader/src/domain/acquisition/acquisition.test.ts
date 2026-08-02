@@ -20,6 +20,7 @@ import {
   sampleRequest,
   sampleTarget,
   selectedHistory,
+  startedHistory,
   validatingHistory,
 } from './__fixtures__/acquisition-fixtures.js';
 
@@ -1022,5 +1023,156 @@ describe('Acquisition.execute — manual edition selection', () => {
         request: { kind: 'musicbrainz', mbid: 'boot-1', targetType: 'album' },
       },
     ]);
+  });
+});
+
+describe('Acquisition.execute — the downloading phase is a recorded fact', () => {
+  const candidate = matchingCandidate('a');
+
+  it('records the start once the source accepts the enqueue', () => {
+    const events = Acquisition.fromHistory(selectedHistory([candidate]))
+      .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+      ._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'DownloadStarted', candidate: candidate.identity }]);
+  });
+
+  it('absorbs a duplicate start report without appending twice', () => {
+    expect(
+      Acquisition.fromHistory(startedHistory([candidate]))
+        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('absorbs a stale start report naming a candidate no longer in flight', () => {
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(selectedHistory([candidate]))
+        .execute({ type: 'RecordDownloadStarted', candidate: other.identity })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('absorbs a start report on a terminal acquisition (the cancel won the race)', () => {
+    expect(
+      Acquisition.fromHistory([...selectedHistory([candidate]), { type: 'AcquisitionCancelled' }])
+        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('rejects a start report outside the downloading phase as a protocol violation', () => {
+    const error = Acquisition.fromHistory(resolvedHistory())
+      .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+      ._unsafeUnwrapErr();
+    expect(error).toEqual({
+      kind: 'IllegalTransition',
+      command: 'RecordDownloadStarted',
+      phase: 'Searching',
+    });
+  });
+});
+
+describe('Acquisition.execute — asynchronous outcomes carry their candidate as the stale-guard', () => {
+  const candidate = matchingCandidate('a');
+
+  it('accepts a completion naming the candidate in flight', () => {
+    const events = Acquisition.fromHistory(startedHistory([candidate]))
+      .execute({
+        type: 'RecordDownloadCompleted',
+        candidate: candidate.identity,
+        files: sampleFiles,
+      })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['DownloadCompleted']);
+  });
+
+  it('absorbs a completion naming a candidate no longer in flight', () => {
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(startedHistory([candidate]))
+        .execute({ type: 'RecordDownloadCompleted', candidate: other.identity, files: sampleFiles })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('absorbs a failure naming a candidate no longer in flight', () => {
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(startedHistory([candidate]))
+        .execute({ type: 'RecordDownloadFailed', candidate: other.identity, reason: 'Stalled' })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+  });
+
+  it('still accepts a candidate-less outcome (the pre-async command shape)', () => {
+    const events = Acquisition.fromHistory(startedHistory([candidate]))
+      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles })
+      ._unsafeUnwrap();
+    expect(types(events)).toEqual(['DownloadCompleted']);
+  });
+
+  it('settles a cancelled in-flight candidate on a completion only when it names it', () => {
+    const cancelled = [...startedHistory([candidate]), { type: 'AcquisitionCancelled' } as const];
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(cancelled)
+        .execute({ type: 'RecordDownloadCompleted', candidate: other.identity, files: sampleFiles })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+    expect(
+      types(
+        Acquisition.fromHistory(cancelled)
+          .execute({
+            type: 'RecordDownloadCompleted',
+            candidate: candidate.identity,
+            files: sampleFiles,
+          })
+          ._unsafeUnwrap(),
+      ),
+    ).toEqual(['CandidateRejected']);
+  });
+
+  it('settles a cancelled in-flight candidate only when the outcome names it', () => {
+    const cancelled = [...startedHistory([candidate]), { type: 'AcquisitionCancelled' } as const];
+    const other = matchingCandidate('z');
+    expect(
+      Acquisition.fromHistory(cancelled)
+        .execute({ type: 'RecordDownloadFailed', candidate: other.identity, reason: 'Cancelled' })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+    expect(
+      types(
+        Acquisition.fromHistory(cancelled)
+          .execute({
+            type: 'RecordDownloadFailed',
+            candidate: candidate.identity,
+            reason: 'Cancelled',
+          })
+          ._unsafeUnwrap(),
+      ),
+    ).toEqual(['CandidateRejected']);
+  });
+});
+
+describe('Acquisition.reactTo — DownloadStarted ensures the watch (level-triggered)', () => {
+  const candidate = matchingCandidate('a');
+
+  it('re-derives the download effect so a restarted process resumes the watch', () => {
+    const effects = Acquisition.fromHistory(startedHistory([candidate])).reactTo({
+      type: 'DownloadStarted',
+      candidate: candidate.identity,
+    });
+    expect(effectTypes(effects)).toEqual(['Download']);
+    expect((effects[0] as Extract<Effect, { type: 'Download' }>).candidate).toEqual(candidate);
+  });
+
+  it('derives nothing once the acquisition has moved past downloading', () => {
+    expect(
+      Acquisition.fromHistory(validatingHistory([candidate])).reactTo({
+        type: 'DownloadStarted',
+        candidate: candidate.identity,
+      }),
+    ).toEqual([]);
   });
 });
