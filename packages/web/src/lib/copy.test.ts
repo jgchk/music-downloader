@@ -92,6 +92,24 @@ describe('entryCopy — downloader entries', () => {
     ]);
   });
 
+  it('carries a track descriptor’s disambiguating album into the request disclosure', () => {
+    const copy = entryCopy(
+      dl({
+        kind: 'requested',
+        request: {
+          kind: 'descriptor',
+          targetType: 'track',
+          artist: 'Nick Drake',
+          title: 'Pink Moon',
+          album: 'Pink Moon',
+        },
+      }),
+    );
+    expect(copy?.detail).toEqual([
+      { label: 'Request', value: 'Nick Drake — Pink Moon (track, from Pink Moon)' },
+    ]);
+  });
+
   it('describes an id request in the disclosure by its id', () => {
     const group = entryCopy(
       dl({
@@ -309,6 +327,7 @@ describe('entryCopy — importer entries (no module prefix, unified voice)', () 
     expect(copy?.text).toBe('Added to the library, but needs attention');
     expect(copy?.state).toBe('attention');
     expect(copy?.detail).toEqual([{ label: 'artwork', value: 'no cover found' }]);
+    expect(copy?.link).toEqual({ href: '/reviews', label: 'Open the review' });
   });
 
   it('renders an import rejection with its reason, promising only what may follow', () => {

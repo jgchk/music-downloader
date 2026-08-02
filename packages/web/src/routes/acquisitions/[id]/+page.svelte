@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import { isStorySettled } from '$lib/copy.js';
-  import { detailFreshness } from '$lib/freshness.js';
+  import { detailFreshness, startLiveness } from '$lib/freshness.js';
   import AcquisitionDetail from '$lib/components/AcquisitionDetail.svelte';
   import type { PageProps as PageProperties } from './$types';
 
@@ -15,25 +15,15 @@
   // contract. Settled stories rest. The effect re-registers on every data change (each tick
   // replaces `data`), tearing down and re-creating the interval — deliberate, not a leak: the
   // fresh interval keeps ticking from now. Client-only by construction ($effect is compiled out of
-  // SSR); the interval driver itself is unit-tested in $lib/freshness.
-  $effect(() => {
-    if (isStorySettled(data.acquisition, data.importSection)) {
-      // A settled story rests — and a stale failure banner must not outlive the retries it
-      // promises (the flag would otherwise absorb: nothing ever clears it once polling stops).
-      refreshFailed = false;
-      return;
-    }
-    return detailFreshness.start(() => {
-      void (async () => {
-        try {
-          await invalidateAll();
-          refreshFailed = false;
-        } catch {
-          refreshFailed = true;
-        }
-      })();
-    });
-  });
+  // SSR); the whole liveness policy is unit-tested as startLiveness in $lib/freshness.
+  $effect(() =>
+    startLiveness(isStorySettled(data.acquisition, data.importSection), detailFreshness, {
+      refresh: invalidateAll,
+      onRefreshFailed: (failed) => {
+        refreshFailed = failed;
+      },
+    }),
+  );
 </script>
 
 <AcquisitionDetail

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { intervalFreshness } from './freshness.js';
+import { intervalFreshness, startLiveness, type FreshnessDriver } from './freshness.js';
 
 describe('intervalFreshness — the swappable refresh trigger', () => {
   beforeEach(() => {
@@ -38,5 +38,89 @@ describe('intervalFreshness — the swappable refresh trigger', () => {
     expect(() => stop()).not.toThrow();
     vi.advanceTimersByTime(5000);
     expect(ticks).not.toHaveBeenCalled();
+  });
+});
+
+describe('startLiveness — the detail page’s whole liveness policy', () => {
+  function crankDriver(): { driver: FreshnessDriver; tick: () => void; stops: () => number } {
+    let onTick: (() => void) | undefined;
+    let stops = 0;
+    return {
+      driver: {
+        start(handler) {
+          onTick = handler;
+          return () => {
+            stops += 1;
+          };
+        },
+      },
+      tick: () => onTick?.(),
+      stops: () => stops,
+    };
+  }
+
+  async function settle(): Promise<void> {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  it('rests when the story is settled — and clears any stale failure banner', () => {
+    const { driver } = crankDriver();
+    const outcomes: boolean[] = [];
+    const stop = startLiveness(true, driver, {
+      refresh: () => Promise.resolve(),
+      onRefreshFailed: (didFail) => {
+        outcomes.push(didFail);
+      },
+    });
+    expect(stop).toBeUndefined();
+    expect(outcomes).toEqual([false]);
+  });
+
+  it('ticks the refresh while unsettled and reports success', async () => {
+    const { driver, tick } = crankDriver();
+    const refresh = vi.fn(() => Promise.resolve());
+    const outcomes: boolean[] = [];
+    const stop = startLiveness(false, driver, {
+      refresh,
+      onRefreshFailed: (didFail) => {
+        outcomes.push(didFail);
+      },
+    });
+    tick();
+    await settle();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(outcomes).toEqual([false]);
+    stop?.();
+  });
+
+  it('surfaces a failed refresh, then recovers on the next success', async () => {
+    const { driver, tick } = crankDriver();
+    let shouldFail = true;
+    const outcomes: boolean[] = [];
+    const stop = startLiveness(false, driver, {
+      refresh: () => (shouldFail ? Promise.reject(new Error('offline')) : Promise.resolve()),
+      onRefreshFailed: (didFail) => {
+        outcomes.push(didFail);
+      },
+    });
+    tick();
+    await settle();
+    shouldFail = false;
+    tick();
+    await settle();
+    expect(outcomes).toEqual([true, false]);
+    stop?.();
+  });
+
+  it('returns the driver’s stop function for teardown', () => {
+    const { driver, stops } = crankDriver();
+    const stop = startLiveness(false, driver, {
+      refresh: () => Promise.resolve(),
+      onRefreshFailed: () => {},
+    });
+    stop?.();
+    expect(stops()).toBe(1);
   });
 });
