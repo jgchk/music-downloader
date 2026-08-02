@@ -190,7 +190,7 @@ describe('createDownloaderFacade', () => {
             candidates: [{ releaseMbid: asMbid(RETAINED_EDITION), trackCount: 12 }],
           },
         ],
-        { acquisitionId: 'acq-1', occurredAt: 't' },
+        { acquisitionId: 'acq-1', occurredAt: '2026-01-01T00:00:00Z' },
       );
       wiring.sync();
       return wiring;
@@ -264,7 +264,7 @@ describe('createDownloaderFacade', () => {
       const wiring = testWiring();
       await wiring.store.append('acq-1', 0, awaitingSelectionHistory(), {
         acquisitionId: 'acq-1',
-        occurredAt: 't',
+        occurredAt: '2026-01-01T00:00:00Z',
       });
       wiring.sync();
 

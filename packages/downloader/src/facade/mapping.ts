@@ -64,24 +64,62 @@ export function resolvePolicies(
     .mapErr(() => 'InvalidPolicy' as const);
 }
 
+/** The request echoed as the submit endpoint's own wire shape (the domain's branded mbid decays to its string). */
+function requestToWire(request: AcquisitionRequest): AcquisitionRequestDto {
+  return request.kind === 'descriptor' ? { ...request } : { ...request };
+}
+
 function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
-  const candidate = { ...entry.candidate };
   const at = entry.at;
   switch (entry.kind) {
+    case 'requested': {
+      return { kind: 'requested', at, request: requestToWire(entry.request) };
+    }
+    case 'resolved': {
+      return { kind: 'resolved', at, artist: entry.artist, title: entry.title, year: entry.year };
+    }
+    case 'search-started': {
+      return { kind: 'search-started', at, round: entry.round };
+    }
+    case 'fulfilled': {
+      return { kind: 'fulfilled', at, location: entry.location };
+    }
+    case 'exhausted': {
+      return { kind: 'exhausted', at };
+    }
+    case 'conflicted': {
+      return { kind: 'conflicted', at, location: entry.location };
+    }
+    case 'metadata-failed': {
+      return { kind: 'metadata-failed', at };
+    }
+    case 'cancelled': {
+      return { kind: 'cancelled', at };
+    }
     case 'selected': {
-      return { kind: 'selected', at, candidate };
+      return { kind: 'selected', at, candidate: { ...entry.candidate } };
     }
     case 'download-failed': {
-      return { kind: 'download-failed', at, candidate, reason: entry.reason };
+      return { kind: 'download-failed', at, candidate: { ...entry.candidate }, reason: entry.reason };
     }
     case 'validation-failed': {
-      return { kind: 'validation-failed', at, candidate, reasons: [...entry.reasons] };
+      return {
+        kind: 'validation-failed',
+        at,
+        candidate: { ...entry.candidate },
+        reasons: [...entry.reasons],
+      };
     }
     case 'imported': {
-      return { kind: 'imported', at, candidate, location: entry.location };
+      return { kind: 'imported', at, candidate: { ...entry.candidate }, location: entry.location };
     }
     case 'fulfillment-rejected': {
-      return { kind: 'fulfillment-rejected', at, candidate, reasons: [...entry.reasons] };
+      return {
+        kind: 'fulfillment-rejected',
+        at,
+        candidate: { ...entry.candidate },
+        reasons: [...entry.reasons],
+      };
     }
   }
 }
@@ -91,6 +129,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     acquisitionId: view.acquisitionId,
     status: view.status,
     target: view.target ? { ...view.target } : undefined,
+    requestedTarget: view.requestedTarget ? requestToWire(view.requestedTarget) : undefined,
     currentCandidate: view.currentCandidate ? { ...view.currentCandidate } : undefined,
     attempts: view.attempts,
     rejectedCount: view.rejectedCount,
