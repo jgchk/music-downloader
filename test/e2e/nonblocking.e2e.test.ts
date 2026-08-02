@@ -122,13 +122,11 @@ describe('non-blocking download observation (head-of-line isolation, prompt canc
   });
 
   afterAll(async () => {
-    // The Hold mapping is registered ad hoc and survives a scenario reset — remove it so a
-    // future phase after this one inherits a clean stub.
-    const res = await admin('GET', '/mappings');
-    const body = (await res.json()) as { mappings: { id: string; scenarioName?: string }[] };
-    for (const mapping of body.mappings) {
-      if (mapping.scenarioName === 'transfer') await admin('DELETE', `/mappings/${mapping.id}`);
-    }
+    // The Hold mapping is registered ad hoc and survives a scenario reset. A mappings RESET
+    // reloads the file-based stubs and drops every ad-hoc registration (deleting by
+    // scenarioName would also delete the permanent transfers-poll mappings, which share the
+    // `transfer` scenario) — a future phase inherits exactly the on-disk stub.
+    await admin('POST', '/mappings/reset');
   });
 
   it('resolves, searches, and downloads a second acquisition while one transfer holds — and cancels the held one promptly', async () => {

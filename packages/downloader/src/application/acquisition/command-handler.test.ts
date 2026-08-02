@@ -75,27 +75,32 @@ describe('applyCommand', () => {
     expect(result._unsafeUnwrap().map((entry) => entry.type)).toContain('SearchCompleted');
   });
 
-  it('absorbs up to two lost races and surfaces the third (the retry bound)', async () => {
+  it('absorbs up to two lost races within the retry bound', async () => {
     const d = dependencies();
     await d.store.append('acq-1', 0, resolvedHistory(), {
       acquisitionId: 'acq-1',
       occurredAt: clock.now().toISOString(),
     });
-
     d.store.conflictNextAppends = 2; // attempts 1–2 lose, attempt 3 lands
-    const landed = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
-    expect(landed.isOk()).toBe(true);
 
-    const d2 = dependencies();
-    await d2.store.append('acq-1', 0, resolvedHistory(), {
+    const landed = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
+
+    expect(landed._unsafeUnwrap().map((entry) => entry.type)).toContain('SearchCompleted');
+  });
+
+  it('surfaces the conflict once every bounded attempt has lost', async () => {
+    const d = dependencies();
+    await d.store.append('acq-1', 0, resolvedHistory(), {
       acquisitionId: 'acq-1',
       occurredAt: clock.now().toISOString(),
     });
-    d2.store.conflictNextAppends = 3; // every attempt loses — the bound surfaces the conflict
-    const exhausted = await applyCommand(d2, 'acq-1', {
+    d.store.conflictNextAppends = 3; // every attempt loses — the bound surfaces the conflict
+
+    const exhausted = await applyCommand(d, 'acq-1', {
       type: 'RecordSearchResults',
       candidates: [],
     });
+
     expect(exhausted._unsafeUnwrapErr()).toMatchObject({ kind: 'ConcurrencyConflict' });
   });
 

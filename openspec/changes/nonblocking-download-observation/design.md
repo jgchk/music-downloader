@@ -115,8 +115,10 @@ deterministic timer, so every time-based judgment stays unit-testable by advanci
   logged and left to the startup sweep (the existing backstop), never allowed to rewrite a
   settled outcome.
 - **Shutdown latches the watches.** `runtime.stop()` marks every watch aborted before closing
-  the store (composition holds the supervisor concretely for exactly this seam); watches are
-  storeless, so dying promptly IS the graceful shutdown — the re-drive rebuilds them.
+  the store (composition holds the supervisor concretely for exactly this seam). The honest
+  cost: a latched-away settled outcome is not "re-derived" — where teardown already removed the
+  source records, the next boot's re-drive repeats the download — so the trade is at most a
+  repeat transfer, never a lost acquisition.
 - **Persistent-failure loops escalate.** Watch-tick and delivery retries promote every tenth
   consecutive warn to an error, so a wedged watch is loud; full stalled-read-model surfacing of
   undeliverable outcomes is deferred.

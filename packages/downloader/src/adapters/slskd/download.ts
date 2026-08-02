@@ -61,17 +61,19 @@ import type { OwnedTransfer } from './transfers.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 /** Persistent-failure loops promote every Nth warn to an error — a wedge is loud, a blip is not. */
-const ESCALATE_EVERY = 10;
+export const ESCALATE_EVERY = 10;
 
 export interface SlskdDownloadConfig extends SlskdConfig {
   /** Root under which each candidate's files are staged (shared with the filesystem library). */
   readonly stagingRoot: string;
 }
 
-/** One live watch: its abort latch and the running loop's completion promise. */
+/** One live watch: its abort latch and a deferred that resolves when the entry is released. */
 interface Watch {
   aborted: boolean;
-  done: Promise<void>;
+  /** Pending from reservation until {@link SlskdDownload.releaseWatch} — truthful from birth. */
+  readonly done: Promise<void>;
+  readonly finish: () => void;
 }
 
 export class SlskdDownload implements DownloadPort {
@@ -134,9 +136,34 @@ export class SlskdDownload implements DownloadPort {
     // Reserve the key before the first await: the one-watch-per-key invariant is enforced HERE,
     // not by trusting every caller to serialize (the reactor's mutex does today, but the adapter
     // cannot see that). A concurrent ensure during the reconcile/enqueue below answers `started`.
-    const watch: Watch = { aborted: false, done: Promise.resolve() };
+    // A reservation that then fails (a refused enqueue, a thrown reconcile) is released — and the
+    // level-triggered re-dispatch is what heals a concurrent ensure that trusted it.
+    const { promise, resolve } = Promise.withResolvers<void>();
+    const watch: Watch = { aborted: false, done: promise, finish: resolve };
     this.watches.set(key, watch);
 
+    try {
+      return await this.reconcileAndEnqueue(watch, key, acquisitionId, candidate, policy);
+    } catch (error) {
+      this.releaseWatch(key, watch);
+      this.retireIfLastWatch(acquisitionId);
+      throw error;
+    }
+  }
+
+  /**
+   * The per-attempt transfer identities, derived from the candidate in ONE place so the
+   * requests/wanted/ownedKeys trio can never disagree with it across start and abort.
+   */
+  private transferPlan(
+    acquisitionId: string,
+    candidate: Candidate,
+  ): {
+    username: string;
+    requests: readonly { readonly filename: string; readonly size: number }[];
+    wanted: ReadonlySet<string>;
+    ownedKeys: readonly SourceResourceKey[];
+  } {
     const { username } = candidate.identity;
     const requests = candidate.files.map((file) => ({
       filename: remoteFilename(candidate.identity.path, file.name),
@@ -146,22 +173,7 @@ export class SlskdDownload implements DownloadPort {
     const ownedKeys = requests.map((request) =>
       this.transferLedger.keyFor(acquisitionId, username, request.filename),
     );
-
-    try {
-      return await this.reconcileAndEnqueue(
-        watch,
-        key,
-        acquisitionId,
-        candidate,
-        policy,
-        requests,
-        wanted,
-        ownedKeys,
-      );
-    } catch (error) {
-      this.releaseWatch(key, watch);
-      throw error;
-    }
+    return { username, requests, wanted, ownedKeys };
   }
 
   /** The reserve-then-enqueue body of {@link doStart}; the caller owns releasing on a throw. */
@@ -171,11 +183,8 @@ export class SlskdDownload implements DownloadPort {
     acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
-    requests: readonly { readonly filename: string; readonly size: number }[],
-    wanted: ReadonlySet<string>,
-    ownedKeys: readonly SourceResourceKey[],
   ): Promise<DownloadStart> {
-    const { username } = candidate.identity;
+    const { username, requests, wanted, ownedKeys } = this.transferPlan(acquisitionId, candidate);
     // Reconcile before enqueue (reactor-durability D3): live ledgered rows are evidence of a
     // prior attempt whose watch died with the process. If the source still holds those
     // transfers, re-attach — resume watching with fresh stall/queue budgets — rather than
@@ -207,17 +216,28 @@ export class SlskdDownload implements DownloadPort {
         );
         await this.transferLedger.release(ownedKeys);
         this.releaseWatch(key, watch);
+        this.retireIfLastWatch(acquisitionId);
         return { kind: 'rejected', reason };
       }
     }
 
-    watch.done = this.runWatch(watch, key, acquisitionId, candidate, policy, wanted, ownedKeys);
+    void this.runWatch(watch, key, acquisitionId, candidate, policy, wanted, ownedKeys);
     return { kind: 'started' };
   }
 
   /** Drop a reservation/watch entry — only our own (a successor may have replaced it). */
   private releaseWatch(key: string, watch: Watch): void {
     if (this.watches.get(key) === watch) this.watches.delete(key);
+    watch.finish();
+  }
+
+  /**
+   * Retire the acquisition's live progress once its LAST watch (or failed reservation) is gone —
+   * every release path funnels here, so a frozen progress bar cannot outlive the watches that
+   * fed it, while a genuine sibling (a successor candidate's watch) keeps the bar alive.
+   */
+  private retireIfLastWatch(acquisitionId: string): void {
+    if (!this.hasWatchFor(acquisitionId)) this.observer.finished(acquisitionId);
   }
 
   /** True while any watch (any candidate) for the acquisition is still registered. */
@@ -230,8 +250,9 @@ export class SlskdDownload implements DownloadPort {
   /**
    * Shutdown latch: every watch exits at its next wake without delivering, so nothing keeps
    * polling the source or retrying deliveries against torn-down infrastructure. Deliberately not
-   * a drain — watches are storeless and rebuilt by the startup re-drive (level-triggered), so
-   * dying promptly IS the graceful shutdown.
+   * a drain — the startup re-drive re-drives an unfinished candidate (re-attaching where the
+   * source still holds its transfers, repeating the download where teardown already removed
+   * them), so a latched-away outcome costs at most a repeat transfer, never the acquisition.
    */
   stop(): void {
     for (const watch of this.watches.values()) watch.aborted = true;
@@ -313,6 +334,12 @@ export class SlskdDownload implements DownloadPort {
           }
           consecutiveTickFailures = 0;
         } catch (error) {
+          if (watch.aborted) {
+            // A latched watch's in-flight tick failing (e.g. against torn-down infrastructure at
+            // shutdown) is the expected wind-down, not a retry — say so and exit.
+            this.logger.debug({ acquisitionId, username }, 'watch aborted mid-tick; exiting');
+            return;
+          }
           // Self-healing (level-triggered): a failed observation delays the settle, it never
           // loses it — the next tick re-samples current state. Escalate once failures persist,
           // so a wedged watch (schema drift, misconfigured staging) is distinguishable from a
@@ -323,7 +350,13 @@ export class SlskdDownload implements DownloadPort {
               ? this.logger.error.bind(this.logger)
               : this.logger.warn.bind(this.logger);
           log(
-            { acquisitionId, username, consecutiveTickFailures, err: error },
+            {
+              acquisitionId,
+              username,
+              candidatePath: candidate.identity.path,
+              consecutiveTickFailures,
+              err: error,
+            },
             'download watch tick failed; retrying on the next tick',
           );
         }
@@ -335,22 +368,29 @@ export class SlskdDownload implements DownloadPort {
       }
     } catch (error) {
       // Nothing may escape the floating loop: an unexpected throw (a bug, not a modeled fault)
-      // is logged with its context and the watch dies; the startup re-drive re-derives it.
+      // is logged with its context and the watch dies. The startup re-drive re-drives the
+      // candidate — re-attaching where the source still holds the transfers, otherwise repeating
+      // the download — so the acquisition is never lost, at the cost of a possible repeat.
       this.logger.error(
         { acquisitionId, username, err: error },
-        'download watch failed unexpectedly; a restart re-drive resumes it',
+        'download watch failed unexpectedly; a restart re-drive resumes the candidate',
       );
     } finally {
-      this.releaseWatch(key, watch);
-      // Retire live progress only when no sibling watch (a successor candidate's) is running —
-      // an old watch's exit must not blank the new candidate's fresh bar.
-      if (!this.hasWatchFor(acquisitionId)) this.observer.finished(acquisitionId);
+      // The cleanup itself is contained too: `watch.done` must never reject, and a throwing
+      // observer must not leave the registry entry live.
+      try {
+        this.releaseWatch(key, watch);
+        this.retireIfLastWatch(acquisitionId);
+      } catch (error) {
+        this.logger.error({ acquisitionId, err: error }, 'watch cleanup failed');
+      }
     }
   }
 
   /**
    * Deliver the settled outcome, retrying on the watch cadence until it lands — once per watch
-   * (system-wide, delivery is at-least-once: a boot re-emit may repeat it; `decide` dedupes).
+   * (system-wide, delivery is at-least-once: a boot re-emit may repeat it, and the decision
+   * path absorbs the duplicate — an empty decision or a recorded-and-skipped rejection).
    * Persistent failures escalate so an undeliverable outcome is loud, not a quiet warn loop.
    */
   private async deliver(
@@ -371,6 +411,7 @@ export class SlskdDownload implements DownloadPort {
         {
           acquisitionId,
           username: candidate.identity.username,
+          candidatePath: candidate.identity.path,
           outcome: result.kind,
           attempt,
           err: delivered.error,
@@ -426,14 +467,7 @@ export class SlskdDownload implements DownloadPort {
     acquisitionId: string,
     candidate: Candidate,
   ): Promise<readonly DownloadedFile[]> {
-    const { username } = candidate.identity;
-    const filenames = candidate.files.map((file) =>
-      remoteFilename(candidate.identity.path, file.name),
-    );
-    const wanted = new Set(filenames);
-    const ownedKeys = filenames.map((filename) =>
-      this.transferLedger.keyFor(acquisitionId, username, filename),
-    );
+    const { username, wanted, ownedKeys } = this.transferPlan(acquisitionId, candidate);
     const mine = await pollOwnedTransfers(this.client, username, wanted);
     this.logger.debug({ username, count: mine.length }, 'aborting slskd download');
     // Resolve the already-completed subset before removal (the events log outlives the record), so

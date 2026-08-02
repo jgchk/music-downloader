@@ -213,6 +213,12 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
 
     case 'RecordDownloadStarted': {
       if (isTerminal(state)) return ok([]); // e.g. a cancellation won the race with the enqueue
+      if (state.phase === 'Validating' || state.phase === 'Importing') {
+        // The outcome outran the start report (a re-attach found the transfers already settled):
+        // a lawful ordering, absorbed — IllegalTransition stays reserved for protocol violations.
+        if (isNaming(command.candidate, state.current.identity)) return ok([]);
+        return err(illegal(command.type, state));
+      }
       if (state.phase !== 'Downloading') return err(illegal(command.type, state));
       if (!isNaming(command.candidate, state.current.identity)) return ok([]); // stale
       if (state.started) return ok([]); // duplicate (ensure-start redelivery)

@@ -1335,13 +1335,14 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     expect(types.filter((type) => type === 'DownloadCompleted')).toHaveLength(1);
     expect(types).not.toContain('DownloadStarted'); // the late report was absorbed, not recorded
     expect(parked.peek('acq-1')).toBeUndefined(); // and nothing parked on the benign race
+    // The absorb is silent: a lawful ordering is not the "rejected as stale" warn family.
     r.stop();
   });
 
-  it('re-fires Download on redelivery of CandidateSelected, then advances past the stale completion', async () => {
-    // Redelivered CandidateSelected folds to Downloading at its position (the stream has since reached
-    // Validating). Download re-fires; the stale RecordDownloadCompleted is an IllegalTransition that
-    // D5 records and advances past — download happened, but the consumer does not wedge.
+  it('re-fires Download on redelivery of CandidateSelected, then absorbs the late start report', async () => {
+    // Redelivered CandidateSelected folds to Downloading at its position (the stream has since
+    // reached Validating). The ensure-start re-fires; its late RecordDownloadStarted names the
+    // same candidate, so decide absorbs it silently — no event, no park, no wedge.
     await seed(validatingHistory([matchingCandidate('a')]));
     const before = streamEventTypes('acq-1');
     const lines: string[] = [];
@@ -1359,7 +1360,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     await reactor(ports, { logger }).process(selected);
     expect(ports.download.start).toHaveBeenCalledOnce();
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(selected.globalSeq);
-    expect(streamEventTypes('acq-1')).toEqual(before); // the stale completion appended nothing
-    expect(lines.join('')).toContain('effect follow-on rejected as stale'); // recorded, not silent
+    expect(streamEventTypes('acq-1')).toEqual(before); // the late start report appended nothing
+    expect(lines.join('')).not.toContain('rejected as stale'); // a lawful ordering, not a warn
   });
 });
