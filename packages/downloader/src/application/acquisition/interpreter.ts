@@ -1,11 +1,9 @@
 import type { ResultAsync } from 'neverthrow';
-import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
 import type { Effect } from '../../domain/acquisition/acquisition.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type {
   AudioProbePort,
   DownloadPort,
-  DownloadProgress,
   LibraryPort,
   MetadataPort,
   SearchPort,
@@ -32,11 +30,6 @@ export interface EffectPorts {
 
 export interface InterpreterDependencies extends CommandDependencies {
   readonly ports: EffectPorts;
-  readonly onProgress: (
-    acquisitionId: string,
-    candidate: CandidateIdentity,
-    progress: DownloadProgress,
-  ) => void;
 }
 
 /** Each resolution outcome re-enters `decide` as its own command (manual-edition-selection D2). */
@@ -78,17 +71,24 @@ export function interpretEffect(
     }
 
     case 'Download': {
+      // The ensure-start (nonblocking-download-observation D1): a short call that reconciles,
+      // enqueues if the source holds nothing, and registers the supervisor's watch. Only the
+      // source refusing THIS candidate is an outcome here; the settled outcome arrives later
+      // through the download-outcome consumer. Idempotent, so live redelivery and the startup
+      // re-drive re-dispatch it freely.
       return ports.download
-        .download(acquisitionId, effect.candidate, effect.policy, (progress) =>
-          dependencies.onProgress(acquisitionId, effect.candidate.identity, progress),
-        )
-        .andThen((result) =>
+        .start(acquisitionId, effect.candidate, effect.policy)
+        .andThen((started) =>
           applyCommand(
             dependencies,
             acquisitionId,
-            result.kind === 'completed'
-              ? { type: 'RecordDownloadCompleted', files: result.files }
-              : { type: 'RecordDownloadFailed', reason: result.reason, files: result.files },
+            started.kind === 'started'
+              ? { type: 'RecordDownloadStarted', candidate: effect.candidate.identity }
+              : {
+                  type: 'RecordDownloadFailed',
+                  reason: started.reason,
+                  candidate: effect.candidate.identity,
+                },
           ),
         );
     }
@@ -134,6 +134,7 @@ export function interpretEffect(
           type: 'RecordDownloadFailed',
           reason: 'Cancelled',
           files,
+          candidate: effect.candidate.identity,
         }),
       );
     }

@@ -53,6 +53,35 @@ describe('applyCommand', () => {
     expect(d.store.all().length).toBe(before);
   });
 
+  it('re-decides against the fresh stream when an append loses the optimistic-concurrency race', async () => {
+    // A benign race: another writer (the download-outcome consumer, a cancellation) appended
+    // between our read and our append. The command re-runs against the fresh stream — decide is
+    // the guard — instead of surfacing a retryable fault that would park the stream for nothing.
+    const d = dependencies();
+    await d.store.append('acq-1', 0, resolvedHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: clock.now().toISOString(),
+    });
+    d.store.conflictNextAppends = 1;
+
+    const result = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
+
+    expect(result._unsafeUnwrap().map((entry) => entry.type)).toContain('SearchCompleted');
+  });
+
+  it('surfaces persistent append contention as the retryable conflict it is', async () => {
+    const d = dependencies();
+    await d.store.append('acq-1', 0, resolvedHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: clock.now().toISOString(),
+    });
+    d.store.conflictAppends = true;
+
+    const result = await applyCommand(d, 'acq-1', { type: 'RecordSearchResults', candidates: [] });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'ConcurrencyConflict' });
+  });
+
   it('propagates an infrastructure read failure', async () => {
     const d = dependencies();
     d.store.failReads = true;

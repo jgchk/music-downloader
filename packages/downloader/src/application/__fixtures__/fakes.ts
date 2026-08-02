@@ -30,6 +30,8 @@ export class FakeEventStore implements EventStorePort {
   /** Fail appends with an infra fault, or with a concurrency conflict. */
   public failAppends = false;
   public conflictAppends = false;
+  /** Conflict only the next N appends — a transient optimistic-concurrency race. */
+  public conflictNextAppends = 0;
   /** Throw (not err) from readAll — for specs that pin bug-backstop behavior. */
   public throwOnReadAll = false;
 
@@ -41,6 +43,10 @@ export class FakeEventStore implements EventStorePort {
   ): ResultAsync<readonly StoredEvent[], AppendError> {
     if (this.failAppends) return errAsync(infraError('event-store.append', 'boom'));
     const current = this.events.filter((entry) => entry.streamId === streamId);
+    if (this.conflictNextAppends > 0) {
+      this.conflictNextAppends -= 1;
+      return errAsync({ kind: 'ConcurrencyConflict', streamId, expectedVersion });
+    }
     if (this.conflictAppends || current.length !== expectedVersion) {
       return errAsync({ kind: 'ConcurrencyConflict', streamId, expectedVersion });
     }

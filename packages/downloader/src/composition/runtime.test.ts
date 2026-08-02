@@ -13,7 +13,7 @@ import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import type { EffectPorts } from '../application/acquisition/interpreter.js';
 import { FakeDeadLetterStore, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
-import type { DownloadResult } from '../application/ports/outbound-ports.js';
+import type { DownloadObserverPort, DownloadResult } from '../application/ports/outbound-ports.js';
 import {
   matchingCandidate,
   requestedHistory,
@@ -43,14 +43,31 @@ const PROBES: Record<string, ProbedAudio> = {
 };
 const COMPLETED: DownloadResult = { kind: 'completed', files: FILES };
 
-function fakePorts(): EffectPorts {
+function fakePorts(observer: DownloadObserverPort): EffectPorts {
   return {
     metadata: { resolve: () => okAsync({ kind: 'resolved', target: sampleTarget }) },
     search: { search: () => okAsync([matchingCandidate('seeder')]) },
     download: {
-      download: (_id, _candidate, _policy, onProgress) => {
-        onProgress({ percent: 100, bytesTransferred: 1, bytesTotal: 1 });
-        return okAsync(COMPLETED);
+      // The supervisor shape: start answers promptly; progress and the outcome arrive through
+      // the runtime's observer wiring on a later turn, exactly as the real watch delivers them.
+      start: (id, candidate, _policy) => {
+        // Deliver like the real watch: at-least-once, retrying until the consumer lands it (a
+        // concurrency conflict with the reactor's own follow-on append is expected and benign).
+        const deliver = async (): Promise<void> => {
+          observer.progress(id, candidate.identity, {
+            percent: 100,
+            bytesTransferred: 1,
+            bytesTotal: 1,
+          });
+          for (;;) {
+            const delivered = await observer.outcome(id, candidate, COMPLETED);
+            if (delivered.isOk()) break;
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          }
+          observer.finished(id);
+        };
+        queueMicrotask(() => void deliver());
+        return okAsync({ kind: 'started' });
       },
       abort: () => okAsync([]),
     },
@@ -86,7 +103,7 @@ async function testRuntime(databaseFile = ':memory:'): Promise<DownloaderRuntime
       slskd: {},
     },
     silentLogger(),
-    { ports: fakePorts() },
+    { ports: fakePorts },
   );
   cleanups.push(() => runtime.stop());
   return runtime;
@@ -114,9 +131,10 @@ describe('createDownloaderRuntime', () => {
     await untilFulfilled(runtime, id);
     expect(wokeUp).toHaveBeenCalled();
 
-    // Progress flowed through the runtime's onProgress wiring into the read model.
+    // The settled watch retired its live progress through the observer wiring: a fulfilled
+    // acquisition reports none (the flow-through itself is pinned by the adapter tier).
     const progress = runtime.facade.getAcquisitionProgress({ id });
-    expect(progress.ok).toBe(true);
+    expect(progress.ok).toBe(false);
 
     // The fulfilment is published on the outbound feed with its self-contained payload.
     const batch = await runtime.feed.read(0, 100);
@@ -173,7 +191,7 @@ describe('createDownloaderRuntime', () => {
           slskd: {},
         },
         silentLogger(),
-        { ports: fakePorts() },
+        { ports: fakePorts },
       );
       let isStopped = false;
       const stopOnce = async () => {
@@ -303,7 +321,7 @@ describe('createDownloaderRuntime', () => {
         slskd: {},
       },
       logger,
-      { ports: fakePorts() },
+      { ports: fakePorts },
     );
     cleanups.push(() => runtime.stop());
     expect(errors.join('')).toContain('projection rebuild failed');
@@ -351,7 +369,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
         reactor: { retry: { budgetMs: 21_600_000 }, stalledRetentionMs: 30 * 24 * 3_600_000 },
       },
       silentLogger(),
-      { ports: fakePorts() },
+      { ports: fakePorts },
     );
     cleanups.push(() => runtime.stop());
     return runtime;
@@ -382,7 +400,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
         slskd: {},
       },
       logger,
-      { ports: fakePorts(), deadLetters },
+      { ports: fakePorts, deadLetters },
     );
     cleanups.push(() => runtime.stop());
 
@@ -431,10 +449,10 @@ describe('boot readiness (reactor-durability D4)', () => {
         resolve({ kind: 'unresolved' });
       };
     });
-    const ports: EffectPorts = {
-      ...fakePorts(),
+    const ports = (observer: DownloadObserverPort): EffectPorts => ({
+      ...fakePorts(observer),
       metadata: { resolve: () => ResultAsync.fromSafePromise(gate) },
-    };
+    });
 
     // The pending resolution hangs indefinitely; boot must return anyway (backgrounded drain).
     const runtime = await createDownloaderRuntime(

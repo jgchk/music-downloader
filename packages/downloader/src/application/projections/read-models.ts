@@ -306,6 +306,11 @@ export class ProgressReadModel {
     this.progress.set(acquisitionId, progress);
   }
 
+  /** The watch ended (settled or aborted): a download no longer in flight reports no progress. */
+  clear(acquisitionId: string): void {
+    this.progress.delete(acquisitionId);
+  }
+
   get(acquisitionId: string): DownloadProgress | undefined {
     return this.progress.get(acquisitionId);
   }

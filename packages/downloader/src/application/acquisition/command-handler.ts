@@ -15,6 +15,12 @@ import type { Clock } from '../ports/system-ports.js';
  * The single write path (D2): load the stream, fold it, run `decide`, and append the resulting
  * events under optimistic concurrency. `decide` is the guard — stale/duplicate outcomes come back
  * as an empty event list (no append), protocol violations as a `DomainError`.
+ *
+ * A lost optimistic-concurrency race re-runs the command against the fresh stream (bounded): with
+ * asynchronous download outcomes, a reactor follow-on and the outcome consumer lawfully append
+ * concurrently, and the benign loser must re-decide — where the stale guards absorb it — rather
+ * than surface a retryable fault that parks its stream for nothing
+ * (nonblocking-download-observation D2). Persistent contention still surfaces as the conflict.
  */
 export type CommandError = DomainError | AppendError;
 
@@ -23,10 +29,21 @@ export interface CommandDependencies {
   readonly clock: Clock;
 }
 
+const OPTIMISTIC_ATTEMPTS = 3;
+
 export function applyCommand(
   dependencies: CommandDependencies,
   acquisitionId: string,
   command: AcquisitionCommand,
+): ResultAsync<readonly StoredEvent[], CommandError> {
+  return attemptCommand(dependencies, acquisitionId, command, OPTIMISTIC_ATTEMPTS);
+}
+
+function attemptCommand(
+  dependencies: CommandDependencies,
+  acquisitionId: string,
+  command: AcquisitionCommand,
+  attemptsLeft: number,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   return dependencies.store.readStream(acquisitionId).andThen((stored) => {
     const acquisition = Acquisition.fromHistory(stored.map((entry) => entry.event));
@@ -37,6 +54,12 @@ export function applyCommand(
       acquisitionId,
       occurredAt: dependencies.clock.now().toISOString(),
     };
-    return dependencies.store.append(acquisitionId, stored.length, decision.value, metadata);
+    return dependencies.store
+      .append(acquisitionId, stored.length, decision.value, metadata)
+      .orElse((error) =>
+        error.kind === 'ConcurrencyConflict' && attemptsLeft > 1
+          ? attemptCommand(dependencies, acquisitionId, command, attemptsLeft - 1)
+          : errAsync<readonly StoredEvent[], CommandError>(error),
+      );
   });
 }

@@ -16,38 +16,38 @@ folded into each item, not batched at the end.
 
 ## 2. Download supervisor — the watch moves out of the dispatch
 
-- [ ] 2.1 Carve the watch loop out of `SlskdDownload.download()` into a supervisor unit with
+- [x] 2.1 Carve the watch loop out of `SlskdDownload.download()` into a supervisor unit with
       injected timer/clock: failing tests first for one watch's lifecycle (poll → aggregate →
       settle) using fake time; behavior parity with today's loop (stall budget, queue budget,
       doomed-candidate cancellation, teardown, staged-file resolution).
-- [ ] 2.2 Start port: failing tests first — start returns promptly after reconcile/re-attach +
+- [x] 2.2 Start port: failing tests first — start returns promptly after reconcile/re-attach +
       enqueue acceptance (modeled enqueue rejections stay synchronous), registers the watch and
       ledger ownership.
-- [ ] 2.3 Outcome port: failing tests first — a settling watch emits exactly one candidate-level
+- [x] 2.3 Outcome port: failing tests first — a settling watch emits exactly one candidate-level
       outcome fact (completed with staged files / failed with source-agnostic reason); emission
       is single-shot per watch.
-- [ ] 2.4 Abort path: failing tests first — abort cancels owned transfers at the source and ends
+- [x] 2.4 Abort path: failing tests first — abort cancels owned transfers at the source and ends
       the watch promptly regardless of watch state; settle-side partial-staging cleanup intact.
-- [ ] 2.5 Progress registry: failing tests first — in-flight watches feed the existing progress
+- [x] 2.5 Progress registry: failing tests first — in-flight watches feed the existing progress
       read model port; progress for a settled/aborted watch is gone.
-- [ ] 2.6 Boot re-derivation: failing tests first — starting a candidate whose ledger rows exist
+- [x] 2.6 Boot re-derivation: failing tests first — starting a candidate whose ledger rows exist
       and whose source transfers are already settled emits the outcome immediately
       (level-triggered re-emit); still-live transfers re-attach with fresh budgets.
 
 ## 3. Application — short dispatches and the outcome consumer
 
-- [ ] 3.1 Reactor download dispatch becomes start-only: failing reactor tests first — the mutex
+- [x] 3.1 Reactor download dispatch becomes start-only: failing reactor tests first — the mutex
       is released after start returns; a slow watch blocks no other stream's drain and no due
       parked retry (the incident's shape, as a test).
-- [ ] 3.2 Download-outcome consumer (verdict-consumer idiom): failing tests first — outcomes
+- [x] 3.2 Download-outcome consumer (verdict-consumer idiom): failing tests first — outcomes
       translate into the existing follow-on commands through `decide`; stale/duplicate outcomes
       (crash-window re-emit, outcome-after-cancel) are recorded and skipped without wedging.
-- [ ] 3.3 `AbortDownload` effect re-pointed at the supervisor: failing tests first — cancel
+- [x] 3.3 `AbortDownload` effect re-pointed at the supervisor: failing tests first — cancel
       during an in-flight watch dispatches promptly (no serialization behind the download).
-- [ ] 3.4 Startup re-drive: failing tests first — a mid-download acquisition re-drives into a
+- [x] 3.4 Startup re-drive: failing tests first — a mid-download acquisition re-drives into a
       supervisor watch (re-attach, no second download; budgets from resumption); the crash-window
       convergence scenarios still pass.
-- [ ] 3.5 Composition wiring: supervisor constructed in composition behind its ports; reactor,
+- [x] 3.5 Composition wiring: supervisor constructed in composition behind its ports; reactor,
       consumer, and progress read model wired; DI stays vanilla.
 
 ## 4. Facade, BFF, and web — the phase made visible (additive)

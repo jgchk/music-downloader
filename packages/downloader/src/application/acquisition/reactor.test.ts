@@ -28,6 +28,7 @@ import {
   sampleFiles,
   sampleTarget,
   selectedHistory,
+  startedHistory,
   validatingHistory,
 } from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 
@@ -38,7 +39,7 @@ function stubPorts(overrides: Partial<EffectPorts> = {}): EffectPorts {
     },
     search: { search: vi.fn(() => okAsync([])) },
     download: {
-      download: vi.fn(() => okAsync({ kind: 'failed' as const, reason: 'Stalled' as const })),
+      start: vi.fn(() => okAsync({ kind: 'started' as const })),
       abort: vi.fn(() => okAsync([])),
     },
     probe: { probe: vi.fn() },
@@ -56,7 +57,7 @@ let stalled: StalledReadModel;
 let clock: SettableClock;
 
 function interpreter(ports: EffectPorts): InterpreterDependencies {
-  return { store, clock, ports, onProgress: vi.fn() };
+  return { store, clock, ports };
 }
 
 interface ReactorOverrides {
@@ -144,15 +145,27 @@ describe('Reactor.start', () => {
   });
 
   it('re-drives an already-checkpointed in-flight download after a restart', async () => {
-    // The old contract ("not downloaded a second time") was satisfied by never driving the
-    // download again — the orphan bug this change removes. Resumption is now required: the
-    // effect re-fires idempotently and the ADAPTER reconciles against the source's live
-    // transfers instead of enqueueing twice (reactor-durability D3).
+    // Resumption is required: the ensure-start re-fires idempotently and the ADAPTER reconciles
+    // against the source's live transfers instead of enqueueing twice (reactor-durability D3).
     await seed(selectedHistory([matchingCandidate('a')])); // ends at CandidateSelected (globalSeq 5)
     await checkpoints.save(REACTOR_CONSUMER, 5); // as if processed just before the crash
     const ports = stubPorts();
     await reactor(ports).start();
-    expect(ports.download.download).toHaveBeenCalledOnce();
+    expect(ports.download.start).toHaveBeenCalled();
+    expect(streamEventTypes('acq-1')).toContain('DownloadStarted');
+  });
+
+  it('re-drives a watch whose stream already recorded DownloadStarted (mid-transfer restart)', async () => {
+    // The stream's LAST event mid-download is DownloadStarted; its reaction must re-derive the
+    // ensure-start or a restarted process would never rebuild the supervisor's watch
+    // (nonblocking-download-observation D3).
+    await seed(startedHistory([matchingCandidate('a')])); // ends at DownloadStarted (globalSeq 6)
+    await checkpoints.save(REACTOR_CONSUMER, 6);
+    const ports = stubPorts();
+    await reactor(ports).start();
+    expect(ports.download.start).toHaveBeenCalledOnce();
+    // The absorbed duplicate report appends nothing: DownloadStarted appears exactly once.
+    expect(streamEventTypes('acq-1').filter((type) => type === 'DownloadStarted')).toHaveLength(1);
   });
 
   it('subscribes even when the catch-up read fails', async () => {
@@ -373,6 +386,35 @@ describe('Reactor — per-stream parking (reactor-durability D1)', () => {
     r.stop();
   });
 
+  it('keeps draining other acquisitions and due retries while a download is in flight (the incident shape)', async () => {
+    // 2026-08-02: one slow healthy album held the dispatch mutex for its entire transfer,
+    // freezing every other acquisition's searches, resolutions, and parked retries. The start
+    // effect now returns once the source accepts; the unsettled watch holds nothing.
+    const a = matchingCandidate('a');
+    await seed(selectedHistory([a]), 'acq-1'); // mid-download; its outcome never arrives here
+    await seed(requestedHistory(), 'acq-2');
+    const start = vi.fn(() => okAsync({ kind: 'started' as const }));
+    const resolve = vi
+      .fn()
+      // acq-1's replayed AcquisitionRequested resolves; its follow-on is stale and advances past.
+      .mockReturnValueOnce(okAsync({ kind: 'resolved' as const, target: sampleTarget }))
+      .mockReturnValueOnce(errAsync(infraError('mb', '503'))) // acq-2 parks first…
+      .mockReturnValue(okAsync({ kind: 'resolved' as const, target: sampleTarget }));
+    const r = reactor(
+      stubPorts({ download: { start, abort: vi.fn(() => okAsync([])) }, metadata: { resolve } }),
+    );
+    await r.start();
+
+    expect(streamEventTypes('acq-1')).toContain('DownloadStarted'); // in flight, unsettled
+    expect(parked.peek('acq-2')).toBeDefined();
+
+    // …and its due retry fires on schedule while acq-1 is still transferring.
+    clock.advance(5000);
+    await r.drain();
+    expect(streamEventTypes('acq-2')).toContain('TargetResolved');
+    r.stop();
+  });
+
   it('holds the checkpoint when the park itself cannot be written (durable fallback)', async () => {
     await seed(requestedHistory());
     parked.failPark = true;
@@ -390,12 +432,12 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
   it('queues later events of a parked stream and dispatches them in order after the park resolves', async () => {
     const a = matchingCandidate('a');
     await seed(selectedHistory([a])); // ends CandidateSelected (seq 5) → Download effect
-    const download = vi
+    const start = vi
       .fn()
       .mockReturnValueOnce(errAsync(infraError('slskd', 'down')))
-      .mockReturnValue(okAsync({ kind: 'completed' as const, files: sampleFiles }));
+      .mockReturnValue(okAsync({ kind: 'started' as const }));
     const abort = vi.fn(() => okAsync([]));
-    const ports = stubPorts({ download: { download, abort } });
+    const ports = stubPorts({ download: { start, abort } });
     const r = reactor(ports);
 
     await r.start(); // parks acq-1 at the CandidateSelected download
@@ -420,12 +462,12 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
   it('re-parks the stream when a queued event fails during catch-up', async () => {
     const a = matchingCandidate('a');
     await seed(selectedHistory([a]));
-    const download = vi
+    const start = vi
       .fn()
       .mockReturnValueOnce(errAsync(infraError('slskd', 'down')))
-      .mockReturnValue(okAsync({ kind: 'completed' as const, files: sampleFiles }));
+      .mockReturnValue(okAsync({ kind: 'started' as const }));
     const abort = vi.fn(() => errAsync(infraError('slskd.abort', 'down')));
-    const r = reactor(stubPorts({ download: { download, abort } }));
+    const r = reactor(stubPorts({ download: { start, abort } }));
 
     await r.start(); // parked at seq 5
     await seed([{ type: 'AcquisitionCancelled' }]);
@@ -768,9 +810,9 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
   it('degrades an exhausted Download to the modeled stalled rejection', async () => {
     const a = matchingCandidate('a');
     await seed(selectedHistory([a]));
-    const download = vi.fn(() => errAsync(infraError('slskd', 'down')));
+    const start = vi.fn(() => errAsync(infraError('slskd', 'down')));
     const abort = vi.fn(() => okAsync([]));
-    const r = reactor(stubPorts({ download: { download, abort } }), { retryPolicy: TIGHT_BUDGET });
+    const r = reactor(stubPorts({ download: { start, abort } }), { retryPolicy: TIGHT_BUDGET });
     await r.start();
 
     clock.advance(61_000);
@@ -786,9 +828,9 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     const a = matchingCandidate('a');
     await seed([...selectedHistory([a]), { type: 'AcquisitionCancelled' }]);
     await checkpoints.save(REACTOR_CONSUMER, 5); // only the cancellation's abort is pending
-    const download = vi.fn();
+    const start = vi.fn();
     const abort = vi.fn(() => errAsync(infraError('slskd.abort', 'down')));
-    const r = reactor(stubPorts({ download: { download, abort } }), { retryPolicy: TIGHT_BUDGET });
+    const r = reactor(stubPorts({ download: { start, abort } }), { retryPolicy: TIGHT_BUDGET });
     await r.start();
     expect(parked.peek('acq-1')).toMatchObject({ globalSeq: 6 });
 
@@ -1029,7 +1071,10 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
     await r.start();
 
     expect(ports.metadata.resolve).toHaveBeenCalledOnce(); // acq-pending resumed
-    expect(ports.download.download).toHaveBeenCalledOnce(); // acq-downloading resumed
+    expect(ports.download.start).toHaveBeenCalled(); // acq-downloading resumed
+    expect(
+      streamEventTypes('acq-downloading').filter((type) => type === 'DownloadStarted'),
+    ).toHaveLength(1); // the ensure re-dispatch absorbed, never double-recorded
     expect(ports.search.search).not.toHaveBeenCalled(); // terminal and paused derive nothing
     r.stop();
   });
@@ -1273,12 +1318,12 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     const selected = storedOfType('CandidateSelected');
     const ports = stubPorts({
       download: {
-        download: vi.fn(() => okAsync({ kind: 'completed' as const, files: sampleFiles })),
+        start: vi.fn(() => okAsync({ kind: 'started' as const })),
         abort: vi.fn(() => okAsync([])),
       },
     });
     await reactor(ports, { logger }).process(selected);
-    expect(ports.download.download).toHaveBeenCalledOnce();
+    expect(ports.download.start).toHaveBeenCalledOnce();
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(selected.globalSeq);
     expect(streamEventTypes('acq-1')).toEqual(before); // the stale completion appended nothing
     expect(lines.join('')).toContain('effect follow-on rejected as stale'); // recorded, not silent
