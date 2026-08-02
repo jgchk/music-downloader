@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { messageOf, statusOf } from '$lib/server/facade-errors.js';
+import { isTransferStarted } from '$lib/acquisitions.js';
 import { mergeTimeline, type ImportSection } from '$lib/timeline.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -58,16 +59,19 @@ export const load: PageServerLoad = ({ locals, params }) => {
     now: locals.now(),
   };
 
-  if (acquisition.status !== 'Downloading') {
+  if (acquisition.status !== 'Downloading' || !isTransferStarted(acquisition)) {
+    // Not downloading — or selected but not yet accepted by the source (no recorded
+    // `download-started`), where an empty progress read is the honest expected state
+    // (nonblocking-download-observation), not an inconsistency worth a warning.
     return { ...base, progress: undefined, progressUnavailable: false };
   }
 
   const progress = locals.facades.downloader.getAcquisitionProgress({ id: params.id });
   if (!progress.ok) {
-    // Don't collapse a failed progress read to the same `undefined` as "not downloading": while
-    // Downloading the reachable error is a cross-projection inconsistency (the "pending forever"
-    // family), not a just-started download. Log it with the id, and tell the view the bar is
-    // unavailable so it can say so instead of rendering an indistinguishable blank.
+    // Don't collapse a failed progress read to the same `undefined` as "not downloading": on a
+    // LIVE transfer the reachable error is a cross-projection inconsistency (the "pending
+    // forever" family). Log it with the id, and tell the view the bar is unavailable so it can
+    // say so instead of rendering an indistinguishable blank.
     locals.logger.warn(
       { acquisitionId: params.id, err: progress.error },
       'progress unavailable for a downloading acquisition',

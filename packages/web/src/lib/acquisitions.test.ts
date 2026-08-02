@@ -3,6 +3,7 @@ import type { AcquisitionStatusResponseDto } from '@music/downloader';
 import {
   formatBytes,
   isCancellable,
+  isTransferStarted,
   isTerminal,
   parseAcquisitionView,
   statusTone,
@@ -19,6 +20,29 @@ function acquisition(over: Partial<AcquisitionStatusResponseDto>): AcquisitionSt
     ...over,
   };
 }
+
+describe('isTransferStarted', () => {
+  const candidate = { username: 'u', path: 'p', sizeBytes: 1 };
+  const at = '2026-08-01T10:00:00Z';
+
+  it('walks past non-attempt entries to find the live start', () => {
+    expect(
+      isTransferStarted(
+        acquisition({
+          history: [
+            { kind: 'selected', at, candidate },
+            { kind: 'download-started', at, candidate },
+            { kind: 'download-failed', at, candidate, reason: 'Stalled' },
+          ],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('reports no live transfer for an empty history', () => {
+    expect(isTransferStarted(acquisition({ history: [] }))).toBe(false);
+  });
+});
 
 describe('statusTone', () => {
   // The tone table stays a presentation mapping the web layer owns — exhaustive on purpose.

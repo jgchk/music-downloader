@@ -647,17 +647,81 @@ describe('pendingRowFor', () => {
     });
   });
 
-  it('names the source and carries progress while downloading', () => {
+  it('names the source and carries progress while the transfer is live', () => {
     expect(
-      pendingRowFor(acquisition({ status: 'Downloading', currentCandidate: candidate }), NO_IMPORT),
+      pendingRowFor(
+        acquisition({
+          status: 'Downloading',
+          currentCandidate: candidate,
+          history: [
+            { kind: 'selected', at: AT, candidate },
+            { kind: 'download-started', at: AT, candidate },
+          ],
+        }),
+        NO_IMPORT,
+      ),
     ).toEqual({ text: 'Downloading from xronin…', state: 'pending', showProgress: true });
   });
 
-  it('downloads without a known source still read as downloading', () => {
-    expect(pendingRowFor(acquisition({ status: 'Downloading' }), NO_IMPORT)).toEqual({
+  it('live transfers without a known source still read as downloading', () => {
+    expect(
+      pendingRowFor(
+        acquisition({
+          status: 'Downloading',
+          history: [{ kind: 'download-started', at: AT, candidate }],
+        }),
+        NO_IMPORT,
+      ),
+    ).toEqual({
       text: 'Downloading…',
       state: 'pending',
       showProgress: true,
+    });
+  });
+
+  it('a selected candidate whose transfer has not started reads as preparing, without a bar', () => {
+    // Between the selection and the source accepting the enqueue there is nothing to measure:
+    // an honest "preparing" instead of a downloading claim with a blank progress bar.
+    expect(
+      pendingRowFor(
+        acquisition({
+          status: 'Downloading',
+          currentCandidate: candidate,
+          history: [{ kind: 'selected', at: AT, candidate }],
+        }),
+        NO_IMPORT,
+      ),
+    ).toEqual({
+      text: 'Preparing the transfer from xronin…',
+      state: 'pending',
+      showProgress: false,
+    });
+    expect(pendingRowFor(acquisition({ status: 'Downloading' }), NO_IMPORT)).toEqual({
+      text: 'Preparing the transfer…',
+      state: 'pending',
+      showProgress: false,
+    });
+  });
+
+  it('a re-attempt after an earlier started transfer reads as preparing again', () => {
+    expect(
+      pendingRowFor(
+        acquisition({
+          status: 'Downloading',
+          currentCandidate: candidate,
+          history: [
+            { kind: 'selected', at: AT, candidate },
+            { kind: 'download-started', at: AT, candidate },
+            { kind: 'download-failed', at: AT, candidate, reason: 'Stalled' },
+            { kind: 'selected', at: AT, candidate },
+          ],
+        }),
+        NO_IMPORT,
+      ),
+    ).toEqual({
+      text: 'Preparing the transfer from xronin…',
+      state: 'pending',
+      showProgress: false,
     });
   });
 
@@ -666,7 +730,7 @@ describe('pendingRowFor', () => {
     // silently end the narration mid-story.
     expect(
       pendingRowFor(acquisition({ status: 'Downloading', cancellable: undefined }), NO_IMPORT),
-    ).toEqual({ text: 'Downloading…', state: 'pending', showProgress: true });
+    ).toEqual({ text: 'Preparing the transfer…', state: 'pending', showProgress: false });
   });
 
   it('claims nothing when the enum and the decided flag contradict', () => {

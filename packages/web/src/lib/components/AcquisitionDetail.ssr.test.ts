@@ -22,7 +22,12 @@ const working = {
   currentCandidate: candidate,
   attempts: 2,
   rejectedCount: 1,
-  history: [{ kind: 'selected' as const, at: T(0), candidate }],
+  // The transfer is live: the recorded start is what lets the view claim "downloading" with a
+  // progress bar rather than the not-yet-started "preparing" row.
+  history: [
+    { kind: 'selected' as const, at: T(0), candidate },
+    { kind: 'download-started' as const, at: T(1), candidate },
+  ],
   // A non-terminal acquisition: the downloader decides it cancellable, and the detail renders that.
   cancellable: true,
 };
@@ -50,7 +55,10 @@ describe('AcquisitionDetail (SSR)', () => {
       props: {
         ...base,
         acquisition: working,
-        timeline: [dl({ kind: 'selected', at: T(0), candidate })],
+        timeline: [
+          dl({ kind: 'selected', at: T(0), candidate }),
+          dl({ kind: 'download-started', at: T(1), candidate }),
+        ],
         importSection: { state: 'none' },
         progress: { percent: 50, bytesTransferred: 5, bytesTotal: 10 },
       },
