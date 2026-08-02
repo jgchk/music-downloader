@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { wordDiff } from './diff.js';
 
 /**
- * The word-level diff behind the tag comparison's change highlighting (design D7). The contract:
+ * The word-level diff behind the tag comparison's change highlighting (reviews-register-alignment D7). The contract:
  * shared runs render plain, each side's divergent words carry the highlight, and no character is
  * ever lost — joining a side's segments reproduces its input exactly.
  */

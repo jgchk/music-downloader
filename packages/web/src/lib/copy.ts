@@ -11,7 +11,7 @@ import type {
 
 /**
  * The acquisition detail's copy system — every timeline and status string in one place, written to
- * the register (design D3): completed entries are past-tense verb-led fragments, the pending row is
+ * the register (legible-acquisition-history D3): completed entries are past-tense verb-led fragments, the pending row is
  * present-progressive, no first person, no internal vocabulary in visible text (enum codes and raw
  * paths live in the per-entry disclosure), numbers human-formatted. Unknown kinds and codes degrade
  * to neutral lines with the raw value in the disclosure — the tolerant reader stays honest, and
@@ -420,7 +420,7 @@ export function overallStatus(
   return { tone: statusTone(acquisition.status), phrase: STATUS_PHRASE[acquisition.status] };
 }
 
-/** Correctly-pluralized counters with zero-count segments omitted (design D9). */
+/** Correctly-pluralized counters with zero-count segments omitted (legible-acquisition-history D9). */
 export function metaSummary(attempts: number, rejectedCount: number): string {
   const parts: string[] = [];
   if (attempts > 0) parts.push(`${attempts} attempt${attempts === 1 ? '' : 's'}`);
@@ -430,7 +430,7 @@ export function metaSummary(attempts: number, rejectedCount: number): string {
   return parts.join(' \u{B7} ');
 }
 
-// --- The synthesized in-progress row (design D5) -----------------------------------------------
+// --- The synthesized in-progress row (legible-acquisition-history D5) -----------------------------------------------
 
 export type PendingState = 'pending' | 'attention';
 

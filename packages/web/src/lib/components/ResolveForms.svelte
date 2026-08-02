@@ -22,9 +22,9 @@
   }: Properties = $props();
 </script>
 
-<!-- Labels come from the verb inventory (design D1): imperative fragments, em-dash consequences
+<!-- Labels come from the verb inventory (reviews-register-alignment D1): imperative fragments, em-dash consequences
      stating the composed contract, no parenthesized asides. The two file-deleting verbs render
-     low-emphasis danger — visible up front, confirmed in-page after submit (design D5). -->
+     low-emphasis danger — visible up front, confirmed in-page after submit (reviews-register-alignment D5). -->
 
 {#if supplyId}
   <details data-testid="supply-id">

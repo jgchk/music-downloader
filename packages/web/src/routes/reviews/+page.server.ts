@@ -4,7 +4,8 @@ import { guardedRead } from '$lib/server/facade-reads.js';
 import { reviewTitlesFor } from '$lib/server/review-titles.js';
 
 /**
- * The attention queue: both module facades composed into one web-owned list (design D1). Each
+ * The attention queue: both module facades composed into one web-owned list
+ * (unified-attention-queue D1). Each
  * section degrades independently — a failing facade read is logged and yields the other module's
  * items plus a modeled section error, never a page-level failure (web-ui spec). Review rows are
  * titled by their musical intent where the correlation composes (reviews-register-alignment D3).

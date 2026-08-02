@@ -77,7 +77,7 @@ describe('attention queue load', () => {
     expect(warnings).toEqual([]);
   });
 
-  it('titles a correlated review by its musical intent (design D3)', () => {
+  it('titles a correlated review by its musical intent (reviews-register-alignment D3)', () => {
     const { locals: event } = locals({
       listPendingReviews: () => ({ reviews: [pendingReview] }),
       getImport: () => ({ ok: true, value: { importId: 'imp-1', acquisitionId: 'acq-9' } }),

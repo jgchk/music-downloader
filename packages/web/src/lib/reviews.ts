@@ -3,7 +3,7 @@ import { matchPercent } from './copy.js';
 
 /**
  * Presentation vocabulary for the review surface: pure mappings from importer facade DTOs to what
- * the queue and detail pages show, written to the register (design D4/D6/D9): chips speak the ask,
+ * the queue and detail pages show, written to the register (reviews-register-alignment D4/D6/D9): chips speak the ask,
  * match quality is coarse and higher-is-better, copy is source-agnostic — no internal tool names —
  * and every open-string code passes through a gloss map with a verbatim-safe fallback. No-match is
  * deliberately distinct from low confidence (match-review spec).
@@ -36,7 +36,7 @@ export function kindLabel(kind: ReviewDto['kind']): string {
   }
 }
 
-// --- Match quality (design D6) -----------------------------------------------------------------
+// --- Match quality (reviews-register-alignment D6) -----------------------------------------------------------------
 
 export interface MatchQuality {
   readonly category: 'Strong match' | 'Good match' | 'Weak match';
@@ -145,10 +145,9 @@ export function contextSummary(pending: PendingReviewDto): string {
       const best = review.candidates[0];
       // The percent qualifies its own category word in a compact metadata line, so it sits in
       // parentheses (the affordance register's aside ban is about consequence copy on actions).
+      const quality = best === undefined ? undefined : matchQuality(best.distance);
       const detail =
-        best === undefined
-          ? ''
-          : ` \u{2014} best: ${matchQuality(best.distance).category} (${matchQuality(best.distance).pct}%)`;
+        quality === undefined ? '' : ` \u{2014} best: ${quality.category} (${quality.pct}%)`;
       const note = hintNote(review);
       const hint = note === undefined ? '' : ` \u{2014} ${note}`;
       const plural = review.candidates.length === 1 ? '' : 'es';
@@ -175,12 +174,12 @@ export function contextSummary(pending: PendingReviewDto): string {
   }
 }
 
-/** Distances are 0..1 where smaller is better; the disclosure-only percentage form (design D7). */
+/** Distances are 0..1 where smaller is better; the disclosure-only percentage form (reviews-register-alignment D7). */
 export function formatDistance(distance: number): string {
   return `${(distance * 100).toFixed(1)}%`;
 }
 
-// --- Titling (design D3) -----------------------------------------------------------------------
+// --- Titling (reviews-register-alignment D3) -----------------------------------------------------------------------
 
 /** Strip everything up to the last slash (a leaf path stays whole). */
 export function pathBasename(path: string): string {
