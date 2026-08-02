@@ -5,10 +5,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
   DATA_DIR,
+  DELIVERED_NARRATION,
   IMPORTER_DB,
   MBID,
   countEvents,
   pollForEvent,
+  pollForStatus,
   pollUntilTerminal,
   reviewQueueEmpty,
   seedStagedFixture,
@@ -44,10 +46,11 @@ describe('restart resilience (durable stores + subscription checkpoint)', () => 
   it('completes the import exactly once across a kill between fulfilment and import', async () => {
     const acquisitionId = await submitAcquisition(MBID);
 
-    // Fulfilment committed (observable over the interface) and the seam handoff durably recorded
-    // in the importer's own store — while the blocked bridge guarantees the import cannot finish.
-    const status = await pollUntilTerminal(acquisitionId);
-    expect(status).toBe('In your library');
+    // Fulfilment committed (observable over the interface as the delivered-and-importing
+    // narration — the honest UI never claims an ending here) and the seam handoff durably
+    // recorded in the importer's own store, while the blocked bridge guarantees the import
+    // cannot finish.
+    await pollForStatus(acquisitionId, DELIVERED_NARRATION);
     await pollForEvent(IMPORTER_DB, 'ImportRequested');
     expect(countEvents(IMPORTER_DB, 'ImportApplied')).toBe(0);
 

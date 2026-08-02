@@ -134,6 +134,37 @@ export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise
   }
 }
 
+/**
+ * Poll until the detail page's status marker reads one of the given phrases. For observing a
+ * mid-story state the terminal poll deliberately never settles on (e.g. delivered-and-importing
+ * while a test has the bridge gated shut).
+ */
+export async function pollForStatus(
+  id: string,
+  phrases: ReadonlySet<string>,
+  timeoutMs = 90_000,
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const status = await readStatus(id);
+    if (status !== undefined && phrases.has(status)) return status;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `acquisition ${id} never showed ${[...phrases].join(' / ')} (last: ${status})`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+/** The delivered-and-importing narration: the downloader has deposited; the import is working. */
+export const DELIVERED_NARRATION: ReadonlySet<string> = new Set([
+  'Delivered \u{2014} confirming the import',
+  'Matching against the library',
+  'Adding to the library',
+  'Waiting for your review',
+]);
+
 /** True when the review queue page shows its explicit empty marker. */
 export async function reviewQueueEmpty(): Promise<boolean> {
   const res = await fetch(`${BASE_URL}/reviews`, {
