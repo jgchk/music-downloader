@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.15.0](https://github.com/jgchk/music-downloader/compare/v3.14.0...v3.15.0) (2026-08-02)
+
+### Features
+
+* **web:** align the /reviews surface with the copy register ([df51149](https://github.com/jgchk/music-downloader/commit/df5114938d4844e3eabf2d48a7528a37410ec161))
+
+### Bug Fixes
+
+* **web:** harden the review surface against review findings ([2df9e21](https://github.com/jgchk/music-downloader/commit/2df9e2135a0a021497d7b5e9baf74f49d0c164cb))
 ## [3.14.0](https://github.com/jgchk/music-downloader/compare/v3.13.0...v3.14.0) (2026-08-02)
 
 ### Features
