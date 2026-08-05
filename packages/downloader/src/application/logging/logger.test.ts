@@ -82,6 +82,23 @@ describe('createLogger', () => {
     expect(lines[0]).not.toContain('nested-secret-token');
   });
 
+  it('redacts Soulseek peer usernames — third-party PII never reaches the log stream', () => {
+    // The same leak class the contract recorder's scrub closed on the fixture side: peer
+    // usernames are other people's identifiers, logged only as structured fields so this
+    // redaction can catch every site at once.
+    const { stream, lines } = collectingDestination();
+    const logger = createLogger({ destination: stream });
+
+    logger.warn({ username: 'peer-42' }, 'slskd download failed');
+    logger.warn({ transfer: { username: 'peer-42' } }, 'tearing down a transfer');
+
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      expect(line).toContain('[REDACTED]');
+      expect(line).not.toContain('peer-42');
+    }
+  });
+
   it('honours custom redaction paths', () => {
     const { stream, lines } = collectingDestination();
     const logger = createLogger({ destination: stream, redactPaths: ['secretField'] });

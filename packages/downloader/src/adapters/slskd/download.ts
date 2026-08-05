@@ -16,8 +16,8 @@ import type {
   SourceResourceKey,
 } from '../../application/ports/resource-ledger-port.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { downloadsPath, SlskdClient } from './client.js';
-import type { SlskdConfig } from './client.js';
+import { downloadsPath } from './client.js';
+import type { SlskdConfig, SlskdClient } from './client.js';
 import { remoteFilename } from './mapping.js';
 import { pollOwnedTransfers } from './poll.js';
 import { StagedFileResolver } from './staged-files.js';
@@ -89,7 +89,7 @@ export class SlskdDownload implements DownloadPort {
     ledger: ResourceLedgerStore,
     config: SlskdDownloadConfig,
     private readonly observer: DownloadObserverPort,
-    client: SlskdClient = new SlskdClient(),
+    client: SlskdClient,
     private readonly timer: Timer = realTimer,
   ) {
     this.client = client;
@@ -201,7 +201,9 @@ export class SlskdDownload implements DownloadPort {
         // maps it to a retryable InfraError (the reactor parks and retries the short start effect),
         // matching every other GET/POST path in this adapter. Marking it a candidate failure would
         // manufacture AcquisitionExhausted from a transient slskd overload.
-        throw new Error(`slskd responded ${enqueue.status} for POST ${downloadsPath(username)}`);
+        // The peer username stays out of the message: this string reaches dead-letter payloads,
+        // where the redaction paths cannot follow it. The debug line above carries it structured.
+        throw new Error(`slskd responded ${enqueue.status} for the download enqueue POST`);
       }
       if (enqueue.status < 200 || enqueue.status >= 300) {
         // A 4xx (other than 401/403) means slskd answered and refused THIS candidate's enqueue

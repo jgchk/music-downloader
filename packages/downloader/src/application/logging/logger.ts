@@ -10,8 +10,11 @@ export type Logger = PinoLogger;
 export const DEFAULT_LOG_LEVEL = 'info';
 
 /**
- * Paths pino redacts so credentials and file contents never reach the log stream (D15).
- * Wildcards match the field at any object depth pino supports.
+ * Paths pino redacts so credentials, file contents, and third-party PII never reach the log
+ * stream (D15). Wildcards match the field at any object depth pino supports. Soulseek peer
+ * usernames are other people's identifiers (the same leak class the contract recorder scrubs
+ * from fixtures) — adapters log them only as structured `username` fields so one path here
+ * covers every site.
  */
 export const DEFAULT_REDACT_PATHS: readonly string[] = [
   'password',
@@ -25,6 +28,8 @@ export const DEFAULT_REDACT_PATHS: readonly string[] = [
   'req.headers.authorization',
   'fileContents',
   '*.fileContents',
+  'username',
+  '*.username',
 ];
 
 export interface CreateLoggerOptions {

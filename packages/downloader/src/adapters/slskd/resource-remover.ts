@@ -6,7 +6,8 @@ import type {
   SourceResourceRemover,
 } from '../../application/ports/resource-ledger-port.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { downloadsPath, SlskdClient } from './client.js';
+import type { SlskdClient } from './client.js';
+import { downloadsPath } from './client.js';
 import { slskdTransfersSchema } from './schemas.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
@@ -33,7 +34,7 @@ export class SlskdResourceRemover implements SourceResourceRemover {
 
   constructor(
     private readonly logger: Logger,
-    private readonly client: SlskdClient = new SlskdClient(),
+    private readonly client: SlskdClient,
     private readonly timer: Timer = realTimer,
     pollIntervalMs: number = DEFAULT_POLL_INTERVAL_MS,
   ) {

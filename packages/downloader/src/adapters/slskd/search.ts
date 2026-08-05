@@ -9,7 +9,7 @@ import type {
   SourceResourceKey,
 } from '../../application/ports/resource-ledger-port.js';
 import type { Logger } from '../../application/logging/logger.js';
-import { SlskdClient } from './client.js';
+import type { SlskdClient } from './client.js';
 import type { SlskdConfig } from './client.js';
 import { mapSearchResponses } from './mapping.js';
 import { slskdSearchResponsesSchema, slskdSearchStateSchema } from './schemas.js';
@@ -47,7 +47,7 @@ export class SlskdSearch implements SearchPort {
   constructor(
     private readonly logger: Logger,
     private readonly ledger: ResourceLedgerStore,
-    client: SlskdClient = new SlskdClient(),
+    client: SlskdClient,
     private readonly timer: Timer = realTimer,
     config: SlskdConfig = {},
   ) {
