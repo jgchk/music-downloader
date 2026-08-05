@@ -143,6 +143,7 @@ def collect_items(directory):
     if not os.path.isdir(directory):
         raise BridgeRefusal("directory-not-found", f"not a directory: {directory}")
     items = []
+    skipped = 0
     for root, _dirs, files in os.walk(directory):
         for name in sorted(files):
             path = os.path.join(root, name)
@@ -154,7 +155,13 @@ def collect_items(directory):
                 # dropping a file that beets could have read once the fault clears.
                 raise
             except Exception:
+                skipped += 1
                 continue  # not an audio file beets can read (unreadable/unsupported format)
+    if skipped:
+        # Skipping is by design (album folders carry covers and logs), but the COUNT must be
+        # visible: a proposal built on 9 of 12 tracks otherwise reads as silent corruption. The
+        # diagnostic stream only — the stdout JSON contract is unchanged.
+        print(f"collect: skipped {skipped} unreadable file(s) under {directory}", file=sys.stderr)
     if not items:
         raise BridgeRefusal("no-audio-files", f"no readable audio files under: {directory}")
     return items
