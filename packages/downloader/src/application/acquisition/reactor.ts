@@ -463,7 +463,31 @@ export class Reactor {
     );
     if (schedule.kind === 'exhausted') {
       const isLanded = await this.lander.land(stored, outcome.effect, outcome.error, attempt);
-      if (isLanded) await this.resumeStream(entry, stream.value);
+      if (isLanded) {
+        await this.resumeStream(entry, stream.value);
+        return;
+      }
+      // The landing itself failed on infrastructure: leaving the past-due park untouched would
+      // re-dispatch the live effect on EVERY tick — unbounded, with no backoff. The budget is
+      // spent, so only the landing is owed; back the park off at the policy cap and let the next
+      // due tick re-attempt it, like every neighbouring infra-failure path reschedules.
+      const heldOver = await this.dependencies.parked.park({
+        ...entry,
+        attempt,
+        nextRetryAt: new Date(now.getTime() + this.policy.maxDelayMs).toISOString(),
+        lastError: describeCommandError(outcome.error),
+      });
+      if (heldOver.isErr()) {
+        this.dependencies.logger.error(
+          { acquisitionId: entry.streamId, err: heldOver.error },
+          'failed landing could not be re-parked; its effect will re-fire next tick',
+        );
+        return;
+      }
+      this.dependencies.logger.error(
+        { acquisitionId: entry.streamId, effect: outcome.effect.type, attempt, err: outcome.error },
+        'exhausted effect could not be landed; parked again at the policy cap',
+      );
       return;
     }
     const rescheduled = await this.dependencies.parked.park({
