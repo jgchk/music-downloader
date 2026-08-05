@@ -1,5 +1,6 @@
-import { errAsync, okAsync } from 'neverthrow';
+import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Import } from '../../domain/import/import.js';
 import {
   DIRECTORY,
   POLICY,
@@ -9,6 +10,9 @@ import {
 import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import { infraError } from '../ports/errors.js';
+import type { CheckpointStore } from '../ports/event-store-port.js';
+import { createLogger } from '../logging/logger.js';
+import type { Logger } from '../logging/logger.js';
 import {
   FakeCheckpointStore,
   FakeDeadLetterStore,
@@ -53,6 +57,7 @@ function reactor(
   overrides: {
     interval?: (function_: () => void, ms: number) => () => void;
     retryBudget?: number;
+    logger?: Logger;
   } = {},
 ): Reactor {
   return new Reactor({
@@ -63,7 +68,7 @@ function reactor(
     parked,
     stalled,
     clock: fixedClock(),
-    logger: silentLogger(),
+    logger: overrides.logger ?? silentLogger(),
     interpret,
     // Tests drive drains explicitly; the default real interval is covered by its own test below.
     interval: overrides.interval ?? (() => () => {}),
@@ -562,5 +567,129 @@ describe('Reactor — durable retry budget & stalled exposure', () => {
 
     expect(stalled.isStalled('imp-1')).toBe(true); // stays marked — the letters still exist
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // but the stream still advances
+  });
+});
+
+describe('Reactor — defect containment', () => {
+  it('catches and logs an unexpected throw from a fire-and-forget drain, surviving the pass', async () => {
+    // Failures inside a pass are values (neverthrow) — an actual throw (a defect in an interpreter
+    // closure, or a corrupt event breaking the fold) is a bug. A wakeup-driven `void this.drain()`
+    // must contain it: in the composed monolith an unhandled rejection from this durable loop
+    // would terminate the one process serving the web UI and both modules.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    let isBoom = true;
+    const interpret: EffectInterpreter = (_importId, _effect) => {
+      if (isBoom) throw new Error('interpreter defect');
+      return okAsync([]);
+    };
+    const r = reactor(interpret, { logger });
+    await r.start(); // empty log: the startup drain is clean
+
+    // A live append publishes on the bus, so this wakeup alone fires the throwing drain.
+    await store.append('imp-1', 0, [requested()], { importId: 'imp-1', occurredAt: 't' });
+    await vi.waitFor(() => {
+      expect(lines.join('')).toContain('reactor pass failed unexpectedly');
+    });
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined(); // held: nothing was settled
+
+    // The reactor survived: a later healthy pass drains the same backlog.
+    isBoom = false;
+    await r.drain();
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    r.stop();
+  });
+
+  it('does not attach the live loop when stop() lands during the startup checkpoint load', async () => {
+    await seed([requested()]);
+    const interpret = vi.fn(() => okAsync([]));
+    const { promise: gate, resolve: releaseLoad } = Promise.withResolvers<void>();
+    const gated: CheckpointStore = {
+      load: (name) => ResultAsync.fromSafePromise(gate).andThen(() => checkpoints.load(name)),
+      save: (name, globalSeq) => checkpoints.save(name, globalSeq),
+    };
+    const intervals: (() => void)[] = [];
+    const r = new Reactor({
+      store,
+      checkpoints: gated,
+      bus,
+      deadLetters,
+      parked,
+      stalled,
+      clock: fixedClock(),
+      logger: silentLogger(),
+      interpret,
+      interval: (function_) => {
+        intervals.push(function_);
+        return () => {};
+      },
+    });
+
+    const started = r.start();
+    r.stop(); // a backgrounded boot torn down before the checkpoint read resolves
+    releaseLoad();
+    await started;
+
+    // Nothing attached and nothing drained: no subscription, no fallback poll, no dispatch.
+    expect(bus.subscriberCount()).toBe(0);
+    expect(intervals).toHaveLength(0);
+    expect(interpret).not.toHaveBeenCalled();
+  });
+});
+
+describe('Reactor — sibling effects of one event', () => {
+  // The real `react()` currently yields at most one effect per event, so the multi-effect protocol
+  // is pinned with a widened double on a genuine aggregate: the loop's contract — each sibling
+  // settles independently — must already hold when a future reaction yields more than one.
+  function twoEffectAggregate(): void {
+    const aggregate = Import.fromHistory([requested()]);
+    vi.spyOn(aggregate, 'reactTo').mockReturnValue([
+      { type: 'Propose', directory: DIRECTORY },
+      { type: 'DeleteIntake', directory: DIRECTORY },
+    ]);
+    vi.spyOn(Import, 'fromHistory').mockReturnValue(aggregate);
+  }
+
+  it('a stale rejection of one sibling does not silently drop the effects behind it', async () => {
+    await seed([requested()]);
+    twoEffectAggregate();
+    const interpret = vi
+      .fn<EffectInterpreter>()
+      .mockReturnValueOnce(errAsync({ kind: 'NoOpenReview' }))
+      .mockReturnValue(okAsync([]));
+
+    await reactor(interpret).start();
+
+    // Both siblings were interpreted — the settled rejection of the first is not a verdict on the
+    // second — and the event as a whole advances.
+    expect(interpret).toHaveBeenCalledTimes(2);
+    expect(interpret).toHaveBeenLastCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'DeleteIntake' }),
+    );
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+
+  it('a dead-lettered sibling settles alone: the effects behind it still dispatch', async () => {
+    await seed([requested()]);
+    twoEffectAggregate();
+    const interpret = vi
+      .fn<EffectInterpreter>()
+      .mockReturnValueOnce(errAsync(infraError('bridge.propose', 'beets always fails')))
+      .mockReturnValue(okAsync([]));
+
+    await reactor(interpret, { retryBudget: 1 }).start(); // budget 1: first sibling dead-letters now
+
+    expect(interpret).toHaveBeenCalledTimes(2);
+    expect(interpret).toHaveBeenLastCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'DeleteIntake' }),
+    );
+    expect(deadLetters.letters).toHaveLength(1);
+    expect(stalled.isStalled('imp-1')).toBe(true);
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
 });

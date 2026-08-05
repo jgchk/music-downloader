@@ -107,6 +107,7 @@ export class Reactor {
   private stopInterval: (() => void) | undefined;
   private running = false;
   private pending = false;
+  private stopped = false;
 
   constructor(private readonly dependencies: ReactorDependencies) {}
 
@@ -124,6 +125,7 @@ export class Reactor {
    */
   async start(): Promise<void> {
     const checkpoint = await this.dependencies.checkpoints.load(REACTOR_CONSUMER);
+    if (this.stopped) return; // stopped while loading (a backgrounded boot torn down early)
     if (checkpoint.isErr()) {
       // Replaying from the log start is safe (idempotent effects + decide's stale guards) but noisy
       // and slow — the operator must be able to tell it apart from a genuinely fresh consumer.
@@ -145,6 +147,7 @@ export class Reactor {
   }
 
   stop(): void {
+    this.stopped = true;
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.stopInterval?.();
@@ -175,6 +178,14 @@ export class Reactor {
           }
         }
       } while (this.pending);
+    } catch (error: unknown) {
+      // Failures inside a pass are values (neverthrow) — an actual throw (a defect in an
+      // interpreter closure, or a corrupt event breaking the fold) is a bug. It is contained here
+      // so a wakeup-driven `void this.drain()` can never surface as an unhandled process rejection
+      // from the durable reactor — in the composed monolith that rejection would terminate the one
+      // process serving both modules and the web UI. The checkpoint is untouched, so the pass
+      // simply redelivers on the next wakeup or fallback poll.
+      this.dependencies.logger.error({ err: error }, 'reactor pass failed unexpectedly');
     } finally {
       this.running = false;
     }
@@ -208,16 +219,19 @@ export class Reactor {
       if (result.isErr()) {
         if (isRetryable(result.error)) {
           if (!(await this.handleRetryable(stored, effect.type, result.error))) return; // held
-          isDeadLettered = true; // budget spent: dead-lettered — fall through to advance past it
-          break;
+          // Budget spent: this sibling is dead-lettered — a settled outcome, not a verdict on the
+          // effects behind it, which still dispatch before the event advances.
+          isDeadLettered = true;
+          continue;
         }
-        // Stale/illegal outcome — the stream has already settled it. Record and advance past
-        // it; retrying would only re-fire the same rejection forever.
+        // Stale/illegal outcome — the stream has already settled this sibling; retrying would only
+        // re-fire the same rejection forever. Record it and carry on: dropping the effects behind
+        // it would silently lose work the event still owes.
         this.dependencies.logger.warn(
           { importId: stored.streamId, effect: effect.type, err: result.error },
-          'effect follow-on rejected as stale; advancing past it',
+          'effect follow-on rejected as stale; continuing past it',
         );
-        break;
+        continue;
       }
       this.dependencies.logger.debug(
         { importId: stored.streamId, effect: effect.type },

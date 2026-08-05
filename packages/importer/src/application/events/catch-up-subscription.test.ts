@@ -2,6 +2,7 @@ import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import { createLogger } from '../logging/logger.js';
 import { infraError } from '../ports/errors.js';
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
@@ -382,6 +383,42 @@ describe('CatchUpSubscription', () => {
 
     expect(wakeListeners).toHaveLength(0);
     expect(intervals[0]!.stopped).toBe(true);
+  });
+
+  it('catches and logs an unexpected throw from a fire-and-forget poll, surviving the cycle', async () => {
+    // A defective feed/handler that THROWS (rather than returning a modeled failure) is a bug; a
+    // wakeup- or timer-driven poll must not let it escape as an unhandled process rejection — in
+    // the composed monolith that rejection would terminate the one process serving the web UI and
+    // both modules. It is caught at the boundary, logged, and the loop lives on.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    let isBoom = false;
+    const throwingFeed = {
+      read: (from: number, limit: number) => {
+        if (isBoom) throw new Error('feed adapter bug');
+        return feed.read(from, limit);
+      },
+    };
+    const sub = subscription({ feed: throwingFeed, logger });
+    await sub.start(); // the initial (awaited) poll drains cleanly
+
+    isBoom = true;
+    for (const listener of wakeListeners) {
+      listener(); // fires the fire-and-forget poll under the hood — the throw must be contained
+    }
+    await vi.waitFor(() => {
+      expect(lines.join('')).toContain('seam subscription poll failed unexpectedly');
+    });
+
+    // The subscription survived: a later healthy poll still delivers.
+    isBoom = false;
+    feed.events = [seamEvent(1)];
+    await sub.poll();
+    expect(handled).toEqual([1]);
+    sub.stop();
   });
 
   it('uses a real interval by default and stops it cleanly', async () => {
