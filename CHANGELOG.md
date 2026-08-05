@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.16.1](https://github.com/jgchk/music-downloader/compare/v3.16.0...v3.16.1) (2026-08-05)
+
+### Bug Fixes
+
+* **downloader:** back a failed landing off instead of re-firing the exhausted effect every tick ([024bdbf](https://github.com/jgchk/music-downloader/commit/024bdbf7c00e6d623c815445754a14a29b6493a6))
+* **downloader:** bound and instrument the ffmpeg probe; decode subprocess output as a stream ([5f9ef50](https://github.com/jgchk/music-downloader/commit/5f9ef50db994db6358a057fbe2f6c4356bfbef7b))
+* **downloader:** refuse to boot on a failed projection rebuild; harden the composed boot and shutdown ([f1f3956](https://github.com/jgchk/music-downloader/commit/f1f39562fec71eef10a13fec7f82f7a0b0f791d1))
+* **downloader:** require the slskd client injected; redact peer usernames from logs ([581b9ef](https://github.com/jgchk/music-downloader/commit/581b9eff1051b9a5c2aea78b472e8254c51983a4))
+* **importer:** contain reactor and seam-subscription defects; settle sibling effects independently ([4cf147d](https://github.com/jgchk/music-downloader/commit/4cf147d005f3ff2d455c3aeef78e5a582189e1d5))
+* **importer:** count the files the bridge skips as unreadable on stderr ([7d736e7](https://github.com/jgchk/music-downloader/commit/7d736e7b5af7494fdc91185e354d21fa14394c4d))
 ## [3.16.0](https://github.com/jgchk/music-downloader/compare/v3.15.1...v3.16.0) (2026-08-02)
 
 ### Features
