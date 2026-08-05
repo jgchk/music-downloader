@@ -94,8 +94,16 @@ afterEach(async () => {
   cleanups.length = 0;
 });
 
+/** Boot the factory and unwrap: these wiring specs assert the healthy path. */
+async function bootDownloaderRuntime(
+  ...factoryArguments: Parameters<typeof createDownloaderRuntime>
+): Promise<DownloaderRuntime> {
+  const booted = await createDownloaderRuntime(...factoryArguments);
+  return booted._unsafeUnwrap();
+}
+
 async function testRuntime(databaseFile = ':memory:'): Promise<DownloaderRuntime> {
-  const runtime = await createDownloaderRuntime(
+  const runtime = await bootDownloaderRuntime(
     {
       databaseFile,
       libraryRoot: '/library',
@@ -171,7 +179,7 @@ describe('createDownloaderRuntime', () => {
         abort: () => okAsync([]),
       },
     });
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
         libraryRoot: '/library',
@@ -203,7 +211,7 @@ describe('createDownloaderRuntime', () => {
     // No acquisitions are submitted, so nothing dispatches — this pins real-adapter construction
     // and executes the stop seam (`slskdDownload.stop()` before the store closes); the latch
     // BEHAVIOR itself is owned by the adapter tier's "stop() latches every watch" test.
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
         libraryRoot: '/library',
@@ -256,7 +264,7 @@ describe('createDownloaderRuntime', () => {
   it('stops the connected verdict subscription on stop() so its poll loop cannot outlive the db', async () => {
     vi.useFakeTimers();
     try {
-      const runtime = await createDownloaderRuntime(
+      const runtime = await bootDownloaderRuntime(
         {
           databaseFile: ':memory:',
           libraryRoot: '/library',
@@ -319,7 +327,7 @@ describe('createDownloaderRuntime', () => {
   it('constructs real adapters when no overrides are given', async () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
     cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: path.join(directory, 'data', 'events.db'),
         libraryRoot: path.join(directory, 'library'),
@@ -367,39 +375,6 @@ describe('createDownloaderRuntime', () => {
     // A pure read of runtime state advances no stream and creates no work.
     expect(runtime.facade.listAcquisitions()).toEqual({ acquisitions: [] });
   });
-
-  it('logs and continues when the projection rebuild cannot read the backlog', async () => {
-    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
-    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
-    const file = path.join(directory, 'events.db');
-    const seed = openEventDatabase(file);
-    seed
-      .prepare(
-        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
-         VALUES ('acq-x', 1, 'Broken', 1, 'not-json', 'also-not-json')`,
-      )
-      .run();
-    seed.close();
-
-    const errors: string[] = [];
-    const logger = createLogger({
-      level: 'error',
-      destination: { write: (line: string) => void errors.push(line) },
-    });
-    const runtime = await createDownloaderRuntime(
-      {
-        databaseFile: file,
-        libraryRoot: '/library',
-        stagingRoot: '/staging',
-        musicbrainz: {},
-        slskd: {},
-      },
-      logger,
-      { ports: fakePorts },
-    );
-    cleanups.push(() => runtime.stop());
-    expect(errors.join('')).toContain('projection rebuild failed');
-  });
 });
 
 describe('stalled exposure at boot (reactor-durability D2)', () => {
@@ -433,7 +408,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     });
     database.close();
 
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: file,
         libraryRoot: '/library',
@@ -465,7 +440,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
       level: 'warn',
       destination: { write: (line: string) => void lines.push(line) },
     });
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
         libraryRoot: '/library',
@@ -529,7 +504,7 @@ describe('boot readiness (reactor-durability D4)', () => {
     });
 
     // The pending resolution hangs indefinitely; boot must return anyway (backgrounded drain).
-    const runtime = await createDownloaderRuntime(
+    const runtime = await bootDownloaderRuntime(
       {
         databaseFile: file,
         libraryRoot: '/library',
@@ -549,5 +524,43 @@ describe('boot readiness (reactor-durability D4)', () => {
       const status = runtime.facade.getAcquisition({ id: 'acq-hung' });
       expect(status).toMatchObject({ ok: true, value: { status: 'MetadataFailed' } });
     });
+  });
+
+  it('refuses to boot when the projection rebuild cannot read the backlog', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'downloader-runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+    const seed = openEventDatabase(file);
+    seed
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES ('acq-x', 1, 'Broken', 1, 'not-json', 'also-not-json')`,
+      )
+      .run();
+    seed.close();
+
+    const errors: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void errors.push(line) },
+    });
+    const result = await createDownloaderRuntime(
+      {
+        databaseFile: file,
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      logger,
+      { ports: fakePorts },
+    );
+
+    // A half-rebuilt projection boots half-blind: every acquisition list/detail answers "nothing
+    // exists" while readiness still reads `up` — an infra fault masquerading as a business answer.
+    // Mirror the importer's contract: never boot on a projection we could not fully rebuild.
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().kind).toBe('ProjectionRebuildFailed');
+    expect(errors.join('')).toContain('projection rebuild failed');
   });
 });

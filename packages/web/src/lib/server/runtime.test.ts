@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { err, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DownloaderRuntime } from '@music/downloader/runtime';
+import type { createDownloaderRuntime, DownloaderRuntime } from '@music/downloader/runtime';
 import type { createImporterRuntime, ImporterRuntime } from '@music/importer/runtime';
 import { PlexTvAccess } from './plex/adapter.js';
 import {
@@ -53,6 +53,7 @@ function fakeSubscription(log: string[], name: string) {
 function fakeRuntimes(
   log: string[],
   statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {},
+  failures: { acquisitionsStart?: boolean } = {},
 ) {
   // Each seam must be wired to the OTHER module's feed and wakeups; capturing what each connect call
   // received lets a test catch a cross-wiring (e.g. handing the verdict seam the downloader's own
@@ -83,7 +84,14 @@ function fakeRuntimes(
     connectAcquisitionFeed: (feed: unknown, options: { sourceRoot: string }, wakeups: unknown) => {
       log.push(`acquisitions:connect:${options.sourceRoot}`);
       captured.acquisition = { feed, wakeups };
-      return fakeSubscription(log, 'acquisitions');
+      return failures.acquisitionsStart
+        ? {
+            start: () => Promise.reject(new Error('subscription start defect')),
+            stop: () => {
+              log.push('acquisitions:stop');
+            },
+          }
+        : fakeSubscription(log, 'acquisitions');
     },
     readiness: () => ({ status: statuses.importer ?? 'up' }),
     stop: () => {
@@ -97,7 +105,7 @@ function fakeRuntimes(
     captured,
     createDownloader: vi.fn(() => {
       log.push('downloader:create');
-      return Promise.resolve(downloader);
+      return Promise.resolve(ok(downloader));
     }),
     createImporter: vi.fn(() => {
       log.push('importer:create');
@@ -198,6 +206,64 @@ describe('bootRuntimes', () => {
       }),
     ).rejects.toThrow(/bad yaml/);
     expect(log).toContain('downloader:stop');
+  });
+
+  it('fails when the downloader cannot start, before the importer ever boots', async () => {
+    const log: string[] = [];
+    const fakes = fakeRuntimes(log);
+    const failingDownloader = vi.fn((() =>
+      Promise.resolve(
+        err({ kind: 'ProjectionRebuildFailed', detail: 'backlog unreadable' }),
+      )) as unknown as typeof createDownloaderRuntime);
+
+    await expect(
+      bootRuntimes(VALID_ENV, {
+        createDownloader: failingDownloader,
+        createImporter: fakes.createImporter,
+        onShutdownSignal: vi.fn(),
+      }),
+    ).rejects.toThrow(/downloader startup failed: backlog unreadable/);
+    expect(log).not.toContain('importer:create'); // nothing else booted, nothing to stop
+  });
+
+  it('tears both runtimes down when a seam subscription fails to start', async () => {
+    // A subscription whose start() THROWS (a defect, not a modeled failure) must not strand two
+    // booted runtimes with live pollers behind a rejected boot — everything already started stops.
+    const log: string[] = [];
+    const fakes = fakeRuntimes(log, {}, { acquisitionsStart: true });
+
+    await expect(
+      bootRuntimes(VALID_ENV, {
+        createDownloader: fakes.createDownloader,
+        createImporter: fakes.createImporter,
+        onShutdownSignal: vi.fn(),
+      }),
+    ).rejects.toThrow(/subscription start defect/);
+    expect(log).toContain('acquisitions:stop');
+    expect(log).toContain('verdicts:stop');
+    expect(log).toContain('downloader:stop');
+    expect(log).toContain('importer:stop');
+  });
+
+  it('logs, rather than loses, a rejection from the signal-driven shutdown', async () => {
+    // The default registration fires `void shutdown()` from a process event: a rejection there
+    // has no awaiting caller, so unobserved it would be an unhandled rejection at teardown.
+    const log: string[] = [];
+    const fakes = fakeRuntimes(log);
+    await bootRuntimes(VALID_ENV, {
+      createDownloader: fakes.createDownloader,
+      createImporter: fakes.createImporter,
+    });
+    const errorSpy = vi.spyOn(loggerOf(), 'error');
+    fakes.downloader.stop = () => Promise.reject(new Error('close raced'));
+
+    (process.emit as (event: string) => boolean)('sveltekit:shutdown');
+
+    await vi.waitFor(() => {
+      const messages = errorSpy.mock.calls.map((call) => String(call.at(-1)));
+      expect(messages).toContain('shutdown failed');
+    });
+    fakes.downloader.stop = () => Promise.resolve(); // let afterEach tear down cleanly
   });
 
   it('composes the access surface: the configured session secret and the real plex.tv adapter', async () => {

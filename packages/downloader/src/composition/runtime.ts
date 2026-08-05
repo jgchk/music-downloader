@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { err, ok } from 'neverthrow';
+import type { Result } from 'neverthrow';
 import {
   FfmpegAudioProbe,
   FilesystemLibrary,
@@ -105,6 +107,15 @@ export interface DownloaderReadiness {
   readonly status: 'up' | 'down';
 }
 
+/**
+ * Startup failures are values (mirroring the importer's factory): a runtime that cannot fully
+ * rebuild its projections must refuse to boot, not serve empty answers with readiness `up`.
+ */
+export type DownloaderStartupError = {
+  readonly kind: 'ProjectionRebuildFailed';
+  readonly detail: string;
+};
+
 export interface DownloaderRuntime {
   readonly facade: DownloaderFacade;
   /** This module's outbound seam surface, consumed by the importer's subscription. */
@@ -121,7 +132,7 @@ export async function createDownloaderRuntime(
   config: DownloaderRuntimeConfig,
   logger: Logger,
   overrides: DownloaderRuntimeOverrides = {},
-): Promise<DownloaderRuntime> {
+): Promise<Result<DownloaderRuntime, DownloaderStartupError>> {
   const clock = overrides.clock ?? { now: () => new Date() };
   const ids = overrides.ids ?? { next: () => randomUUID() };
 
@@ -144,12 +155,18 @@ export async function createDownloaderRuntime(
   await seedStalledReadModel(deadLetters, stalledModel, REACTOR_CONSUMER, horizon, logger);
 
   const backlog = await store.readAll(0);
-  if (backlog.isOk()) {
-    status.rebuild(backlog.value);
-    for (const stored of backlog.value) libraryView.apply(stored);
-  } else {
-    logger.error({ err: backlog.error }, 'projection rebuild failed');
+  if (backlog.isErr()) {
+    // A projection rebuilt from a failed read boots half-blind: every acquisition list/detail
+    // answers "nothing exists" and the library dedup view is empty, all while readiness still
+    // reads `up` — an infra fault masquerading as a business answer. Fail the boot loudly,
+    // exactly as the importer's factory does — never boot on a projection we could not fully
+    // rebuild.
+    logger.error({ err: backlog.error }, 'projection rebuild failed; refusing to boot');
+    database.close();
+    return err({ kind: 'ProjectionRebuildFailed', detail: backlog.error.message });
   }
+  status.rebuild(backlog.value);
+  for (const stored of backlog.value) libraryView.apply(stored);
   // These two read models are kept live by the bus alone: boot-rebuilt from `readAll(0)` above,
   // then followed forward here with NO catch-up cursor of their own. The event bus now isolates
   // each handler in its own try/catch, so a throw from an `apply` is swallowed and logged rather
@@ -266,7 +283,7 @@ export async function createDownloaderRuntime(
   // halted-on-poison state is this module's one exposed "down" signal (design D4).
   let verdicts: CatchUpSubscription | undefined;
 
-  return {
+  return ok({
     facade,
     feed,
     wakeups,
@@ -305,5 +322,5 @@ export async function createDownloaderRuntime(
       database.close();
       return Promise.resolve();
     },
-  };
+  });
 }
