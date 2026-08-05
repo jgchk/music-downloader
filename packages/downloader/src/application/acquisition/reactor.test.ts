@@ -695,6 +695,81 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     r.stop();
   });
 
+  it('backs a failed landing off at the policy cap instead of re-firing the effect every tick', async () => {
+    // Budget exhausted AND the landing itself fails on infrastructure (the dead-letter write
+    // errors): leaving the past-due park untouched would re-dispatch the live effect on every
+    // drain tick — unbounded, with no backoff. The failed landing reschedules like every other
+    // infra failure, so the next attempt waits a full backoff step at the policy cap.
+    const a = matchingCandidate('a');
+    await seed([
+      ...selectedHistory([a]),
+      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: a.identity, files: sampleFiles },
+    ]);
+    await checkpoints.save(REACTOR_CONSUMER, 7); // nothing pending — only the park is due
+    await parked.park({
+      streamId: 'acq-1',
+      globalSeq: 7,
+      attempt: 3,
+      parkedAt: '2026-07-22T10:00:00.000Z', // budget long spent
+      nextRetryAt: '2026-07-22T11:59:00.000Z', // due now
+      lastError: 'fs: denied',
+    });
+    deadLetters.failRecord = true;
+    const discardStaging = vi.fn(() => errAsync(infraError('fs', 'denied')));
+    const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }), {
+      retryPolicy: TIGHT_BUDGET,
+    });
+    await r.start();
+
+    const entry = parked.peek('acq-1');
+    expect(entry).toBeDefined();
+    expect(new Date(entry!.nextRetryAt).getTime()).toBeGreaterThan(clock.now().getTime());
+
+    // The very next tick must NOT re-fire the effect: the park is no longer due.
+    const fired = discardStaging.mock.calls.length;
+    await r.drain();
+    expect(discardStaging).toHaveBeenCalledTimes(fired);
+    r.stop();
+  });
+
+  it('says so loudly when the failed landing cannot even be re-parked', async () => {
+    // Landing failed AND the backoff re-park failed: the entry stays past-due (it will re-fire
+    // next tick — the last-resort behavior), but never silently.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const a = matchingCandidate('a');
+    await seed([
+      ...selectedHistory([a]),
+      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      { type: 'CandidateRejected', candidate: a.identity, files: sampleFiles },
+    ]);
+    await checkpoints.save(REACTOR_CONSUMER, 7);
+    await parked.park({
+      streamId: 'acq-1',
+      globalSeq: 7,
+      attempt: 3,
+      parkedAt: '2026-07-22T10:00:00.000Z',
+      nextRetryAt: '2026-07-22T11:59:00.000Z',
+      lastError: 'fs: denied',
+    });
+    deadLetters.failRecord = true;
+    parked.failPark = true;
+    const discardStaging = vi.fn(() => errAsync(infraError('fs', 'denied')));
+    const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }), {
+      retryPolicy: TIGHT_BUDGET,
+      logger,
+    });
+    await r.start();
+
+    expect(lines.join('')).toContain('could not be re-parked');
+    expect(parked.peek('acq-1')?.nextRetryAt).toBe('2026-07-22T11:59:00.000Z'); // untouched
+    r.stop();
+  });
+
   it('dead-letters an exhausted Search — an empty result would be a fabricated fact', async () => {
     await seed(resolvedHistory()); // ends TargetResolved -> Search effect
     await checkpoints.save(REACTOR_CONSUMER, 1); // only the search dispatch is pending
@@ -802,6 +877,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     expect(parked.peek('acq-1')).toBeDefined(); // still parked — the landing must not be lost
 
     deadLetters.failRecord = false;
+    clock.advance(TIGHT_BUDGET.maxDelayMs + 1); // the failed landing backed off at the policy cap
     await r.drain();
     expect(parked.count()).toBe(0);
     expect(deadLetters.letters).toHaveLength(1);
@@ -917,6 +993,7 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
     expect(parked.peek('acq-1')).toBeDefined(); // the modeled landing must not be lost
 
     store.failAppends = false;
+    clock.advance(TIGHT_BUDGET.maxDelayMs + 1); // the failed landing backed off at the policy cap
     await r.drain();
     expect(parked.count()).toBe(0);
     expect(streamEventTypes('acq-1')).toContain('MetadataResolutionFailed');
