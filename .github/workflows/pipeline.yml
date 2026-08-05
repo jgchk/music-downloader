@@ -76,7 +76,7 @@ jobs:
           cache: pnpm
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium (browser-mode client tests)
         run: pnpm --dir packages/web exec playwright install --with-deps chromium
