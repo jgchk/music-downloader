@@ -13,6 +13,8 @@ A regression that reordered those handlers or widened the bare `except` would si
 beets could have read once the fault cleared — the exact class of bug this bridge change fixed.
 """
 
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -84,6 +86,26 @@ class CollectItemsTest(unittest.TestCase):
         sentinel = object()
         _install_fake_beets(lambda _path: sentinel)
         self.assertEqual(bridge.collect_items(self._dir.name), [sentinel])
+
+    def test_skipped_unreadable_files_are_counted_on_stderr(self):
+        """A partially unreadable directory proposes on what it can read, but says how much it
+        dropped: a proposal built on 9 of 12 tracks otherwise reads as silent corruption, hinted
+        at only by an indirect missing-tracks penalty. The count goes to the diagnostic stream —
+        the stdout JSON contract is unchanged."""
+        with open(os.path.join(self._dir.name, "cover.jpg"), "wb") as handle:
+            handle.write(b"\0")
+
+        def read_only_flac(path):
+            if os.fsdecode(path).endswith(".flac"):
+                return "item"
+            raise ValueError("not an audio file beets can read")
+
+        _install_fake_beets(read_only_flac)
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            items = bridge.collect_items(self._dir.name)
+        self.assertEqual(items, ["item"])
+        self.assertIn("skipped 1", stderr.getvalue())
 
     def test_a_missing_directory_is_refused(self):
         """A path that is not a directory is a modeled refusal, before any file is read."""
