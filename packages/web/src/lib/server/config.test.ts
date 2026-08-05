@@ -18,6 +18,7 @@ describe('loadComposedConfig', () => {
     expect(config.downloader.stagingRoot).toBe('/staging');
     expect(config.importer.intakeRoot).toBe('/intake');
     expect(config.importer.bridgeTimeoutMs).toBe(600_000);
+    expect(config.downloader.ffmpeg).toEqual({ timeoutMs: 120_000 });
     expect(config.importer.autoApplyThreshold).toBe(0.04);
     expect(config.logLevel).toBe('info');
   });
@@ -65,9 +66,11 @@ describe('loadComposedConfig', () => {
       BRIDGE_PYTHON: '/venv/bin/python',
       BRIDGE_SCRIPT: '/app/bridge.py',
       BRIDGE_TIMEOUT_MS: '1000',
+      FFMPEG_TIMEOUT_MS: '30000',
       AUTO_APPLY_THRESHOLD: '0.1',
     })._unsafeUnwrap();
     expect(config.downloader.slskd).toEqual({ baseUrl: 'http://slskd:5030', apiKey: 'key' });
+    expect(config.downloader.ffmpeg).toEqual({ timeoutMs: 30_000 });
     expect(config.downloader.musicbrainz).toEqual({ baseUrl: 'http://mb', userAgent: 'ua' });
     expect(config.downloader.databaseFile).toBe('/data/d.db');
     expect(config.importer.databaseFile).toBe('/data/i.db');

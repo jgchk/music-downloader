@@ -14,7 +14,10 @@ import type { FfprobeOutput, FfprobeStream } from './schemas.js';
  * (`ffmpeg -f null`), which catches truncated/corrupt P2P downloads a header parse would miss;
  * the audio metadata (codec, ground-truth duration, sample rate, bit depth, bitrate, channels)
  * comes from `ffprobe`. A bad/unreadable file is a *business* outcome (`decodedCleanly: false`),
- * not an infra fault — only a failure to spawn the binaries surfaces as an `InfraError`.
+ * not an infra fault — only a failure to spawn the binaries, or a run killed on timeout, surfaces
+ * as an `InfraError`. A timeout is deliberately NOT a bad-file verdict: a kill is not a confirmed
+ * read of a corrupt file, and folding it to unplayable would let a stalled staging mount burn
+ * every candidate to "corrupt" (the misclassified-permanent incident family).
  */
 
 interface AudioMetadata {
@@ -29,7 +32,12 @@ interface AudioMetadata {
 export interface FfmpegConfig {
   readonly ffprobePath?: string;
   readonly ffmpegPath?: string;
+  /** Per-run kill budget; a hung decode inside the reactor's dispatch must never wedge it. */
+  readonly timeoutMs?: number;
 }
+
+/** Generous per-file bound: a full decode pass of a large lossless file on a slow mount. */
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 /**
  * Parse a numeric ffprobe field, tolerating absence, an empty string, and the literal `N/A` ffprobe
@@ -91,6 +99,7 @@ function parseAudioMetadata(output: FfprobeOutput): AudioMetadata | undefined {
 export class FfmpegAudioProbe implements AudioProbePort {
   private readonly ffprobe: string;
   private readonly ffmpeg: string;
+  private readonly timeoutMs: number;
 
   constructor(
     private readonly logger: Logger,
@@ -99,6 +108,7 @@ export class FfmpegAudioProbe implements AudioProbePort {
   ) {
     this.ffprobe = config.ffprobePath ?? 'ffprobe';
     this.ffmpeg = config.ffmpegPath ?? 'ffmpeg';
+    this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   probe(filePath: string): ResultAsync<ProbedAudio, InfraError> {
@@ -110,17 +120,37 @@ export class FfmpegAudioProbe implements AudioProbePort {
   private async runProbe(filePath: string): Promise<ProbedAudio> {
     this.logger.debug({ filePath }, 'probing audio file');
     const [meta, decode] = await Promise.all([
-      this.runner.run(this.ffprobe, [
-        '-v',
-        'error',
-        '-show_streams',
-        '-show_format',
-        '-print_format',
-        'json',
-        filePath,
-      ]),
-      this.runner.run(this.ffmpeg, ['-v', 'error', '-i', filePath, '-f', 'null', '-']),
+      this.runner.run(
+        this.ffprobe,
+        ['-v', 'error', '-show_streams', '-show_format', '-print_format', 'json', filePath],
+        this.timeoutMs,
+      ),
+      this.runner.run(
+        this.ffmpeg,
+        ['-v', 'error', '-i', filePath, '-f', 'null', '-'],
+        this.timeoutMs,
+      ),
     ]);
+
+    if (meta.timedOut || decode.timedOut) {
+      const binary = meta.timedOut ? this.ffprobe : this.ffmpeg;
+      throw new Error(`${binary} timed out after ${this.timeoutMs}ms on ${filePath}`);
+    }
+    // The folds below are the designed business outcome, but the binaries' own words are the only
+    // diagnosis when a *systematic* environmental fault (permissions, a missing codec in the
+    // image) starts reading every candidate as "corrupt" — so they are never discarded silently.
+    if (decode.code !== 0) {
+      this.logger.warn(
+        { filePath, code: decode.code, stderr: decode.stderr },
+        'audio decode failed; treating the file as unplayable',
+      );
+    }
+    if (meta.code !== 0) {
+      this.logger.warn(
+        { filePath, code: meta.code, stderr: meta.stderr },
+        'ffprobe could not read audio metadata',
+      );
+    }
 
     const audio = meta.code === 0 ? parseAudioMetadata(parseFfprobeOutput(meta.stdout)) : undefined;
     return {

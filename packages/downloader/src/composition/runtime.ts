@@ -16,6 +16,7 @@ import {
   SqliteResourceLedger,
   buildUpcasterRegistry,
   fetchHttpClient,
+  nodeCommandRunner,
   openEventDatabase,
   realTimer,
 } from '../adapters/index.js';
@@ -65,6 +66,8 @@ export interface DownloaderRuntimeConfig {
   readonly stagingRoot: string;
   readonly musicbrainz: { readonly baseUrl?: string; readonly userAgent?: string };
   readonly slskd: { readonly baseUrl?: string; readonly apiKey?: string };
+  /** Probe/decode kill budget (per file); unset falls back to the adapter's generous default. */
+  readonly ffmpeg?: { readonly timeoutMs?: number };
   /** Parked-effect retry tuning (reactor-durability D2); defaults are production-sane. */
   readonly reactor?: {
     readonly retry?: Partial<RetryPolicy>;
@@ -197,7 +200,9 @@ export async function createDownloaderRuntime(
       }),
       search: new SlskdSearch(logger, ledger, slskdClient, realTimer),
       download: slskdDownload,
-      probe: new FfmpegAudioProbe(logger),
+      probe: new FfmpegAudioProbe(logger, nodeCommandRunner, {
+        timeoutMs: config.ffmpeg?.timeoutMs,
+      }),
       library: new FilesystemLibrary(
         { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
         logger,
