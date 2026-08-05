@@ -84,9 +84,18 @@ export interface BootOverrides {
 // module-scoped binding from inside a function.
 const runtime: { booted?: Booted; booting?: Promise<Booted> } = {};
 
-function registerProcessShutdown(shutdown: () => Promise<void>): void {
-  // adapter-node stops accepting connections on SIGINT/SIGTERM, then emits this event.
-  process.once('sveltekit:shutdown', () => void shutdown());
+function registerProcessShutdown(shutdown: () => Promise<void>, logger: Logger): void {
+  // adapter-node stops accepting connections on SIGINT/SIGTERM, then emits this event. The
+  // fire-and-forget call has no awaiting caller, so a rejection (e.g. a close racing an in-flight
+  // pass) must be observed and logged here — never dropped, never an unhandled rejection.
+  const runShutdown = async (): Promise<void> => {
+    try {
+      await shutdown();
+    } catch (error) {
+      logger.error({ err: error }, 'shutdown failed');
+    }
+  };
+  process.once('sveltekit:shutdown', () => void runShutdown());
 }
 
 async function boot(
@@ -98,9 +107,14 @@ async function boot(
 
   const logger = createLogger(config.value.logLevel);
 
-  const downloader: DownloaderRuntime = await (
-    overrides.createDownloader ?? createDownloaderRuntime
-  )(config.value.downloader, logger);
+  const downloaderResult = await (overrides.createDownloader ?? createDownloaderRuntime)(
+    config.value.downloader,
+    logger,
+  );
+  if (downloaderResult.isErr()) {
+    throw new Error(`downloader startup failed: ${downloaderResult.error.detail}`);
+  }
+  const downloader: DownloaderRuntime = downloaderResult.value;
 
   const importerResult = await (overrides.createImporter ?? createImporterRuntime)(
     config.value.importer,
@@ -118,8 +132,18 @@ async function boot(
     downloader.wakeups,
   );
   const verdicts: Stoppable = downloader.connectVerdictFeed(importer.feed, importer.wakeups);
-  await acquisitions.start();
-  await verdicts.start();
+  try {
+    await acquisitions.start();
+    await verdicts.start();
+  } catch (error) {
+    // A subscription whose start throws must not strand two booted runtimes with live pollers
+    // behind a rejected boot: stop everything already started, then surface the fatal.
+    acquisitions.stop();
+    verdicts.stop();
+    await downloader.stop();
+    await importer.stop();
+    throw error;
+  }
 
   const shutdown = async (): Promise<void> => {
     acquisitions.stop();
@@ -129,7 +153,7 @@ async function boot(
     runtime.booted = undefined;
     runtime.booting = undefined;
   };
-  (overrides.onShutdownSignal ?? registerProcessShutdown)(shutdown);
+  (overrides.onShutdownSignal ?? ((handler) => registerProcessShutdown(handler, logger)))(shutdown);
 
   return {
     facades: { downloader: downloader.facade, importer: importer.facade },
