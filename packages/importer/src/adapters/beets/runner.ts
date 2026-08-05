@@ -29,8 +29,13 @@ export const nodeCommandRunner: CommandRunner = {
         isTimedOut = true;
         child.kill('SIGKILL');
       }, timeoutMs);
-      child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
-      child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
+      // Decode the stream, not the chunks: a multi-byte code point split across two chunks
+      // corrupts under a per-chunk `Buffer#toString` — and this stdout is `JSON.parse`d, so a
+      // split non-ASCII artist name would read back as a bridge crash.
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', (chunk: string) => (stdout += chunk));
+      child.stderr.on('data', (chunk: string) => (stderr += chunk));
       child.on('error', (cause) => {
         clearTimeout(timer);
         reject(cause);

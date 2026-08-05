@@ -29,6 +29,8 @@ const environmentSchema = z.object({
   REACTOR_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().optional(),
   REACTOR_RETRY_BUDGET_MS: z.coerce.number().int().nonnegative().optional(),
   REACTOR_STALLED_RETENTION_MS: z.coerce.number().int().positive().optional(),
+  /** Per-file kill budget for the ffprobe/decode passes — a hung run must never wedge dispatch. */
+  FFMPEG_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
 
   // --- importer --------------------------------------------------------------------------------
   IMPORTER_DATABASE_FILE: z.string().min(1).default('data/importer/events.db'),
@@ -100,6 +102,7 @@ export function loadComposedConfig(
       stagingRoot: v.STAGING_ROOT,
       musicbrainz: { baseUrl: v.MUSICBRAINZ_BASE_URL, userAgent: v.MUSICBRAINZ_USER_AGENT },
       slskd: { baseUrl: v.SLSKD_BASE_URL, apiKey: v.SLSKD_API_KEY },
+      ffmpeg: { timeoutMs: v.FFMPEG_TIMEOUT_MS },
       reactor: {
         retry: {
           ...(v.REACTOR_RETRY_INITIAL_DELAY_MS !== undefined && {

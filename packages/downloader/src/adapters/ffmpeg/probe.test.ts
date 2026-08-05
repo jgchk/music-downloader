@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { createLogger } from '../../application/logging/logger.js';
 import { FfmpegAudioProbe } from './probe.js';
 import type { CommandResult, CommandRunner } from './runner.js';
 
-const OK = { code: 0, stdout: '', stderr: '' };
+const OK = { code: 0, stdout: '', stderr: '', timedOut: false };
 
 function runner(probe: CommandResult, decode: CommandResult): CommandRunner {
   return {
@@ -12,7 +13,7 @@ function runner(probe: CommandResult, decode: CommandResult): CommandRunner {
 }
 
 function ffprobeJson(streams: unknown[], format?: unknown): CommandResult {
-  return { code: 0, stdout: JSON.stringify({ streams, format }), stderr: '' };
+  return { code: 0, stdout: JSON.stringify({ streams, format }), stderr: '', timedOut: false };
 }
 
 function probeWith(runnerImpl: CommandRunner): FfmpegAudioProbe {
@@ -52,7 +53,7 @@ describe('FfmpegAudioProbe', () => {
 
   it('marks a file unplayable when the decode pass fails', async () => {
     const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
-    const decodeFailed = { code: 1, stdout: '', stderr: 'Invalid data' };
+    const decodeFailed = { code: 1, stdout: '', stderr: 'Invalid data', timedOut: false };
 
     const probeResult2 = await probeWith(runner(meta, decodeFailed)).probe('/x.flac');
     const result = probeResult2._unsafeUnwrap();
@@ -62,8 +63,73 @@ describe('FfmpegAudioProbe', () => {
     expect(result.durationMs).toBe(10_000);
   });
 
+  it('logs the decode stderr when folding a failed decode to unplayable', async () => {
+    // The unplayable fold is the designed business outcome, but discarding ffmpeg's own words
+    // hides a *systematic* environmental fault (a permissions problem, a missing codec in the
+    // image) that makes every candidate read "corrupt" — the diagnosis lives in this one line.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
+    const decodeFailed = {
+      code: 1,
+      stdout: '',
+      stderr: '/staging/x.flac: Permission denied',
+      timedOut: false,
+    };
+
+    const result = await new FfmpegAudioProbe(logger, runner(meta, decodeFailed)).probe('/x.flac');
+
+    expect(result._unsafeUnwrap().decodedCleanly).toBe(false);
+    const logged = lines.join('');
+    expect(logged).toContain('Permission denied');
+    expect(logged).toContain('/x.flac');
+  });
+
+  it('logs the ffprobe stderr when metadata could not be read', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const probeFailed = { code: 1, stdout: '', stderr: 'moov atom not found', timedOut: false };
+
+    const result = await new FfmpegAudioProbe(logger, runner(probeFailed, OK)).probe('/x.m4a');
+
+    expect(result._unsafeUnwrap().decodedCleanly).toBe(false);
+    expect(lines.join('')).toContain('moov atom not found');
+  });
+
+  it('surfaces a timed-out run as an InfraError, never as a bad-file verdict', async () => {
+    // A kill-on-timeout is NOT a confirmed read of a corrupt file: a stalled staging mount would
+    // otherwise burn every candidate to "corrupt" (the misclassification family from the
+    // reactor-misclassified-permanent incidents). Timeouts stay infrastructure faults.
+    const timedOut = { code: null, stdout: '', stderr: '', timedOut: true };
+
+    const result = await probeWith(runner(timedOut, OK)).probe('/x.flac');
+
+    const error = result._unsafeUnwrapErr();
+    expect(error.kind).toBe('InfraError');
+    expect(error.operation).toBe('ffmpeg.probe');
+    expect(error.message).toContain('timed out');
+    expect(error.message).toContain('ffprobe'); // names the binary that hung
+  });
+
+  it('names ffmpeg when the decode pass is the run that timed out', async () => {
+    const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
+    const hungDecode = { code: null, stdout: '', stderr: '', timedOut: true };
+
+    const result = await probeWith(runner(meta, hungDecode)).probe('/x.flac');
+
+    const error = result._unsafeUnwrapErr();
+    expect(error.kind).toBe('InfraError');
+    expect(error.message).toContain('ffmpeg timed out');
+  });
+
   it('yields empty metadata when ffprobe itself fails', async () => {
-    const probeFailed = { code: 1, stdout: '', stderr: 'not found' };
+    const probeFailed = { code: 1, stdout: '', stderr: 'not found', timedOut: false };
 
     const probeResult3 = await probeWith(runner(probeFailed, OK)).probe('/x.flac');
     const result = probeResult3._unsafeUnwrap();
@@ -90,7 +156,7 @@ describe('FfmpegAudioProbe', () => {
   });
 
   it('handles ffprobe output with no streams at all', async () => {
-    const meta = { code: 0, stdout: '{}', stderr: '' };
+    const meta = { code: 0, stdout: '{}', stderr: '', timedOut: false };
 
     const probeResult5 = await probeWith(runner(meta, OK)).probe('/empty');
     const result = probeResult5._unsafeUnwrap();
@@ -164,7 +230,7 @@ describe('FfmpegAudioProbe', () => {
   it('surfaces an InfraError naming ffprobe when it exits 0 with non-JSON output', async () => {
     // A successful exit that is not JSON is a broken/incompatible ffprobe (a `-print_format json`
     // run always emits JSON) — a boundary fault to surface, not a bad-file business outcome.
-    const garbage = { code: 0, stdout: 'not json at all', stderr: '' };
+    const garbage = { code: 0, stdout: 'not json at all', stderr: '', timedOut: false };
 
     const result = await probeWith(runner(garbage, OK)).probe('/x.flac');
 
@@ -177,7 +243,12 @@ describe('FfmpegAudioProbe', () => {
   it('surfaces an InfraError when ffprobe JSON violates the consumed contract shape', async () => {
     // Exit 0, valid JSON, but `streams` is not an array — a consumed field changed type, which the
     // tolerant schema rejects rather than silently degrading to all-undefined metadata.
-    const drifted = { code: 0, stdout: JSON.stringify({ streams: 'not-an-array' }), stderr: '' };
+    const drifted = {
+      code: 0,
+      stdout: JSON.stringify({ streams: 'not-an-array' }),
+      stderr: '',
+      timedOut: false,
+    };
 
     const result = await probeWith(runner(drifted, OK)).probe('/x.flac');
 
