@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
+  IMPORT_VOICE_PHRASE,
   MBID,
   pollForStatus,
   pollUntilTerminal,
   readStatus,
   seedStagedFixture,
   sessionCookieHeader,
+  statusPhrase,
   submitAcquisition,
   waitForOk,
 } from './helpers.js';
@@ -111,7 +113,7 @@ async function cancelAcquisition(id: string): Promise<void> {
   }
 }
 
-const DOWNLOADING = new Set(['Downloading']);
+const DOWNLOADING = new Set([statusPhrase('Downloading')]);
 
 describe('non-blocking download observation (head-of-line isolation, prompt cancel)', () => {
   beforeAll(async () => {
@@ -138,14 +140,14 @@ describe('non-blocking download observation (head-of-line isolation, prompt canc
     // enqueue must all run — the exact work the incident showed frozen behind the mutex.
     const second = await submitAcquisition(MBID);
     await pollForStatus(second, DOWNLOADING, 60_000);
-    expect(await readStatus(held)).toBe('Downloading'); // A is still mid-transfer, unharmed
+    expect(await readStatus(held)).toBe(statusPhrase('Downloading')); // A is still mid-transfer, unharmed
 
     // Cancel A while its transfer is provably un-settled: the abort must land promptly instead
     // of waiting out the transfer (pre-change it serialized behind the blocking dispatch). The
     // status flip alone would not discriminate — the cancel command appends outside the reactor —
     // so the stub's journal must show the abort's DELETE actually reaching the source promptly.
     await cancelAcquisition(held);
-    await pollForStatus(held, new Set(['Cancelled']), 30_000);
+    await pollForStatus(held, new Set([statusPhrase('Cancelled')]), 30_000);
     await pollUntil(
       async () => (await cancelDeletesSeen()) > 0,
       'the abort’s cancel DELETE to reach the source',
@@ -154,6 +156,6 @@ describe('non-blocking download observation (head-of-line isolation, prompt canc
     // Release the held scenario: B's watch observes the settle and the freed pipeline carries it
     // through validation, deposit, the seam, and beets to the library.
     await admin('PUT', '/scenarios/transfer/state', { state: 'Completed' });
-    expect(await pollUntilTerminal(second, 180_000)).toBe('In your library');
+    expect(await pollUntilTerminal(second, 180_000)).toBe(IMPORT_VOICE_PHRASE.applied);
   });
 });

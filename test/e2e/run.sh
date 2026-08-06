@@ -2,7 +2,7 @@
 # Out-of-process E2E orchestration (merge-modular-monolith): run the ONE real image — both module
 # runtimes + the web interface in a single process — against WireMock stubs for the two outermost
 # third parties (loop phases; phase 0 runs stub-free), and drive it over the web routes on a real
-# socket. Three isolated phases:
+# socket. Isolated phases (each with fresh stores — the count lives in the list, not this prose):
 #
 #   phase 0  parity.spec.ts          Playwright: a real browser drives the image's web interface
 #                                    with third-party URLs the app CANNOT reach (not the stubs) —
@@ -10,7 +10,8 @@
 #                                    image is proven to boot and serve while third parties are down
 #   phase 1  full-loop.e2e.test.ts   intent → download → deposit → seam → real beets → applied
 #   phase 2  restart.e2e.test.ts     kill between fulfilment and import; durable resume, exactly once
-#   (phases 3–4 below: mid-download restart resumption; non-blocking observation + prompt cancel)
+#   phase 3  restart-mid-download.e2e.test.ts   kill mid-transfer; re-drive to the outcome, one enqueue
+#   phase 4  nonblocking.e2e.test.ts squeeze a second acquisition past a held transfer; prompt cancel
 #
 # Path topology (host ./.e2e-tmp ⇄ container):
 #   music/staging  ⇄ /music/staging   STAGING_ROOT — the harness seeds the fixture at the location

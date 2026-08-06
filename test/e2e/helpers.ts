@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 // The PRODUCTION session codec, imported — not reimplemented — so the harness's minted cookies
 // can never drift from what the image's unmodified gate verifies (out-of-process-e2e).
 import { SESSION_COOKIE, signSession } from '../../packages/web/src/lib/server/session.js';
+// The PRODUCTION copy layer, for the same reason: this tier scrapes the detail page's status
+// phrases, so the whitelists below are built from the strings the app renders — a copy change is
+// a compile-visible harness change here, never a main-only e2e surprise (e2e-blackbox blast
+// radius). Which phrases mean "terminal" or "delivered" stays this harness's own grouping.
+import { IMPORT_VOICE_PHRASE, statusPhrase } from '../../packages/web/src/lib/copy.js';
+
+export { IMPORT_VOICE_PHRASE, statusPhrase };
 
 /**
  * Shared driver utilities for the out-of-process E2E tier. The suite is a browserless HTTP client
@@ -117,14 +124,15 @@ export async function readStatus(id: string): Promise<string | undefined> {
 // The detail page's status marker speaks the human status phrases (legible-acquisition-history),
 // and a delivery only reads as settled once its import applied — so "terminal" here means the
 // story's true endings, not the downloader enum: the loop now proves the WHOLE pipeline through
-// beets before it returns.
+// beets before it returns. The phrases come from the production copy layer; only the grouping
+// (which of them end a story) is this tier's own claim.
 const TERMINAL = new Set([
-  'In your library',
-  'No usable download found',
-  'Stopped \u{2014} destination occupied',
-  'Cancelled',
-  'Couldn\u{2019}t identify the release',
-  'Import rejected',
+  IMPORT_VOICE_PHRASE.applied,
+  statusPhrase('Exhausted'),
+  statusPhrase('Conflicted'),
+  statusPhrase('Cancelled'),
+  statusPhrase('MetadataFailed'),
+  IMPORT_VOICE_PHRASE.rejected,
 ]);
 
 export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise<string> {
@@ -164,10 +172,10 @@ export async function pollForStatus(
 
 /** The delivered-and-importing narration: the downloader has deposited; the import is working. */
 export const DELIVERED_NARRATION: ReadonlySet<string> = new Set([
-  'Delivered \u{2014} confirming the import',
-  'Matching against the library',
-  'Adding to the library',
-  'Waiting for your review',
+  IMPORT_VOICE_PHRASE.confirming,
+  IMPORT_VOICE_PHRASE.matching,
+  IMPORT_VOICE_PHRASE.applying,
+  IMPORT_VOICE_PHRASE.awaitingReview,
 ]);
 
 /** True when the review queue page shows its explicit empty marker. */
