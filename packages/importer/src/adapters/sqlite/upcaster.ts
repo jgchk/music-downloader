@@ -1,3 +1,5 @@
+import { err, ok } from 'neverthrow';
+import type { Result } from 'neverthrow';
 import type { ImportEvent } from '../../domain/import/events.js';
 
 /**
@@ -14,6 +16,18 @@ export const CURRENT_SCHEMA_VERSION = 2;
 /** Transforms one on-disk event payload from version N to version N+1. */
 export type Upcaster = (data: Record<string, unknown>) => Record<string, unknown>;
 
+/**
+ * A registration gap: the chain walk stopped at `arrivedAt` while a step registered from
+ * `unappliedFrom` (above it) could never apply. Serving the arrived shape to `evolve` would be
+ * silent corruption, so the walk refuses as a value instead.
+ */
+export interface UpcastGap {
+  readonly kind: 'UpcastGap';
+  readonly type: string;
+  readonly arrivedAt: number;
+  readonly unappliedFrom: number;
+}
+
 export class UpcasterRegistry {
   // event type -> (fromVersion -> upcaster that produces fromVersion + 1)
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();
@@ -28,12 +42,19 @@ export class UpcasterRegistry {
 
   /**
    * Apply the chain of registered upcasters from `schemaVersion` up to the latest known shape.
-   * With nothing registered (the MVP), this is a pass-through: the stored payload is already
-   * current and is returned untouched.
+   * With nothing registered for the type, this is a pass-through: the stored payload is declared
+   * already-current and is returned untouched. A walk that stops below a still-registered step is
+   * a registration gap — refused as a value, never served stale (absence of a step from the
+   * arrival version upward is the declaration that no shape change exists there, so a remaining
+   * higher step can only mean a hole in the chain).
    */
-  upcast(type: string, schemaVersion: number, data: Record<string, unknown>): ImportEvent {
+  upcast(
+    type: string,
+    schemaVersion: number,
+    data: Record<string, unknown>,
+  ): Result<ImportEvent, UpcastGap> {
     const forType = this.upcasters.get(type);
-    if (forType === undefined) return data as unknown as ImportEvent;
+    if (forType === undefined) return ok(data as unknown as ImportEvent);
 
     let version = schemaVersion;
     let current = data;
@@ -41,7 +62,11 @@ export class UpcasterRegistry {
       current = step(current);
       version += 1;
     }
-    return current as unknown as ImportEvent;
+    const unapplied = [...forType.keys()].filter((from) => from > version).sort((a, b) => a - b);
+    if (unapplied.length > 0) {
+      return err({ kind: 'UpcastGap', type, arrivedAt: version, unappliedFrom: unapplied[0]! });
+    }
+    return ok(current as unknown as ImportEvent);
   }
 }
 

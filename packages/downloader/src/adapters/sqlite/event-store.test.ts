@@ -203,6 +203,22 @@ describe('SqliteEventStore', () => {
     });
   });
 
+  it('surfaces an upcaster registration gap as a modeled infra error on read', async () => {
+    // Steps {current→+1, current+2→+3} leave a hole: the walk stops with a step unapplied above
+    // it. The read must refuse as an InfraError — never hand evolve a stale shape.
+    const registry = new UpcasterRegistry()
+      .register('AcquisitionFulfilled', CURRENT_SCHEMA_VERSION, (data) => data)
+      .register('AcquisitionFulfilled', CURRENT_SCHEMA_VERSION + 2, (data) => data);
+    const store = new SqliteEventStore(freshDatabase(), registry);
+    await store.append('acq-1', 0, [FULFILLED], META);
+
+    const read = await store.readStream('acq-1');
+
+    expect(read.isErr()).toBe(true);
+    expect(read._unsafeUnwrapErr().kind).toBe('InfraError');
+    expect(read._unsafeUnwrapErr().message).toContain('upcast gap');
+  });
+
   it('upcasts stored events on read', async () => {
     const registry = new UpcasterRegistry().register(
       'AcquisitionFulfilled',

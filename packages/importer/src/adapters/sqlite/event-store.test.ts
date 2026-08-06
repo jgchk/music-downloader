@@ -180,6 +180,22 @@ describe('SqliteEventStore', () => {
     expect(row.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
+  it('surfaces an upcaster registration gap as a modeled infra error on read', async () => {
+    // Steps {current→+1, current+2→+3} leave a hole: the walk stops with a step unapplied above
+    // it. The read must refuse as an InfraError — never hand evolve a stale shape.
+    const registry = new UpcasterRegistry()
+      .register('ImportApplied', CURRENT_SCHEMA_VERSION, (data) => data)
+      .register('ImportApplied', CURRENT_SCHEMA_VERSION + 2, (data) => data);
+    const store = new SqliteEventStore(freshDatabase(), registry);
+    await store.append('imp-1', 0, [APPLIED], META);
+
+    const read = await store.readStream('imp-1');
+
+    expect(read.isErr()).toBe(true);
+    expect(read._unsafeUnwrapErr().kind).toBe('InfraError');
+    expect(read._unsafeUnwrapErr().message).toContain('upcast gap');
+  });
+
   it('upcasts stored events on read', async () => {
     // Registered at the version `append` stamps, so a freshly-stored row is lifted on read-back.
     const registry = new UpcasterRegistry().register(
