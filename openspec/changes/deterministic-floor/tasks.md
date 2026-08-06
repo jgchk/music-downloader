@@ -27,7 +27,9 @@ judgment commits. Red-first only where a triage uncovers a real defect (then `fi
 
 - [ ] 3.1 Write `docs/development/quality-gates.md`: admission contract (<10% effective FP,
       actionable-only, appeasement counts as false), four-rung promotion ladder with
-      when-to-stop guidance, waiver-doctrine cross-reference.
+      when-to-stop guidance, waiver-doctrine cross-reference, and the local-gate latency
+      budget (`pnpm check` stays seconds-order; minutes-order analysis lives in CI and is
+      locally runnable on demand, never in the commit gate).
 - [ ] 3.2 Link it from CLAUDE.md's constitution list and from `testing.md`/
       `coding-standards.md` where they touch gate membership.
 - [ ] 3.3 Sanity-check the contract text against the actual sonarjs triage experience
