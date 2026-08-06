@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   slskdDownloadFileCompleteSchema,
+  slskdEnqueueRejectionSchema,
   slskdEventsSchema,
   slskdOptionsSchema,
   slskdSearchResponsesSchema,
@@ -14,10 +15,10 @@ describe('slskd contract schemas', () => {
       slskdSearchStateSchema.parse({
         id: 's1',
         isComplete: true,
-        state: 'Completed, TimedOut',
+        state: 'Completed, TimedOut', // vocabulary-exempt: a SEARCH state, not a transfer's
         responseCount: 180,
       }),
-    ).toEqual({ id: 's1', isComplete: true, state: 'Completed, TimedOut', responseCount: 180 });
+    ).toEqual({ id: 's1', isComplete: true, state: 'Completed, TimedOut', responseCount: 180 }); // vocabulary-exempt: SEARCH state
   });
 
   it('tolerates a bare create response', () => {
@@ -79,7 +80,7 @@ describe('slskd contract schemas', () => {
       directories: [
         {
           directory: 'd', // unknown to the contract (stripped)
-          files: [{ id: 't1', filename: 'a.flac', state: 'InProgress, Transferring', size: 100 }],
+          files: [{ id: 't1', filename: 'a.flac', state: 'InProgress', size: 100 }],
         },
       ],
     });
@@ -125,7 +126,7 @@ describe('slskd contract schemas', () => {
       localFilename: '/app/downloads/2007 - Alive/13 Human.mp3',
       remoteFilename: String.raw`@@x\Alive\13 Human.mp3`,
       transfer: { id: '2f3b3fd5', state: 'Completed, Succeeded' }, // extra transfer field stripped
-      state: 'Completed', // unknown to the contract (stripped)
+      state: 'Completed', // vocabulary-exempt: deliberately invalid, proves unknown fields strip
     });
 
     expect(parsed.localFilename).toBe('/app/downloads/2007 - Alive/13 Human.mp3');
@@ -155,5 +156,25 @@ describe('slskd contract schemas', () => {
   it('rejects an options payload whose downloads root is missing or not a string', () => {
     expect(slskdOptionsSchema.safeParse({ directories: {} }).success).toBe(false);
     expect(slskdOptionsSchema.safeParse({ directories: { downloads: 5 } }).success).toBe(false);
+  });
+});
+
+describe('slskdEnqueueRejectionSchema', () => {
+  it('accepts the bare exception message slskd answers a refused enqueue with', () => {
+    // Recorded from the lab: slskd does not wrap an enqueue failure in JSON, it returns the
+    // exception's message as the whole body. The classifier reads that text directly, so "this is
+    // a string" is the contract — the day slskd wraps it in an object, the substring matching
+    // silently stops seeing the reason and every rejection degrades to a generic failure.
+    expect(
+      slskdEnqueueRejectionSchema.parse(
+        'One or more errors occurred. (Transfer rejected: File not shared.)',
+      ),
+    ).toBe('One or more errors occurred. (Transfer rejected: File not shared.)');
+  });
+
+  it('rejects a structured body, because the classifier could not read one', () => {
+    expect(slskdEnqueueRejectionSchema.safeParse({ message: 'File not shared.' }).success).toBe(
+      false,
+    );
   });
 });
