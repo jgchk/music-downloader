@@ -25,7 +25,7 @@ import { TransferLedger, filenameOfKey } from './transfer-ledger.js';
 import { TransferTeardown } from './teardown.js';
 import { realTimer } from './timer.js';
 import type { Timer } from './timer.js';
-import { aggregate, enqueueRejectionReason } from './transfers.js';
+import { aggregate, enqueueRejectionReason, recogniseRejection } from './transfers.js';
 import type { OwnedTransfer } from './transfers.js';
 
 /**
@@ -196,24 +196,56 @@ export class SlskdDownload implements DownloadPort {
       this.logger.debug({ username, fileCount: requests.length }, 'enqueueing slskd download');
       const enqueue = await this.client.postRaw(downloadsPath(username), requests);
       if (enqueue.status >= 500 || [429, 401, 403].includes(enqueue.status)) {
-        // A 5xx/429/401/403 is slskd itself faulting, throttling, or refusing auth — transient or
-        // operational infrastructure, not this candidate's defeat. Throw so `ResultAsync.fromPromise`
-        // maps it to a retryable InfraError (the reactor parks and retries the short start effect),
-        // matching every other GET/POST path in this adapter. Marking it a candidate failure would
-        // manufacture AcquisitionExhausted from a transient slskd overload.
-        // The peer username stays out of the message: this string reaches dead-letter payloads,
-        // where pino's structured redaction cannot follow interpolated text. The debug line above
-        // carries the username as a structured field, which the composed logger's redaction paths
-        // scrub from shipped lines — so the peer is deliberately recoverable nowhere downstream.
+        // Treated as slskd itself faulting, throttling, or refusing auth — transient or operational
+        // infrastructure, not this candidate's defeat. Throw so `ResultAsync.fromPromise` maps it to
+        // a retryable InfraError (the reactor parks and retries the short start effect), matching
+        // every other GET/POST path in this adapter.
+        //
+        // KNOWN INCOMPLETE for 5xx, and deliberately not fixed here (change: slskd-contract-truth).
+        // The recording lab witnessed slskd 0.22.5 answering *every* enqueue failure with a 500 — an
+        // offline peer, a file the peer does not share, a peer that never answers — so those take
+        // THIS branch, not the candidate-failure branch below, and the "never an InfraError" promise
+        // written there does not hold for them. The consequence is real: a dead peer parks the
+        // acquisition for the whole retry budget instead of failing the candidate and advancing the
+        // ladder. Separating "slskd is unwell" from "slskd says this peer is bad" means reading the
+        // body on a 5xx, which promotes text classification into the retry decision — its own
+        // design question, proposed separately. The evidence is pinned by the contract tier's
+        // "answers every enqueue failure with a 500" test.
+        //
+        // Until then, log what slskd's body classifies to, so an operator staring at a parked
+        // acquisition can tell the two apart. The reason is derived and PII-free; the body itself is
+        // never logged, because it embeds the peer's chosen username verbatim.
+        // Only a 5xx carries a peer-rejection body worth reading; a 401/403/429 is slskd's own
+        // health or auth speaking, and classifying that text would invite an operator to read a
+        // peer verdict into it. `recogniseRejection` reports a miss distinctly, because
+        // `TransferError` is both a real classification and the catch-all — "unrecognised" is what
+        // an overloaded slskd looks like, and that is the distinction this field exists to make.
+        this.logger.warn(
+          {
+            username,
+            status: enqueue.status,
+            ...(enqueue.status >= 500 && {
+              wouldBe: recogniseRejection(enqueue.body, username) ?? 'unrecognised',
+            }),
+          },
+          'slskd refused the enqueue; retrying as infrastructure',
+        );
+        // The peer username stays out of the thrown message: this string reaches dead-letter
+        // payloads, where pino's structured redaction cannot follow interpolated text. The
+        // structured fields above are scrubbed by the composed logger's redaction paths, so the
+        // peer is deliberately recoverable nowhere downstream.
         throw new Error(`slskd responded ${enqueue.status} for the download enqueue POST`);
       }
       if (enqueue.status < 200 || enqueue.status >= 300) {
-        // A 4xx (other than 401/403) means slskd answered and refused THIS candidate's enqueue
-        // (typically an unreachable peer). That is a business failure for the retry ladder — reject
-        // the candidate and advance to the next-best — never an InfraError, which would retry the
-        // same dead peer forever (prod 2026-07-22). The write-ahead rows are released: nothing was
-        // created at the source, so the sweep must not chase them.
-        const reason = enqueueRejectionReason(enqueue.body);
+        // A 4xx (other than 401/403) means slskd answered and refused THIS candidate's enqueue.
+        // That is a business failure for the retry ladder — reject the candidate and advance to the
+        // next-best — rather than an InfraError, which would retry the same dead peer (prod
+        // 2026-07-22). The write-ahead rows are released: nothing was created at the source, so the
+        // sweep must not chase them.
+        //
+        // Note the reach of this branch is narrower than it looks: the pinned slskd answers peer
+        // refusals with a 500, so those are absorbed by the branch above. See its comment.
+        const reason = enqueueRejectionReason(enqueue.body, username);
         this.logger.warn(
           { username, status: enqueue.status, reason },
           'slskd rejected the enqueue; failing the candidate',
@@ -292,7 +324,7 @@ export class SlskdDownload implements DownloadPort {
         try {
           const mine = await pollOwnedTransfers(this.client, username, wanted);
           await this.transferLedger.captureIds(acquisitionId, username, mine, captured);
-          const status = aggregate(mine);
+          const status = aggregate(mine, username);
           this.observer.progress(acquisitionId, status.progress);
 
           if (status.succeeded) {

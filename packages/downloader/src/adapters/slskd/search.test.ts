@@ -88,7 +88,7 @@ function deletedSearchIds(requests: readonly HttpRequest[]): string[] {
 describe('SlskdSearch', () => {
   it('creates, awaits completion, groups responses, records ownership, and deletes after harvest', async () => {
     const { adapter, ledger, requests } = searcher({
-      state: () => json({ isComplete: true, state: 'Completed, TimedOut', responseCount: 1 }),
+      state: () => json({ isComplete: true, state: 'Completed, TimedOut', responseCount: 1 }), // vocabulary-exempt: SEARCH state
       responses: json(albumResponses),
     });
 

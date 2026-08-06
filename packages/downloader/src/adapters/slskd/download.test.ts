@@ -181,6 +181,7 @@ interface Harness {
   finished: string[];
   errorLogs: string[];
   warnLogs: string[];
+  warnContexts: Record<string, unknown>[];
 }
 
 function drain(queue: HttpResponse[], fallback: HttpResponse): HttpResponse {
@@ -196,6 +197,7 @@ function downloader(options: Options): Harness {
   const finished: string[] = [];
   const errorLogs: string[] = [];
   const warnLogs: string[] = [];
+  const warnContexts: Record<string, unknown>[] = [];
   const polls = [...options.polls];
   // Default to a page that resolves the candidate's two transfers, so a succeeded outcome reports
   // its staged files without every test having to spell out the events stub.
@@ -251,8 +253,9 @@ function downloader(options: Options): Harness {
   };
   const recordingLogger = {
     ...silentLogger(),
-    warn: (_context: unknown, message?: string) => {
+    warn: (context: unknown, message?: string) => {
       warnLogs.push(message ?? '');
+      warnContexts.push(context as Record<string, unknown>);
     },
     error: (_context: unknown, message?: string) => {
       errorLogs.push(message ?? '');
@@ -266,7 +269,18 @@ function downloader(options: Options): Harness {
     new SlskdClient(http),
     options.timer ?? fakeTimer(),
   );
-  return { adapter, deletes, ledger, counts, outcomes, progress, finished, errorLogs, warnLogs };
+  return {
+    adapter,
+    deletes,
+    ledger,
+    counts,
+    outcomes,
+    progress,
+    finished,
+    errorLogs,
+    warnLogs,
+    warnContexts,
+  };
 }
 
 /** Start the candidate and drive the watch to its delivered outcome (the common happy shape). */
@@ -421,8 +435,14 @@ describe('SlskdDownload', () => {
     const harness = downloader({
       polls: [
         poll([
-          transfer('01.flac', { state: 'Completed, Errored', exception: 'User is offline' }),
-          transfer('02.flac', { state: 'Completed, Errored', exception: 'User is offline' }),
+          transfer('01.flac', {
+            state: 'Completed, Errored',
+            exception: 'User peer1 appears to be offline',
+          }),
+          transfer('02.flac', {
+            state: 'Completed, Errored',
+            exception: 'User peer1 appears to be offline',
+          }),
         ]),
       ],
     });
@@ -670,7 +690,7 @@ describe('SlskdDownload', () => {
     expect(sleeps).toContain(1000); // DEFAULT_POLL_INTERVAL_MS drove the inter-tick sleep
   });
 
-  it('rejects the candidate when a live slskd refuses the enqueue for an unreachable peer', async () => {
+  it('rejects the candidate when slskd answers a 4xx refusal naming an unreachable peer', async () => {
     const harness = downloader({
       enqueue: {
         status: 400,
@@ -718,6 +738,28 @@ describe('SlskdDownload', () => {
     // The durable observable of the redaction decision: this message lands in parked-effect
     // lastError fields and dead-letter payloads, where structured redaction cannot reach.
     expect(infraError.message).not.toContain('u1');
+    // The operator-facing half of the known-incomplete 5xx routing: slskd's own health speaking
+    // reads as `unrecognised`, which is exactly how it is told apart from a dead peer. The raw body
+    // is never logged — it can embed the peer's chosen username verbatim.
+    const warned = harness.warnContexts.at(-1)!;
+    expect(warned).toMatchObject({ status: 503, wouldBe: 'unrecognised' });
+    expect(JSON.stringify(warned)).not.toContain('Service Unavailable');
+  });
+
+  it('names the peer failure a 5xx enqueue body describes, so a parked acquisition is diagnosable', async () => {
+    // A dead peer and an overloaded slskd both come back as a 5xx and are both retried; the only
+    // thing telling an operator which they are looking at is this field.
+    const harness = downloader({
+      enqueue: { status: 500, body: 'User u1 appears to be offline' },
+      polls: [],
+    });
+
+    await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+
+    expect(harness.warnContexts.at(-1)).toMatchObject({
+      status: 500,
+      wouldBe: 'PeerUnavailable',
+    });
   });
 
   it('surfaces a 429 enqueue response as a retryable InfraError', async () => {
@@ -727,6 +769,10 @@ describe('SlskdDownload', () => {
     });
 
     const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+
+    // Throttling is slskd's own health, not a peer verdict — classifying its body would invite an
+    // operator to read a peer failure into it, so no `wouldBe` is offered at all.
+    expect(harness.warnContexts.at(-1)).not.toHaveProperty('wouldBe');
 
     expect(started._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',

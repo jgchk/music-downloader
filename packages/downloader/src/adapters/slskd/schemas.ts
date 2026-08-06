@@ -88,6 +88,25 @@ export const slskdDownloadFileCompleteSchema = z.object({
   transfer: z.object({ id: z.string() }),
 });
 
+/**
+ * `POST /api/v0/transfers/downloads/{username}` when slskd refuses the enqueue. The body is not
+ * JSON: slskd answers with the exception's message as bare text ("User peer1 appears to be offline",
+ * "One or more errors occurred. (Transfer rejected: File not shared.)"), and the failure classifier
+ * reads that text directly. Modeling it as a string is therefore a real contract statement, not a
+ * formality — if slskd ever wrapped the reason in an object, the substring matching would stop
+ * finding it and every distinct rejection would quietly collapse into a generic transfer error.
+ *
+ * Unlike the response schemas above this is not enforced at runtime (the adapter already has the
+ * body as a string from `postRaw`); it exists so the recorded rejection fixtures are held to the
+ * shape the classifier assumes. Empty is excluded deliberately: a blank body carries no reason at
+ * all and would collapse to the generic catch-all, which is the very degradation this pins against.
+ *
+ * Note that on the pinned slskd these bodies arrive with a 500 and take the infrastructure path;
+ * the classifier reads them only for diagnostics, and its answer drives no decision — see
+ * `enqueueRejectionReason` and the contract tier's "answers every enqueue failure with a 500" test.
+ */
+export const slskdEnqueueRejectionSchema = z.string().min(1);
+
 /** `GET /api/v0/options` — the only field consumed is the configured downloads root. */
 export const slskdOptionsSchema = z.object({
   directories: z.object({ downloads: z.string() }),
