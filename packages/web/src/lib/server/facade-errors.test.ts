@@ -76,13 +76,15 @@ describe('messageOf', () => {
     ['NoOpenReview', 'already been settled'],
     ['InvalidResolution', 'Invalid resolution'],
     ['UnknownCandidate', 'Unknown candidate'],
-    ['NoRetainedCandidate', 'retained candidate'],
+    ['NoRetainedCandidate', 'tracked download'],
     ['ConcurrencyConflict', 'reload'],
     ['InfraError', 'Something went wrong'],
   ] as const)('renders the importer %s error as a human message', (kind, needle) => {
     const message = messageOf(importerErrors.find((entry) => entry.kind === kind)!);
     expect(message).toMatch(/\S/);
     expect(message).toContain(needle);
+    // One-voice register: user-visible error copy never names a module or architecture noun.
+    expect(message).not.toMatch(/downloader|importer/i);
   });
 
   it('carries actionable detail through', () => {

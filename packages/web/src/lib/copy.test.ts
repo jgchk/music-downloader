@@ -476,6 +476,12 @@ describe('metaSummary', () => {
 });
 
 describe('statusPhrase', () => {
+  it('degrades an unknown future status to an honest cannot-describe phrase', () => {
+    expect(statusPhrase('BrandNewStatus' as never)).toBe(
+      'This page can\u{2019}t describe this step yet',
+    );
+  });
+
   it('phrases every status humanly, with terminal failures free of enum identifiers', () => {
     expect(statusPhrase('Validating')).toBe('Checking quality');
     expect(statusPhrase('MetadataFailed')).toBe('Couldn’t identify the release');

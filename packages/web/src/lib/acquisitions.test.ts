@@ -33,6 +33,12 @@ describe('isTransferStarted', () => {
 });
 
 describe('statusTone', () => {
+  it('degrades an unknown future status to the neutral pending tone', () => {
+    // Simulates wire evolution ahead of this build (the copy layer's as-never idiom): the tone
+    // must degrade honestly, never render undefined into the badge channel.
+    expect(statusTone('BrandNewStatus' as never)).toBe('pending');
+  });
+
   // The tone table stays a presentation mapping the web layer owns — exhaustive on purpose.
   it.each([
     ['Empty', 'pending'],

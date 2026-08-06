@@ -177,6 +177,6 @@ describe('resolve action', () => {
       eventFor({ resolveReview }, { verb: 'reject-unusable-delivery', confirmed: 'true' }),
     )) as { status: number; data: { message: string } };
     expect(result.status).toBe(409);
-    expect(result.data.message).toContain('Plain reject is still available');
+    expect(result.data.message).toContain('A plain reject is still available');
   });
 });

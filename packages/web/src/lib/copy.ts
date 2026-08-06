@@ -373,7 +373,12 @@ const STATUS_PHRASE: Readonly<Record<AcquisitionStatusResponseDto['status'], str
 
 /** The human phrase for a downloader status on its own (the queue list, which has no import read). */
 export function statusPhrase(status: AcquisitionStatusResponseDto['status']): string {
-  return STATUS_PHRASE[status];
+  // Dual regime: STATUS_PHRASE is compile-total, and the lookup still degrades honestly for a
+  // status this build cannot know — never the literal text "undefined" in the narrator's voice.
+  return (
+    (STATUS_PHRASE as Partial<Record<string, string>>)[status] ??
+    'This page can\u{2019}t describe this step yet'
+  );
 }
 
 /**
@@ -424,7 +429,7 @@ export function overallStatus(
       }
     }
   }
-  return { tone: statusTone(acquisition.status), phrase: STATUS_PHRASE[acquisition.status] };
+  return { tone: statusTone(acquisition.status), phrase: statusPhrase(acquisition.status) };
 }
 
 /** Correctly-pluralized counters with zero-count segments omitted (legible-acquisition-history D9). */

@@ -55,7 +55,9 @@ export function attentionItems(
 
 function reviewItem(pending: PendingReviewDto, composedTitle: string | undefined): AttentionItem {
   return {
-    module: MODULE_OF[pending.review.kind],
+    // Structurally importer-owned: this item was composed from the importer's pending-review
+    // read, so an unknown future kind keeps a factual module channel instead of breaking it.
+    module: (MODULE_OF as Partial<Record<string, AttentionItem['module']>>)[pending.review.kind] ?? 'importer',
     kind: pending.review.kind,
     id: pending.importId,
     // Musical intent first, then the staged basename, then the neutral phrase — sparse
