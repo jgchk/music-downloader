@@ -70,6 +70,11 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
   });
 
   it('leaves a current v2 event (already absent for unknown) untouched', () => {
+    // `asMbid`, not `parseMbid`: this payload is synthetic legacy history authored here, never bytes
+    // recorded from MusicBrainz and never fed back through an adapter, so there is nothing for the
+    // UUID guard to certify — the ids match the fixture's only so the two cases read as one story.
+    // (Values that DO come from a recording are parsed: see `recordedMbid` in
+    // musicbrainz.contract.test.ts and `parseCandidateIdentity` in slskd.contract.test.ts.)
     const v2Event: AcquisitionEvent = {
       type: 'ManualSelectionRequested',
       candidates: [
