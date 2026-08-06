@@ -20,15 +20,12 @@ judgment commits. Red-first only where a triage uncovers a real defect (then `fi
 - [x] 2.2 Triage every rule with findings: admit (fix findings, rule stays `error`) or
       reject (disable + justification comment). Record the tally in `design.md` D3.
 - [x] 2.3 Any genuine production defect found: red-first regression test, fix, retitle
-      release impact to `fix:`. **Outcome: no behaviour-affecting production defect.** All 18 rules
-      with findings were triaged and the four likeliest defect candidates traced to ground
-      (design.md D3). Three are false positives; one is a real, diagnosis-quality finding — the
-      `transfer.id!` assertion in the slskd staged-file resolver asserts a wire field the schema
-      declares `.optional()`, but it is masked (an unresolvable id fails the resolver's own size
-      check), so it degrades diagnosis rather than corrupting data. Naming it accurately is a
-      Result-channel design change this gate-focused work has no business making, so it is
-      deliberately deferred as a follow-up, recorded at the rule's config site in
-      `eslint.config.js`. Nothing runtime-visible changed, so release impact stays `chore`.
+      release impact to `fix:`. **Outcome for sonarjs: none** — all 18 rules with findings were
+      triaged and the four likeliest defect candidates traced to ground; every one is a false
+      positive (design.md D3). **But the STRICT TIER did surface one**, via
+      `no-unnecessary-condition` on the login route — see the "Real defect" note in design.md D3.
+      It is fixed in the review commit. Release-type consequence is a decision left to the
+      shipper (see 5.2).
 - [x] 2.4 If zero rules admitted: drop the plugin, record the outcome in the tally.
       **Did not fire:** one rule was admitted, so the dependency stays — but only that rule is
       enabled, not `recommended` minus the rejections (design.md D3, with the latency evidence).
@@ -59,5 +56,22 @@ judgment commits. Red-first only where a triage uncovers a real defect (then `fi
 - [x] 5.1 `pnpm check` green; commit the research doc
       (`docs/research/automated-quality-function.md`) with the change. The research doc was already
       committed on the base branch — verified present at the base revision, not re-added.
-- [x] 5.2 Version decision: **`chore`, no bump** — task 2.3 did not fire, and nothing in this
-      change alters runtime behaviour.
+- [x] 5.2 Version decision: **RESOLVED at ship time — this ships as a `fix`, patch bump to
+      3.17.5.** The sonarjs triage found no defect, but the strict tier did (login route,
+      design.md D3), and that fix originally rode in the `chore(review):` commit, where it would
+      have reached production with no changelog line.
+
+      It was **split into its own `fix(web):` commit** rather than retitling the whole review
+      commit, so the changelog names the defect and nothing else: the review commit carries a dozen
+      unrelated findings, and a `fix:` subject covering all of them would describe the release
+      worse than it describes the diff.
+
+      The bar this clears is deliberate, not reflexive. It is a real behavioural defect (not a
+      refactor), reachable by anyone with a URL on the one route served **without a session**, and
+      it broke a declared type — `?error=toString` handed the page a Function where `string` was
+      declared. An operator reading the changelog to decide whether to take an upgrade needs to see
+      that. Everything else in this change is tooling and docs, so the `chore`/`docs`/`style`
+      commits stay as they are and contribute no release semantics; the `fix` alone drives the bump.
+
+      This also restores the sequencing note at the top of this file ("Red-first only where a triage
+      uncovers a real defect (then `fix:`)") to being true of what shipped.

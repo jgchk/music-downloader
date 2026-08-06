@@ -10,15 +10,11 @@ let base: string;
 
 beforeAll(async () => {
   server = createServer((request, response) => {
-    const { method, url } = request;
     // Node always fills both in for a server-side request; they are optional only because
-    // `IncomingMessage` doubles as a client response type. Refuse loudly rather than echo the word
-    // "undefined" into the body, which would read as a wire-shape bug in the client under test.
-    if (method === undefined || url === undefined) {
-      response.writeHead(500);
-      response.end('malformed request line');
-      return;
-    }
+    // `IncomingMessage` doubles as a client response type — hence the assertions rather than an
+    // unreachable guard arm.
+    const method = request.method!;
+    const url = request.url!;
     if (url === '/hang') return; // never respond — the timeout must fire
     let body = '';
     request.on('data', (chunk: Buffer) => (body += chunk.toString()));

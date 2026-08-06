@@ -246,6 +246,12 @@ export class CatchUpSubscription {
     do {
       this.pending = false;
       await this.drain();
+      // `pending` is set true by the wakeup path and false here, across an
+      // await. TypeScript does not invalidate property narrowing across a call, so it reads the flag as
+      // constant — deleting this condition would break wakeup coalescing outright. The directive
+      // necessarily covers BOTH operands, so a `halted` that ever went genuinely constant would be
+      // hidden here too; it is checked by the halt tests rather than by this rule.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     } while (this.pending && !this.halted);
   }
 

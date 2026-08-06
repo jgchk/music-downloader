@@ -188,7 +188,7 @@ describe('entryCopy — downloader entries', () => {
       dl({ kind: 'download-failed', candidate, reason: 'SomethingNew' as never }),
     );
     expect(copy?.text).toBe('Download failed — trying the next source.');
-    expect(copy?.detail?.[0]).toEqual({ label: 'Reason code', value: 'SomethingNew' });
+    expect(copy?.detail[0]).toEqual({ label: 'Reason code', value: 'SomethingNew' });
   });
 
   it('glosses validation failures and keeps the raw reasons in the disclosure', () => {
@@ -199,7 +199,7 @@ describe('entryCopy — downloader entries', () => {
       'The files failed quality checks — some files were unplayable; track lengths didn’t match the release. Trying the next source.',
     );
     expect(copy?.state).toBe('failure');
-    expect(copy?.detail?.[0]).toEqual({
+    expect(copy?.detail[0]).toEqual({
       label: 'Reason codes',
       value: 'Unplayable, DurationMismatch',
     });

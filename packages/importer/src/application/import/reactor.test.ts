@@ -363,7 +363,7 @@ describe('Reactor', () => {
     // pass rather than interleaving or being lost.
     await r.drain();
     await r.drain();
-    release?.();
+    release();
     await started;
     await vi.waitFor(() => {
       expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);

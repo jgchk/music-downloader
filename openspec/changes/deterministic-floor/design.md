@@ -65,32 +65,78 @@ fix) and retitles the change's release impact to `fix:`.
 
 ### D3 — Admission tally lives in this design doc
 
-One line per rule with findings: `rule — admitted/rejected — count — reason`. This is the
-evidence the spec delta's "admitted, not accumulated" requirement points at.
+One line per rule with findings: `rule — admitted/rejected — count — reason`. Counts are
+**repo-wide** unless a line says otherwise. This is the evidence the spec delta's "admitted, not
+accumulated" requirement points at.
 
 #### strict typed tiers — 537 findings, 17 rules with findings
 
 126 production, 411 test-tier. Notably **zero** `no-unsafe-*`: those already ship in
 `recommendedTypeChecked`, so the boundary-parsing exposure was already covered and the fallout is
-smaller and duller than the proposal assumed. 64 findings were autofixable; 4 rules rejected:
+smaller and duller than the proposal assumed. 64 findings were autofixable; 3 rules rejected:
 
 | rule | count | reason |
 | --- | --- | --- |
-| `no-non-null-assertion` | 38 | 34 are indices already bounded by their own loop or a length guard. With `noUncheckedIndexedAccess` **and** 100% branch coverage both enforced, replacing one adds an unreachable branch that must then be waived with `v8 ignore` — trading a visible assertion for an invisible one. |
-| `no-empty-function` | 34 | An empty body is how `.map(() => {})` narrows `ResultAsync<T, E>` to `ResultAsync<void, E>`, and how a test double implements a port it does not exercise. 34/34 false. |
-| `no-invalid-void-type` | 31 | Every finding is `okAsync<void, E>()`, `errAsync<void, E>()` or `Promise.withResolvers<void>()`. `allowInGenericTypeArguments` covers type references, not call-site type arguments — no option separates them. 31/31 false. |
-| `no-unnecessary-condition` | 11 | TypeScript does not invalidate property narrowing across an `await`, so the wakeup-coalescing `pending` flag and the slskd watch `aborted` latch read as always-falsy. Obeying it would delete live conditions and break both. 6/11 false; the 5 true ones are pure clarity. |
+| `no-non-null-assertion` | 241 repo-wide (38 production) | 33 of the 38 are indices already bounded by their own loop or a length guard. With `noUncheckedIndexedAccess` **and** 100% branch coverage both enforced, replacing one adds an unreachable branch that must then be waived with `v8 ignore` — trading a visible assertion for an invisible one. That coverage argument does not cover 12 of the 38, which sit outside the coverage gate (`__fixtures__`, `packages/*/scripts`, `scripts/release`); those rest on the plainer ground that the guard would be unreachable noise. |
+| `no-empty-function` | 34 | Three sanctioned shapes, two of them production: `.map(() => {})` narrowing `ResultAsync<T, E>` to `ResultAsync<void, E>`; the beets bridge's promise-queue tail `next.then(() => {}, () => {})`, which is neither a `.map` nor a test double; and the no-op port method, disposer, or callback on a test double implementing a port it does not exercise. 34/34 false. |
+| `no-invalid-void-type` | 31 | Every finding is `okAsync<void, E>()`, `errAsync<void, E>()`, `ok<void, E>()`, `ResultAsync.fromSafePromise<void>()` or `Promise.withResolvers<void>()`. `allowInGenericTypeArguments` covers type references, not call-site type arguments — no option separates them. 31/31 false. |
+
+**Counts here are the triage-time inventory, and the tree has moved since.** The table above is
+retained as-is because the 537 total is built from it; the config comments at the disable sites
+carry the re-measured numbers, since that is what a reader arming a rule today will see. Re-measured
+on the merge-time tree — this change was rebased onto v3.17.4, which landed a property-test harness
+in both packages and a whole slskd contract tier after the triage ran:
+
+| rule | triage-time | merge-time | what moved |
+| --- | --- | --- | --- |
+| `no-non-null-assertion` | 241 (38 production) | **270** (38 production, 232 test code) | Production is unchanged — the reviewed-one-by-one subset is still the same 38 sites in the same files, so the 33-of-38 and 12-of-38 splits above stand. Every added finding is test-code `arr[0]!` / `mock.calls[0]!` fixture indexing in tiers that landed after triage. |
+| `no-empty-function` | 34 | **35** | One more: the slskd contract tier's `{ progress: () => {}, finished: () => {} }` port doubles — sanctioned shape (3), so the verdict is now 35/35 false. |
+| `no-invalid-void-type` | 31 | **31** | Unchanged. |
+
+The rejection reasoning is unmoved by this: every added finding falls inside a shape already
+triaged. Had one landed outside them, that would have been cause to revisit the disable itself, not
+merely to restate a count.
+
+**`no-unnecessary-condition` was initially rejected here and is now ARMED.** The original rejection
+(11 findings, 5 false) was reversed during review. The false positives are not spread across the
+repo: they cluster in **5 files** — the wakeup-coalescing `pending` flag and the slskd watch
+`aborted` latch — and both are the same TypeScript limit, narrowing that is not invalidated across
+an `await`. Five narrow `eslint-disable-next-line` waivers at those sites are a better trade than a
+repo-wide disable, because they name the limit at the place it bites instead of blinding the rule
+everywhere. Its **6 true positives were fixed**, and two of them earned the re-arm on their own:
+casts (`as unknown[]`, `as keyof typeof`) that lied to the type system and thereby made a
+load-bearing `??` look dead. A rule that finds a cast hiding a live fallback is doing exactly the
+job the admission contract asks for.
 
 Two rules were tuned rather than disabled (`restrict-template-expressions` with `allowNumber` and
-every other allowance pinned explicitly; `no-confusing-void-expression` with `ignoreArrowShorthand`).
+every other boolean allowance pinned explicitly — the rule's default
+`allow: [Error, URL, URLSearchParams]` survives the merge and is deliberately left in force;
+`no-confusing-void-expression` with `ignoreArrowShorthand`).
 
-#### sonarjs (`recommended`, 279 rules) — 130 findings, 18 rules with findings
+**Admitted, with counts** (the other 14 rules with findings — every one fixed rather than waived):
+`restrict-template-expressions` 108 (tuned), `dot-notation` 52, `no-confusing-void-expression` 35
+(tuned), `no-unnecessary-condition` 11 (re-armed, see above), `consistent-type-definitions` 8,
+`no-deprecated` 4, `no-misused-spread` 2, `array-type` 2, `no-unnecessary-type-arguments` 2,
+`prefer-optional-chain` 2, `prefer-nullish-coalescing` 2, `restrict-plus-operands` 1,
+`no-dynamic-delete` 1, `no-unnecessary-type-parameters` 1.
+
+**Recorded scope limit:** the strict tiers are armed over `**/*.ts` only, so a `.svelte` file's
+`<script lang="ts">` block is **not** covered by the typed profile — svelte-check does that job.
+This is a deliberate hole, not an oversight; reversing it is a decision, not a discovery.
+
+#### sonarjs (`recommended`, 279 rule keys / 217 armed) — 130 findings, 18 rules with findings
+
+As with the strict-tier table, these counts are the **triage-time inventory** — the one-shot
+repo-wide run this admission review was decided on, taken before the rebase onto v3.17.4. A reader
+arming `recommended` today will see different totals as the test tiers grow; that is drift in the
+measurement, not in the verdict. What is durable is the per-rule reasoning below and the one
+admitted rule, and the one admitted rule is enforced by the gate, so it cannot silently rot.
 
 **Admitted: 1.**
 
 | rule | count | reason |
 | --- | --- | --- |
-| `prefer-specific-assertions` | 8 | ~0% FP, all 8 a keystroke to fix. `expect(x.length).toBe(n)` → `toHaveLength(n)`; the e2e site's `includes(…)).toBe(true)` → `toContain(…)` turns "expected false to be true" into a printed haystack, in the tier where reproducing a failure costs most. |
+| `prefer-specific-assertions` | 8 | ~0% FP, all 8 a keystroke to fix. Three rewrites were applied: `expect(x.length).toBe(n)` → `toHaveLength(n)`, `toBe(null)` → `toBeNull()`, and the e2e site's `includes(…)).toBe(true)` → `toContain(…)`, which turns "expected false to be true" into a printed haystack, in the tier where reproducing a failure costs most. |
 
 **Rejected: 17.** No rule other than the above found a genuine defect; the four likeliest
 candidates were each traced to ground and are false.
@@ -117,10 +163,34 @@ candidates were each traced to ground and are false.
 
 **Consequence for the config.** Only the admitted rule is enabled — not `recommended` with
 seventeen `'off'` lines. That is itself an admission-contract call, and the measurement is the
-argument: the full set cost **+15.7s (+63%)** on cold lint, the gate's longest lane, while the
-single admitted rule costs **+0.3s (+1.2%)**. A rule that is switched off still costs the time to
-decide it does not apply. Task 2.4 (drop the plugin on a zero-admission triage) therefore does not
+argument: the full set cost roughly **+16s (~+65%)** on cold lint, the gate's longest lane, while
+the single admitted rule costs about **+0.3s (~+1%)**. The figures are approximate on purpose — two
+independent measurements on the same tree came out at +15.7s/+63% and +17.1s/+66% (and +0.3s/+1.2%
+for the single rule) — because that is the precision a wall-clock lint benchmark has; quoting one
+decimal place would claim more than the method supports. A rule that is switched off still costs the
+time to decide it does not apply. Task 2.4 (drop the plugin on a zero-admission triage) therefore does not
 fire — one rule was admitted, so the dependency stays and earns its place.
+
+#### Real defect surfaced by the strict tier
+
+`no-unnecessary-condition` flagged the `??` in `packages/web/src/routes/login/+page.server.ts` as
+dead. It was not dead — the `LOGIN_ERROR_MESSAGES[code as keyof typeof …]` cast in front of it told
+the type system every string was a key, so the type system could not see the fallback doing work.
+The runtime consequence, on an unauthenticated GET with a user-writable query parameter:
+
+| `?error=` | before | after |
+| --- | --- | --- |
+| `expired` | the expired message | unchanged |
+| `wat` | the generic message | unchanged |
+| `toString` | **a Function** | the generic message |
+| `__proto__` | **Object.prototype** | the generic message |
+| `constructor` | **a Function** | the generic message |
+
+A prototype-chain lookup reached past the literal and returned a non-string where the page data
+declares `string | undefined`. Fixed by testing membership (`Object.hasOwn`) instead of asserting
+it. This is the change's one genuine production defect, and it is a good advertisement for the
+thesis: the rule that found it was one this change had initially *rejected*, and the finding only
+became visible once the rejection was narrowed to per-site waivers during review.
 
 **Two follow-ups surfaced by the triage, independent of the lint decision:** `slskd/download.ts`
 `runWatch` is a genuinely long supervisor loop (complexity 28, nested try/catch/finally, six

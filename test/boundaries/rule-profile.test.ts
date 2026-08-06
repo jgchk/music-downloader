@@ -18,7 +18,7 @@ import config from '../../eslint.config.js';
  * Two complementary readings, because neither alone is enough. The per-file scenarios resolve the
  * config for real paths, which is the only way to see what a file actually gets; but a list of
  * sample paths can never prove a NEGATIVE — a carve-out aimed somewhere the samples do not name
- * (`packages/*&#47;src/adapters/**`, say) would disable the rule across production while every
+ * (`packages/*` `/src/adapters/**`, say) would disable the rule across production while every
  * sample stayed green. That hole was found by mutation, so the structural scenario reads the config
  * ARRAY instead and pins every block that so much as mentions the rule. Between them: what a file
  * gets, and that nothing else can quietly grant it.
@@ -168,7 +168,18 @@ function byName(left: string, right: string): number {
  */
 function entryOf(entry: Linter.RuleEntry | undefined): string {
   const options = Array.isArray(entry) ? entry.slice(1) : [];
-  return JSON.stringify([severityOf(entry), options]);
+  // Key order is not part of a rule's meaning, but `JSON.stringify` preserves insertion order, so
+  // reordering `{ allowNumber, allowAny }` in the config — a no-op — would otherwise fail the
+  // options pin. Sorting keys keeps the comparison about VALUES.
+  return JSON.stringify([severityOf(entry), options], (_key, value: unknown) =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).toSorted(([left], [right]) =>
+            byName(left, right),
+          ),
+        )
+      : value,
+  );
 }
 
 /** Every rule whose resolved level or options differ between the two files, sorted. */
@@ -190,8 +201,55 @@ const STRICT_TIER_CARVE_OUTS = [
   '@typescript-eslint/no-empty-function',
   '@typescript-eslint/no-invalid-void-type',
   '@typescript-eslint/no-non-null-assertion',
-  '@typescript-eslint/no-unnecessary-condition',
 ];
+
+/**
+ * Rules kept at `error` whose OPTIONS were deliberately relaxed, pinned as whole entries.
+ *
+ * These are the quietest regression in the whole config, and severity cannot see them: an options
+ * object REPLACES a preset's entry rather than merging into it, and these rules' own defaults are
+ * more permissive than the strict tier's, so flipping one flag re-admits everything the tier was
+ * holding shut while the rule still reads as `error`. Mutation-checked: with only the severity
+ * compared, turning every `allow*` on `restrict-template-expressions` back to `true` left the whole
+ * suite green.
+ */
+const TUNED_STRICT_RULES: Record<string, Linter.RuleEntry> = {
+  '@typescript-eslint/restrict-template-expressions': [
+    'error',
+    {
+      allowNumber: true,
+      allowAny: false,
+      allowBoolean: false,
+      allowNullish: false,
+      allowRegExp: false,
+      allowNever: false,
+    },
+  ],
+  '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
+  '@typescript-eslint/no-floating-promises': ['error', { checkThenables: true }],
+  '@typescript-eslint/no-unused-vars': [
+    'error',
+    { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+  ],
+};
+
+/**
+ * The single rule admitted from `eslint-plugin-sonarjs` out of 279, after a one-shot triage of 130
+ * findings across 18 rules. Deleting it can only REMOVE lint violations, so nothing else in the
+ * repo goes red when it disappears — the same silent-win shape this file exists to close for
+ * `must-use-result`. Pinned in both directions: the admitted rule stays armed, and nothing else
+ * from the plugin joins it without being declared here.
+ */
+const ADMITTED_SONARJS_RULES = ['sonarjs/prefer-specific-assertions'];
+
+/**
+ * A floor for the derivation below. `off` in the first scenario is computed by FILTERING this
+ * helper's output, so any degeneration of the helper to a subset of the armed rules would satisfy
+ * a `toEqual(CARVE_OUTS)` without checking anything — collapsing it to exactly the carve-outs was
+ * mutation-checked and passed. The floor turns that into a failure. It is deliberately well below
+ * the real count (~93) so a toolchain upgrade does not trip it spuriously.
+ */
+const MINIMUM_STRICT_TIER_RULES = 50;
 
 /** Every rule the two strict tiers arm, flattened across their config objects. */
 function rulesEnabledByStrictTiers(): string[] {
@@ -216,21 +274,124 @@ describe('the strict typed profile', () => {
     // and then hollowed out rule-by-rule, which is the drift this pins. Deriving the expectation
     // from the tier packages themselves means a toolchain upgrade that adds a rule shows up here
     // as a decision to make, not as silence.
+    const armed = rulesEnabledByStrictTiers();
     const production = await rulesFor(PRODUCTION_BASELINE);
-    const off = rulesEnabledByStrictTiers().filter(
-      (rule) => severityOf(production[rule]) !== 'error',
-    );
+    const off = armed.filter((rule) => severityOf(production[rule]) !== 'error');
 
+    expect(armed.length).toBeGreaterThan(MINIMUM_STRICT_TIER_RULES);
     expect(off).toEqual(STRICT_TIER_CARVE_OUTS);
   });
 
-  it('declares no carve-out for a rule the strict tiers never armed', () => {
-    // The mirror of the scenario above, and the same overclaim the test-code carve-out already
-    // guards against: a name in the list that no tier enables would describe a profile the repo
-    // does not have, and would keep passing forever.
-    const armed = new Set(rulesEnabledByStrictTiers());
+  it('switches a carve-out fully off — a warn-level downgrade is not a carve-out', async () => {
+    // Independent force, which the previous version of this scenario did not have: the check above
+    // filters on `!== 'error'`, so a rule downgraded to `warn` satisfies it and lands in the
+    // carve-out list looking legitimate. `quality-gates.md` bans that outright ("a rule is `error`
+    // or it is off") because a warning nobody blocks on is the attested-dead nightly-batch shape.
+    const production = await rulesFor(PRODUCTION_BASELINE);
+    const severities = STRICT_TIER_CARVE_OUTS.map((rule) => [rule, severityOf(production[rule])]);
 
-    expect(STRICT_TIER_CARVE_OUTS.filter((rule) => !armed.has(rule))).toEqual([]);
+    expect(severities).toEqual(STRICT_TIER_CARVE_OUTS.map((rule) => [rule, 'off']));
+  });
+
+  it('pins the options of every deliberately tuned rule, not just its severity', async () => {
+    const production = await rulesFor(PRODUCTION_BASELINE);
+    // Floor first: both sides are derived from the same keys, so an emptied map would compare
+    // [] to [] and pass — the vacuous shape MINIMUM_STRICT_TIER_RULES exists to prevent above.
+    expect(Object.keys(TUNED_STRICT_RULES).length).toBeGreaterThan(0);
+    const resolved = Object.keys(TUNED_STRICT_RULES).map((rule) => [
+      rule,
+      entryOf(production[rule]),
+    ]);
+
+    expect(resolved).toEqual(
+      Object.entries(TUNED_STRICT_RULES).map(([rule, entry]) => [rule, entryOf(entry)]),
+    );
+  });
+
+  it('declares every strict-tier rule this repo re-tunes, not just the ones remembered', () => {
+    // The scenario above pins the OPTIONS of the rules named in TUNED_STRICT_RULES, which can only
+    // ever check rules someone remembered to add — the same enumeration-nobody-checks shape this
+    // file exists to close. Without this, adding
+    // `'@typescript-eslint/no-unnecessary-condition': ['error', { allowConstantLoopConditions: true }]`
+    // and deleting the five waivers would neuter a re-armed rule with every scenario green.
+    // Preset blocks carry a `name`; the blocks written in this repo do not, which is what separates
+    // a deliberate local tuning from the presets' own options.
+    const armed = new Set(rulesEnabledByStrictTiers());
+    const tunedHere = new Set<string>();
+    for (const entry of config) {
+      if (entry.name !== undefined) continue;
+      const declared = Object.entries(entry.rules ?? {});
+      for (const [rule, value] of declared) {
+        if (armed.has(rule) && Array.isArray(value) && value.length > 1) tunedHere.add(rule);
+      }
+    }
+
+    expect([...tunedHere].toSorted(byName)).toEqual(
+      Object.keys(TUNED_STRICT_RULES).toSorted(byName),
+    );
+  });
+
+  it('lets no config block switch off a strict-tier rule it has not declared', () => {
+    // The per-file scenarios above resolve ONE path, and no sample can prove a negative: a block
+    // scoped at `packages/*` + `/src/adapters/**` could switch four strict rules off across both
+    // packages' adapters and domain with every sampled file still green. That mutation was run and
+    // it passed. Reading the config ARRAY makes the claim total, the same way the `must-use-result`
+    // structural scenario below does — any block that silences a strict-tier rule, at any glob, has
+    // to be declared here.
+    const armed = new Set(rulesEnabledByStrictTiers());
+    const silenced: string[] = [];
+    for (const entry of config) {
+      const declared = Object.entries(entry.rules ?? {});
+      for (const [rule, value] of declared) {
+        if (armed.has(rule) && severityOf(value as Linter.RuleEntry) !== 'error') {
+          silenced.push(`${JSON.stringify(entry.files)} :: ${rule}`);
+        }
+      }
+    }
+
+    // Pairs, not bare rule names. Comparing names alone lets a rule that legitimately appears in a
+    // test-code carve-out be silenced anywhere ELSE for free — `unbound-method` switched off across
+    // `packages/*` `/src/adapters/**` would have been allowed by name, and none of the per-file
+    // scenarios sample that tree. The allowance also has to widen by itself every time a new
+    // test-code carve-out is added, which the header says is expected. Binding each rule to the
+    // globs it is silenced OVER removes both problems.
+    const at = (globs: readonly string[], rules: readonly string[]): string[] =>
+      rules.filter((rule) => armed.has(rule)).map((rule) => `${JSON.stringify(globs)} :: ${rule}`);
+    // No CLI_ENTRYPOINT_GLOBS line: that block declares no strict-tier silence of its own. Its
+    // `unbound-method` divergence is INHERITED — the test-code globs already sweep those paths in —
+    // so expecting a declaration there would demand a line the config does not (and should not)
+    // have. A strict-tier rule genuinely switched off by the CLI block would show up as undeclared,
+    // which is the intent.
+    const allowed = [
+      ...at(['**/*.ts'], STRICT_TIER_CARVE_OUTS),
+      ...at(TEST_CODE_GLOBS, TEST_CODE_DIVERGENCE),
+    ].toSorted(byName);
+
+    expect(silenced.toSorted(byName)).toEqual(allowed);
+  });
+
+  it('keeps the admitted sonarjs rule armed, and admits no others', () => {
+    // A rule pack enters by admission, not accumulation (module-architecture). Both directions
+    // matter: deleting the one admitted rule frees no lint violation so every lane stays green,
+    // and swapping the single rule back for `sonarjs.configs.recommended` re-admits 17 rejected
+    // rules and blows the gate's stated latency budget without failing anything.
+    // Read structurally, not from one resolved path: `sonarjs.configs.recommended` re-added under
+    // `files: ['packages/web/src/**']` would re-admit all 17 rejected rules and spend the latency
+    // the config comment argues about, invisibly to a baseline-file check. `tseslint.config()`
+    // flattens `extends`, so a preset addition shows up here as entries carrying `sonarjs/` keys.
+    // Armed means `error`: `warn` is not an admission (quality-gates.md — error or off).
+    const admitted = new Set<string>();
+    for (const entry of config) {
+      const declared = Object.entries(entry.rules ?? {}).filter(([rule]) =>
+        rule.startsWith('sonarjs/'),
+      );
+      for (const [rule, value] of declared) {
+        if (severityOf(value as Linter.RuleEntry) === 'error') admitted.add(rule);
+        else admitted.delete(rule);
+      }
+    }
+
+    expect([...admitted].toSorted(byName)).toEqual(ADMITTED_SONARJS_RULES);
   });
 });
 
