@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { createLogger } from '../../application/logging/logger.js';
 import type { ApplyMode, ManualTags } from '../../domain/import/events.js';
 import { toPositiveInt } from '../../domain/shared/positive-int.js';
 import { BeetsBridge, defaultBridgeScript } from './bridge-adapter.js';
@@ -340,6 +341,39 @@ describe('failure surfaces', () => {
     const proposeResult6 = await bridge(runner).propose('/intake/a', {});
     const error = proposeResult6._unsafeUnwrapErr();
     expect(error.message).toContain('by signal');
+  });
+
+  it('surfaces stderr from a successful run as a warn line, never a swallowed string', async () => {
+    // The bridge reports partial degradation (e.g. "collect: skipped 3 unreadable file(s)") on
+    // stderr while still exiting 0 with a proposal built on the readable subset. The non-zero
+    // path already carries stderr in its error; this is the ONLY channel for the success path —
+    // dropping it makes the degradation invisible to the operator.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const runner = runnerReturning(
+      completed(PROPOSAL_JSON, { stderr: 'collect: skipped 3 unreadable file(s)\n' }),
+    );
+    const proposeOk = await new BeetsBridge(logger, CONFIG, runner).propose('/intake/a', {});
+    expect(proposeOk.isOk()).toBe(true);
+    const joined = lines.join('');
+    expect(joined).toContain('bridge reported diagnostics on a successful run');
+    expect(joined).toContain('skipped 3 unreadable');
+    expect(joined).toContain('propose');
+  });
+
+  it('stays quiet when a successful run writes nothing to stderr', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const runner = runnerReturning(completed(PROPOSAL_JSON));
+    const proposeQuiet = await new BeetsBridge(logger, CONFIG, runner).propose('/intake/a', {});
+    expect(proposeQuiet.isOk()).toBe(true);
+    expect(lines).toHaveLength(0);
   });
 
   it('maps non-JSON output to an InfraError', async () => {

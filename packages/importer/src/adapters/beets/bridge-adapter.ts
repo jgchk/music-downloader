@@ -207,6 +207,15 @@ export class BeetsBridge implements TaggerPort {
         ),
       );
     }
+    if (result.stderr.trim() !== '') {
+      // A zero exit with stderr is the bridge reporting partial degradation (e.g. files skipped
+      // as unreadable) — stderr is that report's only channel on the success path, so it is
+      // logged here, never dropped: the operator's alternative is an unexplained thin proposal.
+      this.logger.warn(
+        { operation, stderr: result.stderr.slice(-2000) },
+        'bridge reported diagnostics on a successful run',
+      );
+    }
     let payload: unknown;
     try {
       payload = JSON.parse(result.stdout);
