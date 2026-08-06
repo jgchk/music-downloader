@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadFixtures } from './support/fixture.js';
-import { fixtureRequiredFields, fixtureSchemas, stubSchemas } from './support/registry.js';
+import {
+  fixtureRequiredFields,
+  fixtureSchemas,
+  stubSchemas,
+  unconsumedResponseFixtures,
+} from './support/registry.js';
 
 /**
  * Conformance: every recorded fixture and every E2E stub payload must satisfy the same contract
@@ -26,11 +31,25 @@ describe('recorded fixtures conform to the contract', () => {
     expect(fixture.request.method).toMatch(/^(GET|POST|DELETE)$/);
   });
 
+  // Completeness (the web tier's pattern): every fixture on disk is either bound to a schema or
+  // explicitly declared response-unconsumed in the registry. Without this, a fixture whose
+  // registration was forgotten would silently escape validation via the skip below.
+  it('every fixture is registered or explicitly declared unconsumed', () => {
+    const onDisk = fixtures.map((f) => `${f.service}/${f.name}`).sort();
+    const known = [...Object.keys(fixtureSchemas), ...unconsumedResponseFixtures].sort();
+    expect(onDisk).toEqual(known);
+  });
+
   it.each(fixtures)(
     '$service/$name response validates against its schema',
     ({ service, name, fixture }) => {
       const schema = fixtureSchemas[`${service}/${name}`];
-      if (schema === undefined) return; // endpoint whose response the adapter does not consume
+      if (schema === undefined) {
+        // Only a declared unconsumed-response fixture may skip validation; the completeness
+        // assertion above keeps this set and the disk in exact agreement.
+        expect(unconsumedResponseFixtures).toContain(`${service}/${name}`);
+        return;
+      }
       const result = schema.safeParse(fixture.response.body);
       expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
     },
