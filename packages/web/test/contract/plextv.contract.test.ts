@@ -28,9 +28,25 @@ function adapter(machineId: string): PlexTvAccess {
   return new PlexTvAccess({ baseUrl: server.baseUrl, machineId });
 }
 
+type RecordedResource = { clientIdentifier: string; provides?: string; owned?: boolean };
+
 /** The first recorded (pseudonymized) clientIdentifier — a machine the account provably sees. */
 function recordedMachineId(): string {
-  return bodyOf<{ clientIdentifier: string }[]>('resources.json')[0]!.clientIdentifier;
+  return bodyOf<RecordedResource[]>('resources.json')[0]!.clientIdentifier;
+}
+
+/**
+ * The recorded entry that declares a server, if the recording has one. The membership predicate
+ * needs `provides: "server"`, and a recording captured BEFORE that field was consumed cannot
+ * witness it — the projection dropped it. Until the fixture is re-recorded, the grant path is
+ * covered at the unit tier (adapter.test.ts) against the tolerant schema, and this tier witnesses
+ * what the recording honestly contains: real identifiers, and a fail-closed denial for entries
+ * that do not declare a server. Fabricating the field here would defeat the tier's whole point.
+ */
+function recordedServer(): RecordedResource | undefined {
+  return bodyOf<RecordedResource[]>('resources.json').find((entry) =>
+    entry.provides?.split(',').some((capability) => capability.trim().toLowerCase() === 'server'),
+  );
 }
 
 beforeEach(async () => {
@@ -79,13 +95,8 @@ describe('plex.tv contract (tier 1)', () => {
     expect(result._unsafeUnwrap()).toEqual({ kind: 'expired' });
   });
 
-  it('grants membership for a recorded resource machine id, sending the token as a header on both calls', async () => {
-    const result = await adapter(recordedMachineId()).checkMembership('a-token');
-    const user = bodyOf<{ id: number; username: string }>('user.json');
-    expect(result._unsafeUnwrap()).toEqual({
-      kind: 'granted',
-      identity: { plexAccountId: String(user.id), username: user.username },
-    });
+  it('runs the membership conversation against the recorded account, sending the token as a header on both calls', async () => {
+    await adapter(recordedMachineId()).checkMembership('a-token');
 
     // Both lookups must happen with the token — their relative order is not part of the contract.
     expect(server.requests.map((r) => `${r.method} ${r.path}`).toSorted()).toEqual([
@@ -102,5 +113,51 @@ describe('plex.tv contract (tier 1)', () => {
     const result = await adapter('not-a-recorded-machine').checkMembership('a-token');
     const user = bodyOf<{ username: string }>('user.json');
     expect(result._unsafeUnwrap()).toEqual({ kind: 'denied', username: user.username });
+  });
+
+  it('denies a recorded identifier whose entry does not declare a server (fail closed on real data)', async () => {
+    // The predicate's narrowing, witnessed against wire data: an identifier the account provably
+    // sees is NOT admission unless that entry declares `provides: server`.
+    const nonServer = bodyOf<RecordedResource[]>('resources.json').find(
+      (entry) => entry !== recordedServer(),
+    );
+    const result = await adapter(nonServer!.clientIdentifier).checkMembership('a-token');
+    const user = bodyOf<{ username: string }>('user.json');
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'denied', username: user.username });
+  });
+
+  it('grants — with the role plex.tv reports — for a recorded entry that declares a server', async () => {
+    const recorded = recordedServer();
+    if (recorded === undefined) {
+      // The recording predates the provides/owned projection (see the fixture's provenance note),
+      // so it cannot witness a grant. The tier states that out loud rather than fabricating the
+      // field; grant and role derivation are covered at the unit tier meanwhile. Re-recording
+      // (`pnpm tsx packages/web/test/contract/record/plextv.ts`) makes the assertion below real —
+      // the recorder now REFUSES to write a listing with no server entry, so a re-record cannot
+      // leave this branch alive.
+      expect(
+        bodyOf<RecordedResource[]>('resources.json').some((e) => e.provides !== undefined),
+      ).toBe(false);
+      return;
+    }
+    const user = bodyOf<{ id: number; username: string }>('user.json');
+    const result = await adapter(recorded.clientIdentifier).checkMembership('a-token');
+    expect(result._unsafeUnwrap()).toEqual({
+      kind: 'granted',
+      identity: { plexAccountId: String(user.id), username: user.username },
+      role: recorded.owned === true ? 'owner' : 'guest',
+    });
+  });
+
+  it('has no recorded guest-side variant, by design: a share-guest token is not ours to record', () => {
+    // `owned: false` cannot be captured — recording it would mean holding someone else's Plex
+    // credential, the exact thing the access design refuses. The tolerant default (absent or
+    // false ⇒ guest) is covered at the unit tier instead. This test states the gap so a reader
+    // does not mistake its absence for an oversight (the same honesty rule the slskd recorder
+    // follows for the events/transfers coupling).
+    const guestVariant = bodyOf<RecordedResource[]>('resources.json').find(
+      (entry) => entry.owned === false,
+    );
+    expect(guestVariant).toBeUndefined();
   });
 });

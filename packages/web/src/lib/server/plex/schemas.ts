@@ -28,6 +28,19 @@ export const plexUserSchema = z.object({
 });
 export type PlexUser = z.infer<typeof plexUserSchema>;
 
-/** GET /resources — every device the account can see; membership is a machine-id match. */
-export const plexResourcesSchema = z.array(z.object({ clientIdentifier: z.string() }));
+/**
+ * GET /resources — every device the account can see. Membership requires a machine-id match on an
+ * entry that PROVIDES A SERVER (device/player identifiers are client-chosen, so the id alone is
+ * forgeable); the matched entry's `owned` flag is the session's role source. Both new fields are
+ * optional — tolerance degrades toward denial/guest, never toward grant.
+ */
+export const plexResourcesSchema = z.array(
+  z.object({
+    clientIdentifier: z.string(),
+    /** Comma-separated capability list (e.g. `"server"`, `"client,player,pubsub-player"`). */
+    provides: z.string().optional(),
+    /** True when the account owns this resource (vs sees it via a share). */
+    owned: z.boolean().optional(),
+  }),
+);
 export type PlexResources = z.infer<typeof plexResourcesSchema>;

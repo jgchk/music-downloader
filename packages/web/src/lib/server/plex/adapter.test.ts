@@ -134,13 +134,16 @@ describe('PlexTvAccess.checkPin', () => {
 describe('PlexTvAccess.checkMembership', () => {
   const USER = { id: 42, username: 'friend', title: 'Friend' };
 
-  it('grants when the account resources include the configured machine id, sending the token as a header only', async () => {
+  it('grants when a resource matches the machine id AND provides a server, sending the token as a header only', async () => {
     const stub = fetchStub(
       jsonResponse(USER),
-      jsonResponse([{ clientIdentifier: 'other' }, { clientIdentifier: 'my-server-machine' }]),
+      jsonResponse([
+        { clientIdentifier: 'other', provides: 'client' },
+        { clientIdentifier: 'my-server-machine', provides: 'server' },
+      ]),
     );
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('tok-123'));
-    expect(outcome).toEqual({
+    expect(outcome).toMatchObject({
       kind: 'granted',
       identity: { plexAccountId: '42', username: 'friend' },
     });
@@ -151,8 +154,71 @@ describe('PlexTvAccess.checkMembership', () => {
     }
   });
 
+  it.each([
+    ['the account owns the matched server', true, 'owner'],
+    ['the account merely sees a shared server', false, 'guest'],
+    ['plex.tv reports no ownership flag at all', undefined, 'guest'],
+  ])('derives the role from the matched entry when %s', async (_case, owned, role) => {
+    const entry = { clientIdentifier: 'my-server-machine', provides: 'server' };
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([owned === undefined ? entry : { ...entry, owned }]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toEqual({
+      kind: 'granted',
+      identity: { plexAccountId: '42', username: 'friend' },
+      role,
+    });
+  });
+
+  it('reads ownership from the MATCHED entry, not from any owned resource in the listing', async () => {
+    // The account owns some other device; the server it reaches is a share. Role must be guest.
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([
+        { clientIdentifier: 'my-laptop', provides: 'client', owned: true },
+        { clientIdentifier: 'my-server-machine', provides: 'server', owned: false },
+      ]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toMatchObject({ kind: 'granted', role: 'guest' });
+  });
+
+  it('denies a matching identifier that does not provide a server — the forged-device attack shape', async () => {
+    // Device/player identifiers are CLIENT-CHOSEN: an attacker's player can claim the (public)
+    // server machine id. The identifier match alone must never admit it.
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([{ clientIdentifier: 'my-server-machine', provides: 'client,player' }]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
+  });
+
+  it('finds server among a multi-value provides list, trimmed and case-insensitively', async () => {
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([{ clientIdentifier: 'my-server-machine', provides: 'client, Server ,sync' }]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toMatchObject({ kind: 'granted' });
+  });
+
+  it('denies a matching identifier whose entry carries no provides at all (tolerance never grants)', async () => {
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([{ clientIdentifier: 'my-server-machine' }]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
+  });
+
   it('denies when no resource matches, carrying the username for the denial message', async () => {
-    const stub = fetchStub(jsonResponse(USER), jsonResponse([{ clientIdentifier: 'other' }]));
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([{ clientIdentifier: 'other', provides: 'server' }]),
+    );
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
     expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
   });

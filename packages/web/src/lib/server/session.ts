@@ -29,12 +29,28 @@ export interface SessionIdentity {
   readonly username: string;
 }
 
+/**
+ * What the session may do, decided once at login from Plex server ownership (web-authorization).
+ * Only `authorize` reads it; nothing else in the app branches on a role.
+ */
+export type Role = 'owner' | 'guest';
+
+/** The signing input: who the session is for, plus the role login derived for it. */
+export interface SessionSubject extends SessionIdentity {
+  readonly role: Role;
+}
+
 // `.readonly()` so the inferred claims match SessionIdentity's immutability — claims land on the
 // shared `locals` bag, where a route mutating them would otherwise compile.
 const claimsSchema = z
   .object({
     plexAccountId: z.string(),
     username: z.string(),
+    // Optional on the WIRE, total in the decoded value: a validly signed cookie minted before
+    // roles existed decodes as a guest for its remaining lifetime, so privilege can never appear
+    // by omission (web-authorization). An unrecognized role is not defaulted — it fails the parse
+    // and the cookie is invalid, because only this codec's holder could have signed it.
+    role: z.enum(['owner', 'guest']).default('guest'),
     expiresAt: z.number(),
   })
   .readonly();
@@ -52,8 +68,8 @@ function signature(payload: string, secret: string): Buffer {
 }
 
 /** Mint a session cookie value: base64url claims (expiry fixed at now + TTL) + HMAC signature. */
-export function signSession(identity: SessionIdentity, secret: string, now: number): string {
-  const claims: SessionClaims = { ...identity, expiresAt: now + SESSION_TTL_MS };
+export function signSession(subject: SessionSubject, secret: string, now: number): string {
+  const claims: SessionClaims = { ...subject, expiresAt: now + SESSION_TTL_MS };
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
   return `${payload}.${signature(payload, secret).toString('base64url')}`;
 }

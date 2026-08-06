@@ -31,7 +31,12 @@ export function authenticatedStorageState(): StorageState {
     cookies: [
       {
         name: SESSION_COOKIE,
-        value: signSession({ plexAccountId: 'e2e', username: 'e2e-browser' }, SECRET, Date.now()),
+        // The browser phase stands in for the server's owner (see test/e2e/helpers.ts).
+        value: signSession(
+          { plexAccountId: 'e2e', username: 'e2e-browser', role: 'owner' },
+          SECRET,
+          Date.now(),
+        ),
         domain: url.hostname,
         path: '/',
         expires: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),

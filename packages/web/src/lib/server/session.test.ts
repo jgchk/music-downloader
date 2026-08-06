@@ -4,7 +4,7 @@ import { SESSION_TTL_MS, signSession, verifySession } from './session.js';
 
 const SECRET = 'unit-test-secret';
 const NOW = Date.UTC(2026, 0, 1);
-const IDENTITY = { plexAccountId: '12345', username: 'jake' };
+const IDENTITY = { plexAccountId: '12345', username: 'jake', role: 'guest' } as const;
 
 describe('session codec', () => {
   it('round-trips identity claims through sign and verify', () => {
@@ -14,6 +14,43 @@ describe('session codec', () => {
       kind: 'valid',
       claims: { ...IDENTITY, expiresAt: NOW + SESSION_TTL_MS },
     });
+  });
+
+  it.each(['owner', 'guest'] as const)('round-trips the %s role', (role) => {
+    const cookie = signSession({ ...IDENTITY, role }, SECRET, NOW);
+    expect(verifySession(cookie, SECRET, NOW)).toMatchObject({ kind: 'valid', claims: { role } });
+  });
+
+  it('decodes a validly signed pre-role cookie as a guest — privilege never appears by omission', () => {
+    // A cookie minted before roles existed: same secret, same shape, no `role` claim.
+    const payload = Buffer.from(
+      JSON.stringify({
+        plexAccountId: '12345',
+        username: 'jake',
+        expiresAt: NOW + SESSION_TTL_MS,
+      }),
+    ).toString('base64url');
+    const signature = createHmac('sha256', SECRET).update(payload).digest('base64url');
+
+    const verdict = verifySession(`${payload}.${signature}`, SECRET, NOW);
+
+    expect(verdict).toEqual({
+      kind: 'valid',
+      claims: {
+        plexAccountId: '12345',
+        username: 'jake',
+        role: 'guest',
+        expiresAt: NOW + SESSION_TTL_MS,
+      },
+    });
+  });
+
+  it('rejects a cookie claiming an unknown role rather than admitting it', () => {
+    const payload = Buffer.from(
+      JSON.stringify({ ...IDENTITY, role: 'superuser', expiresAt: NOW + SESSION_TTL_MS }),
+    ).toString('base64url');
+    const signature = createHmac('sha256', SECRET).update(payload).digest('base64url');
+    expect(verifySession(`${payload}.${signature}`, SECRET, NOW)).toEqual({ kind: 'invalid' });
   });
 
   it('fixes expiry inside the signed claims at seven days from issue (codec-level, tamper-proof)', () => {
