@@ -41,6 +41,14 @@ export const fixtureSchemas: Record<string, ZodType> = {
 };
 
 /**
+ * Fixtures recorded for endpoints whose *response body* the adapters deliberately do not consume
+ * (the request side is still exercised by the replay tier). Declaring them here is what lets the
+ * conformance suite skip schema validation without a silent early-return: every fixture on disk
+ * must appear either in {@link fixtureSchemas} or in this list, exactly.
+ */
+export const unconsumedResponseFixtures: readonly string[] = ['slskd/transfers-enqueue.json'];
+
+/**
  * Consumed fields that must be *present* in a recorded capture, not merely allowed by the
  * (all-optional, tolerant-reader) schema. The adapter's harvest-integrity gates branch on these
  * fields and fail open when one is absent — so a re-record that loses one must fail the tier and
