@@ -113,6 +113,34 @@ unfixed code (or against the plausible wrong fix) before being trusted.
 - [x] 7.8 The spec delta claimed readiness reports down "naming the fault", which the
       `{ status }` shape cannot deliver. The scenario now says what is true: readiness reports
       down and the fault is named in a structured log line.
-- [x] 7.9 The `.svelte` `must-use-result` blind spot documented — the component block cannot be
-      type-aware, and the rule needs the type checker, so a discarded Result in a
-      `<script lang="ts">` is invisible to lint.
+- [x] 7.9 The `.svelte` `must-use-result` blind spot documented — the component block is not
+      type-aware (a policy choice, not a parser limit) and the rule needs the type checker, so a
+      discarded Result in a `<script lang="ts">` is invisible to lint.
+
+## 8. Verification pass (cycle 4)
+
+Four reviewers scoped to this cycle's own fixes: comment accuracy, test quality,
+errors-as-values, bounded contexts. Two Criticals, both closed; every fix below was proven
+against the mutant that motivated it.
+
+- [x] 8.1 **Critical** — the composition-level ordering (drain fully before `database.close()`)
+      had no test: reordering the close above the await, and dropping the await, both left the
+      whole suite green. Both runtimes now park a drain inside a gated feed read, stop, and read
+      the checkpoint back from the reopened file; both mutants fail it.
+- [x] 8.2 **Critical** — `rule-profile.test.ts` sampled four production paths, so a carve-out
+      over `src/adapters` + `src/domain` disabled the rule across both layers with every
+      boundaries scenario green. The suite now also reads the config array and pins every block
+      mentioning the rule; samples widened per layer and asserted to exist.
+- [x] 8.3 Divergence was severity-only, so stripping `checkThenables` for all test code read as
+      no divergence. Comparison is now level plus options.
+- [x] 8.4 The halt branch's early `return` was unpinned — deleting it logged a contradictory
+      transient "holding checkpoint" line after the permanent one. Both sides now assert the
+      halt logs exactly once, and what it says.
+- [x] 8.5 Comment corrections in the rewrite itself: acceptance position 2 had the quantifier
+      backwards (the rule accepts on at least ONE handled reference — a single `isOk()` licenses
+      every other bare hand-off), a seventh acceptance path was missing (any TypeScript-syntax
+      parent short-circuits the rule, so a cast or `!` disarms it), and the `testFiles` comment
+      wrongly described the `scripts`-tree CLI entrypoints as swept in and re-armed.
+- [x] 8.6 Twin/doc accuracy: the importer said "every verdict behind it" on a subscription that
+      tails fulfilments; both `stop()` docstrings overstated how immediately the caller closes the
+      handle; the flush helper was named for the opposite of what it does.
