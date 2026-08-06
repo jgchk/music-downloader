@@ -10,6 +10,7 @@ import type {
   PendingReviewView,
 } from '../application/projections/read-models.js';
 import { asDistance } from '../domain/shared/__fixtures__/distance.js';
+import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
 import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
@@ -193,6 +194,70 @@ describe('statusViewToDto / pendingReviewToDto', () => {
 
   it('omits the acquisition id for a manually-submitted import', () => {
     expect(statusViewToDto({ ...view, acquisitionId: undefined }).acquisitionId).toBeUndefined();
+  });
+
+  it('projects every history kind onto the wire as its exact schema shape', () => {
+    const history: ImportStatusView['history'] = [
+      { kind: 'requested', at: 't1', hints: { artist: 'a', album: 'b' } },
+      { kind: 'requested', at: 't2' },
+      { kind: 'proposed', at: 't3', candidateCount: 2, pinnedId: 'mb-1' },
+      {
+        kind: 'auto-apply-selected',
+        at: 't4',
+        candidate: { dataSource: 'musicbrainz', albumId: 'alb-1' },
+        distance: 0.01,
+      },
+      { kind: 'review-required', at: 't5', reviewKind: 'match-review' },
+      { kind: 'review-resolved', at: 't6', resolution: 'apply-candidate' },
+      { kind: 'applied', at: 't7', location: '/library/x' },
+      { kind: 'remediation-required', at: 't8', failures: [FAILURE] },
+      { kind: 'rejected', at: 't9', reason: 'r', filesDeleted: false },
+      {
+        kind: 'release-verdict-recorded',
+        at: 't10',
+        acquisitionId: toAcquisitionId('acq-9'),
+        reasons: ['unusable'],
+      },
+    ];
+    const dto = statusViewToDto({ ...view, history });
+    expect(dto.history).toEqual([
+      { kind: 'requested', at: 't1', hints: { artist: 'a', album: 'b' } },
+      { kind: 'requested', at: 't2', hints: undefined },
+      { kind: 'proposed', at: 't3', candidateCount: 2, pinnedId: 'mb-1' },
+      {
+        kind: 'auto-apply-selected',
+        at: 't4',
+        candidate: { dataSource: 'musicbrainz', albumId: 'alb-1' },
+        distance: 0.01,
+      },
+      { kind: 'review-required', at: 't5', reviewKind: 'match-review' },
+      { kind: 'review-resolved', at: 't6', resolution: 'apply-candidate' },
+      { kind: 'applied', at: 't7', location: '/library/x' },
+      { kind: 'remediation-required', at: 't8', failures: [FAILURE] },
+      { kind: 'rejected', at: 't9', reason: 'r', filesDeleted: false },
+      {
+        kind: 'release-verdict-recorded',
+        at: 't10',
+        acquisitionId: 'acq-9',
+        reasons: ['unusable'],
+      },
+    ]);
+    // The wire copy is a fresh projection, never the projection's own objects.
+    expect(dto.history[7]).not.toBe(history[7]);
+  });
+
+  it('cannot leak a domain-only history field onto the wire', () => {
+    // Simulate a future projection-only field the wire schema does not know: an explicit per-kind
+    // projection must drop it, where a spread would leak it into every consumer's payload.
+    const entry = {
+      kind: 'applied',
+      at: 't',
+      location: '/library/x',
+      projectionOnlyDebugField: 'must-not-ship',
+    } as unknown as ImportStatusView['history'][number];
+    const dto = statusViewToDto({ ...view, history: [entry] });
+    expect(dto.history[0]).toEqual({ kind: 'applied', at: 't', location: '/library/x' });
+    expect(dto.history[0]).not.toHaveProperty('projectionOnlyDebugField');
   });
 
   it('maps a status view carrying an open review', () => {
