@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { releaseCandidateIds } from '../../../src/adapters/musicbrainz/mapping.js';
 import { mbReleaseSearchSchema } from '../../../src/adapters/musicbrainz/schemas.js';
 import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.js';
@@ -15,7 +15,7 @@ import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.
 
 const BASE_URL = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'music-downloader-contract/0.0 (https://github.com/anthropics/music-downloader)';
-const OUT_DIR = join(CONTRACT_FIXTURE_ROOT, 'musicbrainz');
+const OUT_DIR = path.join(CONTRACT_FIXTURE_ROOT, 'musicbrainz');
 
 // Stable, long-established entities unlikely to be merged or deleted.
 const ALBUM = { artist: 'Pink Floyd', title: 'The Dark Side of the Moon' };
@@ -36,7 +36,7 @@ async function get(path: string, rawQuery: string): Promise<ContractFixture> {
   const response = await fetch(`${BASE_URL}${path}?${rawQuery}`, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
   });
-  const body = (await response.json()) as unknown;
+  const body = await response.json();
   await sleep(1100); // ≥1 req/s
   return {
     provenance: { source: `${BASE_URL} (live)`, capturedAt, note: 'public data; no sanitization' },
@@ -46,7 +46,7 @@ async function get(path: string, rawQuery: string): Promise<ContractFixture> {
 }
 
 function write(name: string, fixture: ContractFixture): void {
-  writeFileSync(join(OUT_DIR, name), `${JSON.stringify(fixture, null, 2)}\n`);
+  writeFileSync(path.join(OUT_DIR, name), `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`wrote musicbrainz/${name} (${fixture.response.status})`);
 }
 

@@ -110,10 +110,9 @@ describe('plex.tv contract (tier 1)', () => {
     );
 
     // Both lookups must happen with the token — their relative order is not part of the contract.
-    expect(server.requests.map((r) => `${r.method} ${r.path}`).toSorted()).toEqual([
-      'GET /resources',
-      'GET /user',
-    ]);
+    expect(
+      server.requests.map((r) => `${r.method} ${r.path}`).toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(['GET /resources', 'GET /user']);
     for (const request of server.requests) {
       expect(request.headers['x-plex-token']).toBe('a-token');
       expect(request.headers['x-plex-client-identifier']).toBe('music-downloader-web');

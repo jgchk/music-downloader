@@ -18,7 +18,7 @@ const appVersion = (
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
   resolve: {
-    alias: { $lib: fileURLToPath(new URL('./src/lib', import.meta.url)) },
+    alias: { $lib: fileURLToPath(new URL('src/lib', import.meta.url)) },
   },
   test: {
     name: 'web:server',

@@ -20,14 +20,12 @@ export default defineConfig({
     baseURL: harnessUrl || 'http://localhost:4173',
     trace: 'retain-on-failure',
   },
-  ...(harnessUrl
-    ? {}
-    : {
-        webServer: {
-          command: 'bash tests/serve.sh',
-          port: 4173,
-          reuseExistingServer: !process.env.CI,
-          timeout: 180_000,
-        },
-      }),
+  ...(!harnessUrl && {
+    webServer: {
+      command: 'bash tests/serve.sh',
+      port: 4173,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  }),
 });

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import type { ZodType } from 'zod';
@@ -31,18 +31,18 @@ export const publishedEventSchemas: readonly PublishedEventSchemaSource[] = [
   { type: RELEASE_VERDICT_TYPE, schema: releaseVerdictEventSchema },
 ];
 
-export const eventContractsDir = join(REPO_ROOT, 'contracts', 'events');
+export const eventContractsDirectory = path.join(REPO_ROOT, 'contracts', 'events');
 
 export function latestSchemaPath(type: string): string {
-  return join(eventContractsDir, `${type}.schema.json`);
+  return path.join(eventContractsDirectory, `${type}.schema.json`);
 }
 
-export function historyDir(type: string): string {
-  return join(eventContractsDir, 'history', type);
+export function historyDirectory(type: string): string {
+  return path.join(eventContractsDirectory, 'history', type);
 }
 
-export function eventFixturesDir(type: string): string {
-  return join(REPO_ROOT, 'test', 'contract', 'fixtures', 'events', type);
+export function eventFixturesDirectory(type: string): string {
+  return path.join(REPO_ROOT, 'test', 'contract', 'fixtures', 'events', type);
 }
 
 export interface HistorySnapshot {
@@ -52,13 +52,13 @@ export interface HistorySnapshot {
 
 /** The committed history snapshots for a type, ordered oldest → newest. */
 export function historySnapshots(type: string): readonly HistorySnapshot[] {
-  const dir = historyDir(type);
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
+  const directory = historyDirectory(type);
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
     .map((name) => /^(\d+)\.schema\.json$/.exec(name))
     .filter((match): match is RegExpExecArray => match !== null)
-    .map((match) => ({ version: Number(match[1]), path: join(dir, match[0]) }))
-    .sort((a, b) => a.version - b.version);
+    .map((match) => ({ version: Number(match[1]), path: path.join(directory, match[0]) }))
+    .toSorted((a, b) => a.version - b.version);
 }
 
 /**
@@ -73,7 +73,7 @@ export function generateJsonSchema(source: PublishedEventSchemaSource): unknown 
 }
 
 function openObjects(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(openObjects);
+  if (Array.isArray(node)) return node.map((member) => openObjects(member));
   if (!isRecord(node)) return node;
   const entries = Object.entries(node)
     .filter(([key, value]) => !(key === 'additionalProperties' && value === false))
@@ -85,7 +85,7 @@ function isRecord(node: unknown): node is Record<string, unknown> {
   return typeof node === 'object' && node !== null && !Array.isArray(node);
 }
 
-function sameJson(a: unknown, b: unknown): boolean {
+function isSameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -103,32 +103,32 @@ export function additivityViolations(previous: unknown, next: unknown): readonly
 
 function walk(previous: unknown, next: unknown, path: string, out: string[]): void {
   if (!isRecord(previous) || !isRecord(next)) {
-    if (!sameJson(previous, next)) out.push(`${path}: schema changed`);
+    if (!isSameJson(previous, next)) out.push(`${path}: schema changed`);
     return;
   }
-  if (!sameJson(previous.type, next.type)) {
+  if (!isSameJson(previous.type, next.type)) {
     out.push(
       `${path}: type changed (${JSON.stringify(previous.type)} → ${JSON.stringify(next.type)})`,
     );
   }
-  if ('const' in previous && !sameJson(previous.const, next.const)) {
+  if ('const' in previous && !isSameJson(previous.const, next.const)) {
     out.push(`${path}: const changed`);
   }
-  if ('default' in previous && !sameJson(previous.default, next.default)) {
+  if ('default' in previous && !isSameJson(previous.default, next.default)) {
     out.push(`${path}: default changed`);
   }
   if (Array.isArray(previous.enum)) {
     const nextEnum = Array.isArray(next.enum) ? next.enum : [];
     for (const value of previous.enum) {
-      if (!nextEnum.some((candidate) => sameJson(candidate, value))) {
+      if (nextEnum.every((candidate) => !isSameJson(candidate, value))) {
         out.push(`${path}: enum value ${JSON.stringify(value)} removed`);
       }
     }
   }
   if (isRecord(previous.properties)) {
-    const nextProps = isRecord(next.properties) ? next.properties : {};
+    const nextProperties = isRecord(next.properties) ? next.properties : {};
     for (const [key, sub] of Object.entries(previous.properties)) {
-      if (key in nextProps) walk(sub, nextProps[key], `${path}.${key}`, out);
+      if (Object.hasOwn(nextProperties, key)) walk(sub, nextProperties[key], `${path}.${key}`, out);
       else out.push(`${path}.${key}: property removed`);
     }
     const previousRequired = Array.isArray(previous.required) ? previous.required : [];
@@ -145,12 +145,12 @@ function walk(previous: unknown, next: unknown, path: string, out: string[]): vo
   if (Array.isArray(previous.anyOf)) {
     const nextAnyOf = Array.isArray(next.anyOf) ? next.anyOf : [];
     for (const [index, member] of previous.anyOf.entries()) {
-      const survives = nextAnyOf.some((candidate) => {
+      const isSurvives = nextAnyOf.some((candidate) => {
         const memberViolations: string[] = [];
         walk(member, candidate, path, memberViolations);
         return memberViolations.length === 0;
       });
-      if (!survives) out.push(`${path}: anyOf alternative ${index} removed or changed`);
+      if (!isSurvives) out.push(`${path}: anyOf alternative ${index} removed or changed`);
     }
   }
 }

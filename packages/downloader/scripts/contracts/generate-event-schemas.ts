@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import {
   additivityViolations,
   generateJsonSchema,
-  historyDir,
+  historyDirectory,
   historySnapshots,
   latestSchemaPath,
   publishedEventSchemas,
@@ -17,11 +17,11 @@ import {
  * verifies on every commit).
  */
 
-function writeJson(path: string, value: unknown): void {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+function writeJson(filePath: string, value: unknown): void {
+  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-let failed = false;
+let isFailed = false;
 
 for (const source of publishedEventSchemas) {
   const next = generateJsonSchema(source);
@@ -47,15 +47,15 @@ for (const source of publishedEventSchemas) {
     console.error(`${source.type}: NON-ADDITIVE schema change refused:`);
     for (const violation of violations) console.error(violation);
     console.error('A breaking payload change must be published as a new event type.');
-    failed = true;
+    isFailed = true;
     continue;
   }
 
   const version = (snapshots.at(-1)?.version ?? 0) + 1;
-  mkdirSync(historyDir(source.type), { recursive: true });
+  mkdirSync(historyDirectory(source.type), { recursive: true });
   writeJson(latestPath, next);
-  writeJson(join(historyDir(source.type), `${String(version)}.schema.json`), next);
+  writeJson(path.join(historyDirectory(source.type), `${String(version)}.schema.json`), next);
   console.log(`${source.type}: wrote ${latestPath} (history v${String(version)})`);
 }
 
-if (failed) process.exit(1);
+if (isFailed) process.exit(1);

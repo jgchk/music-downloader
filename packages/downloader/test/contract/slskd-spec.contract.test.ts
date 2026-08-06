@@ -6,6 +6,7 @@ import {
   undeclaredQueryParams,
 } from './support/slskd-manifest.js';
 import { checkSlskdSpec } from './support/spec-compat.js';
+import type { OpenApiSpec } from './support/spec-compat.js';
 
 /**
  * Pins the consumed-surface manifest against the committed slskd spec snapshot (task 4.3). If the
@@ -14,14 +15,14 @@ import { checkSlskdSpec } from './support/spec-compat.js';
  * here to hold for the version we build against.
  */
 
-const SPEC_DIR = new URL('./slskd-spec/', import.meta.url).pathname;
+const SPEC_DIR = new URL('slskd-spec/', import.meta.url).pathname;
 
 describe('slskd consumed surface (pinned snapshot)', () => {
   const provenance = JSON.parse(readFileSync(`${SPEC_DIR}provenance.json`, 'utf8')) as {
     specPath: string;
     pinnedVersion: string;
   };
-  const spec = JSON.parse(readFileSync(`${SPEC_DIR}${provenance.specPath}`, 'utf8'));
+  const spec = JSON.parse(readFileSync(`${SPEC_DIR}${provenance.specPath}`, 'utf8')) as OpenApiSpec;
 
   it(`every consumed operation exists in the pinned ${provenance.pinnedVersion} spec`, () => {
     const violations = checkSlskdSpec(spec, SLSKD_CONSUMED_OPERATIONS);
@@ -33,10 +34,9 @@ describe('slskd consumed surface (pinned snapshot)', () => {
     // runtime endpoint is unchanged, so this must not read as drift.
     const versioned = {
       paths: Object.fromEntries(
-        Object.entries(spec.paths).map(([p, item]) => [
-          (p as string).replace('/api/v0/', '/api/v{version}/'),
-          item,
-        ]),
+        Object.entries(spec.paths ?? {}).map(
+          ([p, item]) => [p.replace('/api/v0/', '/api/v{version}/'), item] as const,
+        ),
       ),
       components: spec.components,
     };

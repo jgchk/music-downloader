@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -56,7 +56,7 @@ const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082
  *  username, path, AND size — the downloader's rejected-candidate dedupe keys on that triple,
  *  so an identical re-offer would (correctly) never be re-tried. */
 const ALT_SUBDIR = 'Test Album (Alt)';
-const DEPOSIT_RELEASE_DIR = join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)');
+const DEPOSIT_RELEASE_DIR = path.join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)');
 
 async function admin(method: string, path: string, body?: unknown): Promise<Response> {
   const res = await fetch(`${SLSKD_ADMIN}${path}`, {
@@ -183,11 +183,11 @@ async function rejectUnusableDelivery(importId: string): Promise<void> {
  * like the permanent stubs (`test/contract/support/registry.ts` `scriptedStubSchemas`), so
  * they cannot drift silently.
  */
-const SCRIPTED_DIR = fileURLToPath(new URL('./stubs/slskd/scripted/', import.meta.url));
-const ON_DISK_MAPPINGS_DIR = fileURLToPath(new URL('./stubs/slskd/mappings/', import.meta.url));
+const SCRIPTED_DIR = fileURLToPath(new URL('stubs/slskd/scripted/', import.meta.url));
+const ON_DISK_MAPPINGS_DIR = fileURLToPath(new URL('stubs/slskd/mappings/', import.meta.url));
 
 function readMapping(dir: string, name: string): { response: { jsonBody?: unknown } } {
-  return JSON.parse(readFileSync(join(dir, name), 'utf8')) as {
+  return JSON.parse(readFileSync(path.join(dir, name), 'utf8')) as {
     response: { jsonBody?: unknown };
   };
 }
@@ -205,7 +205,8 @@ describe('review-resolution revival loop (reject-unusable-delivery over HTTP, cr
     expect(readMapping(SCRIPTED_DIR, 'search-create-round1.json').response.jsonBody).toEqual(
       readMapping(ON_DISK_MAPPINGS_DIR, 'search-create.json').response.jsonBody,
     );
-    for (const name of readdirSync(SCRIPTED_DIR).sort()) {
+    const scriptedMappings = readdirSync(SCRIPTED_DIR).toSorted((a, b) => a.localeCompare(b));
+    for (const name of scriptedMappings) {
       await admin('POST', '/mappings', readMapping(SCRIPTED_DIR, name));
     }
     await waitForOk(BASE_URL);
@@ -233,10 +234,10 @@ describe('review-resolution revival loop (reject-unusable-delivery over HTTP, cr
 
       // ── 2.2 Resolution over HTTP with a production-codec GUEST session.
       await rejectUnusableDelivery(importId);
-      await pollUntil(
-        async () => (await reviewQueueHtml()).includes('data-testid="empty"'),
-        'the review queue to empty after resolution',
-      );
+      await pollUntil(async () => {
+        const html = await reviewQueueHtml();
+        return html.includes('data-testid="empty"');
+      }, 'the review queue to empty after resolution');
       await pollForEvent(IMPORTER_DB, 'ReleaseVerdictRecorded');
 
       // ── D4: the rejection's contract, witnessed from outside — the delivered files are gone.
@@ -270,7 +271,8 @@ describe('review-resolution revival loop (reject-unusable-delivery over HTTP, cr
       expect(countEvents(IMPORTER_DB, 'ReleaseVerdictRecorded')).toBe(1);
       expect(await enqueueCount('peer1')).toBe(1);
       expect(await enqueueCount('peer2')).toBe(1);
-      expect((await reviewQueueHtml()).includes('data-testid="empty"')).toBe(true);
+      const settledQueueHtml = await reviewQueueHtml();
+      expect(settledQueueHtml.includes('data-testid="empty"')).toBe(true);
       expect(existsSync(LIBRARY_DIR)).toBe(true);
       expect(existsSync(DEPOSIT_RELEASE_DIR)).toBe(true); // the re-deposited second delivery
 
@@ -280,7 +282,7 @@ describe('review-resolution revival loop (reject-unusable-delivery over HTTP, cr
         async () => {
           const deletes = await slskdDeletes();
           return (
-            deletes.some((url) => url === '/api/v0/searches/search-2') &&
+            deletes.includes('/api/v0/searches/search-2') &&
             deletes.some((url) => url.startsWith('/api/v0/transfers/downloads/peer2/transfer-2'))
           );
         },

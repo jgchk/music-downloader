@@ -75,7 +75,50 @@ scratch project-array setup, noted so nobody rediscovers it).
 Single change, `fix:` bump (D3). No deploy sequencing beyond D7. Rollback is reverting the
 config + fixes together (the gates and the code they cover move as one).
 
+## Decisions taken at implementation
+
+**D8 — The boundaries tier reads `eslint.config.js` via `allowJs`** (settling the open question
+below). Both were measured: `allowJs: true` on `test/boundaries/tsconfig.json` produced exactly one
+error, and fixing it made the diff *negative* — TS inferred the config's real `ConfigArray` type,
+which let a hand-rolled `FlatConfigEntry` interface and two `as readonly Record<string, unknown>[]`
+casts be deleted. A local `.d.ts` would have had to declare the export as `unknown` (a precise hand
+declaration is a second source of truth that drifts from the config it describes, silently — the
+exact failure mode this tier exists to prevent) and would have kept those casts. The tier's tsconfig
+also claims `eslint.config.js` in `include`, so the config file itself is now linted; it was
+previously ignored by `**/*.config.js`.
+
+**D9 — The root project must be named `tsconfig.json`.** The build-tooling config files
+(`vitest.config.ts`, `packages/web/*.config.*`, …) belong to no package. A
+`tsconfig.config-files.json` typechecks them fine but leaves all seven a *lint parse error*:
+eslint's project service discovers projects by walking up for that exact filename. Renaming it to a
+root `tsconfig.json` with an explicit `files` list (so it claims nothing else on its way up the
+tree) fixed all seven — the service does consult ancestor projects when the nearest one does not
+claim the file.
+
+**D10 — Two typecheckers, so two coverage assertions.** `ts.getParsedCommandLineOfConfigFile` never
+lists a `.svelte` file (the compiler does not know the extension), so the boundaries tier proves
+`.ts` coverage by tsconfig membership and `.svelte` coverage by containment in `svelte-check`'s
+project root. Both the tsconfig set and the source set are *discovered*, not listed, so a new tier
+or project counts the moment it lands.
+
+**D11 — Deviation from D5 on the `conventional-changelog` typings.** The measurement predicted
+missing typings needing a local `.d.ts`; the truth is that those packages ship types and
+`conventional-changelog-conventionalcommits@10.2.1` simply declares `createPreset`'s return type as
+`{}`. A `.d.ts` cannot repair a return type without a duplicate-identifier conflict, so the fix is a
+named local `Preset` interface derived from the *consumers'* signatures plus one documented cast.
+
+**D12 — `unicorn/no-process-exit` gets a named CLI carve-out.** Nine hits, all in real command-line
+programs (release tooling, schema generators, contract recorders and drift checkers) where an exit
+status *is* the interface — which is what unicorn's own rule text says. The rule stays on
+everywhere else, where a bare exit would tear down the process serving both modules and the web UI.
+
+**D13 — The test-tier carve-out is scoped to test *code*, not `*.test.ts`.** The tiers' helpers,
+fixture builders, and recorders are test code by any reading, so the shared `testFiles` glob covers
+`test/**`, `packages/*/test/**`, and `packages/web/tests/**` alongside `**/*.test.ts`. Only
+`unicorn/name-replacements` was added to the existing carve-outs (59 hits, all identifiers mirroring
+wire shapes); scripts' 21 hits were fixed properly, as D5 intended.
+
 ## Open Questions
 
-- Whether the boundaries tier imports `eslint.config.js` via `allowJs` or a hand `.d.ts` —
-  whichever produces the smaller honest diff at implementation.
+- ~~Whether the boundaries tier imports `eslint.config.js` via `allowJs` or a hand `.d.ts`.~~
+  Settled as `allowJs` — see D8.

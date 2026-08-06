@@ -20,7 +20,7 @@ const base = {
 };
 
 function withPatch(patch: (schema: typeof base) => unknown): unknown {
-  return patch(JSON.parse(JSON.stringify(base)) as typeof base);
+  return patch(structuredClone(base));
 }
 
 describe('additivityViolations', () => {
@@ -51,12 +51,12 @@ describe('additivityViolations', () => {
       schema.properties.id = { type: 'number' };
       return schema;
     });
-    expect(additivityViolations(base, next).join()).toContain('$.id: type changed');
+    expect(additivityViolations(base, next).join(',')).toContain('$.id: type changed');
   });
 
   it('flags a required field becoming optional', () => {
     const next = withPatch((schema) => ({ ...schema, required: ['id'] }));
-    expect(additivityViolations(base, next).join()).toContain('$.kind: no longer required');
+    expect(additivityViolations(base, next).join(',')).toContain('$.kind: no longer required');
   });
 
   it('flags a removed enum value', () => {
@@ -64,7 +64,7 @@ describe('additivityViolations', () => {
       schema.properties.kind.enum = ['album'];
       return schema;
     });
-    expect(additivityViolations(base, next).join()).toContain('enum value "track" removed');
+    expect(additivityViolations(base, next).join(',')).toContain('enum value "track" removed');
   });
 
   it('flags a changed default', () => {
@@ -72,7 +72,7 @@ describe('additivityViolations', () => {
       schema.properties.year.default = 0;
       return schema;
     });
-    expect(additivityViolations(base, next).join()).toContain('$.year: default changed');
+    expect(additivityViolations(base, next).join(',')).toContain('$.year: default changed');
   });
 
   it('flags a removed anyOf alternative (nullability revoked)', () => {
@@ -80,7 +80,7 @@ describe('additivityViolations', () => {
       schema.properties.year.anyOf = [{ type: 'integer' }];
       return schema;
     });
-    expect(additivityViolations(base, next).join()).toContain('anyOf alternative 1 removed');
+    expect(additivityViolations(base, next).join(',')).toContain('anyOf alternative 1 removed');
   });
 
   it('recurses into array items', () => {
@@ -88,16 +88,18 @@ describe('additivityViolations', () => {
       schema.properties.files.items.properties.name = { type: 'number' };
       return schema;
     });
-    expect(additivityViolations(base, next).join()).toContain('$.files[].name: type changed');
+    expect(additivityViolations(base, next).join(',')).toContain('$.files[].name: type changed');
   });
 
   it('flags a const change and a leaf replaced by a non-object', () => {
-    expect(additivityViolations({ const: 'a' }, { const: 'b' }).join()).toContain('const changed');
+    expect(additivityViolations({ const: 'a' }, { const: 'b' }).join(',')).toContain(
+      'const changed',
+    );
     expect(
       additivityViolations(
         { type: 'object', properties: { x: true } },
         { type: 'object', properties: { x: false } },
-      ).join(),
+      ).join(','),
     ).toContain('$.x: schema changed');
   });
 });

@@ -8,37 +8,62 @@ import prettier from 'eslint-config-prettier';
 const modulePackages = ['downloader', 'importer'];
 
 /**
+ * Test code, wherever it lives: the co-located unit/integration suites plus every out-of-src tier
+ * (contract, boundaries, e2e, Playwright) — including the tiers' non-`.test.ts` helpers, fixture
+ * builders, and recorders, which are test code by any reading. The carve-outs below are scoped to
+ * this list; the production profile is otherwise identical, per module-architecture ("Test tiers
+ * SHALL run the production rule profile except for short, named, documented carve-outs").
+ */
+const testFiles = [
+  '**/*.test.ts',
+  'test/**/*.ts',
+  'packages/*/test/**/*.ts',
+  'packages/web/tests/**/*.ts',
+];
+
+/**
+ * The repo's actual command-line programs: the release tooling, the event-schema generators behind
+ * `pnpm contracts:events`, and the contract recorders/drift checkers run as `tsx <file>`.
+ */
+const cliEntrypoints = [
+  'scripts/**/*.ts',
+  'packages/*/scripts/**/*.ts',
+  'packages/*/test/contract/record/**/*.ts',
+  'packages/*/test/contract/drift/**/*.ts',
+];
+
+/**
  * The dependency rule (D9): domain <- application <- {adapters, interfaces} <- composition.
  * A layer may import from itself and inner layers only, within each bounded-context package.
  * Encoded as forbidden (target, from) pairs for `import/no-restricted-paths`; a violation fails
  * lint and therefore CI.
  */
-const layerBoundaryZones = modulePackages.flatMap((pkg) => {
-  const src = `./packages/${pkg}/src`;
+const layerBoundaryZones = modulePackages.flatMap((package_) => {
+  const source = `./packages/${package_}/src`;
   return [
     // domain imports nothing outward — the pure core depends on no other layer.
-    { target: `${src}/domain`, from: `${src}/application` },
-    { target: `${src}/domain`, from: `${src}/adapters` },
-    { target: `${src}/domain`, from: `${src}/interfaces` },
-    { target: `${src}/domain`, from: `${src}/composition` },
+    { target: `${source}/domain`, from: `${source}/application` },
+    { target: `${source}/domain`, from: `${source}/adapters` },
+    { target: `${source}/domain`, from: `${source}/interfaces` },
+    { target: `${source}/domain`, from: `${source}/composition` },
     // application depends only on domain.
-    { target: `${src}/application`, from: `${src}/adapters` },
-    { target: `${src}/application`, from: `${src}/interfaces` },
-    { target: `${src}/application`, from: `${src}/composition` },
+    { target: `${source}/application`, from: `${source}/adapters` },
+    { target: `${source}/application`, from: `${source}/interfaces` },
+    { target: `${source}/application`, from: `${source}/composition` },
     // adapters depend on application + domain, never on interfaces or composition.
-    { target: `${src}/adapters`, from: `${src}/interfaces` },
-    { target: `${src}/adapters`, from: `${src}/composition` },
+    { target: `${source}/adapters`, from: `${source}/interfaces` },
+    { target: `${source}/adapters`, from: `${source}/composition` },
     // interfaces depend on application + domain, never on adapters or composition.
-    { target: `${src}/interfaces`, from: `${src}/adapters` },
-    { target: `${src}/interfaces`, from: `${src}/composition` },
+    { target: `${source}/interfaces`, from: `${source}/adapters` },
+    { target: `${source}/interfaces`, from: `${source}/composition` },
     // the facade sits above application + domain only; inner layers never reach outward to it,
     // and the facade never reaches adapters, interfaces, or composition.
-    { target: `${src}/domain`, from: `${src}/facade` },
-    { target: `${src}/application`, from: `${src}/facade` },
-    { target: `${src}/adapters`, from: `${src}/facade` },
-    { target: `${src}/facade`, from: `${src}/adapters` },
-    { target: `${src}/facade`, from: `${src}/interfaces` },
-    { target: `${src}/facade`, from: `${src}/composition` },
+    { target: `${source}/domain`, from: `${source}/facade` },
+    { target: `${source}/application`, from: `${source}/facade` },
+    { target: `${source}/adapters`, from: `${source}/facade` },
+    { target: `${source}/facade`, from: `${source}/adapters` },
+    { target: `${source}/facade`, from: `${source}/interfaces` },
+    { target: `${source}/facade`, from: `${source}/composition` },
   ];
 });
 
@@ -58,17 +83,15 @@ const moduleBoundaryZones = [
     from: './packages/downloader',
     message: 'Modules are isolated: importer must not import downloader.',
   },
-  ...modulePackages.flatMap((pkg) => [
-    {
-      // The web package sees a module only through its facade — plus the designated runtime
-      // entry, which a files-scoped no-restricted-imports below confines to $lib/server (the
-      // composed process's composition seam, design D8).
-      target: './packages/web',
-      from: `./packages/${pkg}/src`,
-      except: ['./facade', './composition/runtime.ts'],
-      message: `Interface packages import a module only via its facade (@music/${pkg}).`,
-    },
-  ]),
+  ...modulePackages.map((package_) => ({
+    // The web package sees a module only through its facade — plus the designated runtime entry,
+    // which a files-scoped no-restricted-imports below confines to $lib/server (the composed
+    // process's composition seam, design D8).
+    target: './packages/web',
+    from: `./packages/${package_}/src`,
+    except: ['./facade', './composition/runtime.ts'],
+    message: `Interface packages import a module only via its facade (@music/${package_}).`,
+  })),
 ];
 
 /**
@@ -92,49 +115,71 @@ const aggregates = [
   },
 ];
 const aggregateEncapsulationZones = aggregates.flatMap(({ pkg, dir, message }) => {
-  const src = `./packages/${pkg}/src`;
+  const source = `./packages/${pkg}/src`;
   const internals = [
-    `${src}/domain/${dir}/state.ts`,
-    `${src}/domain/${dir}/decide.ts`,
-    `${src}/domain/${dir}/react.ts`,
+    `${source}/domain/${dir}/state.ts`,
+    `${source}/domain/${dir}/decide.ts`,
+    `${source}/domain/${dir}/react.ts`,
   ];
   const externalConsumers = [
-    `${src}/application`,
-    `${src}/adapters`,
-    `${src}/interfaces`,
-    `${src}/composition`,
+    `${source}/application`,
+    `${source}/adapters`,
+    `${source}/interfaces`,
+    `${source}/composition`,
   ];
   return externalConsumers.flatMap((target) =>
     internals.map((from) => ({ target, from, message })),
   );
 });
 
+/**
+ * Resolver settings shared by the `.ts` and `.svelte` blocks. `.svelte` is added to the node
+ * resolver's extensions because Svelte imports carry an explicit `.svelte` suffix and the TypeScript
+ * resolver does not claim that extension; SvelteKit's `$lib/*` still resolves through the generated
+ * `.svelte-kit/tsconfig.json` on the typescript resolver.
+ */
+const importSettings = {
+  'import/resolver': {
+    node: { extensions: ['.js', '.ts', '.mjs', '.cjs', '.svelte'] },
+    typescript: { project: ['packages/*/tsconfig.json'] },
+  },
+};
+
+/**
+ * The dependency and module boundaries, enforced identically in `.ts` and inside a `.svelte`
+ * `<script lang="ts">` block. `no-restricted-paths` crosses the parser boundary because it only
+ * visits the linted file's own `ImportDeclaration`s and resolves their paths — it never re-parses
+ * the imported module.
+ *
+ * LIMITATION worth knowing before reaching for a sibling rule: the ExportMap-family import rules
+ * (`no-cycle`, `no-duplicates`, `no-unused-modules`, `no-named-as-default*`) DO re-parse imported
+ * modules, and they miss `.svelte` edges *silently* — svelte-eslint-parser nests the imports inside
+ * a `SvelteScriptElement`, which ExportMap's top-level walk never sees. Never rely on them for the
+ * component graph; if component-graph cycles ever matter, dependency-cruiser is the attested tool
+ * (docs/research/result-lint-and-tier-enforcement.md §4.2-4.3).
+ */
+const restrictedPathsRule = [
+  'error',
+  { zones: [...layerBoundaryZones, ...moduleBoundaryZones, ...aggregateEncapsulationZones] },
+];
+
 export default tseslint.config(
   {
-    // test/e2e, packages/*/test/contract, and scripts (release + contract generators) are
-    // out-of-src suites verified by execution (Docker-driven e2e; frozen-fixture contract tests;
-    // version:prep unit tests), not part of the src-scoped TypeScript projects (tsconfig
-    // `include: ["src"]`); keep them out of the type-checked lint to avoid projectService
-    // "file not in project" errors. Their production dependency — the schema modules — lives in
-    // src and is fully linted and typechecked there.
+    // Only generated output, third-party trees, and non-TypeScript sources are ignored. Every
+    // first-party TS source — package src, scripts, and all four out-of-src test tiers — is linted
+    // with the production profile, because every one of them now lives in a tsconfig the project
+    // service can find (module-architecture: "Every first-party source tier is inside the lint and
+    // typecheck gates"). Adding a tier here again means it must also leave `pnpm typecheck:tiers`.
     ignores: [
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
       '**/.svelte-kit/**',
       'packages/web/build/**',
-      'packages/web/tests/**',
-      'packages/web/playwright.config.ts',
       '.e2e-tmp/**',
-      'test/e2e/**',
-      'test/boundaries/**',
-      'packages/*/test/contract/**',
+      // The beets bridge is Python; it has its own native unittest + coverage.py tier.
       'packages/*/test/bridge/**',
       '**/.venv/**',
-      'scripts/**',
-      'packages/*/scripts/**',
-      '**/*.config.ts',
-      '**/*.config.js',
     ],
   },
   unicorn.configs.recommended,
@@ -206,18 +251,9 @@ export default tseslint.config(
       import: importPlugin,
       neverthrow,
     },
-    settings: {
-      'import/resolver': {
-        typescript: {
-          project: ['packages/*/tsconfig.json'],
-        },
-      },
-    },
+    settings: importSettings,
     rules: {
-      'import/no-restricted-paths': [
-        'error',
-        { zones: [...layerBoundaryZones, ...moduleBoundaryZones, ...aggregateEncapsulationZones] },
-      ],
+      'import/no-restricted-paths': restrictedPathsRule,
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -293,7 +329,13 @@ export default tseslint.config(
         parser: tseslint.parser,
       },
     },
+    plugins: {
+      import: importPlugin,
+    },
+    settings: importSettings,
     rules: {
+      // Components obey the same boundaries as everything else — see restrictedPathsRule.
+      'import/no-restricted-paths': restrictedPathsRule,
       // The app serves at the root (no configured base path), and $lib components stay free of
       // kit-runtime imports so the three-tier component tests can compile them without a kit
       // context; plain string hrefs are correct here.
@@ -301,16 +343,30 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.ts'],
+    files: testFiles,
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       // vitest mocks are referenced unbound in assertions (expect(fn).toHaveBeen…).
       '@typescript-eslint/unbound-method': 'off',
+      // Test code names things after the vocabulary of the thing under test — a recorded HTTP
+      // `res`ponse, a `params` bag, the `err` field of a log line — and unicorn's expansion table
+      // would rename those away from the wire shapes they mirror. The rule stays on for production
+      // code, where the expansions are unambiguously an improvement.
+      'unicorn/name-replacements': 'off',
       // Tests drive Result-returning functions for their effects and assert through other means
       // (the store, a spy, a projection), so the must-use obligation reads as noise here — the
       // production rule is what protects operators. Ratchet trigger: turn this back on (and burn
       // down the backlog) if a test ever passes *because* it silently discarded a failed Result.
       'neverthrow/must-use-result': 'off',
+    },
+  },
+  {
+    // `process.exit(1)` with a status code *is* the interface of a command-line program — unicorn's
+    // own rule says so ("Only use `process.exit()` in CLI apps"). It stays on everywhere else, where
+    // a bare exit would tear down the one process serving both modules and the web UI.
+    files: cliEntrypoints,
+    rules: {
+      'unicorn/no-process-exit': 'off',
     },
   },
   prettier,

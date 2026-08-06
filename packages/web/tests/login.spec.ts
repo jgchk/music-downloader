@@ -9,10 +9,10 @@ import { expect, test } from '@playwright/test';
  * local serve.sh mode has no stub, so these skip there.
  */
 
-const stubbed = Boolean(process.env['E2E_PLEX_STUB']);
+const isStubbed = Boolean(process.env['E2E_PLEX_STUB']);
 
 test.describe('login journey (plex.tv stubbed)', () => {
-  test.skip(!stubbed, 'needs the harness plex.tv stub (test/e2e/run.sh phase 0)');
+  test.skip(!isStubbed, 'needs the harness plex.tv stub (test/e2e/run.sh phase 0)');
 
   test('a member walks form → Plex redirect contract → callback → issued session → gated app', async ({
     page,

@@ -180,12 +180,12 @@ describe('run (--check collision guard wiring)', () => {
     // the guard defends. The committed package.json deliberately does NOT match the computed 3.5.4,
     // so if the guard ever regressed *after* the version-match check, that check would abort first
     // with a different message and this assertion on the rebase message would catch it.
-    let raced = false;
+    let isRaced = false;
     const reader: ReleaseReader = {
       ...fakeReader({ tags: [], commits: [], committedPackageJson: '{ "version": "3.5.3" }' }),
-      releaseTags: () => (raced ? ['v3.5.3', 'v3.5.4'] : ['v3.5.3']),
+      releaseTags: () => (isRaced ? ['v3.5.3', 'v3.5.4'] : ['v3.5.3']),
       rangeCommits: () => {
-        raced = true;
+        isRaced = true;
         return [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }];
       },
     };

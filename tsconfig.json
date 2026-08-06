@@ -1,5 +1,8 @@
-// The build-tooling config files, which belong to no package's `include`. Named explicitly (not
-// globbed) so a new one is a deliberate addition and the boundaries tier can prove none is orphaned.
+// The repo-root project: the build-tooling config files, which belong to no package's `include`.
+// It must be named `tsconfig.json` — eslint's project service discovers projects by walking up for
+// that exact filename, so a `tsconfig.config-files.json` would typecheck fine and still leave every
+// config file a lint parse error. Files are named explicitly (not globbed) so a new one is a
+// deliberate addition, and so this project claims nothing else on its way up the tree.
 // `packages/web/vite.config.ts` and `eslint.config.js` are deliberately absent — the SvelteKit
 // generated tsconfig and `test/boundaries/tsconfig.json` respectively already claim them, and a file
 // claimed by two projects breaks eslint's project service.

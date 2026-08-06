@@ -40,9 +40,9 @@ function versionOf(packageJson: string): string {
 
 /** Reassemble CHANGELOG.md from its base content with `section` prepended — catv's exact logic. */
 export function assembleChangelog(baseChangelog: string, section: string): string {
-  const frontMatter = baseChangelog.substring(0, baseChangelog.indexOf('# Changelog'));
+  const frontMatter = baseChangelog.slice(0, Math.max(0, baseChangelog.indexOf('# Changelog')));
   const bodyStart = baseChangelog.search(START_OF_LAST_RELEASE);
-  const oldBody = bodyStart !== -1 ? baseChangelog.substring(bodyStart) : baseChangelog;
+  const oldBody = bodyStart === -1 ? baseChangelog : baseChangelog.slice(Math.max(0, bodyStart));
   return frontMatter + CHANGELOG_HEADER + '\n' + (section + oldBody).replace(/\n+$/, '\n');
 }
 
@@ -115,7 +115,12 @@ export interface PrepEffects {
  * shell wrote the unchanged file back and logged "prepared" over a prep that never happened.
  */
 export function anchorVersion(source: string, version: string): string | null {
-  const anchored = source.replace(/("version":\s*)"[^"]*"/, `$1"${version}"`);
+  // A replacer function, not a replacement string: a `$`-bearing version would otherwise be read as
+  // a capture-group reference and silently corrupt the manifest.
+  const anchored = source.replace(
+    /("version":\s*)"[^"]*"/,
+    (_match, prefix: string) => `${prefix}"${version}"`,
+  );
   try {
     return (JSON.parse(anchored) as { version?: unknown }).version === version ? anchored : null;
   } catch {
@@ -131,18 +136,22 @@ export function anchorVersion(source: string, version: string): string | null {
  */
 export async function run(
   reader: ReleaseReader,
-  check: boolean,
+  isCheckOnly: boolean,
   { fail: abort, log, manifest }: PrepEffects,
 ): Promise<void> {
   // Best-effort: CI checks out with full history/tags; locally the developer may already have them.
   reader.fetch();
 
-  const computed = await compute(reader).catch((error: unknown) =>
-    abort(`version:prep: ${error instanceof Error ? error.message : String(error)}`),
-  );
+  let computed;
+  try {
+    computed = await compute(reader);
+  } catch (error: unknown) {
+    // `return` because `abort` is a parameter binding — see the note at the anchor failure below.
+    return abort(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
+  }
   const { version, bumped, section } = computed;
 
-  if (!check) {
+  if (!isCheckOnly) {
     // Write mode: apply the computed state to the working tree for the developer to commit. Anchor
     // package.json's version (preserving the branch's other package.json edits) and rebuild
     // CHANGELOG.md from its base content so the section is prepended exactly once.
@@ -150,8 +159,8 @@ export async function run(
       read: () => readFileSync(PKG, 'utf8'),
       write: (content: string) => writeFileSync(PKG, content),
     };
-    const pkg = anchorVersion(io.read(), version);
-    if (pkg === null) {
+    const package_ = anchorVersion(io.read(), version);
+    if (package_ === null) {
       // `return` because `abort` is a parameter binding: CFA does not treat the bare call as
       // never-returning, and `never` is assignable to the return type — this is the narrowing.
       return abort(
@@ -160,7 +169,7 @@ export async function run(
           `trusting this prep.`,
       );
     }
-    io.write(pkg);
+    io.write(package_);
 
     if (bumped && section !== null) {
       writeFileSync(CHANGELOG, assembleChangelog(reader.baseChangelog(), section));
@@ -211,9 +220,9 @@ export async function run(
 }
 
 async function main(): Promise<void> {
-  const check = process.argv.includes('--check');
+  const isCheck = process.argv.includes('--check');
   const reader = detectReader();
-  await run(reader, check, { fail, log: (message) => void process.stdout.write(message) });
+  await run(reader, isCheck, { fail, log: (message) => void process.stdout.write(message) });
 }
 
 // Run only as the CLI entry point; importing the module (the unit tests) must not touch the tree.

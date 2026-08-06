@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { SLSKD_CONSUMED_OPERATIONS } from '../support/slskd-manifest.js';
 import { checkSlskdSpec } from '../support/spec-compat.js';
+import type { OpenApiSpec } from '../support/spec-compat.js';
 
 /**
  * Tier-2 drift check for slskd (task 5.1). Fetches the OpenAPI document of a running slskd — the
@@ -23,7 +24,9 @@ async function main(): Promise<void> {
     specPath: string;
     pinnedVersion: string;
   };
-  const pinnedSpec = JSON.parse(readFileSync(`${SPEC_DIR}${provenance.specPath}`, 'utf8'));
+  const pinnedSpec = JSON.parse(
+    readFileSync(`${SPEC_DIR}${provenance.specPath}`, 'utf8'),
+  ) as OpenApiSpec;
 
   const pinnedViolations = checkSlskdSpec(pinnedSpec, SLSKD_CONSUMED_OPERATIONS);
   if (pinnedViolations.length > 0) {
@@ -38,12 +41,12 @@ async function main(): Promise<void> {
     console.error(`could not fetch latest spec: HTTP ${response.status}`);
     process.exit(2);
   }
-  const latestSpec = JSON.parse(await response.text());
+  const latestSpec = JSON.parse(await response.text()) as OpenApiSpec | null;
 
   // Guard against a half-ready or wrong endpoint: an (almost) empty paths object is an environment
   // fault, not "every operation we consume vanished". Fail as an error (2), not a drift signal (1).
   const pathCount = Object.keys(latestSpec?.paths ?? {}).length;
-  if (pathCount < 10) {
+  if (latestSpec === null || pathCount < 10) {
     console.error(`fetched spec has only ${pathCount} paths — looks empty/unready, not real drift`);
     process.exit(2);
   }

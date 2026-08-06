@@ -9,12 +9,12 @@
 const VERSION_HEADING = /^#{1,2} \[?(\d+\.\d+\.\d+)/;
 
 function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 export function extractChangelogSection(changelog: string, version: string): string {
   const lines = changelog.split('\n');
-  const heading = new RegExp(`^#{1,2} \\[?${escapeForRegExp(version)}(?:\\]|\\s|$)`);
+  const heading = new RegExp(String.raw`^#{1,2} \[?${escapeForRegExp(version)}(?:\]|\s|$)`);
 
   const start = lines.findIndex((line) => heading.test(line));
   if (start === -1) {
@@ -22,9 +22,9 @@ export function extractChangelogSection(changelog: string, version: string): str
   }
 
   let end = lines.length;
-  for (let i = start + 1; i < lines.length; i += 1) {
-    if (VERSION_HEADING.test(lines[i]!)) {
-      end = i;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (VERSION_HEADING.test(lines[index]!)) {
+      end = index;
       break;
     }
   }

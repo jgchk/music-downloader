@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from '../../../src/lib/server/plex/identity.js';
 import { plexPinCheckSchema, plexPinCreateSchema } from '../../../src/lib/server/plex/schemas.js';
 
@@ -19,16 +19,17 @@ const HEADERS = {
   'X-Plex-Client-Identifier': PLEX_CLIENT_IDENTIFIER,
 };
 
-let failed = false;
+/** Every reported drift, in report order — non-empty is the non-zero exit. */
+const drifts: string[] = [];
 
 function report(operation: string, error: z.ZodError | string): void {
-  failed = true;
+  drifts.push(operation);
   const detail = typeof error === 'string' ? error : JSON.stringify(error.issues, undefined, 2);
   console.error(`DRIFT ${operation}: ${detail}`);
 }
 
 /** A non-JSON 2xx (captive portal, CDN interstitial) is drift too, not an unhandled crash. */
-async function jsonBody(operation: string, response: Response): Promise<unknown | undefined> {
+async function jsonBody(operation: string, response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch {
@@ -39,15 +40,15 @@ async function jsonBody(operation: string, response: Response): Promise<unknown 
 
 async function main(): Promise<void> {
   // 1. PIN create — the login flow's first live call.
-  const createResponse = await fetch(`${BASE}/pins?strong=true`, {
+  const pinCreateResponse = await fetch(`${BASE}/pins?strong=true`, {
     method: 'POST',
     headers: HEADERS,
   });
-  if (!createResponse.ok) {
-    report('pin create', `unexpected status ${createResponse.status}`);
+  if (!pinCreateResponse.ok) {
+    report('pin create', `unexpected status ${pinCreateResponse.status}`);
     return;
   }
-  const createBody = await jsonBody('pin create', createResponse);
+  const createBody = await jsonBody('pin create', pinCreateResponse);
   if (createBody === undefined) return;
   const created = plexPinCreateSchema.safeParse(createBody);
   if (!created.success) {
@@ -87,5 +88,5 @@ try {
   // Whatever escapes (transport fault mid-run) is still a DRIFT-labelled failure, not a bare stack.
   report('drift run', error instanceof Error ? error.message : String(error));
 }
-if (failed) process.exit(1);
+if (drifts.length > 0) process.exit(1);
 console.log('plex.tv consumed surface: no drift detected');

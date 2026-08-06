@@ -27,21 +27,21 @@ Sequencing: after the S-queue drains (S2/S3 touch overlapping test files).
 
 ## 3. Tier coverage — lint
 
-- [ ] 3.1 Delete the tiers from eslint `ignores`; verify projectService coverage; add the
+- [x] 3.1 Delete the tiers from eslint `ignores`; verify projectService coverage; add the
       `unicorn/name-replacements` test-tier carve-out with rationale beside the existing
       unicorn carve-outs.
-- [ ] 3.2 Autofix pass per tier (mechanical commits), then hand-fix the remainder (notably the
+- [x] 3.2 Autofix pass per tier (mechanical commits), then hand-fix the remainder (notably the
       `no-unsafe-*` cluster in scripts/downloader-contract and scripts' nine name-replacement
       renames).
 
 ## 4. Svelte zones
 
-- [ ] 4.1 Zones `files` gains `**/*.svelte`; resolver extensions gain `.svelte`; a red-first
+- [x] 4.1 Zones `files` gains `**/*.svelte`; resolver extensions gain `.svelte`; a red-first
       probe violation proves the rule fires in `<script lang="ts">`, then is removed; the
       ExportMap `.svelte`-blindness limitation documented in the config comment.
 
 ## 5. Constitution and gate
 
-- [ ] 5.1 `error-handling.md`'s linter sentence updated to name the real rule; the boundaries
+- [x] 5.1 `error-handling.md`'s linter sentence updated to name the real rule; the boundaries
       tier asserts the new coverage (a file outside every tsconfig/lint zone is a failure).
 - [ ] 5.2 Full gate green; `pnpm check` timing sanity-checked; local out-of-process e2e green.

@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
@@ -32,7 +32,7 @@ import {
  */
 
 const APP_CONTAINER = process.env['E2E_APP_CONTAINER'] ?? 'music-e2e-app';
-const BLOCK_FLAG = join(DATA_DIR, 'bin', 'bridge-blocked');
+const BLOCK_FLAG = path.join(DATA_DIR, 'bin', 'bridge-blocked');
 
 function docker(args: string): void {
   execSync(`docker ${args}`, { stdio: 'inherit', timeout: 60_000 });

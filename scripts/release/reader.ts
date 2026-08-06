@@ -40,8 +40,8 @@ export function parseCommitLog(log: string): RangeCommit[] {
     .map((entry) => entry.replace(/^\n+/, ''))
     .filter((entry) => entry.trim().length > 0)
     .map((entry) => {
-      const sep = entry.indexOf('\x1f');
-      return { hash: entry.slice(0, sep).trim(), message: entry.slice(sep + 1).trim() };
+      const separator = entry.indexOf('\u{1F}');
+      return { hash: entry.slice(0, separator).trim(), message: entry.slice(separator + 1).trim() };
     })
     .filter((commit) => commit.message.length > 0);
 }
@@ -49,21 +49,34 @@ export function parseCommitLog(log: string): RangeCommit[] {
 const PKG = 'package.json';
 const CHANGELOG = 'CHANGELOG.md';
 
+const git = (arguments_: string[]): string =>
+  execFileSync('git', arguments_, { encoding: 'utf8' }).trim();
+
+const jj = (arguments_: string[]): string => execFileSync('jj', arguments_, { encoding: 'utf8' });
+
+/** Contents of a path at a git ref, or '' when the file did not exist there. */
+const show = (reference: string, path: string): string => {
+  try {
+    return execFileSync('git', ['show', `${reference}:${path}`], { encoding: 'utf8' });
+  } catch {
+    return '';
+  }
+};
+
+/** The merge-base this branch forked from — the anchor for the release range. */
+const base = (): string => git(['merge-base', 'origin/main', 'HEAD']);
+
+/** File content at a jj revision, or '' when the file did not exist there. */
+const fileAt = (rev: string, path: string): string => {
+  try {
+    return jj(['file', 'show', '-r', rev, path]);
+  } catch {
+    return '';
+  }
+};
+
 /** The CI / colocated backend: today's `git` calls, unchanged. */
 export function gitReader(): ReleaseReader {
-  const git = (args: string[]): string => execFileSync('git', args, { encoding: 'utf8' }).trim();
-
-  // Contents of a path at a ref, or '' when the file did not exist there.
-  const show = (ref: string, path: string): string => {
-    try {
-      return execFileSync('git', ['show', `${ref}:${path}`], { encoding: 'utf8' });
-    } catch {
-      return '';
-    }
-  };
-
-  const base = (): string => git(['merge-base', 'origin/main', 'HEAD']);
-
   return {
     fetch() {
       try {
@@ -92,17 +105,6 @@ export function gitReader(): ReleaseReader {
 
 /** The non-colocated jj-workspace backend: same inputs, sourced from `jj`. */
 export function jjReader(): ReleaseReader {
-  const jj = (args: string[]): string => execFileSync('jj', args, { encoding: 'utf8' });
-
-  // File content at a revision, or '' when the file did not exist there.
-  const fileAt = (rev: string, path: string): string => {
-    try {
-      return jj(['file', 'show', '-r', rev, path]);
-    } catch {
-      return '';
-    }
-  };
-
   return {
     fetch() {
       try {
@@ -113,7 +115,14 @@ export function jjReader(): ReleaseReader {
     },
     releaseTags() {
       // Each tagged commit reachable from the released mainline; `tags` renders its tag name(s).
-      return jj(['log', '-r', 'tags() & ::main@origin', '--no-graph', '-T', 'tags ++ "\\n"'])
+      return jj([
+        'log',
+        '-r',
+        'tags() & ::main@origin',
+        '--no-graph',
+        '-T',
+        String.raw`tags ++ "\n"`,
+      ])
         .split(/\s+/)
         .filter(Boolean);
     },
@@ -125,7 +134,7 @@ export function jjReader(): ReleaseReader {
         `${sinceTag}..@`,
         '--no-graph',
         '-T',
-        'commit_id ++ "\\x1f" ++ description ++ "\\x00"',
+        String.raw`commit_id ++ "\x1f" ++ description ++ "\x00"`,
       ]);
       return parseCommitLog(log);
     },

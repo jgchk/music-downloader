@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { FfmpegAudioProbe } from '../../src/adapters/ffmpeg/probe.js';
@@ -20,8 +20,8 @@ interface FfprobeFixture {
 }
 
 function loadFixture(name: string): FfprobeFixture {
-  const path = join(CONTRACT_FIXTURE_ROOT, 'ffprobe', name);
-  return JSON.parse(readFileSync(path, 'utf8')) as FfprobeFixture;
+  const fixturePath = path.join(CONTRACT_FIXTURE_ROOT, 'ffprobe', name);
+  return JSON.parse(readFileSync(fixturePath, 'utf8')) as FfprobeFixture;
 }
 
 /** A runner that replays the recorded ffprobe stdout and a clean decode pass. */
@@ -37,7 +37,8 @@ describe('ffprobe contract (tier 1)', () => {
     const runner = replayRunner(JSON.stringify(fixture.stdout));
     const probe = new FfmpegAudioProbe(silentLogger(), runner);
 
-    const result = (await probe.probe('/staging/01.flac'))._unsafeUnwrap();
+    const probed = await probe.probe('/staging/01.flac');
+    const result = probed._unsafeUnwrap();
 
     // Fed the identical bytes real ffprobe emitted, the adapter must recover every consumed field:
     // codec/duration/sampleRate/bitDepth (from bits_per_raw_sample) and bitrate (format fallback).
@@ -60,7 +61,8 @@ describe('ffprobe contract (tier 1)', () => {
     const runner = replayRunner(JSON.stringify(fixture.stdout));
     const probe = new FfmpegAudioProbe(silentLogger(), runner);
 
-    const result = (await probe.probe('/staging/01.wav'))._unsafeUnwrap();
+    const probed = await probe.probe('/staging/01.wav');
+    const result = probed._unsafeUnwrap();
 
     expect(result).toEqual({
       decodedCleanly: true,

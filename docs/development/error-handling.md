@@ -16,7 +16,11 @@ Business sadness is **not** an error. Model it as a first-class outcome, not an 
 - Functions that can fail return `Result<T, E>` (or `ResultAsync<T, E>`); they don't throw.
 - Errors are **typed and meaningful** — no stringly-typed or catch-all errors that force callers to guess.
 - Handle an error at the boundary that can actually make a decision, **once**. Don't log-and-rethrow; don't catch-and-swallow.
-- **Never ignore a result.** An unhandled result is a bug, and the linter flags it.
+- **Never ignore a result.** An unhandled result is a bug, and a dedicated must-use lint rule fails
+  the build on one. Consumption must be visible at the call site: match it, unwrap it with a
+  default, interrogate it, return it, or combine it. Handing a result to another function is not
+  consumption the rule can see — restructure so it is (pass the operation as a thunk, say) rather
+  than reaching for a waiver. Waivers are per-site with a written justification, like an `any`.
 - Adapters translate foreign errors (library exceptions, transport failures) into our typed results at the boundary — exceptions never leak inward.
 
 ## At the edges

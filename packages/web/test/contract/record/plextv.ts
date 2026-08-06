@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { ZodType } from 'zod';
 import { isServerResource } from '../../../src/lib/server/plex/adapter.js';
@@ -30,7 +30,7 @@ import type { ContractFixture } from '../support/fixture.js';
  */
 
 const BASE = process.env['PLEX_API_BASE_URL'] ?? 'https://plex.tv/api/v2';
-const OUT = join(CONTRACT_FIXTURE_ROOT, 'plextv');
+const OUT = path.join(CONTRACT_FIXTURE_ROOT, 'plextv');
 const TODAY = new Date().toISOString().slice(0, 10);
 
 /** The committed stand-in for the real token — the schema only requires a string. The tier's
@@ -44,7 +44,7 @@ const IDENTITY_HEADERS = {
 };
 
 function write(name: string, fixture: ContractFixture): void {
-  writeFileSync(join(OUT, name), `${JSON.stringify(fixture, undefined, 2)}\n`);
+  writeFileSync(path.join(OUT, name), `${JSON.stringify(fixture, undefined, 2)}\n`);
   console.log(`  wrote ${name}`);
 }
 
@@ -54,10 +54,10 @@ function provenance(note: string): ContractFixture['provenance'] {
 
 async function requestJson(
   method: 'GET' | 'POST',
-  path: string,
+  endpoint: string,
   token?: string,
 ): Promise<{ status: number; body: unknown }> {
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await fetch(`${BASE}${endpoint}`, {
     method,
     headers:
       token === undefined ? IDENTITY_HEADERS : { ...IDENTITY_HEADERS, 'X-Plex-Token': token },
@@ -170,10 +170,8 @@ async function main(): Promise<void> {
         id: 1,
         // Preserve wire null-ness/absence so the adapter's username fallback chain keeps
         // real-data grounding across re-records.
-        ...(user.username === undefined
-          ? {}
-          : { username: user.username === null ? null : 'user1' }),
-        ...(user.title === undefined ? {} : { title: user.title === null ? null : 'user1' }),
+        ...(user.username !== undefined && { username: user.username === null ? null : 'user1' }),
+        ...(user.title !== undefined && { title: user.title === null ? null : 'user1' }),
       },
     },
   });
@@ -187,14 +185,14 @@ async function main(): Promise<void> {
   // real-data grounding across re-records.
   const projected = resources.map((entry, index) => ({
     clientIdentifier: `machine-${index + 1}`,
-    ...(entry.provides === undefined ? {} : { provides: entry.provides }),
-    ...(entry.owned === undefined ? {} : { owned: entry.owned }),
+    ...(entry.provides !== undefined && { provides: entry.provides }),
+    ...(entry.owned !== undefined && { owned: entry.owned }),
   }));
   if (projected.length === 0)
     throw new Error('no resources with a clientIdentifier — token account sees no devices');
   // Asked with the PRODUCTION predicate: a listing the adapter would grant on must never be
   // refused by the recorder (a case-sensitive copy here would abort a legitimate re-record).
-  if (!projected.some((entry) => isServerResource(entry.provides)))
+  if (projected.every((entry) => !isServerResource(entry.provides)))
     throw new Error(
       'no resource declares provides=server — the recording cannot witness a membership grant',
     );

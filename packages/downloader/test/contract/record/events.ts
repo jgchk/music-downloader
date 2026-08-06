@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import type { StoredEvent } from '../../../src/application/ports/event-store-port.js';
 import type { AcquisitionEvent } from '../../../src/domain/acquisition/events.js';
 import {
@@ -9,7 +9,10 @@ import {
 } from '../../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { publishedEventMapping } from '../../../src/interfaces/contracts/events/mapping.js';
 import { asMbid } from '../../../src/domain/shared/__fixtures__/mbid.js';
-import { eventFixturesDir, historySnapshots } from '../../../scripts/contracts/event-schemas.js';
+import {
+  eventFixturesDirectory,
+  historySnapshots,
+} from '../../../scripts/contracts/event-schemas.js';
 
 /**
  * Records the frozen published-payload fixtures: real payloads rendered by the real mapping over a
@@ -53,11 +56,11 @@ if (rendered.isErr()) {
 
 const type = rendered.value.type;
 const version = historySnapshots(type).at(-1)?.version ?? 1;
-const dir = eventFixturesDir(type);
-const path = join(dir, `v${String(version)}.json`);
-mkdirSync(dir, { recursive: true });
+const directory = eventFixturesDirectory(type);
+const fixturePath = path.join(directory, `v${String(version)}.json`);
+mkdirSync(directory, { recursive: true });
 writeFileSync(
-  path,
+  fixturePath,
   `${JSON.stringify(
     {
       provenance: {
@@ -71,4 +74,4 @@ writeFileSync(
     2,
   )}\n`,
 );
-console.log(`wrote ${path}`);
+console.log(`wrote ${fixturePath}`);

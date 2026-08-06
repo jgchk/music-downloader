@@ -11,18 +11,18 @@ import { parseCommitLog } from './reader.ts';
  */
 describe('parseCommitLog', () => {
   it('parses a commit into its full hash and trimmed message', () => {
-    expect(parseCommitLog('abc123\x1ffeat(web): add health endpoint\n\x00')).toEqual([
+    expect(parseCommitLog('abc123\u{1F}feat(web): add health endpoint\n\u{0}')).toEqual([
       { hash: 'abc123', message: 'feat(web): add health endpoint' },
     ]);
   });
 
   it('preserves a multi-line message body', () => {
-    const log = 'abc123\x1ffix(x): repair\n\nBREAKING CHANGE: it moved\n\x00';
+    const log = 'abc123\u{1F}fix(x): repair\n\nBREAKING CHANGE: it moved\n\u{0}';
     expect(parseCommitLog(log)[0]?.message).toBe('fix(x): repair\n\nBREAKING CHANGE: it moved');
   });
 
   it('drops a description-less commit (jj empty commit) so the parser never sees it', () => {
-    const log = 'aaa\x1ffeat: real\x00bbb\x1f\x00ccc\x1ffix: also real\x00';
+    const log = 'aaa\u{1F}feat: real\u{0}bbb\u{1F}\u{0}ccc\u{1F}fix: also real\u{0}';
     expect(parseCommitLog(log)).toEqual([
       { hash: 'aaa', message: 'feat: real' },
       { hash: 'ccc', message: 'fix: also real' },

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
@@ -44,13 +44,13 @@ async function slskdDeletes(): Promise<string[]> {
 }
 
 async function waitForDeletes(
-  predicate: (deletes: string[]) => boolean,
+  isSatisfied: (deletes: string[]) => boolean,
   timeoutMs = 15_000,
 ): Promise<string[]> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const deletes = await slskdDeletes();
-    if (predicate(deletes)) return deletes;
+    if (isSatisfied(deletes)) return deletes;
     if (Date.now() >= deadline)
       throw new Error(`slskd DELETEs never matched: ${deletes.join(', ')}`);
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -72,7 +72,7 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     // seam → beets auto-apply — settled only when the page says "In your library".
     const status = await pollUntilTerminal(acquisitionId);
     expect(status).toBe(IMPORT_VOICE_PHRASE.applied);
-    expect(existsSync(join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)'))).toBe(true);
+    expect(existsSync(path.join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)'))).toBe(true);
 
     // Seam handoff: the importer's catch-up subscription consumed acquisition.fulfilled and
     // submitted the import through the native path — visible in its own durable store.
@@ -102,7 +102,7 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     // removes the completed transfer's record — and touches no resource it does not own.
     const deletes = await waitForDeletes(
       (urls) =>
-        urls.some((url) => url === '/api/v0/searches/search-1') &&
+        urls.includes('/api/v0/searches/search-1') &&
         urls.some((url) => url.startsWith('/api/v0/transfers/downloads/peer1/transfer-1')),
     );
     expect(

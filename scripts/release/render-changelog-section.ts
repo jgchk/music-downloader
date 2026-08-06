@@ -70,28 +70,30 @@ type WriterCommit =
  */
 export async function renderChangelogSection(
   commits: readonly RangeCommit[],
-  opts: { version: string; previousVersion: string },
+  options: { version: string; previousVersion: string },
 ): Promise<string> {
   // The preset's default URL format functions derive commit/compare/issue links from
   // context.host/owner/repository (the same shapes catv's explicit templates produced), so we no
   // longer pass URL templates — the `context` below supplies host/owner/repository directly.
-  const { parser: parserOpts, writer: writerOpts } = createPreset({ types: [...TYPES] }) as Preset;
+  const { parser: parserOptions, writer: writerOptions } = createPreset({
+    types: [...TYPES],
+  }) as Preset;
 
-  const parser = new CommitParser(parserOpts);
+  const parser = new CommitParser(parserOptions);
   const parsed: WriterCommit[] = commits.map((c) => ({ ...parser.parse(c.message), hash: c.hash }));
 
   const context = {
     host: HOST,
     owner: OWNER,
     repository: REPOSITORY,
-    version: opts.version,
-    previousTag: `v${opts.previousVersion}`,
-    currentTag: `v${opts.version}`,
+    version: options.version,
+    previousTag: `v${options.previousVersion}`,
+    currentTag: `v${options.version}`,
     linkCompare: true,
     // v9's writer template defaults the commit path segment to `commits` (plural); catv used the
     // singular `commit` (matching GitHub's own /commit/<sha> URL), so pin it to preserve fidelity.
     commit: 'commit',
   };
 
-  return writeChangelogString(parsed, context, writerOpts);
+  return writeChangelogString(parsed, context, writerOptions);
 }
