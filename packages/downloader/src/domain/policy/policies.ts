@@ -21,7 +21,9 @@ import type { QualityPolicy } from './quality-policy.js';
  */
 export type MatchPolicy = Brand<{ readonly threshold: Unit }, 'MatchPolicy'>; // confidence in [0, 1]
 
-export type MatchPolicyError = { readonly kind: 'ThresholdOutOfRange' };
+export interface MatchPolicyError {
+  readonly kind: 'ThresholdOutOfRange';
+}
 
 export function createMatchPolicy(threshold: number): Result<MatchPolicy, MatchPolicyError> {
   return parseUnit(threshold)

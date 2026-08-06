@@ -10,17 +10,20 @@ import { defineConfig } from '@playwright/test';
  * - Local (E2E_BASE_URL unset or empty): a dockerless developer convenience that builds and
  *   boots the adapter-node app via tests/serve.sh. Not a CI gate.
  */
-const harnessUrl = process.env.E2E_BASE_URL;
+// An exported-but-empty E2E_BASE_URL means "no harness" exactly as an unset one does (a CI shell
+// exports the variable unconditionally), so fold empty to undefined once — the two readings below
+// then agree by construction.
+const harnessUrl = process.env.E2E_BASE_URL === '' ? undefined : process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: './tests',
   // This suite gates image publish in CI: a stray `.only` must fail loudly, not shrink the gate.
   forbidOnly: !!process.env.CI,
   use: {
-    baseURL: harnessUrl || 'http://localhost:4173',
+    baseURL: harnessUrl ?? 'http://localhost:4173',
     trace: 'retain-on-failure',
   },
-  ...(!harnessUrl && {
+  ...(harnessUrl === undefined && {
     webServer: {
       command: 'bash tests/serve.sh',
       port: 4173,

@@ -57,9 +57,9 @@ describe('acquisitionFulfilledSchema — the tolerant reader', () => {
   it('tolerates unknown fields at every level and unknown target types', () => {
     const payload = fulfilledPayload();
     Object.assign(payload, { futureEnvelopeField: true });
-    const data = payload['data'] as Record<string, unknown>;
+    const data = payload.data as Record<string, unknown>;
     Object.assign(data, { futureDataField: { nested: 1 } });
-    Object.assign(data['target'] as Record<string, unknown>, {
+    Object.assign(data.target as Record<string, unknown>, {
       type: 'boxset',
       futureTargetField: 'x',
     });
@@ -69,15 +69,14 @@ describe('acquisitionFulfilledSchema — the tolerant reader', () => {
 
   it('tolerates a null or absent MusicBrainz release id', () => {
     const nulled = fulfilledPayload();
-    ((nulled['data'] as Record<string, unknown>)['target'] as Record<string, unknown>)[
-      'musicbrainzReleaseId'
-    ] = null;
+    (
+      (nulled.data as Record<string, unknown>).target as Record<string, unknown>
+    ).musicbrainzReleaseId = null;
     expect(acquisitionFulfilledSchema.parse(nulled).data.target.musicbrainzReleaseId).toBeNull();
 
     const absent = fulfilledPayload();
-    delete ((absent['data'] as Record<string, unknown>)['target'] as Record<string, unknown>)[
-      'musicbrainzReleaseId'
-    ];
+    delete ((absent.data as Record<string, unknown>).target as Record<string, unknown>)
+      .musicbrainzReleaseId;
     expect(
       acquisitionFulfilledSchema.parse(absent).data.target.musicbrainzReleaseId,
     ).toBeUndefined();
@@ -85,28 +84,29 @@ describe('acquisitionFulfilledSchema — the tolerant reader', () => {
 
   it('tolerates an absent, size-less, or malformed candidate (only verdicts need it)', () => {
     const absent = fulfilledPayload();
-    delete (absent['data'] as Record<string, unknown>)['candidate'];
+    delete (absent.data as Record<string, unknown>).candidate;
     expect(acquisitionFulfilledSchema.parse(absent).data.candidate).toBeUndefined();
 
     const sizeless = fulfilledPayload();
-    delete ((sizeless['data'] as Record<string, unknown>)['candidate'] as Record<string, unknown>)[
-      'sizeBytes'
-    ];
+    delete ((sizeless.data as Record<string, unknown>).candidate as Record<string, unknown>)
+      .sizeBytes;
     expect(acquisitionFulfilledSchema.parse(sizeless).data.candidate).toEqual({
       username: 'peer1',
       path: 'peer1/x',
     });
 
     const malformed = fulfilledPayload();
-    (malformed['data'] as Record<string, unknown>)['candidate'] = { username: 42 };
+    (malformed.data as Record<string, unknown>).candidate = { username: 42 };
     expect(acquisitionFulfilledSchema.parse(malformed).data.candidate).toBeUndefined();
   });
 
   it('rejects a payload missing the fields the importer actually needs', () => {
     for (const strip of ['acquisitionId', 'location', 'target'] as const) {
       const payload = fulfilledPayload();
-      delete (payload['data'] as Record<string, unknown>)[strip];
-      expect(acquisitionFulfilledSchema.safeParse(payload).success).toBe(false);
+      // Rebuild `data` without the field rather than deleting it: same absent-field payload, and
+      // the omission reads as data construction instead of mutation of a computed key.
+      const { [strip]: _omitted, ...data } = payload.data as Record<string, unknown>;
+      expect(acquisitionFulfilledSchema.safeParse({ ...payload, data }).success).toBe(false);
     }
   });
 });

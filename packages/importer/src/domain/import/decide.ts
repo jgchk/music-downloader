@@ -118,7 +118,7 @@ function decideResolutionForReview(state: AwaitingReviewState, resolution: Resol
 }
 
 function decideResolutionForApplied(state: AppliedState, resolution: Resolution): Decision {
-  if (state.remediation === undefined || state.remediation.status !== 'open') return NOTHING;
+  if (state.remediation?.status !== 'open') return NOTHING;
   if (resolution.kind !== 'accept' && resolution.kind !== 'retry-enrichment') {
     return err({
       kind: 'InvalidResolution',

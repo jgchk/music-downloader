@@ -123,11 +123,15 @@ describe('E2E stub payloads conform to the contract', () => {
       expect(unconsumedStubMappings).toContain(rel);
       return;
     }
+    // `rel` is always `<service>/<mapping>.json` — it is built from that pair above. The guard
+    // keeps the impossible case a legible failure instead of a read against a path containing the
+    // word "undefined".
+    const [service, name] = rel.split('/', 2);
+    if (service === undefined || name === undefined) {
+      throw new Error(`malformed stub mapping id: ${rel}`);
+    }
     const mapping = JSON.parse(
-      readFileSync(
-        path.join(STUB_ROOT, `${rel.split('/', 1)[0]}/mappings/${rel.split('/', 2)[1]}`),
-        'utf8',
-      ),
+      readFileSync(path.join(STUB_ROOT, service, 'mappings', name), 'utf8'),
     ) as {
       response: { jsonBody?: unknown };
     };

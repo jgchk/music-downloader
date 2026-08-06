@@ -77,7 +77,7 @@ export class SlskdResourceRemover implements SourceResourceRemover {
       const id = current.id ?? capturedId ?? '';
       this.logger.debug({ username, id, terminal: isTerminal }, 'sweeping slskd transfer');
       await this.client.delIfPresent(
-        `${downloadsPath(username)}/${encodeURIComponent(id)}?remove=${isTerminal}`,
+        `${downloadsPath(username)}/${encodeURIComponent(id)}?remove=${String(isTerminal)}`,
       );
       if (round >= MAX_REMOVE_ROUNDS) break;
       await this.timer.sleep(this.pollIntervalMs);

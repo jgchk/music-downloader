@@ -70,7 +70,10 @@ interface Booted {
   readonly shutdown: () => Promise<void>;
 }
 
-type Stoppable = { start(): Promise<void>; stop(): Promise<void> };
+interface Stoppable {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
 
 export interface BootOverrides {
   readonly createDownloader?: typeof createDownloaderRuntime;

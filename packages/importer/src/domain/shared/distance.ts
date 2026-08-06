@@ -12,7 +12,10 @@ import type { Brand } from './brand.js';
  */
 export type Distance = Brand<number, 'Distance'>;
 
-export type InvalidDistance = { readonly kind: 'InvalidDistance'; readonly value: number };
+export interface InvalidDistance {
+  readonly kind: 'InvalidDistance';
+  readonly value: number;
+}
 
 /** Parse-don't-validate: a finite in-range number becomes a {@link Distance}, anything else an error. */
 export function parseDistance(value: number): Result<Distance, InvalidDistance> {

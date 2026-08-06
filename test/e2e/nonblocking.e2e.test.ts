@@ -29,7 +29,7 @@ import {
  * the freed pipeline, proven end to end.
  */
 
-const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
+const SLSKD_ADMIN = process.env.E2E_SLSKD_ADMIN_URL ?? 'http://localhost:8082/__admin';
 const DOWNLOADS_PATH = '/api/v0/transfers/downloads/peer1';
 
 async function admin(method: string, path: string, body?: unknown): Promise<Response> {

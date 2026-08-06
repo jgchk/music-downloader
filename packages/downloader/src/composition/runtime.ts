@@ -125,10 +125,10 @@ export interface DownloaderReadiness {
  * Startup failures are values (mirroring the importer's factory): a runtime that cannot fully
  * rebuild its projections must refuse to boot, not serve empty answers with readiness `up`.
  */
-export type DownloaderStartupError = {
+export interface DownloaderStartupError {
   readonly kind: 'ProjectionRebuildFailed';
   readonly detail: string;
-};
+}
 
 export interface DownloaderRuntime {
   readonly facade: DownloaderFacade;

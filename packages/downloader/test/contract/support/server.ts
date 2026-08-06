@@ -41,19 +41,24 @@ export async function startFixtureServer(
 
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '', 'http://localhost');
+    // Node always sets the method on a server-side request (`IncomingMessage` types it as optional
+    // only because it doubles as a client response). Resolve it once, so the recorded request and
+    // the route lookup can never disagree — and an absent method routes to the 404 arm rather than
+    // looking up a key that begins with the word "undefined".
+    const method = req.method ?? '';
     let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString();
     });
     req.on('end', () => {
       requests.push({
-        method: req.method ?? '',
+        method,
         path: url.pathname,
         query: Object.fromEntries(url.searchParams),
         headers: req.headers as Record<string, string | undefined>,
         body,
       });
-      const fixture = routes.get(`${req.method} ${url.pathname}`);
+      const fixture = routes.get(`${method} ${url.pathname}`);
       if (fixture !== undefined) {
         const { body, status } = fixture.response;
         // A recorded body that is already a string is served verbatim as text. slskd answers a

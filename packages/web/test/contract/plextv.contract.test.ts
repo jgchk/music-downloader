@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 import { PlexTvAccess, isServerResource } from '../../src/lib/server/plex/adapter.js';
+import {
+  plexPinCreateSchema,
+  plexResourcesSchema,
+  plexUserSchema,
+} from '../../src/lib/server/plex/schemas.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
 import { startFixtureServer } from './support/server.js';
@@ -20,7 +26,14 @@ const byName = (name: string): ContractFixture => {
 };
 
 const pinIdOf = (name: string): number => Number(byName(name).request.path.split('/').at(-1));
-const bodyOf = <T>(name: string): T => byName(name).response.body as T;
+
+/**
+ * A recorded body, read THROUGH the production schema that governs it — the tier asserts against
+ * the same consumed surface the adapter parses, and a fixture that drifted out of that shape fails
+ * here rather than being asserted against a hand-written claim about its type.
+ */
+const bodyOf = <Schema extends z.ZodType>(name: string, schema: Schema): z.infer<Schema> =>
+  schema.parse(byName(name).response.body);
 
 let server: FixtureServer;
 
@@ -28,14 +41,18 @@ function adapter(machineId: string): PlexTvAccess {
   return new PlexTvAccess({ baseUrl: server.baseUrl, machineId });
 }
 
-type RecordedResource = { clientIdentifier: string; provides?: string; owned?: boolean };
+interface RecordedResource {
+  clientIdentifier: string;
+  provides?: string;
+  owned?: boolean;
+}
 
 /** The first recorded (pseudonymized) clientIdentifier — a machine the account provably sees. */
 function recordedMachineId(): string {
-  return bodyOf<RecordedResource[]>('resources.json')[0]!.clientIdentifier;
+  return bodyOf('resources.json', plexResourcesSchema)[0]!.clientIdentifier;
 }
 
-const recordedResources = (): RecordedResource[] => bodyOf<RecordedResource[]>('resources.json');
+const recordedResources = (): RecordedResource[] => bodyOf('resources.json', plexResourcesSchema);
 
 /**
  * The recorded entry that declares a server, if the recording has one — asked with the PRODUCTION
@@ -61,7 +78,7 @@ afterEach(async () => {
 describe('plex.tv contract (tier 1)', () => {
   it('creates a PIN with the recorded path, strong query, and identity headers', async () => {
     const result = await adapter('any').createPin();
-    const recorded = bodyOf<{ id: number; code: string }>('pin-create.json');
+    const recorded = bodyOf('pin-create.json', plexPinCreateSchema);
     expect(result._unsafeUnwrap()).toEqual({ id: recorded.id, code: recorded.code });
 
     const [request] = server.requests;
@@ -70,7 +87,7 @@ describe('plex.tv contract (tier 1)', () => {
     expect(request!.query).toEqual(byName('pin-create.json').request.query);
     expect(request!.headers['x-plex-product']).toBe('music-downloader');
     expect(request!.headers['x-plex-client-identifier']).toBe('music-downloader-web');
-    expect(request!.headers['accept']).toBe('application/json');
+    expect(request!.headers.accept).toBe('application/json');
   });
 
   it('reads an approved PIN check as authorized, sending the same identity headers that created the PIN', async () => {
@@ -83,7 +100,7 @@ describe('plex.tv contract (tier 1)', () => {
     // real checks never authorize — so the tier pins the headers here, not just on create.
     const [request] = server.requests;
     expect(request!.headers['x-plex-client-identifier']).toBe('music-downloader-web');
-    expect(request!.headers['accept']).toBe('application/json');
+    expect(request!.headers.accept).toBe('application/json');
   });
 
   it('reads an unapproved PIN check as pending, with the identity headers riding along', async () => {
@@ -104,7 +121,7 @@ describe('plex.tv contract (tier 1)', () => {
     // leads with the owner's server turns this outcome into `granted`; assuming the denied shape
     // would fail on exactly the handoff step this tier is waiting for.)
     const outcome = result._unsafeUnwrap();
-    const user = bodyOf<{ username: string }>('user.json');
+    const user = bodyOf('user.json', plexUserSchema);
     expect(outcome.kind === 'granted' ? outcome.identity.username : outcome.username).toBe(
       user.username,
     );
@@ -121,7 +138,7 @@ describe('plex.tv contract (tier 1)', () => {
 
   it('denies membership for a machine id absent from the recorded resources', async () => {
     const result = await adapter('not-a-recorded-machine').checkMembership('a-token');
-    const user = bodyOf<{ username: string }>('user.json');
+    const user = bodyOf('user.json', plexUserSchema);
     expect(result._unsafeUnwrap()).toEqual({
       kind: 'denied',
       username: user.username,
@@ -140,7 +157,7 @@ describe('plex.tv contract (tier 1)', () => {
       // The predicate's narrowing, witnessed against wire data: an identifier the account provably
       // sees is NOT admission unless that entry declares `provides: server`.
       const result = await adapter(nonServerEntry()!.clientIdentifier).checkMembership('a-token');
-      const user = bodyOf<{ username: string }>('user.json');
+      const user = bodyOf('user.json', plexUserSchema);
       expect(result._unsafeUnwrap()).toMatchObject({ kind: 'denied', username: user.username });
     },
   );
@@ -153,7 +170,7 @@ describe('plex.tv contract (tier 1)', () => {
     'grants — with the role plex.tv reports — for a recorded entry that declares a server',
     async () => {
       const recorded = recordedServer()!;
-      const user = bodyOf<{ id: number; username: string }>('user.json');
+      const user = bodyOf('user.json', plexUserSchema);
       const result = await adapter(recorded.clientIdentifier).checkMembership('a-token');
       expect(result._unsafeUnwrap()).toEqual({
         kind: 'granted',

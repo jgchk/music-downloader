@@ -19,15 +19,15 @@ describe('createLogger', () => {
   let savedLevel: string | undefined;
 
   beforeEach(() => {
-    savedLevel = process.env['LOG_LEVEL'];
-    delete process.env['LOG_LEVEL'];
+    savedLevel = process.env.LOG_LEVEL;
+    delete process.env.LOG_LEVEL;
   });
 
   afterEach(() => {
     if (savedLevel === undefined) {
-      delete process.env['LOG_LEVEL'];
+      delete process.env.LOG_LEVEL;
     } else {
-      process.env['LOG_LEVEL'] = savedLevel;
+      process.env.LOG_LEVEL = savedLevel;
     }
   });
 
@@ -37,13 +37,13 @@ describe('createLogger', () => {
   });
 
   it('reads the level from the LOG_LEVEL env var', () => {
-    process.env['LOG_LEVEL'] = 'debug';
+    process.env.LOG_LEVEL = 'debug';
     const logger = createLogger();
     expect(logger.level).toBe('debug');
   });
 
   it('prefers an explicit level option over the env var', () => {
-    process.env['LOG_LEVEL'] = 'warn';
+    process.env.LOG_LEVEL = 'warn';
     const logger = createLogger({ level: 'error' });
     expect(logger.level).toBe('error');
   });

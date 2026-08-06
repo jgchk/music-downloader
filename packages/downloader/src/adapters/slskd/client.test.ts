@@ -135,7 +135,7 @@ describe('SlskdClient', () => {
       const { http } = recordingClient({ status: 500, body: 'boom' });
       const client = new SlskdClient(http);
 
-      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).rejects.toThrowError(/500/);
+      await expect(client.getOr('/api/v0/transfers/downloads/u', {})).rejects.toThrow(/500/);
     });
 
     it('returns undefined for an empty 2xx body, like a plain GET', async () => {

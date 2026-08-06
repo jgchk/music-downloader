@@ -29,7 +29,7 @@ import type { ContractFixture } from '../support/fixture.js';
  * summary before committing.
  */
 
-const BASE = process.env['PLEX_API_BASE_URL'] ?? 'https://plex.tv/api/v2';
+const BASE = process.env.PLEX_API_BASE_URL ?? 'https://plex.tv/api/v2';
 const OUT = path.join(CONTRACT_FIXTURE_ROOT, 'plextv');
 const TODAY = new Date().toISOString().slice(0, 10);
 

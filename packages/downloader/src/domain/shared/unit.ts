@@ -16,7 +16,10 @@ import type { Brand } from './brand.js';
  */
 export type Unit = Brand<number, 'Unit'>;
 
-export type OutOfUnitRange = { readonly kind: 'OutOfUnitRange'; readonly value: number };
+export interface OutOfUnitRange {
+  readonly kind: 'OutOfUnitRange';
+  readonly value: number;
+}
 
 /** Parse-don't-validate: a finite in-range number becomes a {@link Unit}, anything else an error. */
 export function parseUnit(value: number): Result<Unit, OutOfUnitRange> {

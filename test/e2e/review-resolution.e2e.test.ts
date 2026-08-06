@@ -50,7 +50,7 @@ import {
  * the download supervisor's stall watch and burn the candidate.
  */
 
-const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
+const SLSKD_ADMIN = process.env.E2E_SLSKD_ADMIN_URL ?? 'http://localhost:8082/__admin';
 
 /** Candidate B's staged subdir (stubs/slskd/scripted): it differs from candidate A in
  *  username, path, AND size — the downloader's rejected-candidate dedupe keys on that triple,

@@ -18,8 +18,11 @@ import type { MbScoredRelease } from './schemas.js';
  * well-formed. The seed keeps the intent legible while the value satisfies the UUID guard.
  */
 function fakeMbid(seed: string): string {
-  const hex = [...seed]
-    .map((character) => character.codePointAt(0)!.toString(16).padStart(2, '0'))
+  // `Array.from`, not a spread: the seeds are ASCII literals, so walking them by code point is
+  // exact here — and saying so explicitly keeps it clear no rich-text handling is intended.
+  const hex = Array.from(seed, (character) =>
+    character.codePointAt(0)!.toString(16).padStart(2, '0'),
+  )
     .join('')
     .padEnd(32, '0')
     .slice(0, 32);

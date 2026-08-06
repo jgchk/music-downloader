@@ -578,7 +578,7 @@ describe('CatchUpSubscription', () => {
     // defect, but it must still reach the operator through the reset's declared error channel.
     const rejectingCheckpoints = {
       load: (name: string) => checkpoints.load(name),
-      save: () => ResultAsync.fromSafePromise<void, never>(Promise.reject(new Error('store gone'))),
+      save: () => ResultAsync.fromSafePromise<void>(Promise.reject(new Error('store gone'))),
     };
     const sub = subscription({ checkpoints: rejectingCheckpoints });
 

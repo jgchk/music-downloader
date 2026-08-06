@@ -71,7 +71,7 @@ describe('plex.tv fixtures', () => {
     // The recorder preserves which consumed fields the wire carried (and their null-ness) but
     // every present string value must be the pseudonym — nothing real survives.
     expect(['id', 'title', 'username']).toEqual(expect.arrayContaining(Object.keys(body)));
-    expect(body['id']).toBe(1);
+    expect(body.id).toBe(1);
     for (const field of ['username', 'title']) {
       if (typeof body[field] === 'string') expect(body[field]).toMatch(/^user\d+$/);
       else expect([null, undefined]).toContain(body[field]);
@@ -89,9 +89,9 @@ describe('plex.tv fixtures', () => {
       // Names the offending keys on failure (and cannot be "fixed" into the inverse assertion,
       // which would let unscrubbed fields through).
       expect(Object.keys(entry).filter((key) => !allowed.has(key))).toEqual([]);
-      expect(entry['clientIdentifier']).toMatch(/^machine-\d+$/);
-      if ('provides' in entry) expect(typeof entry['provides']).toBe('string');
-      if ('owned' in entry) expect(typeof entry['owned']).toBe('boolean');
+      expect(entry.clientIdentifier).toMatch(/^machine-\d+$/);
+      if ('provides' in entry) expect(typeof entry.provides).toBe('string');
+      if ('owned' in entry) expect(typeof entry.owned).toBe('boolean');
     }
   });
 
