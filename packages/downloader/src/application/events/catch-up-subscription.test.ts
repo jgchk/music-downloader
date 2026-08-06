@@ -130,7 +130,7 @@ describe('CatchUpSubscription', () => {
     expect(handled).toEqual([3]);
   });
 
-  it('surfaces a faulted checkpoint read instead of silently replaying from zero unremarked', async () => {
+  it('halts on a faulted checkpoint read instead of replaying the whole feed from zero', async () => {
     const { stream, lines } = collectingDestination();
     feed.events = [seamEvent(1), seamEvent(2)];
     checkpoints.failLoad = true;
@@ -138,9 +138,13 @@ describe('CatchUpSubscription', () => {
 
     await sub.start();
 
+    // A faulted read knows nothing about what this consumer has already seen; treating it as
+    // "fresh consumer at 0" would redeliver the producer's entire history behind a healthy-
+    // looking readiness. Nothing is delivered, and the module reports itself down.
+    expect(handled).toEqual([]);
+    expect(sub.isHalted).toBe(true);
     expect(lines.some((line) => line.includes('checkpoint load failed'))).toBe(true);
     expect(lines.some((line) => line.includes('seam:test'))).toBe(true);
-    expect(handled).toEqual([1, 2]); // still resumes safely from the log start
   });
 
   it('a wakeup is only a hint — the fallback poll alone still delivers', async () => {
@@ -375,6 +379,48 @@ describe('CatchUpSubscription', () => {
     await sub.reset();
 
     expect(sub.isHalted).toBe(true);
+  });
+
+  it('a failed reset leaves the in-memory cursor on the durable checkpoint, not the requested one', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    const sub = subscription();
+    await sub.start();
+    checkpoints.failSaves = true;
+
+    const outcome = await sub.reset();
+    checkpoints.failSaves = false;
+    await sub.poll();
+
+    // Moving the cursor before the save lands would replay everything the durable checkpoint
+    // still covers — on a reset the operator was explicitly told had failed.
+    expect(outcome.isErr()).toBe(true);
+    expect(handled).toEqual([1, 2]);
+  });
+
+  it('reset waits out an in-flight drain, so its Ok arm is the durable truth', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    const gate = Promise.withResolvers<void>();
+    const arrival = Promise.withResolvers<void>();
+    const sub = subscription({
+      handler: async (event) => {
+        arrival.resolve();
+        await gate.promise;
+        handled.push(event.globalSeq);
+        return ok(undefined);
+      },
+    });
+    const draining = sub.poll();
+    await arrival.promise;
+
+    const resetting = sub.reset();
+    await sub.poll(); // a poll landing mid-reset is dropped, never raced against the save
+    gate.resolve();
+    const outcome = await resetting;
+    await draining;
+
+    // An advance from the drain must not land behind the reset's save and falsify its Ok.
+    expect(outcome.isOk()).toBe(true);
+    expect(await checkpointOf()).toBe(0);
   });
 
   it('reset lifts a halt so a fixed poison event can be reattempted', async () => {
