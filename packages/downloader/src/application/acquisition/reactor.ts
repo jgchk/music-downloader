@@ -181,6 +181,10 @@ export class Reactor {
               return;
             }
           }
+          // `pending` is set true by the wakeup path and false here, across an
+          // await. TypeScript does not invalidate property narrowing across a call, so it reads the flag as
+          // constant — deleting this condition would break wakeup coalescing outright.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         } while (this.pending);
       } finally {
         this.running = false;

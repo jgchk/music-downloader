@@ -6,6 +6,7 @@ import {
   plexResourcesSchema,
   plexUserSchema,
 } from '../../src/lib/server/plex/schemas.js';
+import type { PlexResources, PlexUser } from '../../src/lib/server/plex/schemas.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
 import { startFixtureServer } from './support/server.js';
@@ -41,10 +42,22 @@ function adapter(machineId: string): PlexTvAccess {
   return new PlexTvAccess({ baseUrl: server.baseUrl, machineId });
 }
 
-interface RecordedResource {
-  clientIdentifier: string;
-  provides?: string;
-  owned?: boolean;
+/**
+ * A recorded resource entry, typed from the PRODUCTION schema rather than restated here — one
+ * source of truth for the wire shape, so a schema change can never leave this tier asserting
+ * against a stale hand-written claim.
+ */
+type RecordedResource = PlexResources[number];
+
+/**
+ * The recorded account, with its username witnessed as a real string first: the schema declares
+ * `username` `.nullish()`, so an assertion comparing the adapter's username to an ABSENT recorded
+ * one would pass vacuously (`undefined === undefined`) and prove nothing about the membership read.
+ */
+function recordedUser(): PlexUser {
+  const user = bodyOf('user.json', plexUserSchema);
+  expect(typeof user.username).toBe('string');
+  return user;
 }
 
 /** The first recorded (pseudonymized) clientIdentifier — a machine the account provably sees. */
@@ -121,7 +134,7 @@ describe('plex.tv contract (tier 1)', () => {
     // leads with the owner's server turns this outcome into `granted`; assuming the denied shape
     // would fail on exactly the handoff step this tier is waiting for.)
     const outcome = result._unsafeUnwrap();
-    const user = bodyOf('user.json', plexUserSchema);
+    const user = recordedUser();
     expect(outcome.kind === 'granted' ? outcome.identity.username : outcome.username).toBe(
       user.username,
     );
@@ -138,7 +151,7 @@ describe('plex.tv contract (tier 1)', () => {
 
   it('denies membership for a machine id absent from the recorded resources', async () => {
     const result = await adapter('not-a-recorded-machine').checkMembership('a-token');
-    const user = bodyOf('user.json', plexUserSchema);
+    const user = recordedUser();
     expect(result._unsafeUnwrap()).toEqual({
       kind: 'denied',
       username: user.username,
@@ -157,7 +170,7 @@ describe('plex.tv contract (tier 1)', () => {
       // The predicate's narrowing, witnessed against wire data: an identifier the account provably
       // sees is NOT admission unless that entry declares `provides: server`.
       const result = await adapter(nonServerEntry()!.clientIdentifier).checkMembership('a-token');
-      const user = bodyOf('user.json', plexUserSchema);
+      const user = recordedUser();
       expect(result._unsafeUnwrap()).toMatchObject({ kind: 'denied', username: user.username });
     },
   );
@@ -170,7 +183,7 @@ describe('plex.tv contract (tier 1)', () => {
     'grants — with the role plex.tv reports — for a recorded entry that declares a server',
     async () => {
       const recorded = recordedServer()!;
-      const user = bodyOf('user.json', plexUserSchema);
+      const user = recordedUser();
       const result = await adapter(recorded.clientIdentifier).checkMembership('a-token');
       expect(result._unsafeUnwrap()).toEqual({
         kind: 'granted',

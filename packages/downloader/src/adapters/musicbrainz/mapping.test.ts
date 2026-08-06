@@ -18,8 +18,8 @@ import type { MbScoredRelease } from './schemas.js';
  * well-formed. The seed keeps the intent legible while the value satisfies the UUID guard.
  */
 function fakeMbid(seed: string): string {
-  // `Array.from`, not a spread: the seeds are ASCII literals, so walking them by code point is
-  // exact here — and saying so explicitly keeps it clear no rich-text handling is intended.
+  // `Array.from` with a map fn rather than a mapped spread: same string-iterator walk, one pass,
+  // and it is the form the lint profile prefers. The seeds are ASCII literals either way.
   const hex = Array.from(seed, (character) =>
     character.codePointAt(0)!.toString(16).padStart(2, '0'),
   )

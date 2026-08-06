@@ -48,12 +48,16 @@ function resolveRef(spec: Json, ref: unknown): Json | undefined {
   return asObject(node);
 }
 
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 /** The parameter names an operation declares for one location (`path` or `query`). */
 function paramNames(pathItem: Json, operation: Json, location: 'path' | 'query'): Set<string> {
-  const params = [
-    ...((pathItem.parameters as unknown[]) ?? []),
-    ...((operation.parameters as unknown[]) ?? []),
-  ];
+  // `parameters` is absent on most path items, so the `?? []` here was doing real work — but the
+  // `as unknown[]` in front of it asserted non-null and made the type system believe otherwise.
+  // Narrowing instead of asserting keeps the runtime behaviour and stops the cast lying about it.
+  const params = [...asArray(pathItem.parameters), ...asArray(operation.parameters)];
   const names = new Set<string>();
   for (const raw of params) {
     const param = asObject(raw);

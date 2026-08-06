@@ -284,63 +284,84 @@ export default tseslint.config(
     rules: {
       'import/no-restricted-paths': restrictedPathsRule,
       '@typescript-eslint/consistent-type-imports': 'error',
-      // The one rule admitted from eslint-plugin-sonarjs. The `recommended` set (279 rules) was run
+      // The one rule admitted from eslint-plugin-sonarjs. Its `recommended` config carries 279 rule
+      // keys but only 217 armed ones — 62 ship as `'off'` in the preset — and that armed set was run
       // repo-wide once and triaged rule-by-rule: 18 rules had findings, 130 in total, and exactly
-      // one cleared the admission bar (docs/development/quality-gates.md). The tally, with a reason
-      // per rejected rule, is in openspec/changes/deterministic-floor/design.md D3.
+      // one cleared the admission bar (docs/development/quality-gates.md). That headline —
+      // 18 rules with findings, 130 findings, 1 admitted — is recorded HERE because this comment is
+      // the durable record; the per-rule reasons live in D3 of the adopting change's design doc
+      // (deterministic-floor, archived under openspec/changes/archive/), which is a convenience
+      // reference, not the source of truth, precisely because archiving moves its path.
       //
       // Enabling the one admitted rule rather than `recommended`-minus-seventeen is itself an
-      // admission-contract call, and the measurement is the argument: the full set cost +15.7s
-      // (+63%) on cold lint — the gate's longest lane — while this single rule costs +0.3s (+1.2%).
-      // A rule that is switched off still costs the time to decide it does not apply. This block is
-      // also why the plugin survives at all; task 2.4 drops the dependency on a zero-admission run.
+      // admission-contract call, and the measurement is the argument: the full set cost roughly
+      // +16s (~+65%) on cold lint — the gate's longest lane — while this single rule costs about
+      // +0.3s (~+1%). The figures are approximate on purpose: two independent runs on the same tree
+      // measured +15.7s/+63% and +17.1s/+66%, which is the precision a wall-clock lint benchmark
+      // actually has. A rule that is switched off still costs the time to decide it does not apply.
+      // This block is also why the plugin survives at all; task 2.4 drops the dependency on a
+      // zero-admission run.
       //
       // It lives in the PRODUCTION profile rather than the test-code block even though only test
-      // code can trip it (it rewrites `expect(x.length).toBe(n)` into `toHaveLength(n)` and
-      // `includes(…)).toBe(true)` into `toContain(…)`). Scoping it to the test globs would make it
+      // code can trip it (it rewrites `expect(x.length).toBe(n)` into `toHaveLength(n)`,
+      // `includes(…)).toBe(true)` into `toContain(…)`, and `toBe(null)` into `toBeNull()` — all
+      // three rewrites were applied). Scoping it to the test globs would make it
       // the first rule test code has that production lacks, inverting this config's one-way
       // invariant — tiers run the production profile MINUS named carve-outs — and the rule-profile
       // suite fails on exactly that. Repo-wide it simply never matches outside a test.
       'sonarjs/prefer-specific-assertions': 'error',
       // ── strict-tier carve-outs (deterministic-floor) ──────────────────────────────────────────
-      // Three rules from `strictTypeChecked` are rejected under the admission contract
-      // (docs/development/quality-gates.md): each one's findings on THIS repo were reviewed
-      // one-by-one and were essentially all false, so keeping them would teach the loop to appease
-      // a rule rather than fix a defect. Tuned options are preferred over disables wherever an
-      // option separates the true positives from the false ones.
+      // Three rules the strict tiers arm are rejected under the admission contract
+      // (docs/development/quality-gates.md) — note "tiers", plural: `no-empty-function` comes from
+      // `stylisticTypeChecked`, the other two from `strictTypeChecked`. They are rejected on TWO
+      // different grounds, not one. For `no-invalid-void-type` and `no-empty-function` the findings
+      // on THIS repo were reviewed one-by-one and every one was false, so keeping them would teach
+      // the loop to appease a rule rather than fix a defect. `no-non-null-assertion` is rejected on
+      // a settings CONFLICT instead: some of its findings are real, and it is off anyway because the
+      // fix this repo's other settings force is worse than the finding (see its comment below).
+      // Tuned options are preferred over disables wherever an option separates the true positives
+      // from the false ones.
       //
       // Every `void` finding here was `okAsync<void, E>(undefined)`, `errAsync<void, E>(…)`,
-      // `ok<void, E>(…)` or `Promise.withResolvers<void>()` — i.e. the repo's errors-as-values
-      // core idiom (a command that succeeds with no value) and the standard deferred-promise API.
-      // `allowInGenericTypeArguments` (on by default) covers type REFERENCES like `Promise<void>`
-      // but not explicit type arguments at a CALL site, which is the only shape this repo writes.
-      // 31/31 findings false; no option separates them. Rejected.
+      // `ok<void, E>(…)`, `ResultAsync.fromSafePromise<void>(…)` or `Promise.withResolvers<void>()`
+      // — i.e. the repo's errors-as-values core idiom (a command that succeeds with no value) and
+      // the standard deferred-promise API. `allowInGenericTypeArguments` (on by default) covers type
+      // REFERENCES like `Promise<void>` — which this repo writes constantly — but not explicit type
+      // arguments at a CALL site, which is the only shape the rule flags here. 31/31 findings false;
+      // no option separates them. Rejected.
       '@typescript-eslint/no-invalid-void-type': 'off',
-      // An empty body is how this codebase deliberately says "do nothing" in two sanctioned
-      // shapes: `.map(() => {})`, the neverthrow idiom that discards a success value to narrow
-      // `ResultAsync<T, E>` to `ResultAsync<void, E>`, and the no-op port method on a test double
-      // that must implement an interface it does not exercise. Both are intentional; the rule's
-      // real quarry — a body someone forgot to write — is indistinguishable from them here.
-      // 34/34 findings false. Rejected.
+      // An empty body is how this codebase deliberately says "do nothing", in three sanctioned
+      // shapes — and two of the three are PRODUCTION, so this is not a test-only relaxation.
+      // (1) `.map(() => {})`, the neverthrow idiom that discards a success value to narrow
+      // `ResultAsync<T, E>` to `ResultAsync<void, E>` (both packages' application `use-cases.ts`).
+      // (2) The beets bridge's promise-queue tail, `next.then(() => {}, () => {})` (importer
+      // adapters/beets/bridge-adapter.ts), where both arms normalize the queue's settled state so
+      // the next job runs exactly once on either outcome — neither a `.map` nor a test double.
+      // (3) The no-op port method, disposer, or callback on a test double that must implement an
+      // interface it does not exercise (`interval: () => () => {}`, `subscribe: () => () => {}`,
+      // a silent log destination). All three are intentional; the
+      // rule's real quarry — a body someone forgot to write — is indistinguishable from them here.
+      // 35/35 findings false. Rejected. (34/34 at triage time; the slskd contract tier landed one
+      // more shape-(3) port double before merge.)
       '@typescript-eslint/no-empty-function': 'off',
-      // TypeScript does not invalidate property narrowing across an `await` or a method call, so
-      // every flag-mutated-elsewhere field in this event-driven codebase reads as constant: the
-      // reactor/subscription `pending` wakeup-coalescing flag (set true by `notify`, read by the
-      // drain loop) and the slskd watch `aborted` latch (set true by `stop`, read mid-tick) both
-      // report "value is always falsy". Deleting those conditions — which is what the rule asks —
-      // would silently break wakeup coalescing and abort handling. 6 of 11 findings false against
-      // a <10% bar, and the 5 true ones are pure clarity, no defects. Rejected.
-      '@typescript-eslint/no-unnecessary-condition': 'off',
       // Tuned, not disabled: interpolating a number is unambiguous and ubiquitous here (durations,
-      // byte counts, ports, retry rounds — 95 of 108 findings). The dangerous cases stay armed,
-      // which is the point: `${string | undefined}` silently renders "undefined" into a log line,
-      // a path, or a URL, and this run found real instances of exactly that.
-      // Every other allowance is pinned false ON PURPOSE. An options object REPLACES the strict
-      // tier's entry rather than merging with it, and this rule's own defaults are permissive
+      // byte counts, ports, retry rounds — 97 of 108 findings; 90 plain `number`, 6 numeric
+      // literals, 1 `number | "by signal"`). The dangerous cases stay armed, which is the point:
+      // `${string | undefined}` silently renders "undefined" into a log line, a path, or a URL, and
+      // this run found real instances of exactly that. Those are now fixed, so re-running the rule
+      // today with `allowNumber: false` reports the 97 numeric ones and nothing else.
+      // Every other BOOLEAN allowance is pinned false ON PURPOSE. An options object REPLACES the
+      // strict tier's entry rather than merging with it, and this rule's own defaults are permissive
       // (`allowAny`, `allowBoolean`, `allowNullish`, `allowRegExp` all default true) — so writing
       // `{ allowNumber: true }` alone would have quietly re-admitted `any` and nullish
       // interpolation while looking like a one-word relaxation. Naming them keeps the relaxation
       // exactly one type wide.
+      // One allowance is NOT pinned and stays in force: the rule's own `defaultOptions` carry
+      // `allow: [{ name: ['Error', 'URL', 'URLSearchParams'], from: 'lib' }]`, and typescript-eslint
+      // deep-merges defaults under a user options object rather than replacing them, so those three
+      // lib types remain interpolable. Deliberate — `${error}` and `${url}` are the shapes their
+      // `toString` exists for — but it means "everything else is false" is a claim about the
+      // booleans only.
       '@typescript-eslint/restrict-template-expressions': [
         'error',
         {
@@ -362,18 +383,50 @@ export default tseslint.config(
       // `T | undefined`; coverage thresholds are 100% including branches. Replacing such an index's
       // `!` with a guard or a `?? fallback` therefore adds a branch that cannot execute, which then
       // has to be silenced with a `v8 ignore` — trading a visible, greppable assertion for an
-      // invisible coverage waiver, which is strictly worse. 34 of 38 findings were indices already
-      // bounded by their own loop or a length guard (the LCS table in web/src/lib/diff.ts, the
-      // duration-pairing loop, `parts.at(-1)` on a `split` result that cannot be empty).
+      // invisible coverage waiver, which is strictly worse.
+      //
+      // COUNTS, stated both ways because the rule is disabled REPO-WIDE while the triage below is
+      // production-only. Armed repo-wide it reports 270 findings: 38 in production and 232 in test
+      // code, the latter overwhelmingly `arr[0]!` / `mock.calls[0]!` fixture indexing. A reader who
+      // re-runs the rule and sees 270 is not seeing a regression; the 38 are the subset that was
+      // reviewed one-by-one, and it has stayed 38 across every re-measurement — the repo-wide number
+      // tracks test-tier growth, which is why it is not the number the triage rests on.
+      // Of those 38, 33 are indices already bounded by their own loop or a
+      // length guard (the LCS table in web/src/lib/diff.ts, the duration-pairing loop,
+      // `parts.at(-1)` on a `split` result that cannot be empty).
+      //
+      // The coverage half of that argument is narrower than the whole set and only claims what it
+      // covers: 12 of the 38 sit outside the coverage gate altogether — 5 in downloader
+      // `src/domain/acquisition/__fixtures__/`, 4 in the two packages' `scripts/` schema generators,
+      // 3 in `scripts/release/` — because vitest's coverage `include` is `packages/*/src/**` with
+      // `__fixtures__` excluded (vitest.config.ts). A guard at those 12 buys no `v8 ignore`, so they
+      // rest on the plainer ground: the assertion is honest and the guard would be unreachable noise.
       //
       // The rule was still worth RUNNING once, and the run is why the rejection is evidence-based
-      // rather than assumed. Its four non-index findings were `transfer.id!` in the slskd staged-
-      // file resolver, asserting a wire field the schema declares `.optional()` — traced through,
-      // that one is masked (an unresolvable id fails the resolver's own size check) so it degrades
-      // diagnosis — a generic "did not report N file(s)" after five pointless re-polls — rather
-      // than corrupting data. Left as-is deliberately: naming it accurately means failing fast,
-      // which in that adapter means authoring a throw, and converting it to the Result channel is a
-      // design change this gate-focused work has no business making. Recorded as a follow-up.
+      // rather than assumed. Its five non-index findings are four in the slskd staged-file resolver
+      // and one in `scripts/release/bump.ts` — `RELEASABLE_TYPES.has(type!)`, a regex capture-group
+      // destructure whose match already proved the group present, not an index at all.
+      //
+      // The staged-file four are two `transfer.id!` assertions and two `Map.get()!` assertions, and
+      // they do not share a reason. The `transfer.id!` pair (staged-files.ts:48 and :58) asserts a
+      // wire field the schema declares `.optional()` — traced through, that one is masked (an
+      // unresolvable id fails the resolver's own size check) so it degrades diagnosis — a generic
+      // "did not report N file(s)" after five pointless re-polls — rather than corrupting data. Left
+      // as-is deliberately: naming it accurately means failing fast, which in that adapter means
+      // authoring a throw, and converting it to the Result channel is a design change this
+      // gate-focused work has no business making. Recorded as a follow-up.
+      //
+      // The two `Map.get()!` assertions are the opposite case, and they STRENGTHEN the rejection
+      // rather than sit under it, because both are provably total. `resolved.get(…)!`
+      // (staged-files.ts:58) is only reachable after `resolveStaged` returns, and its sole
+      // non-throwing exit is `if (resolved.size === wantedIds.size) return resolved;`
+      // (staged-files.ts:113) — every wanted id therefore has a key by construction.
+      // `nameByRemote.get(transfer.filename)!` (staged-files.ts:57) cannot miss because
+      // `pollOwnedTransfers(…, wanted)` filters transfers to `wanted.has(transfer.filename)`
+      // (poll.ts), and `wanted` is built from the same
+      // `remoteFilename(candidate.identity.path, file.name)` keys that populate `nameByRemote`
+      // (download.ts:169 and staged-files.ts:52). Replacing either with a guard would add a branch
+      // no test can reach — which is exactly the trade the first paragraph rejects.
       // A check can earn a one-shot audit without earning a permanent seat in the gate; that
       // distinction is the admission contract's (docs/development/quality-gates.md).
       '@typescript-eslint/no-non-null-assertion': 'off',

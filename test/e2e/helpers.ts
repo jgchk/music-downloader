@@ -18,7 +18,13 @@ import { IMPORT_VOICE_PHRASE, statusPhrase } from '../../packages/web/src/lib/co
  * bind-mounted SQLite event stores (the spec's "stores are durable, not in-memory" evidence).
  */
 
-export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
+// An exported-but-empty E2E_BASE_URL means "no harness" exactly as an unset one does (a CI shell
+// exports the variable unconditionally) — folded the same way as the other two readers
+// (packages/web/playwright.config.ts, packages/web/tests/auth.ts), so no reader can end up
+// driving requests at an empty base URL.
+const harnessUrl = process.env.E2E_BASE_URL === '' ? undefined : process.env.E2E_BASE_URL;
+
+export const BASE_URL = harnessUrl ?? 'http://localhost:3000';
 export const DATA_DIR = process.env.E2E_DATA_DIR ?? path.join(process.cwd(), '.e2e-tmp');
 
 /** The harness secret run.sh handed the container — a throwaway that guards nothing real. */
@@ -119,15 +125,32 @@ export async function submitAcquisition(mbid: string): Promise<string> {
   return id;
 }
 
-/** Read an acquisition's status text from its detail page's `data-testid="status"` marker. */
-export async function readStatus(id: string): Promise<string | undefined> {
+/**
+ * A detail-page read: the status marker's text when the page rendered one, ALONGSIDE the HTTP
+ * status of the read itself. Two very different diagnoses collapse into "no status" — a page the
+ * harness could not read (401/403/404/500) and a page that rendered with no status marker — and
+ * only the HTTP code tells them apart, so a timeout message must carry both.
+ */
+interface StatusRead {
+  http: number;
+  status?: string;
+}
+
+async function readStatusDetail(id: string): Promise<StatusRead> {
   const res = await fetch(`${BASE_URL}/acquisitions/${id}`, {
     signal: AbortSignal.timeout(3000),
     headers: { Cookie: sessionCookieHeader() },
   });
-  if (!res.ok) return undefined;
+  if (!res.ok) return { http: res.status };
   const html = await res.text();
-  return /data-testid="status"[^>]*>([^<]+)</.exec(html)?.[1]?.trim();
+  const status = /data-testid="status"[^>]*>([^<]+)</.exec(html)?.[1]?.trim();
+  return { http: res.status, status };
+}
+
+/** Read an acquisition's status text from its detail page's `data-testid="status"` marker. */
+export async function readStatus(id: string): Promise<string | undefined> {
+  const read = await readStatusDetail(id);
+  return read.status;
 }
 
 // The detail page's status marker speaks the human status phrases (legible-acquisition-history),
@@ -147,14 +170,14 @@ const TERMINAL = new Set([
 export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const status = await readStatus(id);
+    const { http, status } = await readStatusDetail(id);
     if (status !== undefined && TERMINAL.has(status)) return status;
     if (Date.now() >= deadline) {
-      // `readStatus` genuinely yields undefined — an unreachable page, or a render with no status
-      // marker — and that is a different diagnosis from a status that never advanced, so name it
-      // rather than interpolating the bare word "undefined".
+      // "no status read" is not one diagnosis: an unreadable page and a rendered page with no
+      // status marker are different bugs, and the HTTP code of the last read separates them — so
+      // report it alongside, rather than interpolating a bare "undefined" over both.
       throw new Error(
-        `acquisition ${id} did not settle in time (last status: ${status ?? 'none read'})`,
+        `acquisition ${id} did not settle in time (last status: ${status ?? 'none read'}, last HTTP ${String(http)})`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -173,11 +196,11 @@ export async function pollForStatus(
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const status = await readStatus(id);
+    const { http, status } = await readStatusDetail(id);
     if (status !== undefined && phrases.has(status)) return status;
     if (Date.now() >= deadline) {
       throw new Error(
-        `acquisition ${id} never showed ${[...phrases].join(' / ')} (last: ${status ?? 'none read'})`,
+        `acquisition ${id} never showed ${[...phrases].join(' / ')} (last: ${status ?? 'none read'}, last HTTP ${String(http)})`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));

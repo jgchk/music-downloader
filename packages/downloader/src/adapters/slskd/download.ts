@@ -370,6 +370,10 @@ export class SlskdDownload implements DownloadPort {
           }
           consecutiveTickFailures = 0;
         } catch (error) {
+          // `aborted` is latched true by stop() while this
+          // tick is in flight. TypeScript does not invalidate property narrowing across an await, so it reads
+          // the latch as constant — deleting this condition would break shutdown handling.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (watch.aborted) {
             // A latched watch's in-flight tick failing (e.g. against torn-down infrastructure at
             // shutdown) is the expected wind-down, not a retry — say so and exit.

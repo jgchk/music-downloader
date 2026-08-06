@@ -74,11 +74,11 @@ export async function startFixtureServer(
         res.end(body === undefined ? '' : JSON.stringify(body));
         return;
       }
-      if (req.method === 'DELETE' && url.pathname.includes('/transfers/downloads/')) {
-        // slskd's documented 204 for a cancel/remove. Kept as a fallback because teardown issues one
-        // DELETE per transfer per phase and recording every combination would pin the adapter's
-        // round count rather than its contract; the `?remove=` values it sends ARE asserted, from
-        // `server.requests`, by the teardown replay test.
+      // slskd's documented 204 for a cancel/remove. Kept as a fallback because teardown issues one
+      // DELETE per transfer per phase and recording every combination would pin the adapter's
+      // round count rather than its contract; the `?remove=` values it sends ARE asserted, from
+      // `server.requests`, by the teardown replay test.
+      if (method === 'DELETE' && url.pathname.includes('/transfers/downloads/')) {
         res.writeHead(204);
         res.end();
         return;
