@@ -37,6 +37,17 @@ interface EventRow {
 /** Thrown inside the append transaction to roll it back on a version mismatch. */
 class ConcurrencyBreak extends Error {}
 
+/** Thrown inside a read's row mapping to surface an upcaster registration gap as the read's
+ * modeled InfraError (the registry itself refuses as a value; no throw escapes the port). */
+class UpcastGapBreak extends Error {
+  constructor(gap: { type: string; arrivedAt: number; unappliedFrom: number }) {
+    super(
+      `upcast gap for ${gap.type}: chain arrived at v${gap.arrivedAt} with a step still ` +
+        `registered from v${gap.unappliedFrom} — refusing to serve a stale shape`,
+    );
+  }
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE';
 }
@@ -155,11 +166,14 @@ export class SqliteEventStore implements EventStorePort {
       streamId: row.stream_id,
       version: row.version,
       type: row.type as ImportEventType,
-      event: this.upcasters.upcast(
-        row.type,
-        row.schema_version,
-        JSON.parse(row.data) as Record<string, unknown>,
-      ),
+      event: this.upcasters
+        .upcast(row.type, row.schema_version, JSON.parse(row.data) as Record<string, unknown>)
+        .match(
+          (event) => event,
+          (gap) => {
+            throw new UpcastGapBreak(gap);
+          },
+        ),
       metadata: JSON.parse(row.metadata) as EventMetadata,
     };
   }

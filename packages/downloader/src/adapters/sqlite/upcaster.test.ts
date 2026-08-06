@@ -2,11 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { UpcasterRegistry, buildUpcasterRegistry } from './upcaster.js';
 
 describe('UpcasterRegistry', () => {
+  it('refuses a gapped chain as a value instead of serving a stale shape', () => {
+    // Steps {1→2, 3→4} with no 2→3: a v1 row walks to 2 and stops while a step from 3 remains
+    // unapplied above it — a registration gap. Serving the v2 shape to evolve would be silent
+    // corruption; the registry surfaces it as a value for the store's modeled error channel.
+    const registry = new UpcasterRegistry()
+      .register('Widened', 1, (data) => ({ ...data, two: true }))
+      .register('Widened', 3, (data) => ({ ...data, four: true }));
+
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'UpcastGap',
+      type: 'Widened',
+      arrivedAt: 2,
+      unappliedFrom: 3,
+    });
+  });
+
   it('is pass-through when nothing is registered (the MVP)', () => {
     const registry = new UpcasterRegistry();
     const data = { type: 'AcquisitionExhausted' };
 
-    expect(registry.upcast('AcquisitionExhausted', 1, data)).toEqual({
+    expect(registry.upcast('AcquisitionExhausted', 1, data)._unsafeUnwrap()).toEqual({
       type: 'AcquisitionExhausted',
     });
   });
@@ -16,7 +35,7 @@ describe('UpcasterRegistry', () => {
       .register('Widened', 1, (data) => ({ ...data, two: true }))
       .register('Widened', 2, (data) => ({ ...data, three: true }));
 
-    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true }) as Record<
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true })._unsafeUnwrap() as Record<
       string,
       unknown
     >;
@@ -31,7 +50,7 @@ describe('UpcasterRegistry', () => {
     }));
 
     // Stored at version 2: no upcaster registered for v2, so it is already current.
-    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true }) as Record<
+    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true })._unsafeUnwrap() as Record<
       string,
       unknown
     >;
@@ -44,7 +63,7 @@ describe('buildUpcasterRegistry — ManualSelectionRequested v1 → v2', () => {
   const registry = buildUpcasterRegistry();
 
   function upcast(data: Record<string, unknown>): Record<string, unknown> {
-    return registry.upcast('ManualSelectionRequested', 1, data);
+    return registry.upcast('ManualSelectionRequested', 1, data)._unsafeUnwrap();
   }
 
   it('drops a v1 trackCount: 0 sentinel to absent and passes a real count through', () => {
@@ -74,6 +93,6 @@ describe('buildUpcasterRegistry — ManualSelectionRequested v1 → v2', () => {
       type: 'ManualSelectionRequested',
       candidates: [{ releaseMbid: 'b', title: 'Unknown' }],
     };
-    expect(registry.upcast('ManualSelectionRequested', 2, v2)).toEqual(v2);
+    expect(registry.upcast('ManualSelectionRequested', 2, v2)._unsafeUnwrap()).toEqual(v2);
   });
 });

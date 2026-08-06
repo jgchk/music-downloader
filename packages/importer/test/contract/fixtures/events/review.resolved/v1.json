@@ -1,0 +1,14 @@
+{
+  "provenance": {
+    "recordedAt": "2026-07-23T00:00:00.000Z",
+    "schemaVersion": 1,
+    "note": "The v1 on-disk shape of an internal ReviewResolved event. Under v1 the rejection-of-a-bad-delivery resolution was stored under the downloader's action verb (reject-and-retry-download) before the importer's own-language rename to reject-unusable-delivery. FROZEN — never regenerate; the upcaster must fold this shape forever."
+  },
+  "event": {
+    "type": "ReviewResolved",
+    "resolution": {
+      "kind": "reject-and-retry-download",
+      "reasons": ["corrupt rip", "wrong pressing"]
+    }
+  }
+}

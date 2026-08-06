@@ -27,7 +27,7 @@ describe('buildUpcasterRegistry', () => {
   it('lifts a v1 ReviewResolved rejection and leaves a v2 one alone', () => {
     const registry = buildUpcasterRegistry();
 
-    expect(registry.upcast('ReviewResolved', 1, legacyRejectResolvedData(['corrupt rip']))).toEqual(
+    expect(registry.upcast('ReviewResolved', 1, legacyRejectResolvedData(['corrupt rip']))._unsafeUnwrap()).toEqual(
       {
         type: 'ReviewResolved',
         resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
@@ -39,7 +39,7 @@ describe('buildUpcasterRegistry', () => {
       resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
     };
     // Already current: returned by reference, not needlessly cloned.
-    expect(registry.upcast('ReviewResolved', CURRENT_SCHEMA_VERSION, v2)).toBe(v2);
+    expect(registry.upcast('ReviewResolved', CURRENT_SCHEMA_VERSION, v2)._unsafeUnwrap()).toBe(v2);
   });
 
   it('lifts a v1 ReviewResolved of a non-rejection kind through the wired path untouched', () => {
@@ -47,14 +47,14 @@ describe('buildUpcasterRegistry', () => {
     const v1 = { type: 'ReviewResolved', resolution: { kind: 'accept' } };
 
     // The rename only touches the rejection verb; other v1 resolutions flow through the registry.
-    expect(registry.upcast('ReviewResolved', 1, v1)).toBe(v1);
+    expect(registry.upcast('ReviewResolved', 1, v1)._unsafeUnwrap()).toBe(v1);
   });
 
   it('leaves a non-ReviewResolved type untouched', () => {
     const registry = buildUpcasterRegistry();
     const data = { type: 'ImportApplied', location: '/library/album' };
 
-    expect(registry.upcast('ImportApplied', 1, data)).toBe(data);
+    expect(registry.upcast('ImportApplied', 1, data)._unsafeUnwrap()).toBe(data);
   });
 });
 
@@ -63,7 +63,7 @@ describe('UpcasterRegistry', () => {
     const registry = new UpcasterRegistry();
     const data = { type: 'ImportApplied', location: '/library/album' };
 
-    expect(registry.upcast('ImportApplied', 1, data)).toEqual({
+    expect(registry.upcast('ImportApplied', 1, data)._unsafeUnwrap()).toEqual({
       type: 'ImportApplied',
       location: '/library/album',
     });
@@ -74,7 +74,7 @@ describe('UpcasterRegistry', () => {
       .register('Widened', 1, (data) => ({ ...data, two: true }))
       .register('Widened', 2, (data) => ({ ...data, three: true }));
 
-    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true }) as Record<
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true })._unsafeUnwrap() as Record<
       string,
       unknown
     >;
@@ -89,12 +89,31 @@ describe('UpcasterRegistry', () => {
     }));
 
     // Stored at version 2: no upcaster registered for v2, so it is already current.
-    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true }) as Record<
+    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true })._unsafeUnwrap() as Record<
       string,
       unknown
     >;
 
     expect(result).toEqual({ type: 'Widened', two: true });
+  });
+
+  it('refuses a gapped chain as a value instead of serving a stale shape', () => {
+    // Steps {1→2, 3→4} with no 2→3: a v1 row walks to 2 and stops while a step from 3 remains
+    // unapplied above it — a registration gap. Serving the v2 shape to evolve would be silent
+    // corruption; the registry surfaces it as a value for the store's modeled error channel.
+    const registry = new UpcasterRegistry()
+      .register('Widened', 1, (data) => ({ ...data, two: true }))
+      .register('Widened', 3, (data) => ({ ...data, four: true }));
+
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toEqual({
+      kind: 'UpcastGap',
+      type: 'Widened',
+      arrivedAt: 2,
+      unappliedFrom: 3,
+    });
   });
 
   it('passes a future/unknown schema version through untouched (forward compatibility)', () => {
@@ -105,7 +124,7 @@ describe('UpcasterRegistry', () => {
 
     // A newer writer stamped v5; this reader knows only a v1→v2 step. With no upcaster registered at
     // or above v5, the payload is already at-or-beyond the reader's latest shape and flows through.
-    const result = registry.upcast('Widened', 5, { type: 'Widened', future: true }) as Record<
+    const result = registry.upcast('Widened', 5, { type: 'Widened', future: true })._unsafeUnwrap() as Record<
       string,
       unknown
     >;
