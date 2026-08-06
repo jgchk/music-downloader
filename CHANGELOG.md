@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.3](https://github.com/jgchk/music-downloader/compare/v3.17.2...v3.17.3) (2026-08-06)
+
+### Bug Fixes
+
+* **slskd:** tell one story about a failed download, whichever path saw it ([d661f04](https://github.com/jgchk/music-downloader/commit/d661f04ad25b388de1824384fa378c9fe32c1542))
 ## [3.17.2](https://github.com/jgchk/music-downloader/compare/v3.17.1...v3.17.2) (2026-08-06)
 
 ### Bug Fixes
