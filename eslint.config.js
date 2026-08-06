@@ -267,7 +267,7 @@ export default tseslint.config(
   },
   {
     files: ['**/*.ts'],
-    extends: [...tseslint.configs.recommendedTypeChecked],
+    extends: [...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -282,6 +282,81 @@ export default tseslint.config(
     rules: {
       'import/no-restricted-paths': restrictedPathsRule,
       '@typescript-eslint/consistent-type-imports': 'error',
+      // ── strict-tier carve-outs (deterministic-floor) ──────────────────────────────────────────
+      // Three rules from `strictTypeChecked` are rejected under the admission contract
+      // (docs/development/quality-gates.md): each one's findings on THIS repo were reviewed
+      // one-by-one and were essentially all false, so keeping them would teach the loop to appease
+      // a rule rather than fix a defect. Tuned options are preferred over disables wherever an
+      // option separates the true positives from the false ones.
+      //
+      // Every `void` finding here was `okAsync<void, E>(undefined)`, `errAsync<void, E>(…)`,
+      // `ok<void, E>(…)` or `Promise.withResolvers<void>()` — i.e. the repo's errors-as-values
+      // core idiom (a command that succeeds with no value) and the standard deferred-promise API.
+      // `allowInGenericTypeArguments` (on by default) covers type REFERENCES like `Promise<void>`
+      // but not explicit type arguments at a CALL site, which is the only shape this repo writes.
+      // 31/31 findings false; no option separates them. Rejected.
+      '@typescript-eslint/no-invalid-void-type': 'off',
+      // An empty body is how this codebase deliberately says "do nothing" in two sanctioned
+      // shapes: `.map(() => {})`, the neverthrow idiom that discards a success value to narrow
+      // `ResultAsync<T, E>` to `ResultAsync<void, E>`, and the no-op port method on a test double
+      // that must implement an interface it does not exercise. Both are intentional; the rule's
+      // real quarry — a body someone forgot to write — is indistinguishable from them here.
+      // 34/34 findings false. Rejected.
+      '@typescript-eslint/no-empty-function': 'off',
+      // TypeScript does not invalidate property narrowing across an `await` or a method call, so
+      // every flag-mutated-elsewhere field in this event-driven codebase reads as constant: the
+      // reactor/subscription `pending` wakeup-coalescing flag (set true by `notify`, read by the
+      // drain loop) and the slskd watch `aborted` latch (set true by `stop`, read mid-tick) both
+      // report "value is always falsy". Deleting those conditions — which is what the rule asks —
+      // would silently break wakeup coalescing and abort handling. 6 of 11 findings false against
+      // a <10% bar, and the 5 true ones are pure clarity, no defects. Rejected.
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      // Tuned, not disabled: interpolating a number is unambiguous and ubiquitous here (durations,
+      // byte counts, ports, retry rounds — 95 of 108 findings). The dangerous cases stay armed,
+      // which is the point: `${string | undefined}` silently renders "undefined" into a log line,
+      // a path, or a URL, and this run found real instances of exactly that.
+      // Every other allowance is pinned false ON PURPOSE. An options object REPLACES the strict
+      // tier's entry rather than merging with it, and this rule's own defaults are permissive
+      // (`allowAny`, `allowBoolean`, `allowNullish`, `allowRegExp` all default true) — so writing
+      // `{ allowNumber: true }` alone would have quietly re-admitted `any` and nullish
+      // interpolation while looking like a one-word relaxation. Naming them keeps the relaxation
+      // exactly one type wide.
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        {
+          allowNumber: true,
+          allowAny: false,
+          allowBoolean: false,
+          allowNullish: false,
+          allowRegExp: false,
+          allowNever: false,
+        },
+      ],
+      // Tuned, not disabled: `() => clearInterval(handle)` and `(listener) => bus.subscribe(…)`
+      // are disposer and adapter shapes where the arrow body IS the effect and the "return" is an
+      // artifact of concise syntax. The rule stays armed for the case that actually confuses —
+      // an explicit `return voidCall()` in a block body, which reads as if it yields something.
+      '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
+      // Rejected on a direct conflict with two settings this repo holds MORE strictly than the rule
+      // assumes. `noUncheckedIndexedAccess` is on, so every provably-in-bounds array index types as
+      // `T | undefined`; coverage thresholds are 100% including branches. Replacing such an index's
+      // `!` with a guard or a `?? fallback` therefore adds a branch that cannot execute, which then
+      // has to be silenced with a `v8 ignore` — trading a visible, greppable assertion for an
+      // invisible coverage waiver, which is strictly worse. 34 of 38 findings were indices already
+      // bounded by their own loop or a length guard (the LCS table in web/src/lib/diff.ts, the
+      // duration-pairing loop, `parts.at(-1)` on a `split` result that cannot be empty).
+      //
+      // The rule was still worth RUNNING once, and the run is why the rejection is evidence-based
+      // rather than assumed. Its four non-index findings were `transfer.id!` in the slskd staged-
+      // file resolver, asserting a wire field the schema declares `.optional()` — traced through,
+      // that one is masked (an unresolvable id fails the resolver's own size check) so it degrades
+      // diagnosis — a generic "did not report N file(s)" after five pointless re-polls — rather
+      // than corrupting data. Left as-is deliberately: naming it accurately means failing fast,
+      // which in that adapter means authoring a throw, and converting it to the Result channel is a
+      // design change this gate-focused work has no business making. Recorded as a follow-up.
+      // A check can earn a one-shot audit without earning a permanent seat in the gate; that
+      // distinction is the admission contract's (docs/development/quality-gates.md).
+      '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -423,10 +498,12 @@ export default tseslint.config(
   {
     files: testFiles,
     rules: {
-      // NB: `@typescript-eslint/no-non-null-assertion` is deliberately NOT switched off here.
-      // `recommendedTypeChecked` never enables it (it lives in `strict`), so an `'off'` would have
-      // been dead config diverging from nothing — while implying production bans `!`, which it does
-      // not. Turning it on for production is a real change (29 sites), tracked as a follow-up.
+      // NB: `@typescript-eslint/no-non-null-assertion` is still deliberately NOT switched off here,
+      // and the reason has changed since the profile bump. It used to be absent because
+      // `recommendedTypeChecked` never enabled it. `strictTypeChecked` does enable it — but the
+      // production block above rejects it repo-wide (see the justification there), so an `'off'`
+      // here would once again be dead config diverging from nothing, and would falsely imply that
+      // production bans `!`. The rule-profile suite fails on exactly that overclaim.
       // vitest mocks are referenced unbound in assertions (expect(fn).toHaveBeen…).
       '@typescript-eslint/unbound-method': 'off',
       // Test code names things after the vocabulary of the thing under test — a recorded HTTP

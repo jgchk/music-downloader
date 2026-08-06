@@ -195,7 +195,7 @@ describe('acquisition detail load', () => {
 
   it('404s a missing acquisition', () => {
     const facade = { getAcquisition: () => ({ ok: false, error: { kind: 'NotFound' } }) };
-    expect(() => load(eventFor(facade))).toThrowError(
+    expect(() => load(eventFor(facade))).toThrow(
       expect.toSatisfy((thrown: unknown) => isHttpError(thrown) && thrown.status === 404),
     );
   });

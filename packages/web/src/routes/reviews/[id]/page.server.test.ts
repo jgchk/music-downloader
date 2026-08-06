@@ -68,7 +68,7 @@ describe('review detail load', () => {
 
   it('404s when no review is open for the id', () => {
     const facade = { listPendingReviews: () => ({ reviews: [] }) };
-    expect(() => load(eventFor(facade))).toThrowError(
+    expect(() => load(eventFor(facade))).toThrow(
       expect.toSatisfy((thrown: unknown) => isHttpError(thrown) && thrown.status === 404),
     );
   });

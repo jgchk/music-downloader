@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { ESLint } from 'eslint';
 import type { Linter } from 'eslint';
+import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 import config from '../../eslint.config.js';
 
@@ -78,8 +79,10 @@ const CLI_ENTRYPOINTS_IN_TEST_TIERS = [
 
 /**
  * The rules the test-code carve-out switches off, derived below and compared against this list.
- * `@typescript-eslint/no-non-null-assertion` is deliberately absent: `recommendedTypeChecked` never
- * enables it, so the carve-out's `'off'` diverges from nothing.
+ * `@typescript-eslint/no-non-null-assertion` is deliberately absent, and stayed absent through the
+ * strict-tier bump: `strictTypeChecked` does enable it, but the production profile rejects it
+ * repo-wide, so a carve-out `'off'` here would diverge from nothing. The "names no rule production
+ * never enabled" scenario below is what keeps that distinction honest.
  */
 const TEST_CODE_DIVERGENCE = [
   '@typescript-eslint/unbound-method',
@@ -174,6 +177,62 @@ async function divergenceFrom(baseline: string, file: string): Promise<string[]>
   const names = new Set([...Object.keys(left), ...Object.keys(right)]);
   return [...names].filter((rule) => entryOf(left[rule]) !== entryOf(right[rule])).toSorted(byName);
 }
+
+/**
+ * The rules the strict tiers enable that the production profile deliberately switches back off.
+ * Each one is rejected under the admission contract (docs/development/quality-gates.md) with its
+ * reasoning at the disable site in `eslint.config.js`; this list is the checkable half of that
+ * claim. Adding a carve-out without declaring it here fails the scenario below — which is the
+ * whole point, because a silent `'off'` is exactly how a strict profile decays back into a weak
+ * one while every lane stays green.
+ */
+const STRICT_TIER_CARVE_OUTS = [
+  '@typescript-eslint/no-empty-function',
+  '@typescript-eslint/no-invalid-void-type',
+  '@typescript-eslint/no-non-null-assertion',
+  '@typescript-eslint/no-unnecessary-condition',
+];
+
+/** Every rule the two strict tiers arm, flattened across their config objects. */
+function rulesEnabledByStrictTiers(): string[] {
+  const tiers = [...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked];
+  const enabled = new Set<string>();
+  for (const entry of tiers) {
+    const declared = Object.entries(entry.rules ?? {});
+    // Later tiers override earlier ones, and they do switch rules back OFF (the base-eslint rule a
+    // typed rule replaces, for one), so this folds in order rather than unioning.
+    for (const [rule, value] of declared) {
+      if (severityOf(value as Linter.RuleEntry) === 'off') enabled.delete(rule);
+      else enabled.add(rule);
+    }
+  }
+  return [...enabled].toSorted(byName);
+}
+
+describe('the strict typed profile', () => {
+  it('arms every rule the strict tiers publish, except the declared carve-outs', async () => {
+    // The constitutional claim is "the production profile extends the STRICTEST typed tiers"
+    // (module-architecture). Naming the tiers in `extends` is not that claim — a tier can be named
+    // and then hollowed out rule-by-rule, which is the drift this pins. Deriving the expectation
+    // from the tier packages themselves means a toolchain upgrade that adds a rule shows up here
+    // as a decision to make, not as silence.
+    const production = await rulesFor(PRODUCTION_BASELINE);
+    const off = rulesEnabledByStrictTiers().filter(
+      (rule) => severityOf(production[rule]) !== 'error',
+    );
+
+    expect(off).toEqual(STRICT_TIER_CARVE_OUTS);
+  });
+
+  it('declares no carve-out for a rule the strict tiers never armed', () => {
+    // The mirror of the scenario above, and the same overclaim the test-code carve-out already
+    // guards against: a name in the list that no tier enables would describe a profile the repo
+    // does not have, and would keep passing forever.
+    const armed = new Set(rulesEnabledByStrictTiers());
+
+    expect(STRICT_TIER_CARVE_OUTS.filter((rule) => !armed.has(rule))).toEqual([]);
+  });
+});
 
 describe('the production Result rule', () => {
   it('is armed as an error on every production tier', async () => {
