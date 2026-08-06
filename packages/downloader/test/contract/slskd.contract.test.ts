@@ -26,9 +26,9 @@ import {
   reasonFromTransfer,
 } from '../../src/adapters/slskd/transfers.js';
 import type { Candidate } from '../../src/domain/candidate/candidate.js';
+import { parseCandidateIdentity } from '../../src/domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../src/domain/policy/policies.js';
 import type { DownloadPolicyInput } from '../../src/domain/policy/policies.js';
-import { asCandidateIdentity } from '../../src/domain/shared/__fixtures__/candidate-identity.js';
 import { createTarget } from '../../src/domain/target/target.js';
 import type { Timer } from '../../src/adapters/slskd/timer.js';
 import { loadFixtures, loadScenario } from './support/fixture.js';
@@ -146,11 +146,14 @@ function candidateFor(scenario: string, filename: string): Candidate {
   const body = fixtureOf(scenario, 'transfers-poll.json').response.body as { username: string };
   const transfer = transfersIn(scenario).find((t) => t.filename === filename)!;
   return {
-    identity: asCandidateIdentity({
+    // Built through the domain's own parser, not a branding helper: a fixture that forges a
+    // value object proves nothing about the shape the system can actually hold, which is the
+    // defect this tier's DownloadPolicy fixture had.
+    identity: parseCandidateIdentity({
       username: body.username,
       path: filename,
       sizeBytes: transfer.size ?? 0,
-    }),
+    })._unsafeUnwrap(),
     files: [{ name: baseName(filename), sizeBytes: transfer.size ?? 0 }],
     source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 1 },
   };
