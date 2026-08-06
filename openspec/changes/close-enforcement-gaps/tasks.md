@@ -77,3 +77,42 @@ than deferred.
       now use the shared `testFiles` constant, whose doc comment enumerates the full six-rule
       divergence; design D13 corrected (two rules were added, not one) and D2 amended to record
       the thunk shape actually shipped.
+
+## 7. Review convergence (cycle 4 — the closing pass)
+
+The list carried into this cycle, closed. Each guard test below was proven red against the
+unfixed code (or against the plausible wrong fix) before being trusted.
+
+- [x] 7.1 **Critical** — the `must-use-result` blind-spot comment was wrong about the rule it
+      documents: it claimed `Result.combine` arguments still flag (the rule has a dedicated
+      acceptance path for them) and presented the rule's own message as the acceptance set, which
+      really has six positions. Rewritten from the pinned plugin source.
+- [x] 7.2 **Critical** — the rule itself was unguarded: deleting it from the config cannot
+      produce a violation, so every lane stayed green. `test/boundaries/rule-profile.test.ts`
+      resolves the config per tier and fails on the deletion (verified: deleting only the
+      production occurrence turns four scenarios red).
+- [x] 7.3 The `testFiles` "exactly six rules" comment was wrong in both directions —
+      `no-non-null-assertion` was dead config (`recommendedTypeChecked` never enables it), and
+      the CLI entrypoints swept in by the same globs diverge by a different set. Dead line
+      removed, both sets now derived from the resolved config and compared to the comment.
+- [x] 7.4 The downloader subscription lacked the importer's permanent-render-defect halt, so a
+      render defect in the verdict mapping would wedge `seam:verdicts` forever while `/health`
+      answered 200. Halt added, and the standing-hold log now names the failure on both sides.
+      Design D18; spec delta extended.
+- [x] 7.5 The seam-error kind crosses the ACL as a bare string with nothing pinning the two
+      sides together. Each module declares its kinds in `seam-contract.json`; both contract tiers
+      pin both roles. Proven by mutation in both directions.
+- [x] 7.6 `stop()` did not await the in-flight drain, so a cycle could resume after
+      `database.close()`. Now async and awaited by both runtimes and the web composition root.
+      Proven against the plausible wrong fix (an async `stop()` that skips the await).
+- [x] 7.7 Stale decisions corrected: D12 named release tooling as a CLI carve-out member (it is
+      deliberately excluded, having zero `process.exit` calls) and fixed a hit count nothing
+      checks; D10 claimed nothing was hand-listed when the guard's own floor and the web lane's
+      reach both are; D16 called the reset serialization a boolean gate when it is a counter and
+      a queue. D17 records the counter/queue/`fromPromise` reasoning.
+- [x] 7.8 The spec delta claimed readiness reports down "naming the fault", which the
+      `{ status }` shape cannot deliver. The scenario now says what is true: readiness reports
+      down and the fault is named in a structured log line.
+- [x] 7.9 The `.svelte` `must-use-result` blind spot documented — the component block cannot be
+      type-aware, and the rule needs the type checker, so a discarded Result in a
+      `<script lang="ts">` is invisible to lint.

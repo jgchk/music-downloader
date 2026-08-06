@@ -104,8 +104,19 @@ claim the file.
 **D10 — Two typecheckers, so two coverage assertions.** `ts.getParsedCommandLineOfConfigFile` never
 lists a `.svelte` file (the compiler does not know the extension), so the boundaries tier proves
 `.ts` coverage by tsconfig membership and `.svelte` coverage by containment in `svelte-check`'s
-project root. Both the tsconfig set and the source set are *discovered*, not listed, so a new tier
-or project counts the moment it lands.
+project root. The tsconfig set and the source set are *discovered* by a filesystem walk, so a new
+tier or project counts the moment it lands.
+
+*Corrected in cycle 4:* this decision used to end "discovered, not listed", which read as though
+nothing here is hand-maintained. Two lists are, and both are load-bearing. `REQUIRED_TIERS` is a
+deliberate hand-written floor: every coverage scenario is `expect(<filtered list>).toEqual([])`, so
+a walk that discovered *nothing* would pass all of them — the floor turns an empty or truncated
+discovery into a failure. `WEB_LANE_REACH`/`WEB_LANE_EXCLUSIONS` are declared rather than parsed at
+coverage time, because reading the project `svelte-kit sync` generates would make this lane's
+verdict depend on whether the `web` lane had run yet; a separate scenario re-derives both from that
+generated config *whenever it is on disk* and fails on drift, with absence skipping rather than
+failing. So: discovery is discovered, the guard's own floor and the web lane's reach are declared
+and cross-checked.
 
 **D11 — Deviation from D5 on the `conventional-changelog` typings.** The measurement predicted
 missing typings needing a local `.d.ts`; the truth is that those packages ship types and
@@ -113,10 +124,18 @@ missing typings needing a local `.d.ts`; the truth is that those packages ship t
 `{}`. A `.d.ts` cannot repair a return type without a duplicate-identifier conflict, so the fix is a
 named local `Preset` interface derived from the *consumers'* signatures plus one documented cast.
 
-**D12 — `unicorn/no-process-exit` gets a named CLI carve-out.** Nine hits, all in real command-line
-programs (release tooling, schema generators, contract recorders and drift checkers) where an exit
-status *is* the interface — which is what unicorn's own rule text says. The rule stays on
-everywhere else, where a bare exit would tear down the process serving both modules and the web UI.
+**D12 — `unicorn/no-process-exit` gets a named CLI carve-out.** Every hit is in a real command-line
+program — the two event-schema generators and the contract recorders/drift checkers — where an exit
+status *is* the interface, which is what unicorn's own rule text says. The rule stays on everywhere
+else, where a bare exit would tear down the process serving both modules and the web UI.
+
+*Corrected in cycle 4:* this decision originally listed "release tooling" among the carve-out's
+members and fixed the count at nine. Neither held. `scripts/**` is deliberately **outside**
+`cliEntrypoints`: the release tier has zero `process.exit` calls — it uses the better
+`process.exitCode` idiom, which the rule does not flag — so listing it would have disabled the rule
+over ~14 files (six of them unit suites) that never needed it. The config comment said exactly
+that, and this decision contradicted it. The hit count is left unstated rather than re-pinned: it
+is a number that moves with every recorder added, and nothing checks it.
 
 **D14 — Gate cost, measured.** `pnpm check` went from ~22s to ~27s wall (parallel mode), the whole
 delta in the lint lane, which now covers ~66 more files; the new `typecheck:tiers` lane runs eight
@@ -172,9 +191,55 @@ sprawling: the two runtime factories are long `async` boot functions, and `SeamF
 `OutboundFeed.read` / `ConsumeHandler` are a *structural* port whose shape is mirrored by fakes
 across four test tiers. (b) The Ok arm over-promised under concurrency: unserialized, a poll's
 `advance` could land just behind the reset's save, leaving the durable checkpoint ahead of
-`toGlobalSeq` while `reset` reported the replay armed. A `resetting` gate now drops polls for the
-duration and the reset awaits the in-flight cycle out; the drain's coalescing semantics are
-untouched (a dropped tick is re-fired by the interval).
+`toGlobalSeq` while `reset` reported the replay armed. Polls are now dropped while a reset is in
+flight, and the reset awaits the in-flight cycle out; the drain's coalescing semantics are untouched
+(a dropped tick is re-fired by the interval). *Corrected in cycle 4:* (b) above described the
+mechanism as a `resetting` **gate**. It is a counter and a queue, and the difference is the whole
+point — see D17.
+
+**D17 — Why the reset serialization is a counter and a queue, not a boolean, and why
+`fromPromise`.** Three mechanism choices in `reset()` that each look like an over-complication
+until the alternative is written out.
+
+*A counter (`resets`), not a boolean `resetting`.* With a boolean, two overlapping resets both set
+it and whichever finished FIRST cleared it — re-admitting the drain while the second reset's save
+was still in flight. That is the same falsified "replay armed" Ok the serialization exists to
+prevent, merely narrowed to the concurrent-reset case. A counter is only released when the last
+reset leaves.
+
+*A queue (`resetQueue`), not just the counter.* The counter keeps the *drain* out; it does not order
+the resets against each other. Two resets to different positions would otherwise race their saves
+and the loser's Ok would describe a checkpoint the winner had already overwritten. Each reset awaits
+the previous one's settled promise, then the in-flight drain, then saves.
+
+*`ResultAsync.fromPromise`, not `new ResultAsync`.* The constructor does not catch: a checkpoint
+store that *rejects* rather than answering with a Result would escape the declared error channel
+entirely and surface as an unhandled rejection — in the composed monolith, on the one process
+serving both modules and the web UI. `fromPromise` converts it into the modeled `InfraError` the
+signature already promises. The same reasoning drives the `settled()` barrier: a drain's rejection
+stays the awaiting `poll` caller's to handle, and the barrier copy swallows it only so that the
+barrier itself can never become a second unhandled rejection.
+
+**D18 — The two subscriptions are one behaviour, and neither may write after `stop()`.** Cycle 4
+found the twins had drifted. (a) The importer halted on a permanent `RenderError` from the feed;
+the downloader folded it into the transient hold path, so a render defect in the importer's verdict
+mapping would wedge `seam:verdicts` on one position forever — re-read every five seconds, never
+delivered, never skipped — while `/health` answered 200, because a module reports `down` only when
+its subscription halts. This is the same class as the boot-fault Critical in D15 and gets the same
+policy: halt, hold the checkpoint, report `down`. (b) `stop()` detached the wakeup listener and the
+fallback timer and returned. That cancels the *next* cycle, not the one already draining — and both
+runtimes close the event-store handle on the following line, so an in-flight cycle went on reading
+the feed and saving checkpoints against a closed database, which is the exact error loop the detach
+was written to prevent. `stop()` is now async and awaits the settled in-flight barrier; both module
+runtimes and the web composition root await it in turn.
+
+Also settled here: the seam-error **kind** is the one part of the feed contract that crosses as a
+bare string, because `SeamFeed.read`'s error is a consumer-owned structural `{ kind: string }` and
+importing the producer's `RenderError` would be a shared kernel. Nothing pinned the two sides to the
+same literal, so a rename on one side alone would degrade the halt into a silent hold. Each module
+now declares its published kinds in a `seam-contract.json` its own contract tier owns, and both
+tiers pin both roles against those files — the same cross-package *file read* the recorded event
+fixtures already use, which keeps `src` free of the import.
 
 ## Open Questions
 
