@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.0](https://github.com/jgchk/music-downloader/compare/v3.16.2...v3.17.0) (2026-08-06)
+
+### Features
+
+* **web:** require a server resource for admission and give sessions a role ([fe651a5](https://github.com/jgchk/music-downloader/commit/fe651a53cea6f1adbe121d24ea658cfc252b4d3f))
+
+### Bug Fixes
+
+* **web:** close the tripwire's scan hole and sharpen the refusal signals ([fc3dd76](https://github.com/jgchk/music-downloader/commit/fc3dd761eea51cc165d6681edc28fe5be6ff312a))
+* **web:** keep the forged-server escalation unarmed and make refusals diagnosable ([827af22](https://github.com/jgchk/music-downloader/commit/827af228faeca99be2e611f0909af539583130ad))
+* **web:** log the probe denial without detaching pino's receiver ([fd71c6e](https://github.com/jgchk/music-downloader/commit/fd71c6e6105ba82f02a26ed8d157a4a1845b0a70))
 ## [3.16.2](https://github.com/jgchk/music-downloader/compare/v3.16.1...v3.16.2) (2026-08-06)
 
 ### Bug Fixes
