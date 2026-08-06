@@ -96,6 +96,22 @@ export interface PrepEffects {
 }
 
 /**
+ * Anchor the computed version into package.json's source text, preserving every other byte. Returns
+ * `null` when the anchor finds no purchase — the pattern not matching, or first-match semantics
+ * landing the rewrite somewhere other than the manifest's own version field — verified by parsing
+ * the result rather than trusting the replace. A `null` means the caller must fail loudly: the old
+ * shell wrote the unchanged file back and logged "prepared" over a prep that never happened.
+ */
+export function anchorVersion(source: string, version: string): string | null {
+  const anchored = source.replace(/("version":\s*)"[^"]*"/, `$1"${version}"`);
+  try {
+    return (JSON.parse(anchored) as { version?: unknown }).version === version ? anchored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The version:prep orchestration, parameterised over its reader and effects so both the write path
  * and the `--check` gate (including the concurrent-branch collision guard) can be exercised without
  * touching the process. {@link main} supplies the real reader + effects; the CLI behaviour is
@@ -118,7 +134,14 @@ export async function run(
     // Write mode: apply the computed state to the working tree for the developer to commit. Anchor
     // package.json's version (preserving the branch's other package.json edits) and rebuild
     // CHANGELOG.md from its base content so the section is prepended exactly once.
-    const pkg = readFileSync(PKG, 'utf8').replace(/("version":\s*)"[^"]*"/, `$1"${version}"`);
+    const pkg = anchorVersion(readFileSync(PKG, 'utf8'), version);
+    if (pkg === null) {
+      abort(
+        `version:prep: could not anchor ${version} in ${PKG} — the "version" field pattern found ` +
+          `no purchase, so the file was left untouched. Fix the anchor in version-prep.ts before ` +
+          `trusting this prep.`,
+      );
+    }
     writeFileSync(PKG, pkg);
 
     if (bumped && section !== null) {
