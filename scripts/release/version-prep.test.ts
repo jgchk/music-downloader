@@ -257,3 +257,33 @@ describe('anchorVersion', () => {
     expect(anchorVersion(source, '3.5.4')).toBeNull();
   });
 });
+
+describe('run (write-path anchor guard)', () => {
+  it('aborts and writes nothing when the manifest cannot be anchored', async () => {
+    const logs: string[] = [];
+    const writes: string[] = [];
+    const reader = fakeReader({
+      tags: ['v3.5.3'],
+      commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
+    });
+
+    await expect(
+      run(reader, false, {
+        fail: (message: string): never => {
+          throw new Error(message);
+        },
+        log: (message: string) => {
+          logs.push(message);
+        },
+        manifest: {
+          read: () => '{ "name": "music-downloader", "ver": "3.5.3" }',
+          write: (content: string) => {
+            writes.push(content);
+          },
+        },
+      }),
+    ).rejects.toThrow(/could not anchor 3\.5\.4 .* left untouched/);
+    expect(writes).toEqual([]);
+    expect(logs).toEqual([]);
+  });
+});

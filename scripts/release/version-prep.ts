@@ -80,9 +80,15 @@ export async function compute(reader: ReleaseReader): Promise<Computed> {
   return { version, bumped: true, section };
 }
 
+/** Thrown by {@link fail} after reporting, so the CLI catch below can tell "already reported and
+ * coded" from an unexpected defect. */
+class PrepFailure extends Error {}
+
 function fail(message: string): never {
   process.stderr.write(`${message}\n`);
-  process.exit(1);
+  // exitCode (not exit()): let the process drain naturally so the stderr write cannot be raced.
+  process.exitCode = 1;
+  throw new PrepFailure(message);
 }
 
 /**
@@ -93,6 +99,12 @@ function fail(message: string): never {
 export interface PrepEffects {
   fail: (message: string) => never;
   log: (message: string) => void;
+  /**
+   * package.json IO, injectable so the write path's anchor guard is testable through {@link run};
+   * defaults to the real file. CHANGELOG stays direct-to-disk — the guard aborts before either
+   * write, so the manifest seam alone is enough to prove "aborts and touches nothing".
+   */
+  manifest?: { read: () => string; write: (content: string) => void };
 }
 
 /**
@@ -120,7 +132,7 @@ export function anchorVersion(source: string, version: string): string | null {
 export async function run(
   reader: ReleaseReader,
   check: boolean,
-  { fail: abort, log }: PrepEffects,
+  { fail: abort, log, manifest }: PrepEffects,
 ): Promise<void> {
   // Best-effort: CI checks out with full history/tags; locally the developer may already have them.
   reader.fetch();
@@ -134,15 +146,21 @@ export async function run(
     // Write mode: apply the computed state to the working tree for the developer to commit. Anchor
     // package.json's version (preserving the branch's other package.json edits) and rebuild
     // CHANGELOG.md from its base content so the section is prepended exactly once.
-    const pkg = anchorVersion(readFileSync(PKG, 'utf8'), version);
+    const io = manifest ?? {
+      read: () => readFileSync(PKG, 'utf8'),
+      write: (content: string) => writeFileSync(PKG, content),
+    };
+    const pkg = anchorVersion(io.read(), version);
     if (pkg === null) {
-      abort(
+      // `return` because `abort` is a parameter binding: CFA does not treat the bare call as
+      // never-returning, and `never` is assignable to the return type — this is the narrowing.
+      return abort(
         `version:prep: could not anchor ${version} in ${PKG} — the "version" field pattern found ` +
           `no purchase, so the file was left untouched. Fix the anchor in version-prep.ts before ` +
           `trusting this prep.`,
       );
     }
-    writeFileSync(PKG, pkg);
+    io.write(pkg);
 
     if (bumped && section !== null) {
       writeFileSync(CHANGELOG, assembleChangelog(reader.baseChangelog(), section));
@@ -201,6 +219,15 @@ async function main(): Promise<void> {
 // Run only as the CLI entry point; importing the module (the unit tests) must not touch the tree.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   void main().catch((error: unknown) => {
-    fail(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof PrepFailure) return; // already reported + exit-coded by fail()
+    // An unexpected defect. The half-mutation window: a throw after the manifest write but
+    // before the CHANGELOG write leaves package.json already bumped — say so instead of letting
+    // a "failed" prep hide a mutated tree.
+    process.stderr.write(
+      `version:prep: ${error instanceof Error ? error.message : String(error)}\n` +
+        `If this failed mid-write, package.json may already carry the bump — review the ` +
+        `working tree (jj diff) before re-running.\n`,
+    );
+    process.exitCode = 1;
   });
 }
