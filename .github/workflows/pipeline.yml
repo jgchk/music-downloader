@@ -174,7 +174,9 @@ jobs:
           E2E_SKIP_BUILD: '1'
         run: pnpm test:e2e
       - name: Upload Playwright traces (parity-phase failures)
-        if: failure()
+        # cancelled() included: a job-timeout cancellation (the new timeout-minutes ceilings) must
+        # still surface its diagnostics, or a wedge dies unexplained.
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-traces
@@ -193,11 +195,26 @@ jobs:
         if: steps.ver.outputs.released == 'false'
         run: |
           set -euo pipefail
+          # A missing/renamed step output interpolates as EMPTY STRING silently — without these
+          # guards a metadata-action drift would push zero tags, exit 0, and release over a
+          # nonexistent image (surfacing days later at deploy time).
+          TAGS="${{ steps.meta.outputs.tags }}"
+          if [ -z "${TAGS//[[:space:]]/}" ]; then
+            echo "::error::metadata produced no tags — refusing to release without publishing an image"
+            exit 1
+          fi
+          PUSHED=0
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             docker tag music-downloader:e2e "$tag"
             docker push "$tag"
-          done <<< "${{ steps.meta.outputs.tags }}"
+            PUSHED=$((PUSHED + 1))
+          done <<< "$TAGS"
+          if [ "$PUSHED" -lt 1 ]; then
+            echo "::error::zero tags pushed — the publish loop must move at least one tag"
+            exit 1
+          fi
+          echo "pushed ${PUSHED} tag(s) of the e2e-gated image"
 
       - name: Tag + GitHub Release
         if: steps.ver.outputs.released == 'false'
