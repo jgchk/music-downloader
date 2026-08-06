@@ -79,7 +79,9 @@ const RESOLUTION_GLOSS: Record<string, string> = Object.fromEntries(
 );
 
 function glossOf(map: Record<string, string>, code: string): string | undefined {
-  return (map as Partial<Record<string, string>>)[code];
+  // Object.hasOwn: an unknown code degrades to undefined, and a prototype key name must not
+  // resolve an inherited member into visible copy.
+  return Object.hasOwn(map, code) ? map[code] : undefined;
 }
 
 /** The auto-apply distance inverted to a whole match percentage (extends the v3.8.0 gloss). */
@@ -375,10 +377,10 @@ const STATUS_PHRASE: Readonly<Record<AcquisitionStatusResponseDto['status'], str
 export function statusPhrase(status: AcquisitionStatusResponseDto['status']): string {
   // Dual regime: STATUS_PHRASE is compile-total, and the lookup still degrades honestly for a
   // status this build cannot know — never the literal text "undefined" in the narrator's voice.
-  return (
-    (STATUS_PHRASE as Partial<Record<string, string>>)[status] ??
-    'This page can\u{2019}t describe this step yet'
-  );
+  // Object.hasOwn: prototype key names are unknown data, never inherited members.
+  return Object.hasOwn(STATUS_PHRASE, status)
+    ? STATUS_PHRASE[status]
+    : 'This page can\u{2019}t describe this step yet';
 }
 
 /**

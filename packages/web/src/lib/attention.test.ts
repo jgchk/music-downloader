@@ -48,6 +48,11 @@ describe('attentionItems', () => {
     expect(composed.kind).toBe('brand-new-review');
   });
 
+  it('treats an Object.prototype key name as an unknown review kind', () => {
+    const composed = attentionItems([review({ review: { kind: 'toString' as never } })], [])[0]!;
+    expect(composed.module).toBe('importer');
+  });
+
   it('maps a pending review to an item whose ask names the decision, titled by its basename', () => {
     expect(attentionItems([review({})], [])).toEqual([
       {
