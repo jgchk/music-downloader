@@ -6,9 +6,11 @@ import {
   importingHistory,
   matchingCandidate,
   sampleFiles,
+  sampleTarget,
 } from '../../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { publishedEventMapping } from '../../../src/interfaces/contracts/events/mapping.js';
-import { asMbid } from '../../../src/domain/shared/__fixtures__/mbid.js';
+import { parseMbid } from '../../../src/domain/shared/mbid.js';
+import { createTarget } from '../../../src/domain/target/target.js';
 import {
   eventFixturesDirectory,
   historySnapshots,
@@ -26,14 +28,25 @@ const OCCURRED_AT = '2026-07-19T12:00:00.000Z';
 const LOCATION = '/library/Radiohead/Kid A (2000)';
 const candidate = matchingCandidate('peer1');
 
+/**
+ * The published payload carries an mbid, so the recorded history resolves to a target that has one.
+ * Both the id and the target are built the way production builds them — `parseMbid` then
+ * `createTarget` — rather than patched onto the fixture target: a spread would forge the `Target`
+ * brand around whatever string was handed in, and the frozen fixture would then record a shape the
+ * system can never actually hold.
+ */
+const identifiedTarget = createTarget({
+  type: sampleTarget.type,
+  artist: sampleTarget.artist,
+  title: sampleTarget.title,
+  year: sampleTarget.year,
+  tracks: sampleTarget.tracks,
+  mbid: parseMbid('6e335887-60ba-38f0-95af-fae8774d20fd')._unsafeUnwrap(),
+})._unsafeUnwrap();
+
 const history: readonly AcquisitionEvent[] = [
   ...importingHistory([candidate]).map((event) =>
-    event.type === 'TargetResolved'
-      ? {
-          ...event,
-          target: { ...event.target, mbid: asMbid('6e335887-60ba-38f0-95af-fae8774d20fd') },
-        }
-      : event,
+    event.type === 'TargetResolved' ? { ...event, target: identifiedTarget } : event,
   ),
   { type: 'Imported', candidate: candidate.identity, location: LOCATION, files: sampleFiles },
   { type: 'AcquisitionFulfilled', location: LOCATION },
