@@ -57,9 +57,9 @@ function reviewItem(pending: PendingReviewDto, composedTitle: string | undefined
   return {
     // Structurally importer-owned: this item was composed from the importer's pending-review
     // read, so an unknown future kind keeps a factual module channel instead of breaking it.
-    module:
-      (MODULE_OF as Partial<Record<string, AttentionItem['module']>>)[pending.review.kind] ??
-      'importer',
+    module: Object.hasOwn(MODULE_OF, pending.review.kind)
+      ? MODULE_OF[pending.review.kind as keyof typeof MODULE_OF]
+      : 'importer',
     kind: pending.review.kind,
     id: pending.importId,
     // Musical intent first, then the staged basename, then the neutral phrase — sparse

@@ -39,6 +39,12 @@ describe('statusTone', () => {
     expect(statusTone('BrandNewStatus' as never)).toBe('pending');
   });
 
+  it('degrades Object.prototype key names like any unknown status', () => {
+    // 'toString' would resolve an inherited function from a plain record lookup; the degrade arm
+    // must treat prototype keys as unknown data, not members.
+    expect(statusTone('toString' as never)).toBe('pending');
+  });
+
   // The tone table stays a presentation mapping the web layer owns — exhaustive on purpose.
   it.each([
     ['Empty', 'pending'],
