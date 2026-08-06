@@ -18,9 +18,10 @@ import {
  * The single contract registry that binds a captured response — a recorded fixture or an E2E
  * WireMock stub — to the schema it must satisfy (change: external-api-contract-tests). Both the
  * fixture-conformance and stub-conformance checks read this map, so a recorded fixture, an E2E
- * double, and the runtime adapter can never disagree about a payload's shape. Endpoints whose
- * response the adapters do not consume (e.g. the transfer-enqueue acknowledgement) are absent by
- * design — there is no contract to hold them to.
+ * double, and the runtime adapter can never disagree about a payload's shape. Absence here is an
+ * ARTIFACT-level statement only ("this recorded body is not consumed"), declared explicitly in
+ * the unconsumed lists below — never an endpoint-level one: the same endpoint can have consumed
+ * shapes this tier has not yet witnessed (see the note on the enqueue rejection body below).
  */
 
 /** Recorded-fixture filename → schema. */
@@ -41,12 +42,31 @@ export const fixtureSchemas: Record<string, ZodType> = {
 };
 
 /**
- * Fixtures recorded for endpoints whose *response body* the adapters deliberately do not consume
- * (the request side is still exercised by the replay tier). Declaring them here is what lets the
+ * Recorded ARTIFACTS whose response body the adapters do not consume (the request side is still
+ * replay-asserted). This is a statement about the artifact, not the endpoint: the transfer-enqueue
+ * 201 ack's body is unconsumed, but the SAME endpoint's 4xx rejection body IS consumed
+ * (enqueueRejectionReason's peer-unavailable classification) and is unwitnessed pending the
+ * slskd-contract-truth change (task 2.3 records it live). Declaring an artifact here lets the
  * conformance suite skip schema validation without a silent early-return: every fixture on disk
- * must appear either in {@link fixtureSchemas} or in this list, exactly.
+ * must appear either in {@link fixtureSchemas} or here, exactly. The moment an adapter consumes
+ * one of these responses, MOVE the entry to {@link fixtureSchemas} (and
+ * {@link fixtureRequiredFields} where a guard branches on a field) — do not let it linger here.
  */
 export const unconsumedResponseFixtures: readonly string[] = ['slskd/transfers-enqueue.json'];
+
+/**
+ * E2E stub mappings whose response body the TS adapters do not consume, under the same
+ * artifact-granularity rules (and the same removal obligation) as
+ * {@link unconsumedResponseFixtures}. The beets MusicBrainz stub is consumed — by beets itself,
+ * whose contract is governed by the pinned-beets bridge tier, not by any TS schema this registry
+ * could hold it to.
+ */
+export const unconsumedStubMappings: readonly string[] = [
+  'musicbrainz/beets-release-ws2.json', // consumed by beets (Python), governed by the bridge tier's beets pin
+  'slskd/search-delete.json', // 204 body-less ack
+  'slskd/transfers-delete.json', // 204 body-less ack
+  'slskd/transfers-enqueue.json', // 201 empty-body ack; the 4xx rejection body is the slskd-contract-truth 2.3 item
+];
 
 /**
  * Consumed fields that must be *present* in a recorded capture, not merely allowed by the

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadFixtures } from './support/fixture.js';
@@ -7,7 +7,9 @@ import {
   fixtureSchemas,
   stubSchemas,
   unconsumedResponseFixtures,
+  unconsumedStubMappings,
 } from './support/registry.js';
+import { CONTRACT_FIXTURE_ROOT } from './support/fixture.js';
 
 /**
  * Conformance: every recorded fixture and every E2E stub payload must satisfy the same contract
@@ -19,11 +21,20 @@ import {
 // The E2E tier is product-level and lives at the workspace root (the stubs serve the whole loop).
 const STUB_ROOT = new URL('../../../../test/e2e/stubs/', import.meta.url).pathname;
 
+// Fixture directories validated by their own dedicated tiers, not this conformance suite —
+// events/ by the events-upcast + events-fold contract tests, ffprobe/ by the ffprobe contract
+// test. Everything else on disk is THIS suite's remit, so a new service directory fails the
+// completeness assertions below instead of escaping wholesale.
+const OWN_TIER_FIXTURE_DIRS = ['events', 'ffprobe'];
+
 describe('recorded fixtures conform to the contract', () => {
-  const fixtures = [
-    ...loadFixtures('musicbrainz').map((f) => ({ ...f, service: 'musicbrainz' })),
-    ...loadFixtures('slskd').map((f) => ({ ...f, service: 'slskd' })),
-  ];
+  const services = readdirSync(CONTRACT_FIXTURE_ROOT, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !OWN_TIER_FIXTURE_DIRS.includes(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+  const fixtures = services.flatMap((service) =>
+    loadFixtures(service).map((f) => ({ ...f, service })),
+  );
 
   it.each(fixtures)('$service/$name carries provenance', ({ fixture }) => {
     expect(fixture.provenance.source).toBeTruthy();
@@ -71,15 +82,40 @@ describe('recorded fixtures conform to the contract', () => {
 });
 
 describe('E2E stub payloads conform to the contract', () => {
-  const cases = Object.keys(stubSchemas).map((rel) => ({ rel }));
+  // plextv stubs belong to the web package's contract tier, which carries its own completeness
+  // assertion over that directory — excluded here so neither tier double-covers or misses it.
+  const stubServices = readdirSync(STUB_ROOT, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'plextv')
+    .map((entry) => entry.name)
+    .sort();
+  const onDisk = stubServices.flatMap((service) =>
+    readdirSync(join(STUB_ROOT, service, 'mappings'))
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => `${service}/${name}`),
+  );
 
-  it.each(cases)('%s validates against its schema', ({ rel }) => {
+  // Completeness, mirroring the fixture side: every mapping on disk is either schema-bound or
+  // explicitly declared response-unconsumed — a body-less DELETE ack is a deliberate
+  // declaration, not indistinguishable from a forgotten registration.
+  it('every stub mapping is registered or explicitly declared unconsumed', () => {
+    const known = [...Object.keys(stubSchemas), ...unconsumedStubMappings].sort();
+    expect([...onDisk].sort()).toEqual(known);
+  });
+
+  const cases = onDisk.map((rel) => ({ rel }));
+
+  it.each(cases)('$rel validates against its schema', ({ rel }) => {
+    const schema = stubSchemas[rel];
+    if (schema === undefined) {
+      expect(unconsumedStubMappings).toContain(rel);
+      return;
+    }
     const mapping = JSON.parse(
       readFileSync(join(STUB_ROOT, `${rel.split('/')[0]}/mappings/${rel.split('/')[1]}`), 'utf8'),
     ) as {
       response: { jsonBody?: unknown };
     };
-    const result = stubSchemas[rel]!.safeParse(mapping.response.jsonBody);
+    const result = schema.safeParse(mapping.response.jsonBody);
     expect(result.success, `${rel}: ${JSON.stringify(result.error?.issues)}`).toBe(true);
   });
 });
