@@ -6,6 +6,7 @@ import {
   isReleaseTagTaken,
   run,
   type Computed,
+  type PrepEffects,
 } from './version-prep.ts';
 import type { ReleaseReader } from './reader.ts';
 import type { RangeCommit } from './render-changelog-section.ts';
@@ -39,6 +40,51 @@ const fakeReader = (state: {
   committedPackageJson: () => state.committedPackageJson ?? '',
   committedChangelog: () => state.committedChangelog ?? '',
 });
+
+/**
+ * The captured side effects, standing in for the CLI's `process.exit`, stdout, and working-tree
+ * writes. `fail` aborts by throwing (it returns `never`), so a rejection is the loud non-zero abort.
+ *
+ * Both file sinks are captured, never defaulted: `run` writes package.json AND CHANGELOG.md, and a
+ * test that supplied only the first used to write the repository's real CHANGELOG.md whenever a
+ * guard regressed. `PrepEffects` now requires both, so this helper is the only way in.
+ */
+const captureEffects = (
+  manifestSource = '{ "version": "0.0.0" }',
+): {
+  logs: string[];
+  manifestWrites: string[];
+  changelogWrites: string[];
+  effects: PrepEffects;
+} => {
+  const logs: string[] = [];
+  const manifestWrites: string[] = [];
+  const changelogWrites: string[] = [];
+  return {
+    logs,
+    manifestWrites,
+    changelogWrites,
+    effects: {
+      fail: (message: string): never => {
+        throw new Error(message);
+      },
+      log: (message: string) => {
+        logs.push(message);
+      },
+      manifest: {
+        read: () => manifestSource,
+        write: (content: string) => {
+          manifestWrites.push(content);
+        },
+      },
+      changelog: {
+        write: (content: string) => {
+          changelogWrites.push(content);
+        },
+      },
+    },
+  };
+};
 
 describe('assembleChangelog', () => {
   const section =
@@ -94,8 +140,21 @@ describe('compute', () => {
     return result.computed;
   };
 
+  /**
+   * Compute a range that must bump. The `bumped` discriminant is what carries `section`, so this
+   * narrowing is the only way to reach it — a release that computes no section is a different type,
+   * not a null field.
+   */
+  const computeBumped = async (
+    reader: ReleaseReader,
+  ): Promise<Extract<Computed, { bumped: true }>> => {
+    const computed = await computeOrFail(reader);
+    if (!computed.bumped) expect.unreachable('the range has releasable commits');
+    return computed;
+  };
+
   it('bumps and anchors on the highest release tag, ignoring a lower foreign lineage', async () => {
-    const computed = await computeOrFail(
+    const computed = await computeBumped(
       fakeReader({
         tags: ['v0.1.8', 'v3.5.3', 'v0.1.7'],
         commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
@@ -103,12 +162,11 @@ describe('compute', () => {
     );
 
     expect(computed.version).toBe('3.5.4');
-    expect(computed.bumped).toBe(true);
     expect(computed.section).toContain('### Bug Fixes');
   });
 
   it('takes the minor bump for a feat', async () => {
-    const computed = await computeOrFail(
+    const computed = await computeBumped(
       fakeReader({
         tags: ['v3.5.3'],
         commits: [{ hash: fullSha('abc1234'), message: 'feat(web): add health endpoint' }],
@@ -119,7 +177,7 @@ describe('compute', () => {
     expect(computed.section).toContain('### Features');
   });
 
-  it('stays put with no section when the range has no releasable commits', async () => {
+  it('stays put, carrying no section at all, when the range has no releasable commits', async () => {
     const computed = await computeOrFail(
       fakeReader({
         tags: ['v3.5.3'],
@@ -127,9 +185,8 @@ describe('compute', () => {
       }),
     );
 
-    expect(computed.version).toBe('3.5.3');
-    expect(computed.bumped).toBe(false);
-    expect(computed.section).toBe(null);
+    // Exhaustive, not field-by-field: an unbumped computation has no `section` member to be null.
+    expect(computed).toEqual({ version: '3.5.3', bumped: false });
   });
 
   it('is idempotent — computing twice from the same state yields the same result', async () => {
@@ -166,24 +223,6 @@ describe('isReleaseTagTaken', () => {
  * returns `never`), so a rejection is the loud non-zero abort and no success line is logged.
  */
 describe('run (--check collision guard wiring)', () => {
-  const captureEffects = (): {
-    logs: string[];
-    effects: { fail: (message: string) => never; log: (message: string) => void };
-  } => {
-    const logs: string[] = [];
-    return {
-      logs,
-      effects: {
-        fail: (message: string): never => {
-          throw new Error(message);
-        },
-        log: (message: string) => {
-          logs.push(message);
-        },
-      },
-    };
-  };
-
   it('aborts loudly, ahead of the version-match check, when a concurrent branch tagged the computed version', async () => {
     const { effects, logs } = captureEffects();
     // A `fix` off v3.5.3 computes v3.5.4. Between anchoring (which reads the tags, then the range)
@@ -208,7 +247,7 @@ describe('run (--check collision guard wiring)', () => {
   });
 
   it('does not fire the guard on a normal prep whose computed version has no tag yet', async () => {
-    const { effects, logs } = captureEffects();
+    const { effects, logs, manifestWrites, changelogWrites } = captureEffects();
     const reader = fakeReader({
       tags: ['v3.5.3'],
       commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
@@ -218,6 +257,8 @@ describe('run (--check collision guard wiring)', () => {
 
     await expect(run(reader, true, effects)).resolves.toBeUndefined();
     expect(logs.join('')).toContain('branch is prepped for 3.5.4');
+    // `--check` is the CI gate: it verifies in memory and never touches the tree.
+    expect([...manifestWrites, ...changelogWrites]).toEqual([]);
   });
 
   it('short-circuits the guard on an unbumped range even though the anchor tag exists', async () => {
@@ -279,32 +320,114 @@ describe('anchorVersion', () => {
   });
 });
 
-describe('run (write-path anchor guard)', () => {
-  it('aborts and writes nothing when the manifest cannot be anchored', async () => {
-    const logs: string[] = [];
-    const writes: string[] = [];
-    const reader = fakeReader({
+/**
+ * The write path applies the computed state to the working tree. Every guard here defends the same
+ * thing — CHANGELOG.md's history — and each one failed silently at some point: an unanchorable
+ * manifest logged "prepared" over a file it never touched, and a base CHANGELOG.md that read back
+ * empty because the VCS call *failed* (rather than because the file was absent) rewrote the file
+ * with the whole history dropped and logged success. Nothing may be written unless everything can be.
+ */
+describe('run (write path)', () => {
+  const releasableRange = (committedChangelog?: string): ReleaseReader =>
+    fakeReader({
       tags: ['v3.5.3'],
       commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
+      committedChangelog,
     });
 
-    await expect(
-      run(reader, false, {
-        fail: (message: string): never => {
-          throw new Error(message);
-        },
-        log: (message: string) => {
-          logs.push(message);
-        },
-        manifest: {
-          read: () => '{ "name": "music-downloader", "ver": "3.5.3" }',
-          write: (content: string) => {
-            writes.push(content);
-          },
-        },
+  it('prepends the new section to the base changelog and anchors the bumped version', async () => {
+    const { effects, logs, manifestWrites, changelogWrites } =
+      captureEffects('{ "version": "3.5.3" }');
+    const reader: ReleaseReader = {
+      ...releasableRange(),
+      baseChangelog: () =>
+        '# Changelog\n\n## [3.5.3](https://example.com/x) (2026-07-01)\n\n* old\n',
+    };
+
+    await expect(run(reader, false, effects)).resolves.toBeUndefined();
+
+    expect(manifestWrites).toEqual(['{ "version": "3.5.4" }']);
+    expect(changelogWrites[0]).toContain('## [3.5.4]');
+    expect(changelogWrites[0]).toContain('* old'); // the history survives
+    expect(logs.join('')).toContain('prepared 3.5.4');
+  });
+
+  it('restores the base changelog untouched, and says so, when nothing is releasable', async () => {
+    const base = '# Changelog\n\n## [3.5.3](https://example.com/x) (2026-07-01)\n\n* old\n';
+    const { effects, logs, manifestWrites, changelogWrites } =
+      captureEffects('{ "version": "3.5.3" }');
+    const reader: ReleaseReader = {
+      ...fakeReader({
+        tags: ['v3.5.3'],
+        commits: [{ hash: fullSha('abc1234'), message: 'chore(deps): bump vitest' }],
       }),
-    ).rejects.toThrow(/could not anchor 3\.5\.4 .* left untouched/);
-    expect(writes).toEqual([]);
+      baseChangelog: () => base,
+    };
+
+    await expect(run(reader, false, effects)).resolves.toBeUndefined();
+
+    expect(changelogWrites).toEqual([base]);
+    expect(manifestWrites).toEqual(['{ "version": "3.5.3" }']);
+    expect(logs.join('')).toContain('no releasable commits — staying at 3.5.3');
+  });
+
+  it('aborts and writes nothing when the manifest cannot be anchored', async () => {
+    const { effects, logs, manifestWrites, changelogWrites } = captureEffects(
+      '{ "name": "music-downloader", "ver": "3.5.3" }',
+    );
+
+    await expect(run(releasableRange(), false, effects)).rejects.toThrow(
+      /could not anchor 3\.5\.4 .* left untouched/,
+    );
+    expect([...manifestWrites, ...changelogWrites]).toEqual([]);
     expect(logs).toEqual([]);
+  });
+
+  it('aborts and writes nothing when the base changelog cannot be read', async () => {
+    // A read that FAILED — an unresolvable base revision, a revset function this jj version lacks,
+    // an unusable repo. Reassembling around it would drop the release history; the abort has to
+    // come before the manifest write, or a "failed" prep leaves a half-bumped tree behind.
+    const { effects, logs, manifestWrites, changelogWrites } =
+      captureEffects('{ "version": "3.5.3" }');
+    const reader: ReleaseReader = {
+      ...releasableRange(),
+      baseChangelog: () => {
+        throw new Error("Error: Revision `main@origin` doesn't exist");
+      },
+    };
+
+    await expect(run(reader, false, effects)).rejects.toThrow(
+      /could not read CHANGELOG\.md[\s\S]*main@origin/,
+    );
+    expect([...manifestWrites, ...changelogWrites]).toEqual([]);
+    expect(logs).toEqual([]);
+  });
+
+  it('refuses to write when the base changelog is empty but the committed tree carries one', async () => {
+    // Defence in depth behind the reader's absent-vs-failed discriminator: whatever the cause, an
+    // empty base against a committed CHANGELOG.md means this write would destroy release history.
+    const { effects, logs, manifestWrites, changelogWrites } =
+      captureEffects('{ "version": "3.5.3" }');
+    const reader: ReleaseReader = {
+      ...releasableRange(
+        '# Changelog\n\n## [3.5.3](https://example.com/x) (2026-07-01)\n\n* old\n',
+      ),
+      baseChangelog: () => '',
+    };
+
+    await expect(run(reader, false, effects)).rejects.toThrow(
+      /base CHANGELOG\.md .* empty[\s\S]*committed/,
+    );
+    expect([...manifestWrites, ...changelogWrites]).toEqual([]);
+    expect(logs).toEqual([]);
+  });
+
+  it('writes a first changelog when neither the base nor the committed tree has one', async () => {
+    // The guard above must not block a genuine first release: absent everywhere is absent, not loss.
+    const { effects, changelogWrites } = captureEffects('{ "version": "3.5.3" }');
+
+    await expect(run(releasableRange(''), false, effects)).resolves.toBeUndefined();
+
+    expect(changelogWrites[0]).toContain('## [3.5.4]');
   });
 });

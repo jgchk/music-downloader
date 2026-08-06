@@ -19,11 +19,15 @@ export interface ReleaseReader {
   releaseTags(): string[];
   /** Commits in `<sinceTag>..committed`, each with full SHA and message. Order is irrelevant. */
   rangeCommits(sinceTag: string): RangeCommit[];
-  /** CHANGELOG.md at the base (merge-base / fork point), or `''` when absent there. */
+  /**
+   * CHANGELOG.md at the base (merge-base / fork point), or `''` when the file is genuinely not in
+   * that revision. A failed *read* throws — see {@link isGitPathAbsent}: `''` means "no such file",
+   * never "the VCS could not answer".
+   */
   baseChangelog(): string;
   /** package.json as committed on the released tree. */
   committedPackageJson(): string;
-  /** CHANGELOG.md as committed on the released tree, or `''` when absent. */
+  /** CHANGELOG.md as committed on the released tree, or `''` when absent there (see above). */
   committedChangelog(): string;
 }
 
@@ -54,26 +58,57 @@ const git = (arguments_: string[]): string =>
 
 const jj = (arguments_: string[]): string => execFileSync('jj', arguments_, { encoding: 'utf8' });
 
-/** Contents of a path at a git ref, or '' when the file did not exist there. */
-const show = (reference: string, path: string): string => {
+/**
+ * Whether a failed `git show <rev>:<path>` means the path is simply not in that revision — the one
+ * outcome {@link readFile} is allowed to turn into `''`. Everything else (`invalid object name`, an
+ * unusable repository, a permissions or lock failure) is a read that FAILED, and must not read back
+ * as an absent file: an empty base CHANGELOG.md makes `version:prep` rewrite the file with the whole
+ * release history dropped and report success. git says `fatal: path '<p>' …` for exactly the absent
+ * cases and leads with a different noun for every other one.
+ */
+export function isGitPathAbsent(stderr: string): boolean {
+  return /^fatal: path .*(?:does not exist|exists on disk, but not) in /m.test(stderr);
+}
+
+/** The jj half of {@link isGitPathAbsent}: `jj file show` says `No such path:` and nothing else does. */
+export function isJjPathAbsent(stderr: string): boolean {
+  return /^Error: No such path:/m.test(stderr);
+}
+
+/** The stderr a failed `execFileSync` captured, or `''` when it carried none. */
+function stderrOf(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'stderr' in error
+    ? String(error.stderr)
+    : '';
+}
+
+/**
+ * Contents of a path at a revision, or `''` when — and only when — `isAbsent` recognises the
+ * failure as "the file is not in that revision". Any other failure propagates: the caller aborts
+ * the prep loudly rather than reassembling CHANGELOG.md around a file it could not read.
+ */
+const readFile = (read: () => string, isAbsent: (stderr: string) => boolean): string => {
   try {
-    return execFileSync('git', ['show', `${reference}:${path}`], { encoding: 'utf8' });
-  } catch {
-    return '';
+    return read();
+  } catch (error: unknown) {
+    if (isAbsent(stderrOf(error))) return '';
+    throw error;
   }
 };
+
+/** Contents of a path at a git ref, or '' when the file is not in that ref. */
+const show = (reference: string, path: string): string =>
+  readFile(
+    () => execFileSync('git', ['show', `${reference}:${path}`], { encoding: 'utf8' }),
+    isGitPathAbsent,
+  );
 
 /** The merge-base this branch forked from — the anchor for the release range. */
 const base = (): string => git(['merge-base', 'origin/main', 'HEAD']);
 
-/** File content at a jj revision, or '' when the file did not exist there. */
-const fileAt = (rev: string, path: string): string => {
-  try {
-    return jj(['file', 'show', '-r', rev, path]);
-  } catch {
-    return '';
-  }
-};
+/** File content at a jj revision, or '' when the file is not in that revision. */
+const fileAt = (rev: string, path: string): string =>
+  readFile(() => jj(['file', 'show', '-r', rev, path]), isJjPathAbsent);
 
 /** The CI / colocated backend: today's `git` calls, unchanged. */
 export function gitReader(): ReleaseReader {

@@ -46,12 +46,18 @@ export function assembleChangelog(baseChangelog: string, section: string): strin
   return frontMatter + CHANGELOG_HEADER + '\n' + (section + oldBody).replace(/\n+$/, '\n');
 }
 
-export interface Computed {
-  version: string;
-  bumped: boolean;
-  /** The rendered CHANGELOG section (heading + body), present only when bumped. */
-  section: string | null;
-}
+/**
+ * The release state computed from (base state, range commits). A discriminated union, not a boolean
+ * beside a nullable section: `{ bumped: true, section: null }` was representable, so the write path
+ * needed a `section !== null` guard whose else-arm wrote the base CHANGELOG and logged "no
+ * releasable commits — staying at X" over a package.json already anchored to the BUMPED X, while
+ * `--check` branched on `bumped` alone — two arms disagreeing about what `bumped` licenses. With the
+ * discriminant carrying the section, the guard is unnecessary and the two arms cannot diverge.
+ */
+export type Computed =
+  | { readonly bumped: false; readonly version: string }
+  /** A releasable range: the rendered CHANGELOG section (heading + body) comes with the bump. */
+  | { readonly bumped: true; readonly version: string; readonly section: string };
 
 /**
  * The computation's outcome as a value. Rendering the section depends on a third-party preset whose
@@ -81,7 +87,7 @@ export async function compute(reader: ReleaseReader): Promise<ComputeResult> {
   const level = bumpLevel(commits.map((c) => c.message));
 
   if (level === null) {
-    return { ok: true, computed: { version: lastVersion, bumped: false, section: null } };
+    return { ok: true, computed: { version: lastVersion, bumped: false } };
   }
 
   const version = applyBump(lastVersion, level);
@@ -101,20 +107,29 @@ function fail(message: string): never {
   throw new PrepFailure(message);
 }
 
+/** An unknown thrown value rendered as a message, for the abort lines below. */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
- * The side-effecting sinks the orchestration abort/report through, injected so a test can drive the
- * flow without exiting the process or writing to a real stdout. `fail` aborts loudly (it returns
- * `never`); `log` reports progress. The CLI wires the process-level versions in {@link main}.
+ * The side-effecting sinks the orchestration reports and writes through, injected so a test can
+ * drive the flow without exiting the process, writing to a real stdout, or mutating the repository.
+ * `fail` aborts loudly (it returns `never`); `log` reports progress. The CLI wires the
+ * process-level versions in {@link main}.
+ *
+ * Both file sinks are REQUIRED. `manifest` was once optional and CHANGELOG.md was written straight
+ * to `process.cwd()`, so a spec that drove write mode with only the manifest stubbed overwrote the
+ * repository's own CHANGELOG.md the moment the guard it was testing regressed. Requiring both makes
+ * "a test cannot touch the working tree" a compile-time property rather than a review-time one.
  */
 export interface PrepEffects {
   fail: (message: string) => never;
   log: (message: string) => void;
-  /**
-   * package.json IO, injectable so the write path's anchor guard is testable through {@link run};
-   * defaults to the real file. CHANGELOG stays direct-to-disk — the guard aborts before either
-   * write, so the manifest seam alone is enough to prove "aborts and touches nothing".
-   */
-  manifest?: { read: () => string; write: (content: string) => void };
+  /** package.json IO — the read the version is anchored into, and the write-back. */
+  manifest: { read: () => string; write: (content: string) => void };
+  /** CHANGELOG.md's write. Its two source revisions are read through the {@link ReleaseReader}. */
+  changelog: { write: (content: string) => void };
 }
 
 /**
@@ -147,32 +162,55 @@ export function anchorVersion(source: string, version: string): string | null {
 export async function run(
   reader: ReleaseReader,
   isCheckOnly: boolean,
-  { fail: abort, log, manifest }: PrepEffects,
+  { fail: abort, log, manifest, changelog }: PrepEffects,
 ): Promise<void> {
   // Best-effort: CI checks out with full history/tags; locally the developer may already have them.
   reader.fetch();
 
-  let result;
+  let result: ComputeResult;
   try {
     result = await compute(reader);
   } catch (error: unknown) {
     // `return` because `abort` is a parameter binding — see the note at the anchor failure below.
-    return abort(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
+    return abort(`version:prep: ${messageOf(error)}`);
   }
   // A modeled computation failure: report it and exit non-zero rather than prepping a release from
   // a section the renderer could not produce faithfully.
   if (!result.ok) return abort(`version:prep: ${result.reason}`);
-  const { version, bumped, section } = result.computed;
+  const computed = result.computed;
+  const { version } = computed;
 
   if (!isCheckOnly) {
     // Write mode: apply the computed state to the working tree for the developer to commit. Anchor
     // package.json's version (preserving the branch's other package.json edits) and rebuild
     // CHANGELOG.md from its base content so the section is prepended exactly once.
-    const io = manifest ?? {
-      read: () => readFileSync(PKG, 'utf8'),
-      write: (content: string) => writeFileSync(PKG, content),
-    };
-    const package_ = anchorVersion(io.read(), version);
+
+    // Both CHANGELOG revisions are read up front, ahead of every write: a read that fails must
+    // abort with the tree untouched, not half-mutated. `''` from the reader means the file is
+    // genuinely absent at that revision — a read that FAILED throws (see `isGitPathAbsent`).
+    let baseChangelog: string;
+    let committedChangelog: string;
+    try {
+      baseChangelog = reader.baseChangelog();
+      committedChangelog = reader.committedChangelog();
+    } catch (error: unknown) {
+      return abort(
+        `version:prep: could not read ${CHANGELOG} from the repository: ${messageOf(error)}\n` +
+          `Reassembling ${CHANGELOG} around a revision that could not be read would drop the ` +
+          `release history, so nothing was written.`,
+      );
+    }
+    // Defence in depth behind that discriminator: whatever the cause, an empty base against a
+    // committed CHANGELOG.md means this write would destroy the release history.
+    if (baseChangelog === '' && committedChangelog !== '') {
+      return abort(
+        `version:prep: the base ${CHANGELOG} read back empty while the committed tree carries ` +
+          `one — writing would discard the release history, so nothing was written. Check that ` +
+          `the base revision (the fork point with the released mainline) resolves, then re-run.`,
+      );
+    }
+
+    const package_ = anchorVersion(manifest.read(), version);
     if (package_ === null) {
       // `return` because `abort` is a parameter binding: CFA does not treat the bare call as
       // never-returning, and `never` is assignable to the return type — this is the narrowing.
@@ -182,15 +220,15 @@ export async function run(
           `trusting this prep.`,
       );
     }
-    io.write(package_);
+    manifest.write(package_);
 
-    if (bumped && section !== null) {
-      writeFileSync(CHANGELOG, assembleChangelog(reader.baseChangelog(), section));
+    if (computed.bumped) {
+      changelog.write(assembleChangelog(baseChangelog, computed.section));
       log(
         `version:prep: prepared ${version}. Review the diff, then commit ${PKG} and ${CHANGELOG}.\n`,
       );
     } else {
-      writeFileSync(CHANGELOG, reader.baseChangelog());
+      changelog.write(baseChangelog);
       log(`version:prep: no releasable commits — staying at ${version}\n`);
     }
     return;
@@ -203,8 +241,11 @@ export async function run(
   // forked off the same tag has already shipped this version. Fail loudly so it is rebased rather
   // than silently overwriting that release. Only a real bump can collide (an unbumped range stays
   // at the last released version, which of course still has its tag).
-  if (bumped && isReleaseTagTaken(version, reader.releaseTags())) {
-    abort(
+  // Every `abort` below is `return abort(...)` for the same reason as the anchor failure above:
+  // `abort` is a parameter binding, so control-flow analysis does not treat a bare call as
+  // never-returning and execution would fall through to the success line.
+  if (computed.bumped && isReleaseTagTaken(version, reader.releaseTags())) {
+    return abort(
       `version:prep --check: v${version} is already a release tag — a concurrent branch shipped it ` +
         `while this one was open.\nRebase onto origin/main and re-run \`pnpm version:prep\`.`,
     );
@@ -212,17 +253,17 @@ export async function run(
 
   const committedVersion = versionOf(reader.committedPackageJson());
   if (committedVersion !== version) {
-    abort(
+    return abort(
       `version:prep --check: expected version ${version} but ${PKG} has ${committedVersion}.\n` +
         `Run \`pnpm version:prep\` and commit ${PKG} and ${CHANGELOG}.`,
     );
   }
 
-  if (bumped) {
+  if (computed.bumped) {
     try {
       extractChangelogSection(reader.committedChangelog(), version);
     } catch {
-      abort(
+      return abort(
         `version:prep --check: ${CHANGELOG} has no section for ${version}.\n` +
           `Run \`pnpm version:prep\` and commit ${PKG} and ${CHANGELOG}.`,
       );
@@ -235,7 +276,21 @@ export async function run(
 async function main(): Promise<void> {
   const isCheck = process.argv.includes('--check');
   const reader = detectReader();
-  await run(reader, isCheck, { fail, log: (message) => void process.stdout.write(message) });
+  await run(reader, isCheck, {
+    fail,
+    log: (message) => void process.stdout.write(message),
+    manifest: {
+      read: () => readFileSync(PKG, 'utf8'),
+      write: (content) => {
+        writeFileSync(PKG, content);
+      },
+    },
+    changelog: {
+      write: (content) => {
+        writeFileSync(CHANGELOG, content);
+      },
+    },
+  });
 }
 
 // Run only as the CLI entry point; importing the module (the unit tests) must not touch the tree.
@@ -246,7 +301,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // before the CHANGELOG write leaves package.json already bumped — say so instead of letting
     // a "failed" prep hide a mutated tree.
     process.stderr.write(
-      `version:prep: ${error instanceof Error ? error.message : String(error)}\n` +
+      `version:prep: ${messageOf(error)}\n` +
         `If this failed mid-write, package.json may already carry the bump — review the ` +
         `working tree (jj diff) before re-running.\n`,
     );
