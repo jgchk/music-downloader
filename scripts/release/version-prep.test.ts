@@ -5,6 +5,7 @@ import {
   compute,
   isReleaseTagTaken,
   run,
+  type Computed,
 } from './version-prep.ts';
 import type { ReleaseReader } from './reader.ts';
 import type { RangeCommit } from './render-changelog-section.ts';
@@ -83,8 +84,18 @@ All notable changes to this project will be documented in this file. See [commit
 });
 
 describe('compute', () => {
+  /**
+   * Compute and unwrap. A computation failure (the renderer's preset contract breaking) is modeled
+   * as a value, so unwrapping doubles as the assertion that these ranges compute at all.
+   */
+  const computeOrFail = async (reader: ReleaseReader): Promise<Computed> => {
+    const result = await compute(reader);
+    if (!result.ok) expect.unreachable(result.reason);
+    return result.computed;
+  };
+
   it('bumps and anchors on the highest release tag, ignoring a lower foreign lineage', async () => {
-    const computed = await compute(
+    const computed = await computeOrFail(
       fakeReader({
         tags: ['v0.1.8', 'v3.5.3', 'v0.1.7'],
         commits: [{ hash: fullSha('abc1234'), message: 'fix(slskd): parse per-user downloads' }],
@@ -97,7 +108,7 @@ describe('compute', () => {
   });
 
   it('takes the minor bump for a feat', async () => {
-    const computed = await compute(
+    const computed = await computeOrFail(
       fakeReader({
         tags: ['v3.5.3'],
         commits: [{ hash: fullSha('abc1234'), message: 'feat(web): add health endpoint' }],
@@ -109,7 +120,7 @@ describe('compute', () => {
   });
 
   it('stays put with no section when the range has no releasable commits', async () => {
-    const computed = await compute(
+    const computed = await computeOrFail(
       fakeReader({
         tags: ['v3.5.3'],
         commits: [{ hash: fullSha('abc1234'), message: 'chore(deps): bump vitest' }],
@@ -238,6 +249,16 @@ describe('anchorVersion', () => {
     const source = '{ "version": "3.5.3" }';
 
     expect(anchorVersion(source, '3.5.3')).toBe(source);
+  });
+
+  it('writes a `$`-bearing version literally, never as a replacement pattern', () => {
+    // The version is data, not a pattern. Passed as a replacement STRING, `$&` expands to the whole
+    // match — splicing the old `"version": "3.5.3"` text back into the field and corrupting the
+    // manifest (here loudly, as unparseable JSON; `$1`/`` $` ``/`$'` corrupt it just as silently).
+    // Only the replacer function keeps the computed version verbatim.
+    const source = '{ "version": "3.5.3" }';
+
+    expect(anchorVersion(source, '3.5.4-rc.$&')).toBe('{ "version": "3.5.4-rc.$&" }');
   });
 
   it('returns null instead of silently writing an unanchored file when the pattern finds no purchase', () => {

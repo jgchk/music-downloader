@@ -46,12 +46,21 @@ export function assembleChangelog(baseChangelog: string, section: string): strin
   return frontMatter + CHANGELOG_HEADER + '\n' + (section + oldBody).replace(/\n+$/, '\n');
 }
 
-interface Computed {
+export interface Computed {
   version: string;
   bumped: boolean;
   /** The rendered CHANGELOG section (heading + body), present only when bumped. */
   section: string | null;
 }
+
+/**
+ * The computation's outcome as a value. Rendering the section depends on a third-party preset whose
+ * shape the compiler cannot police, so "the release state could not be computed" is a modeled
+ * failure carrying the reason to report — never a partly-computed state the write path would act on.
+ */
+export type ComputeResult =
+  | { readonly ok: true; readonly computed: Computed }
+  | { readonly ok: false; readonly reason: string };
 
 /**
  * Whether a release tag for `version` already exists — the concurrent-branch collision guard. Two
@@ -63,7 +72,7 @@ export function isReleaseTagTaken(version: string, tags: readonly string[]): boo
   return tags.includes(`v${version}`);
 }
 
-export async function compute(reader: ReleaseReader): Promise<Computed> {
+export async function compute(reader: ReleaseReader): Promise<ComputeResult> {
   // Anchor on the released mainline's tags, not `git describe` from HEAD: the merged importer
   // lineage carries its own v0.1.x tags at a competitive commit distance, and describe would pick by
   // distance. Released state is whatever main has shipped (tags.ts picks the highest semver).
@@ -72,12 +81,13 @@ export async function compute(reader: ReleaseReader): Promise<Computed> {
   const level = bumpLevel(commits.map((c) => c.message));
 
   if (level === null) {
-    return { version: lastVersion, bumped: false, section: null };
+    return { ok: true, computed: { version: lastVersion, bumped: false, section: null } };
   }
 
   const version = applyBump(lastVersion, level);
-  const section = await renderChangelogSection(commits, { version, previousVersion: lastVersion });
-  return { version, bumped: true, section };
+  const rendered = await renderChangelogSection(commits, { version, previousVersion: lastVersion });
+  if (!rendered.ok) return { ok: false, reason: rendered.reason };
+  return { ok: true, computed: { version, bumped: true, section: rendered.section } };
 }
 
 /** Thrown by {@link fail} after reporting, so the CLI catch below can tell "already reported and
@@ -142,14 +152,17 @@ export async function run(
   // Best-effort: CI checks out with full history/tags; locally the developer may already have them.
   reader.fetch();
 
-  let computed;
+  let result;
   try {
-    computed = await compute(reader);
+    result = await compute(reader);
   } catch (error: unknown) {
     // `return` because `abort` is a parameter binding — see the note at the anchor failure below.
     return abort(`version:prep: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const { version, bumped, section } = computed;
+  // A modeled computation failure: report it and exit non-zero rather than prepping a release from
+  // a section the renderer could not produce faithfully.
+  if (!result.ok) return abort(`version:prep: ${result.reason}`);
+  const { version, bumped, section } = result.computed;
 
   if (!isCheckOnly) {
     // Write mode: apply the computed state to the working tree for the developer to commit. Anchor

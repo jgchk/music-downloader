@@ -10,12 +10,26 @@ import { renderChangelogSection, type RangeCommit } from './render-changelog-sec
 const commit = (hash: string, message: string): RangeCommit => ({ hash, message });
 const fullSha = (short: string): string => short.padEnd(40, '0');
 
+/**
+ * Render and unwrap. The renderer models "the preset no longer hands back the option bags this is
+ * built on" as a failure value (staged in the sibling `.preset` spec), so unwrapping here doubles as
+ * the standing assertion that the *installed* preset still satisfies that shape.
+ */
+const render = async (
+  commits: RangeCommit[],
+  versions: { version: string; previousVersion: string },
+): Promise<string> => {
+  const rendered = await renderChangelogSection(commits, versions);
+  if (!rendered.ok) expect.unreachable(rendered.reason);
+  return rendered.section;
+};
+
 describe('renderChangelogSection', () => {
   it('renders the heading with a compare link and today (UTC) as the date', async () => {
-    const section = await renderChangelogSection(
-      [commit(fullSha('abc1234'), 'feat(web): add a thing')],
-      { version: '3.2.0', previousVersion: '3.1.0' },
-    );
+    const section = await render([commit(fullSha('abc1234'), 'feat(web): add a thing')], {
+      version: '3.2.0',
+      previousVersion: '3.1.0',
+    });
     const today = new Date().toISOString().slice(0, 10);
     expect(section).toContain(
       `## [3.2.0](https://github.com/jgchk/music-downloader/compare/v3.1.0...v3.2.0) (${today})`,
@@ -24,7 +38,7 @@ describe('renderChangelogSection', () => {
 
   it('groups a feat under Features with a short-hash link to the full SHA', async () => {
     const sha = fullSha('abc1234');
-    const section = await renderChangelogSection([commit(sha, 'feat(web): add a thing')], {
+    const section = await render([commit(sha, 'feat(web): add a thing')], {
       version: '3.2.0',
       previousVersion: '3.1.0',
     });
@@ -35,28 +49,25 @@ describe('renderChangelogSection', () => {
   });
 
   it('groups a fix under Bug Fixes', async () => {
-    const section = await renderChangelogSection(
-      [commit(fullSha('def5678'), 'fix(api): 404 mapping')],
-      {
-        version: '3.2.1',
-        previousVersion: '3.2.0',
-      },
-    );
+    const section = await render([commit(fullSha('def5678'), 'fix(api): 404 mapping')], {
+      version: '3.2.1',
+      previousVersion: '3.2.0',
+    });
     expect(section).toContain('### Bug Fixes');
     expect(section).toContain('* **api:** 404 mapping');
   });
 
   it('HIDES perf (no Performance Improvements section) — the config-spec fidelity trap', async () => {
-    const section = await renderChangelogSection(
-      [commit(fullSha('aaa1111'), 'perf(reactor): batch writes')],
-      { version: '3.2.1', previousVersion: '3.2.0' },
-    );
+    const section = await render([commit(fullSha('aaa1111'), 'perf(reactor): batch writes')], {
+      version: '3.2.1',
+      previousVersion: '3.2.0',
+    });
     expect(section).not.toContain('Performance Improvements');
     expect(section).not.toContain('batch writes');
   });
 
   it('renders a BREAKING CHANGES block with the ⚠ marker', async () => {
-    const section = await renderChangelogSection(
+    const section = await render(
       [
         commit(
           fullSha('bbb2222'),
@@ -70,7 +81,7 @@ describe('renderChangelogSection', () => {
   });
 
   it('linkifies a closed issue from the footer', async () => {
-    const section = await renderChangelogSection(
+    const section = await render(
       [commit(fullSha('ccc3333'), 'fix(mcp): remove auth\n\ncloses #51')],
       { version: '2.5.1', previousVersion: '2.5.0' },
     );
@@ -80,7 +91,7 @@ describe('renderChangelogSection', () => {
   });
 
   it('omits an empty group when the only commit is hidden (perf-only → almost-empty section)', async () => {
-    const section = await renderChangelogSection([commit(fullSha('ddd4444'), 'perf(x): y')], {
+    const section = await render([commit(fullSha('ddd4444'), 'perf(x): y')], {
       version: '1.0.1',
       previousVersion: '1.0.0',
     });

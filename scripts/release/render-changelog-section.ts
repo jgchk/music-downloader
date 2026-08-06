@@ -57,6 +57,36 @@ interface Preset {
   readonly writer: Parameters<typeof writeChangelogString>[2];
 }
 
+/**
+ * The keys {@link isPreset} checks for, kept in step with {@link Preset} by `satisfies` so the
+ * interface stays the single declaration of the expected shape: rename a member there and this list
+ * stops typechecking.
+ */
+const PRESET_KEYS = ['parser', 'writer'] as const satisfies readonly (keyof Preset)[];
+
+/**
+ * Validate the preset at the boundary instead of asserting it. Because its declared return type is
+ * `{}`, a dependency bump that renames either option bag typechecks silently: the member reads as
+ * `undefined`, `CommitParser` and `writeChangelogString` each fall back to their own defaults, and
+ * the release ships a wrong-shaped CHANGELOG section that nothing flags. The bags' own contents are
+ * third-party opaque types, so "present and an object" is the whole checkable claim — which is
+ * exactly the claim a rename breaks.
+ */
+function isPreset(value: unknown): value is Preset {
+  if (typeof value !== 'object' || value === null) return false;
+  // The one narrowing: reading members off an already-checked non-null object yields `unknown`.
+  const members = value as Record<string, unknown>;
+  return PRESET_KEYS.every((key) => typeof members[key] === 'object' && members[key] !== null);
+}
+
+/**
+ * The renderer's outcome as a value. The failure is a broken dependency contract, not a business
+ * outcome, and the release tooling is a CLI whose exit status is its interface — so the caller
+ * reports `reason` and exits non-zero rather than shipping a default-rendered section.
+ */
+export type RenderedSection =
+  { readonly ok: true; readonly section: string } | { readonly ok: false; readonly reason: string };
+
 /** The commit shape the writer consumes, taken from its own signature. */
 type WriterCommit =
   Extract<Parameters<typeof writeChangelogString>[0], Iterable<unknown>> extends Iterable<infer C>
@@ -65,19 +95,30 @@ type WriterCommit =
 
 /**
  * Render the section body-with-heading for `version` from the commits in the range since
- * `previousVersion`. Returns the raw writer output (the same `content` catv prepended to
- * CHANGELOG.md), including its trailing blank lines.
+ * `previousVersion`. On success the section is the raw writer output (the same `content` catv
+ * prepended to CHANGELOG.md), including its trailing blank lines; a preset that no longer satisfies
+ * {@link Preset} yields a failure instead of a section rendered from the toolchain's own defaults.
  */
 export async function renderChangelogSection(
   commits: readonly RangeCommit[],
   options: { version: string; previousVersion: string },
-): Promise<string> {
+): Promise<RenderedSection> {
+  const preset: unknown = createPreset({ types: [...TYPES] });
+  if (!isPreset(preset)) {
+    return {
+      ok: false,
+      reason:
+        `conventional-changelog-conventionalcommits no longer returns the ` +
+        `${PRESET_KEYS.map((key) => `\`${key}\``).join(' and ')} option bags this renderer is ` +
+        `built on, so the CHANGELOG section cannot be rendered faithfully. Re-derive the \`Preset\` ` +
+        `shape in render-changelog-section.ts against the installed version before releasing.`,
+    };
+  }
+
   // The preset's default URL format functions derive commit/compare/issue links from
   // context.host/owner/repository (the same shapes catv's explicit templates produced), so we no
   // longer pass URL templates — the `context` below supplies host/owner/repository directly.
-  const { parser: parserOptions, writer: writerOptions } = createPreset({
-    types: [...TYPES],
-  }) as Preset;
+  const { parser: parserOptions, writer: writerOptions } = preset;
 
   const parser = new CommitParser(parserOptions);
   const parsed: WriterCommit[] = commits.map((c) => ({ ...parser.parse(c.message), hash: c.hash }));
@@ -95,5 +136,5 @@ export async function renderChangelogSection(
     commit: 'commit',
   };
 
-  return writeChangelogString(parsed, context, writerOptions);
+  return { ok: true, section: await writeChangelogString(parsed, context, writerOptions) };
 }
