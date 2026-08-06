@@ -29,7 +29,9 @@ const TONE = {
 } as const satisfies Record<AcquisitionStatusResponseDto['status'], BadgePhase>;
 
 export function statusTone(status: AcquisitionStatusResponseDto['status']): BadgePhase {
-  return TONE[status];
+  // Dual regime: the table is compile-total above, and this lookup still degrades honestly to the
+  // neutral tone for a status this build cannot know (wire evolution ahead of the page).
+  return (TONE as Partial<Record<string, BadgePhase>>)[status] ?? 'pending';
 }
 
 /**

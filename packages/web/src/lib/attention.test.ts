@@ -37,6 +37,17 @@ function item(over: Partial<AttentionItem>): AttentionItem {
 }
 
 describe('attentionItems', () => {
+  it('keeps the module channel honest for an unknown future review kind', () => {
+    // A review kind this build does not know still came from the importer's pending-review read,
+    // so the machine-readable module attribute stays factual while the kind passes through raw.
+    const composed = attentionItems(
+      [review({ review: { kind: 'brand-new-review' as never } })],
+      [],
+    )[0]!;
+    expect(composed.module).toBe('importer');
+    expect(composed.kind).toBe('brand-new-review');
+  });
+
   it('maps a pending review to an item whose ask names the decision, titled by its basename', () => {
     expect(attentionItems([review({})], [])).toEqual([
       {
