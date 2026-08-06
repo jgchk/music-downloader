@@ -1,15 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MusicBrainzMetadata } from '../../src/adapters/musicbrainz/metadata.js';
 import {
-  bestMatchId,
-  releaseCandidateIds,
   releaseGroupCandidateIds,
   releaseGroupEditionCandidates,
 } from '../../src/adapters/musicbrainz/mapping.js';
 import {
   mbRecordingSearchSchema,
   mbReleaseGroupBrowseSchema,
-  mbReleaseSearchSchema,
 } from '../../src/adapters/musicbrainz/schemas.js';
 import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
 import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
@@ -83,17 +80,16 @@ describe('MusicBrainz contract (tier 1)', () => {
   // within the confident identity. This famous album's recorded hits are all editions of one release
   // group, so it resolves (where the old flat guard read the edition ties as ambiguity). The test
   // pins that the adapter sends the recorded search query, attempts the canonical pick first, and
-  // resolves the release it can fetch.
+  // resolves the release it can fetch. Both ids are pinned from the recorded bytes, not computed by
+  // the mapping under test: a regression that changes the canonical pick must fail here.
   it('sends the recorded release search and resolves the famous album by grouping its editions', async () => {
-    const releases = mbReleaseSearchSchema.parse(
-      byName('release-search.json').response.body,
-    ).releases;
-    const candidates = releaseCandidateIds(releases, 'The Dark Side of the Moon');
-    const lookupId = mbidFromPath('release-lookup.json');
-
-    // one confident release-group identity spanning many editions; the fetchable release is among them
-    expect(candidates.length).toBeGreaterThan(0);
-    expect(candidates).toContain(lookupId);
+    // The earliest official edition of the recorded search's one confident release group — the
+    // adapter's canonical first fetch attempt.
+    const CANONICAL_FIRST_PICK = '586ff28d-c0fc-4a50-ba18-d7152680417d';
+    // The edition the fixture server can actually serve (release-lookup.json); the adapter walks
+    // the candidate list until this one fetches.
+    const RESOLVED_EDITION = 'be701edc-c9c7-484a-9ed2-aeef051c19be';
+    expect(mbidFromPath('release-lookup.json')).toBe(RESOLVED_EDITION);
 
     const result = (
       await adapter().resolve({
@@ -106,15 +102,22 @@ describe('MusicBrainz contract (tier 1)', () => {
 
     const search = server.requests.find((r) => r.path === '/release')!;
     expect(search.query).toMatchObject(byName('release-search.json').request.query!);
-    expect(server.requests.some((r) => r.path === `/release/${candidates[0]}`)).toBe(true);
-    expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid: lookupId } });
+    expect(server.requests.some((r) => r.path === `/release/${CANONICAL_FIRST_PICK}`)).toBe(true);
+    expect(result).toMatchObject({
+      kind: 'resolved',
+      target: { type: 'album', mbid: RESOLVED_EDITION },
+    });
   });
 
   it('sends the recorded recording search and applies the ambiguity guard to real hits', async () => {
+    // The recorded search returns five 100-score ties for this famous track, so the ambiguity
+    // guard must refuse to pick — pinned as the literal recorded outcome, not recomputed via the
+    // mapping under test (which would follow a guard regression instead of catching it).
     const recordings = mbRecordingSearchSchema.parse(
       byName('recording-search.json').response.body,
     ).recordings;
-    const expectedId = bestMatchId(recordings);
+    expect(recordings).toHaveLength(5);
+    expect(recordings.every((recording) => recording.score === 100)).toBe(true);
 
     const result = (
       await adapter().resolve({
@@ -127,14 +130,7 @@ describe('MusicBrainz contract (tier 1)', () => {
 
     const search = server.requests.find((r) => r.path === '/recording')!;
     expect(search.query).toMatchObject(byName('recording-search.json').request.query!);
-    if (expectedId === undefined) {
-      expect(result).toEqual({ kind: 'unresolved' });
-    } else {
-      expect(result).toMatchObject({
-        kind: 'resolved',
-        target: { type: 'track', mbid: expectedId },
-      });
-    }
+    expect(result).toEqual({ kind: 'unresolved' });
   });
 });
 
