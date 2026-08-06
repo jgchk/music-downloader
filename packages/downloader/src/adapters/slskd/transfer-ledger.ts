@@ -68,14 +68,14 @@ export class TransferLedger {
   /** Must run before the enqueue (write-ahead), so a crash still leaves the sweep a trail. */
   async recordCreated(keys: readonly SourceResourceKey[]): Promise<void> {
     for (const key of keys) {
-      await this.record(this.ledger.recordCreated({ ...key }), 'record transfer');
+      await this.record(() => this.ledger.recordCreated({ ...key }), 'record transfer');
     }
   }
 
   /** Release write-ahead rows for an enqueue slskd refused: nothing was created at the source. */
   async release(keys: readonly SourceResourceKey[]): Promise<void> {
     for (const key of keys) {
-      await this.record(this.ledger.markRemoved(key), 'release rejected transfer');
+      await this.record(() => this.ledger.markRemoved(key), 'release rejected transfer');
     }
   }
 
@@ -91,7 +91,7 @@ export class TransferLedger {
       if (id === undefined || captured.has(filename)) continue;
       captured.add(filename);
       const key = this.keyFor(acquisitionId, username, filename);
-      await this.record(this.ledger.recordId(key, id), 'record transfer id');
+      await this.record(() => this.ledger.recordId(key, id), 'record transfer id');
     }
   }
 
@@ -105,13 +105,17 @@ export class TransferLedger {
   ): Promise<void> {
     for (const key of keys) {
       if (stillPresent.has(filenameOfKey(key))) continue;
-      await this.record(this.ledger.markRemoved(key), 'mark transfer removed');
+      await this.record(() => this.ledger.markRemoved(key), 'mark transfer removed');
     }
   }
 
-  /** Run a ledger write without letting a stewardship fault fail an otherwise-working download. */
-  private async record(op: ResultAsync<void, InfraError>, what: string): Promise<void> {
-    const result = await op;
+  /**
+   * Run a ledger write without letting a stewardship fault fail an otherwise-working download. The
+   * write is passed as a thunk rather than a started `ResultAsync` so the caller's Result is
+   * visibly consumed here (`neverthrow/must-use-result` cannot see a Result handed to a callee).
+   */
+  private async record(op: () => ResultAsync<void, InfraError>, what: string): Promise<void> {
+    const result = await op();
     if (result.isErr()) this.logger.warn({ err: result.error }, `ledger: ${what} failed`);
   }
 }
