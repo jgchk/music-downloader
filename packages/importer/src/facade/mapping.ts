@@ -134,6 +134,64 @@ export function reviewToDto(review: OpenReview): ReviewDto {
   }
 }
 
+/**
+ * The history entry projected onto the wire as an explicit per-kind field projection — never a
+ * spread, so a future projection-only field cannot leak into a consumer's payload (the
+ * anti-corruption copy is real). The domain's branded acquisition id decays to its string here.
+ */
+function historyEntryToDto(
+  entry: ImportStatusView['history'][number],
+): ImportStatusResponseDto['history'][number] {
+  const at = entry.at;
+  switch (entry.kind) {
+    case 'requested': {
+      return {
+        kind: 'requested',
+        at,
+        hints: entry.hints === undefined ? undefined : { ...entry.hints },
+      };
+    }
+    case 'proposed': {
+      return { kind: 'proposed', at, candidateCount: entry.candidateCount, pinnedId: entry.pinnedId };
+    }
+    case 'auto-apply-selected': {
+      return {
+        kind: 'auto-apply-selected',
+        at,
+        candidate: { dataSource: entry.candidate.dataSource, albumId: entry.candidate.albumId },
+        distance: entry.distance,
+      };
+    }
+    case 'review-required': {
+      return { kind: 'review-required', at, reviewKind: entry.reviewKind };
+    }
+    case 'review-resolved': {
+      return { kind: 'review-resolved', at, resolution: entry.resolution };
+    }
+    case 'applied': {
+      return { kind: 'applied', at, location: entry.location };
+    }
+    case 'remediation-required': {
+      return {
+        kind: 'remediation-required',
+        at,
+        failures: entry.failures.map((failure) => ({ ...failure })),
+      };
+    }
+    case 'rejected': {
+      return { kind: 'rejected', at, reason: entry.reason, filesDeleted: entry.filesDeleted };
+    }
+    case 'release-verdict-recorded': {
+      return {
+        kind: 'release-verdict-recorded',
+        at,
+        acquisitionId: entry.acquisitionId,
+        reasons: [...entry.reasons],
+      };
+    }
+  }
+}
+
 export function statusViewToDto(view: ImportStatusView): ImportStatusResponseDto {
   return {
     importId: view.importId,
@@ -145,9 +203,7 @@ export function statusViewToDto(view: ImportStatusView): ImportStatusResponseDto
     rejection: view.rejection === undefined ? undefined : { ...view.rejection },
     settled: view.settled,
     stalled: view.stalled,
-    history: view.history.map(
-      (entry) => ({ ...entry }) as ImportStatusResponseDto['history'][number],
-    ),
+    history: view.history.map((entry) => historyEntryToDto(entry)),
   };
 }
 
