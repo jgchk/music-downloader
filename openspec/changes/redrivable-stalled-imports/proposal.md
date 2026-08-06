@@ -44,6 +44,29 @@ _None._
 - `web-ui`: the acquisition detail SHALL present a stalled import as an attention state with a
   register-compliant retry affordance; the attention queue SHALL list stalled imports.
 
+## Blocking prerequisite (from `auth-roles`, 2026-08-05)
+
+If this change gates the redrive verb on the `owner` role — the seam `auth-roles` shipped, whose
+reserved first action is `system:redrive` — it MUST first close the residual that change recorded,
+or it arms a privilege escalation:
+
+- **Pin the owner by account identity.** plex.tv's `owned` flag (and the `provides: server`
+  declaration, and the machine identifier) are all SELF-ASSERTED by the resource, so an attacker
+  who registers a forged "server" under their own account signs in as `owner`
+  (`docs/research/plex-machine-identifier-trust.md`). Require `ownerId === PLEX_OWNER_ACCOUNT_ID`
+  for shared users, and `owned === true` plus a matching `/user` account id for the owner.
+- **Invalidate pre-existing owner sessions in the same change.** A role is fixed at issue and the
+  pin verifies at login, so an `owner` cookie minted before the pin lands stays valid for up to
+  `SESSION_TTL_MS` (7 days) afterwards. Rotate `SESSION_SECRET` or bump a claims version the codec
+  refuses.
+- **Verify the Plex Home/managed-user case.** It is unknown whether plex.tv reports `owned: true`
+  for a Home member on the admin's server; if it does, every Home member is an `owner` today. The
+  account-identity pin closes this too.
+
+`packages/web/src/lib/server/authz.boundary.test.ts` fails the moment any production file imports
+`authorize`, so this cannot be skipped silently — that failing test IS this prerequisite's
+reminder. Gating the verb on the *stalled* precondition only (no role check) does not trigger it.
+
 ## Impact
 
 - **Code:** `packages/importer` domain (`commands/events/decide/evolve/react`), application
