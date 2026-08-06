@@ -94,6 +94,15 @@ export interface DownloaderRuntimeOverrides {
   readonly ids?: IdGenerator;
   /** Test seam: swap the dead-letter store (e.g. to prove boot survives its faults). */
   readonly deadLetters?: DeadLetterStore;
+  /**
+   * Test seam for the reactor's timing sources (the re-drive jitter sleep and its random),
+   * so composed-boot tests can await the startup re-drive deterministically instead of racing
+   * the production jitter under a wall-clock budget.
+   */
+  readonly reactorTiming?: {
+    readonly sleep?: (ms: number) => Promise<void>;
+    readonly random?: () => number;
+  };
 }
 
 export interface SeamWakeups {
@@ -259,8 +268,9 @@ export async function createDownloaderRuntime(
         clearInterval(handle);
       };
     },
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    random: Math.random,
+    sleep:
+      overrides.reactorTiming?.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    random: overrides.reactorTiming?.random ?? Math.random,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
   });
   // Boot readiness (reactor-durability D4): the runtime is ready once wired; the catch-up drain

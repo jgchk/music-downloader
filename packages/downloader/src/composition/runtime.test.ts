@@ -426,6 +426,9 @@ describe('createDownloaderRuntime', () => {
 });
 
 describe('stalled exposure at boot (reactor-durability D2)', () => {
+  /** The injected boot clock's fixed instant; prune horizons are computed from it. */
+  const BOOT_INSTANT = '2026-07-22T12:00:00.000Z';
+
   async function seededRuntime(occurredAt: string): Promise<DownloaderRuntime> {
     const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
     cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
@@ -466,14 +469,23 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
         reactor: { retry: { budgetMs: 21_600_000 }, stalledRetentionMs: 30 * 24 * 3_600_000 },
       },
       silentLogger(),
-      { ports: fakePorts },
+      {
+        ports: fakePorts,
+        // The prune horizon derives from this injected clock, so both prune cases below are
+        // exact date arithmetic — never a race against the wall clock (S3 review sweep). The
+        // instant re-drive timing lets the post-prune test await the backgrounded pass
+        // deterministically instead of production jitter under a wall-clock budget.
+        clock: { now: () => new Date(BOOT_INSTANT) },
+        reactorTiming: { sleep: () => Promise.resolve(), random: () => 1 },
+      },
     );
     cleanups.push(() => runtime.stop());
     return runtime;
   }
 
   it('seeds the stalled read model from dead letters recorded before the restart', async () => {
-    const runtime = await seededRuntime(new Date().toISOString());
+    // 12 hours before the boot instant: squarely inside the 30-day retention.
+    const runtime = await seededRuntime('2026-07-22T00:00:00.000Z');
 
     const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
     expect(status).toMatchObject({ ok: true, value: { stalled: true } });
@@ -510,19 +522,17 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
 
     const status = runtime.facade.getAcquisition({ id: 'acq-stalled' });
     expect(status.ok).toBe(true);
-    expect(status.ok && status.value.stalled).toBeFalsy();
+    // Absence, not falsiness: the wire flag is tag-or-omit (`stalled?: true`).
+    expect(status.ok ? status.value.stalled : undefined).toBeUndefined();
 
     // No longer stalled, the acquisition is fair game for the startup re-drive: the backgrounded
-    // pass (with its production jitter sleep) drives it to its outcome.
-    await vi.waitFor(
-      () => {
-        expect(runtime.facade.getAcquisition({ id: 'acq-stalled' })).toMatchObject({
-          ok: true,
-          value: { status: 'Fulfilled' },
-        });
-      },
-      { timeout: 5000 },
-    );
+    // pass (instant deterministic timing, injected above) drives it to its outcome.
+    await vi.waitFor(() => {
+      expect(runtime.facade.getAcquisition({ id: 'acq-stalled' })).toMatchObject({
+        ok: true,
+        value: { status: 'Fulfilled' },
+      });
+    });
   });
 });
 
