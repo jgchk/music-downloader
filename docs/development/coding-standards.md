@@ -11,6 +11,9 @@
 
 - Lint with typescript-eslint; format with Prettier. Formatting is automated and never hand-tweaked or debated.
 - Lint and format both run in the commit gate; a violation fails the build.
+- The lint profile is the **strictest typed tier** the toolchain publishes. Rules are admitted or
+  rejected one at a time, never enabled in bulk and never downgraded to `warn`; a rejected rule is
+  disabled in configuration with its reason. See [quality-gates.md](quality-gates.md).
 - Import-boundary rules enforce the architecture's dependency rule.
 
 ## Style

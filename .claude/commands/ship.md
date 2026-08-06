@@ -37,6 +37,38 @@ Loop, max 3 cycles:
 
 Converged when a cycle reports zero Critical/Important findings. If not converged after 3 cycles, stop and present the surviving findings to the user.
 
+## Phase 2b — Mine the cycle for promotion candidates
+
+Review findings are the raw material for new machine rules, and they evaporate when the PR merges. Once converged, scan **every finding applied across all cycles** (not just the last) for two signals:
+
+- a finding **class** that appeared **twice or more** — across cycles, across files, or from two different reviewers; and
+- a finding whose fix was **purely mechanical** — the same edit every time, decidable without judgment.
+
+Either signal makes it a promotion candidate: a rule a machine should be enforcing instead of a reviewer rediscovering. File **one GitHub issue per candidate** (they are the durable channel — the factory must not depend on a human reading a PR body):
+
+Before filing, **dedupe against the issues already open**: `gh issue list --label quality-gate`. A
+candidate that already has an open issue gets a comment with the new instances, not a second issue —
+otherwise the same class is re-filed every cycle and the label stops meaning anything.
+
+```sh
+gh label create quality-gate --description "Candidate promotion from review finding to machine rule" --color 0E8A16 || true
+gh issue create --title "promote: <rule sketch>" --label quality-gate --body "<body>"
+```
+
+(The label create keeps `|| true` for the already-exists case but does **not** hide stderr: expired
+auth, the wrong repo, or a rate limit must be visible here, or the next command fails with a
+confusing "label not found".)
+
+Run this phase's `gh` commands from the colocated main repo (or pass `--repo <owner>/<repo>`): `jj
+workspace add` creates **bare** workspaces with no `.git`, where `gh` cannot resolve the repo at all,
+and the phases either side of this one run inside the workspace (CLAUDE.md, "PRs with `jj` + `gh`").
+
+The body names: the **instances** (file:line per occurrence, with the reviewer that raised each), the **proposed ladder rung** from `docs/development/quality-gates.md` (rule config → local lint rule → dataflow rule → type-level unrepresentability — climb only as far as the rule needs), and the **admission bar it must clear** before it could ever join the gate. Filing the issue is not adopting the rule; adoption is a separate change that runs the one-shot triage.
+
+Report the candidates filed in the final report. If none qualify, say so explicitly — "no recurring or mechanical finding classes this cycle" is a real result, not an omission.
+
+This step is **per-change**: it mines the findings of one change's review cycles. `/retro` is a different altitude — per-session process retrospective — and stays a standalone, unchanged skill. Neither replaces the other; do not fold one into the other. Note that `/retro`'s own enforcement ladder ends at "a deterministic lint rule", which is precisely this ladder's ENTRY rung — a rule arriving by either path must clear the same admission contract in `docs/development/quality-gates.md`.
+
 ## Phase 3 — Archive the change
 
 Repo practice is to archive before the release commit. Invoke the `opsx:archive` skill for the change (it verifies task completion and spec sync, then moves the change to `openspec/changes/archive/YYYY-MM-DD-<name>`). Commit as `chore(openspec): archive <name>`.
