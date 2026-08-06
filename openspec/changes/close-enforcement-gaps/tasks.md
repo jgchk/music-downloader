@@ -44,4 +44,4 @@ Sequencing: after the S-queue drains (S2/S3 touch overlapping test files).
 
 - [x] 5.1 `error-handling.md`'s linter sentence updated to name the real rule; the boundaries
       tier asserts the new coverage (a file outside every tsconfig/lint zone is a failure).
-- [ ] 5.2 Full gate green; `pnpm check` timing sanity-checked; local out-of-process e2e green.
+- [x] 5.2 Full gate green; `pnpm check` timing sanity-checked; local out-of-process e2e green.
