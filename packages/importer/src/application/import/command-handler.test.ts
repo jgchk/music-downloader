@@ -51,7 +51,7 @@ describe('applyCommand', () => {
       failures: [],
     });
     expect(result._unsafeUnwrap()).toEqual([]);
-    expect(d.store.all().length).toBe(before);
+    expect(d.store.all()).toHaveLength(before);
   });
 
   it('propagates an infrastructure read failure', async () => {

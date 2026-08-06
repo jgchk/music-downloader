@@ -486,7 +486,7 @@ describe('createImporterRuntime', () => {
       await stopOnce(); // must clear the subscription's poll interval BEFORE closing the db
       await vi.advanceTimersByTimeAsync(30_000); // several 5s poll intervals would fire if leaked
 
-      expect(reads.length).toBe(readsAtStop);
+      expect(reads).toHaveLength(readsAtStop);
     } finally {
       vi.useRealTimers();
     }
