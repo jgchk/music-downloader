@@ -71,3 +71,10 @@ export function assertProperty<Ts extends [unknown, ...unknown[]]>(
 ): void {
   fc.assert(property, propertyRun);
 }
+
+/** {@link assertProperty} for a property whose predicate awaits — the store round-trips do. */
+export async function assertAsyncProperty<Ts extends [unknown, ...unknown[]]>(
+  property: fc.IAsyncPropertyWithHooks<Ts>,
+): Promise<void> {
+  await fc.assert(property, propertyRun);
+}

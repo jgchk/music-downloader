@@ -1,6 +1,12 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_NUM_RUNS, PINNED_SEED, assertProperty, propertyRun } from './property.js';
+import {
+  DEFAULT_NUM_RUNS,
+  PINNED_SEED,
+  assertAsyncProperty,
+  assertProperty,
+  propertyRun,
+} from './property.js';
 import type * as PropertyHarness from './property.js';
 
 /**
@@ -44,6 +50,15 @@ describe('the property harness reports failures well enough to reproduce them', 
     expect(() => {
       assertProperty(named);
     }).toThrowError(/a settled acquisition re-entered an active phase/);
+  });
+
+  it('fails an awaiting property just as loudly as a synchronous one', async () => {
+    const failing = fc.asyncProperty(fc.integer({ min: 0, max: 1000 }), async (n) => {
+      await Promise.resolve();
+      return n < 5;
+    });
+
+    await expect(assertAsyncProperty(failing)).rejects.toThrowError(/Counterexample: \[5]/);
   });
 
   it('replays the identical counterexample from the reported seed and path', () => {
