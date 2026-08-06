@@ -67,12 +67,15 @@ export const GET: RequestHandler = async ({ cookies, locals, url }) => {
     // indistinguishable without this field, and the owner cannot log in to investigate. The
     // probe rides the same `warn` level as the PIN-binding mismatch above, so an operator
     // alerting on `warn` sees it; the other two stay at `info`.
-    const log =
-      membership.value.reason === 'matched-non-server' ? locals.logger.warn : locals.logger.info;
-    log(
-      { username: membership.value.username, reason: membership.value.reason },
-      'login denied: not a member',
-    );
+    // Called ON the logger, never through a detached reference: pino's methods need their
+    // receiver, and `const log = cond ? logger.warn : logger.info` loses it. The unit tier cannot
+    // see that (its logger is a plain spy) — the out-of-process e2e tier can, and did.
+    const denial = { username: membership.value.username, reason: membership.value.reason };
+    if (membership.value.reason === 'matched-non-server') {
+      locals.logger.warn(denial, 'login denied: not a member');
+    } else {
+      locals.logger.info(denial, 'login denied: not a member');
+    }
     redirect(303, loginErrorPath('denied'));
   }
 

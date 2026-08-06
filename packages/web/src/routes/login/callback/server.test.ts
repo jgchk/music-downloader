@@ -61,6 +61,23 @@ function expectNoTokenLogged(
   expect(JSON.stringify(allCalls)).not.toContain(token);
 }
 
+/**
+ * A logger whose methods need their receiver, exactly as pino's do: calling one detached (`const
+ * log = logger.warn; log(...)`) leaves `this` undefined and throws on the first member access.
+ * A `vi.fn()` spy is receiver-blind and cannot express this.
+ */
+class ReceiverStrictLogger {
+  readonly calls: string[] = [];
+
+  warn(_payload: unknown, message: string): void {
+    this.calls.push(`warn:${message}`);
+  }
+
+  info(_payload: unknown, message: string): void {
+    this.calls.push(`info:${message}`);
+  }
+}
+
 describe('login callback', () => {
   it('issues a signed session cookie and lands the member inside (approved PIN + granted membership)', async () => {
     const plex = new FakePlexAccess();
@@ -157,6 +174,20 @@ describe('login callback', () => {
     // after a denial would make the callback replayable.
     expect(deleted).toHaveLength(1);
     expectNoTokenLogged(logger, 'tok-x');
+  });
+
+  it('logs through the logger, never a detached method reference (pino needs its receiver)', async () => {
+    // The regression the out-of-process e2e tier caught and this tier could not: extracting
+    // `logger.warn` into a variable and calling it bare throws inside pino, 500ing the callback.
+    // A plain spy is receiver-blind, so this double insists on being called as a method.
+    const strict = new ReceiverStrictLogger();
+    const plex = new FakePlexAccess();
+    plex.membership = { kind: 'denied', username: 'stranger', reason: 'matched-non-server' };
+    const { event: requestEvent } = event(plex, '?pin=55');
+    (requestEvent as { locals: { logger: unknown } }).locals.logger = strict;
+
+    await expect(GET(requestEvent)).rejects.toSatisfy(isRedirect);
+    expect(strict.calls).toEqual(['warn:login denied: not a member']);
   });
 
   it.each([
