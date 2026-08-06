@@ -10,9 +10,16 @@ const modulePackages = ['downloader', 'importer'];
 /**
  * Test code, wherever it lives: the co-located unit/integration suites plus every out-of-src tier
  * (contract, boundaries, e2e, Playwright) — including the tiers' non-`.test.ts` helpers, fixture
- * builders, and recorders, which are test code by any reading. The carve-outs below are scoped to
- * this list; the production profile is otherwise identical, per module-architecture ("Test tiers
- * SHALL run the production rule profile except for short, named, documented carve-outs").
+ * builders, and recorders, which are test code by any reading.
+ *
+ * Every test-code carve-out below is scoped to this list and nothing else, so the divergence from
+ * production is exactly six named rules: `@typescript-eslint/no-non-null-assertion`,
+ * `@typescript-eslint/unbound-method`, `unicorn/name-replacements`, `neverthrow/must-use-result`,
+ * `unicorn/no-top-level-assignment-in-function`, and `unicorn/consistent-function-scoping` (the
+ * last two shared with other file sets). A carve-out that names its own glob instead of this
+ * constant is the drift this comment exists to prevent. The production profile is otherwise
+ * identical, per module-architecture ("Test tiers SHALL run the production rule profile except for
+ * short, named, documented carve-outs").
  */
 const testFiles = [
   '**/*.test.ts',
@@ -212,7 +219,7 @@ export default tseslint.config(
     // where assigning a `$state` variable from an effect or handler *is* the reactivity model.
     // Everywhere else the rule stays on (a stray outer-scope assignment is worth a second look —
     // the one production singleton was refactored to a holder object rather than exempted).
-    files: ['**/*.test.ts', '**/*.svelte'],
+    files: [...testFiles, '**/*.svelte'],
     rules: {
       'unicorn/no-top-level-assignment-in-function': 'off',
     },
@@ -222,7 +229,7 @@ export default tseslint.config(
     // `describe` block that uses them — locality next to the assertions they serve reads better than
     // hoisting every closure-free helper to module scope. The rule stays on for production code,
     // where a function that closes over nothing usually does belong at the outer scope.
-    files: ['**/*.test.ts'],
+    files: testFiles,
     rules: {
       'unicorn/consistent-function-scoping': 'off',
     },
