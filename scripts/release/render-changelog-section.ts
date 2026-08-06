@@ -47,6 +47,23 @@ export interface RangeCommit {
 }
 
 /**
+ * What `createPreset` actually returns. conventional-changelog-conventionalcommits 10.2.1 declares
+ * its default export as `(config?: PresetConfig) => {}` (`src/index.d.ts`) — an upstream typing
+ * gap, not a missing typing — so the two option bags it really hands back are named here, derived
+ * from the consumers' own signatures rather than restated by hand.
+ */
+interface Preset {
+  readonly parser: ConstructorParameters<typeof CommitParser>[0];
+  readonly writer: Parameters<typeof writeChangelogString>[2];
+}
+
+/** The commit shape the writer consumes, taken from its own signature. */
+type WriterCommit =
+  Extract<Parameters<typeof writeChangelogString>[0], Iterable<unknown>> extends Iterable<infer C>
+    ? C
+    : never;
+
+/**
  * Render the section body-with-heading for `version` from the commits in the range since
  * `previousVersion`. Returns the raw writer output (the same `content` catv prepended to
  * CHANGELOG.md), including its trailing blank lines.
@@ -58,14 +75,10 @@ export async function renderChangelogSection(
   // The preset's default URL format functions derive commit/compare/issue links from
   // context.host/owner/repository (the same shapes catv's explicit templates produced), so we no
   // longer pass URL templates — the `context` below supplies host/owner/repository directly.
-  const { parser: parserOpts, writer: writerOpts } = createPreset({ types: [...TYPES] });
+  const { parser: parserOpts, writer: writerOpts } = createPreset({ types: [...TYPES] }) as Preset;
 
   const parser = new CommitParser(parserOpts);
-  const parsed = commits.map((c) => {
-    const commit = parser.parse(c.message) as Record<string, unknown>;
-    commit.hash = c.hash;
-    return commit;
-  });
+  const parsed: WriterCommit[] = commits.map((c) => ({ ...parser.parse(c.message), hash: c.hash }));
 
   const context = {
     host: HOST,

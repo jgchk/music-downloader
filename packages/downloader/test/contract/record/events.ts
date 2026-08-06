@@ -8,11 +8,8 @@ import {
   sampleFiles,
 } from '../../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { publishedEventMapping } from '../../../src/interfaces/contracts/events/mapping.js';
-import {
-  eventFixturesDir,
-  historySnapshots,
-  publishedEventSchemas,
-} from '../../../scripts/contracts/event-schemas.js';
+import { asMbid } from '../../../src/domain/shared/__fixtures__/mbid.js';
+import { eventFixturesDir, historySnapshots } from '../../../scripts/contracts/event-schemas.js';
 
 /**
  * Records the frozen published-payload fixtures: real payloads rendered by the real mapping over a
@@ -29,7 +26,10 @@ const candidate = matchingCandidate('peer1');
 const history: readonly AcquisitionEvent[] = [
   ...importingHistory([candidate]).map((event) =>
     event.type === 'TargetResolved'
-      ? { ...event, target: { ...event.target, mbid: '6e335887-60ba-38f0-95af-fae8774d20fd' } }
+      ? {
+          ...event,
+          target: { ...event.target, mbid: asMbid('6e335887-60ba-38f0-95af-fae8774d20fd') },
+        }
       : event,
   ),
   { type: 'Imported', candidate: candidate.identity, location: LOCATION, files: sampleFiles },

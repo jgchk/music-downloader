@@ -9,6 +9,8 @@ import {
   mbReleaseGroupBrowseSchema,
 } from '../../src/adapters/musicbrainz/schemas.js';
 import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
+import type { Mbid } from '../../src/domain/shared/mbid.js';
+import { asMbid } from '../../src/domain/shared/__fixtures__/mbid.js';
 import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
@@ -31,7 +33,7 @@ const byName = (name: string): ContractFixture => {
   return hit.fixture;
 };
 
-const mbidFromPath = (name: string): string => byName(name).request.path.split('/').at(-1)!;
+const mbidFromPath = (name: string): Mbid => asMbid(byName(name).request.path.split('/').at(-1)!);
 
 let server: FixtureServer;
 
@@ -113,11 +115,11 @@ describe('MusicBrainz contract (tier 1)', () => {
     // The recorded search returns five 100-score ties for this famous track, so the ambiguity
     // guard must refuse to pick — pinned as the literal recorded outcome, not recomputed via the
     // mapping under test (which would follow a guard regression instead of catching it).
-    const recordings = mbRecordingSearchSchema.parse(
+    const { recordings } = mbRecordingSearchSchema.parse(
       byName('recording-search.json').response.body,
-    ).recordings;
+    );
     expect(recordings).toHaveLength(5);
-    expect(recordings.every((recording) => recording.score === 100)).toBe(true);
+    expect(recordings?.every((recording) => recording.score === 100)).toBe(true);
 
     const result = (
       await adapter().resolve({
@@ -139,7 +141,7 @@ describe('MusicBrainz contract (tier 1)', () => {
 describe('MusicBrainz release-group contract (tier 1)', () => {
   const browseEntry = fixtures.find((f) => f.name === 'release-group-browse.json')!;
   const lookupEntry = fixtures.find((f) => f.name === 'release-group-lookup.json')!;
-  const releaseGroupMbid = browseEntry.fixture.request.query!['release-group']!;
+  const releaseGroupMbid = asMbid(browseEntry.fixture.request.query!['release-group']!);
 
   let rgServer: FixtureServer;
   beforeEach(async () => {
@@ -182,7 +184,7 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
 // offer them for manual choice instead of resolving or failing — and fetch no edition lookup.
 describe('MusicBrainz release-group no-official contract (tier 1)', () => {
   const browseEntry = fixtures.find((f) => f.name === 'release-group-no-official-browse.json')!;
-  const releaseGroupMbid = browseEntry.fixture.request.query!['release-group']!;
+  const releaseGroupMbid = asMbid(browseEntry.fixture.request.query!['release-group']!);
 
   let rgServer: FixtureServer;
   beforeEach(async () => {

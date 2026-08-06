@@ -6,6 +6,7 @@ import {
   defaultPolicies,
   sampleGroupRequest,
 } from '../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
+import { asMbid } from '../../src/domain/shared/__fixtures__/mbid.js';
 import { foldEvents } from '../../src/domain/acquisition/state.js';
 import { buildUpcasterRegistry } from '../../src/adapters/sqlite/upcaster.js';
 
@@ -38,9 +39,10 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
     const event = upcastFixture();
     if (event.type !== 'ManualSelectionRequested') throw new Error('wrong event type');
 
+    expect(event.candidates).toHaveLength(2);
     const [known, unknown] = event.candidates;
-    expect(known.trackCount).toBe(12);
-    expect(unknown.trackCount).toBeUndefined();
+    expect(known!.trackCount).toBe(12);
+    expect(unknown!.trackCount).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(unknown, 'trackCount')).toBe(false);
   });
 
@@ -71,8 +73,8 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
     const v2Event: AcquisitionEvent = {
       type: 'ManualSelectionRequested',
       candidates: [
-        { releaseMbid: 'boot-1', title: 'Live at Budokan', trackCount: 12 },
-        { releaseMbid: 'boot-2', title: 'Promo Sampler' },
+        { releaseMbid: asMbid('boot-1'), title: 'Live at Budokan', trackCount: 12 },
+        { releaseMbid: asMbid('boot-2'), title: 'Promo Sampler' },
       ],
     };
 
