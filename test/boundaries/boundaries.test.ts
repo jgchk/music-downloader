@@ -14,12 +14,27 @@ interface Zone {
   readonly except?: readonly string[];
 }
 
-function zones(): readonly Zone[] {
-  const entry = config.find((item) => item.rules?.['import/no-restricted-paths'] !== undefined);
+/**
+ * The zones enforced for one file glob. Locating the block by its `files` matters: the rule is
+ * configured twice — once for `.ts`, once for `.svelte` — so a `find` matching merely the first
+ * block would let the `.svelte` enforcement be deleted with this suite still green, and components
+ * would silently regain the ability to reach past a module's facade.
+ */
+function zonesForFiles(glob: string): readonly Zone[] {
+  const entry = config.find(
+    (item) =>
+      Array.isArray(item.files) &&
+      item.files.includes(glob) &&
+      item.rules?.['import/no-restricted-paths'] !== undefined,
+  );
   expect(entry).toBeDefined();
   const rule = entry?.rules?.['import/no-restricted-paths'] as [string, { zones: readonly Zone[] }];
   expect(rule[0]).toBe('error');
   return rule[1].zones;
+}
+
+function zones(): readonly Zone[] {
+  return zonesForFiles('**/*.ts');
 }
 
 function hasZone(list: readonly Zone[], target: string, from: string): boolean {
@@ -31,6 +46,13 @@ describe('module boundary lint zones', () => {
     const all = zones();
     expect(hasZone(all, './packages/downloader', './packages/importer')).toBe(true);
     expect(hasZone(all, './packages/importer', './packages/downloader')).toBe(true);
+  });
+
+  it('enforces the very same zones inside .svelte components, not only in .ts', () => {
+    // Components are the layer furthest from the facade contract, so an unenforced `.svelte` block
+    // is the boundary's widest hole. Comparing the two zone sets pins both that the rule is present
+    // and that it was not quietly narrowed for components alone.
+    expect(zonesForFiles('**/*.svelte')).toEqual(zonesForFiles('**/*.ts'));
   });
 
   it('lets the web package reach a module only via its facade and runtime entries', () => {
