@@ -158,6 +158,19 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(acquisitionStatusResponseSchema.parse({ ...base, stalled: true }).stalled).toBe(true);
   });
 
+  it('rejects a stalled: false the producer never emits (tag-or-omit)', () => {
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'Downloading',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    expect(acquisitionStatusResponseSchema.safeParse({ ...base, stalled: false }).success).toBe(
+      false,
+    );
+  });
+
   it('accepts the additive lifecycle flags present (true/false) and absent', () => {
     const base = {
       acquisitionId: 'acq-1',

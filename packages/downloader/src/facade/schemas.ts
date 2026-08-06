@@ -269,8 +269,9 @@ export const acquisitionStatusResponseSchema = z.object({
   transferStarted: z.boolean().optional(),
   cancellable: z.boolean().optional(),
   awaitingSelection: z.boolean().optional(),
-  // Present (true) only when the acquisition dead-lettered awaiting an operator (additive).
-  stalled: z.boolean().optional(),
+  // Present (true) only when the acquisition dead-lettered awaiting an operator (additive,
+  // tag-or-omit: only ever `true` or absent — the producer joins it, never writes `false`).
+  stalled: z.literal(true).optional(),
 });
 
 export const acquisitionListResponseSchema = z.object({

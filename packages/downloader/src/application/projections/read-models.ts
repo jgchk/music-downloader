@@ -109,9 +109,10 @@ export interface AcquisitionStatusView {
   /**
    * Present (true) when the acquisition's current effect dead-lettered — its retry budget spent,
    * or a permanent fault, with no modeled failure to degrade to — awaiting an operator
-   * (reactor-durability D2). Additive: absent for every acquisition progressing normally.
+   * (reactor-durability D2). Tag-or-omit like the importer's: `true` or absent, never `false` —
+   * the join in the use-cases layer only ever adds the tag.
    */
-  readonly stalled?: boolean;
+  readonly stalled?: true;
 }
 
 /**
