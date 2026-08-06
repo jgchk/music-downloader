@@ -58,11 +58,11 @@ The reliable flow:
 jj git fetch && jj rebase -b <bookmark> -d 'main@origin'  # sync FIRST — concurrent sessions move main mid-ship (recurring collision)
 jj git push --bookmark <bookmark>
 gh pr create --head <bookmark> --base main …              # explicit --head; refer to the PR by number from here on
-gh pr checks <#> --watch
-gh pr merge <#> --rebase                                  # rebase-merge only; NO --delete-branch (remote auto-deletes; local: jj git fetch)
+gh pr merge <#> --auto --rebase                           # arm auto-merge NOW — GitHub merges the moment checks go green (kills the watch-then-merge race, incl. after an amend re-push)
+gh pr checks <#> --watch                                  # then watch for the outcome; rebase-merge only; NO --delete-branch (remote auto-deletes; local: jj git fetch)
 ```
 
-If checks took a while, fetch + rebase again before merging — "head branch is not up to date" means main moved underneath you.
+Auto-merge does NOT update an out-of-date branch: required checks are strict, so if main moves after you armed it the PR just sits — fetch + rebase + push again and auto-merge fires when the re-run goes green. Confirm with `gh pr view <#> --json state` before building on the result.
 
 ## Stack
 
