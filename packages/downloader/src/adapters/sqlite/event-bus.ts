@@ -1,6 +1,7 @@
 import { ResultAsync, err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Logger } from '../../application/logging/logger.js';
+import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   EventBus,
@@ -57,7 +58,13 @@ export function pollCatchUp(
 ): ResultAsync<number, InfraError> {
   // `ResultAsync`, not `Promise<Result>`: the lint rule that makes a discarded Result a build
   // break reads the declared return type, and a bare `Promise<Result>` is invisible to it.
-  return new ResultAsync(drainFrom(store, fromGlobalSeq, handler));
+  // `fromPromise`, not `new ResultAsync`: the latter does not catch, and `handler` is declared
+  // `(event) => void | Promise<void>` — a follower with no error channel of its own, whose throw
+  // is an in-contract input here. Unconverted it would reject a value typed `ResultAsync<…,
+  // InfraError>`, which is the escape this file's own bus documents itself as isolating.
+  return ResultAsync.fromPromise(drainFrom(store, fromGlobalSeq, handler), (error) =>
+    infraError('event-bus.pollCatchUp', 'catch-up handler failed', error),
+  ).andThen((drained) => drained);
 }
 
 async function drainFrom(

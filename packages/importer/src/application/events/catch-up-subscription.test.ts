@@ -1,4 +1,4 @@
-import { err, ok } from 'neverthrow';
+import { ResultAsync, err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
@@ -419,7 +419,6 @@ describe('CatchUpSubscription', () => {
     await arrival.promise;
 
     const resetting = sub.reset();
-    await sub.poll(); // a poll landing mid-reset is dropped, never raced against the save
     gate.resolve();
     const outcome = await resetting;
     await draining;
@@ -440,6 +439,89 @@ describe('CatchUpSubscription', () => {
     await sub.poll();
 
     expect(handled).toEqual([1]);
+  });
+
+  it('drops polls until every queued reset has finished, not just the first', async () => {
+    // Two overlapping resets must queue. A boolean gate would be cleared by whichever landed
+    // first, re-admitting the drain while the second's save was still in flight — and that second
+    // reset would then report Ok over a position the drain had already moved past.
+    const gates: { promise: Promise<void>; resolve: () => void }[] = [];
+    const gatedCheckpoints = {
+      load: (name: string) => checkpoints.load(name),
+      save: (name: string, globalSeq: number) => {
+        const gate = Promise.withResolvers<void>();
+        gates.push(gate);
+        return ResultAsync.fromSafePromise(gate.promise).andThen(() =>
+          checkpoints.save(name, globalSeq),
+        );
+      },
+    };
+    const sub = subscription({ checkpoints: gatedCheckpoints });
+    await sub.start(); // no events yet, so nothing is saved and the drain settles idle
+    feed.events = [seamEvent(1), seamEvent(2)];
+
+    const first = sub.reset(0);
+    const second = sub.reset(0);
+    await vi.waitFor(() => {
+      expect(gates).toHaveLength(1); // queued: the second reset has not begun saving
+    });
+    gates[0]!.resolve();
+    await first;
+
+    await sub.poll(); // the second reset is still saving, and the drain is idle: this must not run
+    expect(handled).toEqual([]);
+
+    await vi.waitFor(() => {
+      expect(gates).toHaveLength(2);
+    });
+    gates[1]!.resolve();
+    await second;
+  });
+
+  it('a reset waiting on a drain that throws still answers with a value', async () => {
+    // The reset barrier observes the drain only to know it has stopped touching the checkpoint.
+    // A defect throw there belongs to the polling caller; it must never surface as a rejection of
+    // the operator-facing reset, which is declared to answer with a Result.
+    const arrival = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    const throwingFeed = {
+      read: async () => {
+        arrival.resolve();
+        await gate.promise;
+        throw new Error('feed adapter bug');
+      },
+    };
+    const sub = subscription({ feed: throwingFeed });
+    const draining = sub.poll();
+    await arrival.promise;
+
+    const resetting = sub.reset(0);
+    gate.resolve();
+    const outcome = await resetting;
+
+    expect(outcome.isOk()).toBe(true);
+    await expect(draining).rejects.toThrow('feed adapter bug');
+  });
+
+  it('a subscription halted by a checkpoint fault resumes on reset, without a restart', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    checkpoints.failLoad = true;
+    const sub = subscription();
+    await sub.start();
+    expect(handled).toEqual([]);
+    // The wakeup and fallback wiring registers despite the halt — that is what makes the
+    // documented recovery reachable without bouncing the process.
+    expect(wakeListeners).toHaveLength(1);
+    expect(intervals).toHaveLength(1);
+
+    checkpoints.failLoad = false;
+    const rearmed = await sub.reset(0);
+    expect(rearmed.isOk()).toBe(true);
+    intervals[0]!.fn();
+
+    await vi.waitFor(() => {
+      expect(handled).toEqual([1, 2]);
+    });
   });
 
   it('stop detaches the wakeup listener and the fallback interval', async () => {
