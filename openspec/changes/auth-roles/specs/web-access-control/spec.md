@@ -39,8 +39,10 @@ the account can see a **server** whose machine identifier equals the configured
 `PLEX_SERVER_MACHINE_ID`: the matching resource entry SHALL both carry the configured machine
 identifier and declare that it provides a server. A resource entry that matches the identifier
 but does not provide a server — a player or other device, whose identifiers are client-chosen —
-SHALL NOT satisfy the check. There SHALL be no user database, allowlist, or per-user
-permissions. The matched entry's ownership flag SHALL be read at this moment as the session's
+SHALL NOT satisfy the check. This requirement NARROWS admission; it does not authenticate the
+server, because a resource's declared capabilities are self-asserted exactly as its identifier is
+— closing that residual requires pinning the owner by account identity, which this capability does
+not yet require. There SHALL be no user database, allowlist, or per-user permissions. The matched entry's ownership flag SHALL be read at this moment as the session's
 role source (see `web-authorization`). A plex.tv failure or unreachability SHALL surface as a
 modeled infrastructure error on the login page and SHALL never result in a grant.
 

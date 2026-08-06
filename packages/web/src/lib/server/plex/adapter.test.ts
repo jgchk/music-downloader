@@ -193,7 +193,45 @@ describe('PlexTvAccess.checkMembership', () => {
       jsonResponse([{ clientIdentifier: 'my-server-machine', provides: 'client,player' }]),
     );
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
-    expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
+    expect(outcome).toEqual({
+      kind: 'denied',
+      username: 'friend',
+      reason: 'matched-non-server',
+    });
+  });
+
+  it('never reads the role from an entry that failed the predicate (same-id device + real server)', async () => {
+    // The escalation shape: a guest's own device claims the server's identifier and is `owned` by
+    // that guest, while the server they actually reach is a share. Role must come from the entry
+    // that ADMITTED them, so this is a guest — reading `owned` off the device would mint an owner.
+    const stub = fetchStub(
+      jsonResponse(USER),
+      jsonResponse([
+        { clientIdentifier: 'my-server-machine', provides: 'client,player', owned: true },
+        { clientIdentifier: 'my-server-machine', provides: 'server', owned: false },
+      ]),
+    );
+    const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+    expect(outcome).toEqual({
+      kind: 'granted',
+      identity: { plexAccountId: '42', username: 'friend' },
+      role: 'guest',
+    });
+  });
+
+  it('decides the role independently of listing order when a machine id appears twice', async () => {
+    // Duplicate machine identifiers happen in the wild (cloned VMs, restored Preferences.xml):
+    // owner iff ANY admitting entry is owned, so plex.tv's array order cannot decide privilege.
+    const owned = { clientIdentifier: 'my-server-machine', provides: 'server', owned: true };
+    const shared = { clientIdentifier: 'my-server-machine', provides: 'server', owned: false };
+    for (const listing of [
+      [owned, shared],
+      [shared, owned],
+    ]) {
+      const stub = fetchStub(jsonResponse(USER), jsonResponse(listing));
+      const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
+      expect(outcome).toMatchObject({ kind: 'granted', role: 'owner' });
+    }
   });
 
   it('finds server among a multi-value provides list, trimmed and case-insensitively', async () => {
@@ -205,13 +243,19 @@ describe('PlexTvAccess.checkMembership', () => {
     expect(outcome).toMatchObject({ kind: 'granted' });
   });
 
-  it('denies a matching identifier whose entry carries no provides at all (tolerance never grants)', async () => {
+  it('denies a matching identifier whose entry carries no provides at all, naming the drift shape', async () => {
+    // Absent capabilities is the plex.tv CONTRACT-DRIFT shape: it denies (tolerance never grants),
+    // and the reason must distinguish it, because that drift locks out every user at once.
     const stub = fetchStub(
       jsonResponse(USER),
       jsonResponse([{ clientIdentifier: 'my-server-machine' }]),
     );
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
-    expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
+    expect(outcome).toEqual({
+      kind: 'denied',
+      username: 'friend',
+      reason: 'matched-no-capabilities',
+    });
   });
 
   it('denies when no resource matches, carrying the username for the denial message', async () => {
@@ -220,7 +264,7 @@ describe('PlexTvAccess.checkMembership', () => {
       jsonResponse([{ clientIdentifier: 'other', provides: 'server' }]),
     );
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
-    expect(outcome).toEqual({ kind: 'denied', username: 'friend' });
+    expect(outcome).toEqual({ kind: 'denied', username: 'friend', reason: 'no-machine-match' });
   });
 
   it.each([
@@ -233,7 +277,7 @@ describe('PlexTvAccess.checkMembership', () => {
   ])('%s', async (_case, user, expected) => {
     const stub = fetchStub(jsonResponse(user), jsonResponse([]));
     const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
-    expect(outcome).toEqual({ kind: 'denied', username: expected });
+    expect(outcome).toMatchObject({ kind: 'denied', username: expected });
   });
 
   it('surfaces a user-lookup failure as plex-unavailable with a token-free detail', async () => {

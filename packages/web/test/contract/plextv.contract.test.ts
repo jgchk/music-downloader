@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { PlexTvAccess } from '../../src/lib/server/plex/adapter.js';
+import { PlexTvAccess, isServerResource } from '../../src/lib/server/plex/adapter.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
 import { startFixtureServer } from './support/server.js';
@@ -35,18 +35,20 @@ function recordedMachineId(): string {
   return bodyOf<RecordedResource[]>('resources.json')[0]!.clientIdentifier;
 }
 
+const recordedResources = (): RecordedResource[] => bodyOf<RecordedResource[]>('resources.json');
+
 /**
- * The recorded entry that declares a server, if the recording has one. The membership predicate
- * needs `provides: "server"`, and a recording captured BEFORE that field was consumed cannot
- * witness it — the projection dropped it. Until the fixture is re-recorded, the grant path is
- * covered at the unit tier (adapter.test.ts) against the tolerant schema, and this tier witnesses
- * what the recording honestly contains: real identifiers, and a fail-closed denial for entries
- * that do not declare a server. Fabricating the field here would defeat the tier's whole point.
+ * The recorded entry that declares a server, if the recording has one — asked with the PRODUCTION
+ * predicate, so this tier cannot disagree with the adapter about what "is a server" means.
+ *
+ * A recording captured BEFORE `provides` was consumed cannot witness one: the projection dropped
+ * the field. Until the fixture is re-recorded, the grant path is covered at the unit tier
+ * (adapter.test.ts) against the tolerant schema, and this tier witnesses what the recording
+ * honestly contains: real identifiers, and a fail-closed denial for entries that do not declare a
+ * server. Fabricating the field here would defeat the tier's whole point.
  */
 function recordedServer(): RecordedResource | undefined {
-  return bodyOf<RecordedResource[]>('resources.json').find((entry) =>
-    entry.provides?.split(',').some((capability) => capability.trim().toLowerCase() === 'server'),
-  );
+  return recordedResources().find((entry) => isServerResource(entry.provides));
 }
 
 beforeEach(async () => {
@@ -96,7 +98,10 @@ describe('plex.tv contract (tier 1)', () => {
   });
 
   it('runs the membership conversation against the recorded account, sending the token as a header on both calls', async () => {
-    await adapter(recordedMachineId()).checkMembership('a-token');
+    const result = await adapter(recordedMachineId()).checkMembership('a-token');
+    // The account identity is witnessable against the recording whatever the verdict is.
+    const user = bodyOf<{ username: string }>('user.json');
+    expect(result._unsafeUnwrap()).toMatchObject({ username: user.username });
 
     // Both lookups must happen with the token — their relative order is not part of the contract.
     expect(server.requests.map((r) => `${r.method} ${r.path}`).toSorted()).toEqual([
@@ -112,52 +117,54 @@ describe('plex.tv contract (tier 1)', () => {
   it('denies membership for a machine id absent from the recorded resources', async () => {
     const result = await adapter('not-a-recorded-machine').checkMembership('a-token');
     const user = bodyOf<{ username: string }>('user.json');
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'denied', username: user.username });
-  });
-
-  it('denies a recorded identifier whose entry does not declare a server (fail closed on real data)', async () => {
-    // The predicate's narrowing, witnessed against wire data: an identifier the account provably
-    // sees is NOT admission unless that entry declares `provides: server`.
-    const nonServer = bodyOf<RecordedResource[]>('resources.json').find(
-      (entry) => entry !== recordedServer(),
-    );
-    const result = await adapter(nonServer!.clientIdentifier).checkMembership('a-token');
-    const user = bodyOf<{ username: string }>('user.json');
-    expect(result._unsafeUnwrap()).toEqual({ kind: 'denied', username: user.username });
-  });
-
-  it('grants — with the role plex.tv reports — for a recorded entry that declares a server', async () => {
-    const recorded = recordedServer();
-    if (recorded === undefined) {
-      // The recording predates the provides/owned projection (see the fixture's provenance note),
-      // so it cannot witness a grant. The tier states that out loud rather than fabricating the
-      // field; grant and role derivation are covered at the unit tier meanwhile. Re-recording
-      // (`pnpm tsx packages/web/test/contract/record/plextv.ts`) makes the assertion below real —
-      // the recorder now REFUSES to write a listing with no server entry, so a re-record cannot
-      // leave this branch alive.
-      expect(
-        bodyOf<RecordedResource[]>('resources.json').some((e) => e.provides !== undefined),
-      ).toBe(false);
-      return;
-    }
-    const user = bodyOf<{ id: number; username: string }>('user.json');
-    const result = await adapter(recorded.clientIdentifier).checkMembership('a-token');
     expect(result._unsafeUnwrap()).toEqual({
-      kind: 'granted',
-      identity: { plexAccountId: String(user.id), username: user.username },
-      role: recorded.owned === true ? 'owner' : 'guest',
+      kind: 'denied',
+      username: user.username,
+      reason: 'no-machine-match',
     });
   });
 
-  it('has no recorded guest-side variant, by design: a share-guest token is not ours to record', () => {
-    // `owned: false` cannot be captured — recording it would mean holding someone else's Plex
-    // credential, the exact thing the access design refuses. The tolerant default (absent or
-    // false ⇒ guest) is covered at the unit tier instead. This test states the gap so a reader
-    // does not mistake its absence for an oversight (the same honesty rule the slskd recorder
-    // follows for the events/transfers coupling).
-    const guestVariant = bodyOf<RecordedResource[]>('resources.json').find(
-      (entry) => entry.owned === false,
+  const nonServerEntry = (): RecordedResource | undefined =>
+    recordedResources().find((entry) => !isServerResource(entry.provides));
+
+  // Selected by the PREDICATE, never by position: a re-recorded listing where the account sees two
+  // servers must not nominate the second one as the "non-server" case.
+  it.runIf(nonServerEntry() !== undefined)(
+    'denies a recorded identifier whose entry does not declare a server (fail closed on real data)',
+    async () => {
+      // The predicate's narrowing, witnessed against wire data: an identifier the account provably
+      // sees is NOT admission unless that entry declares `provides: server`.
+      const result = await adapter(nonServerEntry()!.clientIdentifier).checkMembership('a-token');
+      const user = bodyOf<{ username: string }>('user.json');
+      expect(result._unsafeUnwrap()).toMatchObject({ kind: 'denied', username: user.username });
+    },
+  );
+
+  // SKIPPED, not silently green, while the recording predates the provides/owned projection (see
+  // the fixture's provenance note): a test report must not claim the grant path was witnessed when
+  // it was not. Re-recording (`pnpm tsx packages/web/test/contract/record/plextv.ts`) revives it —
+  // and the recorder REFUSES to write a listing with no server entry, so the skip cannot survive.
+  it.runIf(recordedServer() !== undefined)(
+    'grants — with the role plex.tv reports — for a recorded entry that declares a server',
+    async () => {
+      const recorded = recordedServer()!;
+      const user = bodyOf<{ id: number; username: string }>('user.json');
+      const result = await adapter(recorded.clientIdentifier).checkMembership('a-token');
+      expect(result._unsafeUnwrap()).toEqual({
+        kind: 'granted',
+        identity: { plexAccountId: String(user.id), username: user.username },
+        role: recorded.owned === true ? 'owner' : 'guest',
+      });
+    },
+  );
+
+  it('pins the recording as pre-projection, so a half-updated fixture cannot slip through', () => {
+    // The companion to the skip above: while ANY entry lacks `provides`, none may carry it — a
+    // partially hand-edited fixture (the fabrication this tier exists to prevent) fails here.
+    const resources = recordedResources();
+    const withCapabilities = resources.filter((entry) => entry.provides !== undefined);
+    expect(withCapabilities.length === 0 || withCapabilities.length === resources.length).toBe(
+      true,
     );
-    expect(guestVariant).toBeUndefined();
   });
 });

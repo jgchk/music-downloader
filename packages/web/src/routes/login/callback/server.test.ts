@@ -143,10 +143,16 @@ describe('login callback', () => {
   it('routes a denied membership back to the door with no cookie (unshared account stays outside)', async () => {
     const plex = new FakePlexAccess();
     plex.pinCheck = { kind: 'authorized', token: 'tok-x' };
-    plex.membership = { kind: 'denied', username: 'stranger' };
+    plex.membership = { kind: 'denied', username: 'stranger', reason: 'matched-non-server' };
     const { location, jar, deleted, logger } = await outcome(plex, '?pin=55');
     expect(location).toBe('/login?error=denied');
     expect(jar.size).toBe(0);
+    // The refusal SHAPE is logged: a device presenting our machine id is the attack signal, and an
+    // operator must be able to tell it from ordinary stranger traffic and from contract drift.
+    expect(logger.info).toHaveBeenCalledWith(
+      { username: 'stranger', reason: 'matched-non-server' },
+      expect.stringContaining('denied'),
+    );
     // The binding is consumed on EVERY bound outcome, not just success — a still-live binding
     // after a denial would make the callback replayable.
     expect(deleted).toHaveLength(1);

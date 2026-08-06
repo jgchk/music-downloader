@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { ZodType } from 'zod';
+import { isServerResource } from '../../../src/lib/server/plex/adapter.js';
 import { PLEX_CLIENT_IDENTIFIER, PLEX_PRODUCT } from '../../../src/lib/server/plex/identity.js';
 import {
   plexPinCheckSchema,
@@ -191,7 +192,9 @@ async function main(): Promise<void> {
   }));
   if (projected.length === 0)
     throw new Error('no resources with a clientIdentifier — token account sees no devices');
-  if (!projected.some((entry) => entry.provides?.split(',').some((c) => c.trim() === 'server')))
+  // Asked with the PRODUCTION predicate: a listing the adapter would grant on must never be
+  // refused by the recorder (a case-sensitive copy here would abort a legitimate re-record).
+  if (!projected.some((entry) => isServerResource(entry.provides)))
     throw new Error(
       'no resource declares provides=server — the recording cannot witness a membership grant',
     );

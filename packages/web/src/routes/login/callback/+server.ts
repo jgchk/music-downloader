@@ -61,7 +61,14 @@ export const GET: RequestHandler = async ({ cookies, locals, url }) => {
     redirect(303, loginErrorPath('unavailable'));
   }
   if (membership.value.kind === 'denied') {
-    locals.logger.info({ username: membership.value.username }, 'login denied: not a member');
+    // The reason is logged because the three refusal shapes need different operator responses: an
+    // ordinary stranger is noise, `matched-non-server` is someone presenting our machine id on a
+    // device, and `matched-no-capabilities` is plex.tv contract drift that locks EVERYONE out —
+    // indistinguishable without this field, and the owner cannot log in to investigate.
+    locals.logger.info(
+      { username: membership.value.username, reason: membership.value.reason },
+      'login denied: not a member',
+    );
     redirect(303, loginErrorPath('denied'));
   }
 

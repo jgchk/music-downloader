@@ -27,13 +27,28 @@ export type PinCheckOutcome =
   | { readonly kind: 'expired' };
 
 /**
- * The membership verdict: the token's account either reaches the owner's server or it does not.
- * A grant carries the role plex.tv's ownership flag on THAT server implies — this is the single
- * point where a role is ever derived (web-authorization).
+ * Why a membership check refused. Admission is unaffected — every reason denies — but the three
+ * shapes are operationally distinct and must not collapse into one log line: `matched-non-server`
+ * is the attack signal (someone's device carries our machine id), while `matched-no-capabilities`
+ * is the plex.tv contract-drift signal that would lock EVERY user out, including the owner.
+ */
+export type DenialReason =
+  /** No entry carried the configured machine identifier — an ordinary stranger. */
+  | 'no-machine-match'
+  /** An entry matched the identifier but declared capabilities that do not include a server. */
+  | 'matched-non-server'
+  /** An entry matched the identifier but declared no capabilities at all (drift-shaped). */
+  | 'matched-no-capabilities';
+
+/**
+ * The membership verdict: the token's account either reaches an entry declaring the owner's
+ * server or it does not. A grant carries the role plex.tv's ownership flag on THAT entry implies
+ * — the single point where a role is derived FROM PLEX.TV FACTS. (The session codec's guest
+ * default for pre-role cookies is a least-privilege floor, not a derivation.)
  */
 export type MembershipOutcome =
   | { readonly kind: 'granted'; readonly identity: SessionIdentity; readonly role: Role }
-  | { readonly kind: 'denied'; readonly username: string };
+  | { readonly kind: 'denied'; readonly username: string; readonly reason: DenialReason };
 
 export interface PlexAccessPort {
   createPin(): ResultAsync<PlexPin, PlexUnavailable>;

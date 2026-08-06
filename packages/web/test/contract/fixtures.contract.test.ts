@@ -85,9 +85,10 @@ describe('plex.tv fixtures', () => {
       // The consumed set, nothing else: the identifier is pseudonymized, while `provides` and
       // `owned` are plex.tv's own vocabulary (a capability list and a boolean) and identify
       // nobody — they are recorded verbatim so the predicate meets the real spelling.
-      expect(['clientIdentifier', 'provides', 'owned']).toEqual(
-        expect.arrayContaining(Object.keys(entry)),
-      );
+      const allowed = new Set(['clientIdentifier', 'provides', 'owned']);
+      // Names the offending keys on failure (and cannot be "fixed" into the inverse assertion,
+      // which would let unscrubbed fields through).
+      expect(Object.keys(entry).filter((key) => !allowed.has(key))).toEqual([]);
       expect(entry['clientIdentifier']).toMatch(/^machine-\d+$/);
       if ('provides' in entry) expect(typeof entry['provides']).toBe('string');
       if ('owned' in entry) expect(typeof entry['owned']).toBe('boolean');

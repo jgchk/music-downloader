@@ -1,7 +1,8 @@
 # Tasks — auth-roles
 
-Every production edit follows red-first TDD: the failing test lands before the code, visible in
-commit order. All work is in `packages/web` unless a task says otherwise.
+Every production edit follows red-first TDD: the failing test is authored and watched fail before
+its production code. (Commits group a task's test+code so every commit passes the gate — a red
+commit could not.) All work is in `packages/web` unless a task says otherwise.
 
 ## 1. The tightened membership predicate
 
@@ -60,7 +61,9 @@ commit order. All work is in `packages/web` unless a task says otherwise.
       identity shape; local out-of-process e2e run passes.
 - [ ] 5.2 Post-deploy manual verification (with Jake): owner login carries `owner`, a
       share-guest login still succeeds as `guest`, and pre-existing sessions behave as guests.
-      **Jake handoff — requires real Plex credentials for both an owner and a share-guest
-      account; no agent can complete it.** Everything verifiable without an interactive login
+      Also verify a Plex **Home/managed** member if one exists: `owned` may report true for
+      them, which would silently make every Home member an owner (design Risks).
+      **Jake handoff — requires real Plex credentials for an owner, a share-guest, and (if any) a
+      Home member; no agent can complete it.** Everything verifiable without an interactive login
       (health, unauthenticated redirect behaviour, cookie shape) is covered by the e2e/contract
       tiers and the post-deploy verification.

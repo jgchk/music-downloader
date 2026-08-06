@@ -30,8 +30,8 @@ zero call-site churn — with no consumer beyond the fix itself.
   `authorize(session, action)` where actions are a closed union (compile-checked, same
   discipline as the web verb inventory). Call sites name *actions, never roles*; the decision
   internals are a table-driven role check today and swappable (ABAC/PBAC) behind the unchanged
-  signature later — the XACML PEP/PDP split. The action union ships empty-but-for-a-seam-test
-  member until stall-surfacing adds `system:redrive` as its first real consumer.
+  signature later — the XACML PEP/PDP split. The action union ships with `system:redrive` declared
+  as its reserved first member — referenced by no route until stall-surfacing consumes it.
 - **Contract truth for the new fields.** `provides` and `owned` become consumed fields of the
   plex.tv resources contract: schema, recorded fixture witness, and recorder projection all
   extend together. The guest-side variant (`owned` absent/false) is documented as a tolerant
@@ -65,10 +65,15 @@ zero call-site churn — with no consumer beyond the fix itself.
 - **Contract tier:** `packages/web/test/contract` plextv fixtures re-recorded to witness
   `provides`/`owned` on the owner's account; recorder projection extended to the newly consumed
   fields (secret-scrub discipline unchanged).
-- **Security posture:** closes the review sweep's Plex-predicate finding. One verification item
-  travels with implementation: whether plex.tv permits a hostile *server* registration to claim
-  an arbitrary machine identifier (if so, the documented fallback is pinning the owner by
-  account identity via configuration — a design.md decision point, not a blocker for the
-  predicate fix, which strictly narrows admission either way).
+- **Security posture:** strictly NARROWS the review sweep's Plex-predicate finding; it does not
+  close it. The travelling verification item (task 1.3) came back positive: plex.tv does not
+  demonstrably enforce ownership or uniqueness of a server machine identifier, and `provides` is
+  self-asserted by the same client-chosen-header mechanism as a device's identifier
+  (`docs/research/plex-machine-identifier-trust.md`). The trivially-exploitable device/player hole
+  closes; the residual — a forged *server* registration under the attacker's own account, which
+  also decodes as `owner` — is closed only by pinning the owner by account identity via
+  configuration. That fallback is now a REQUIRED PREREQUISITE of the first owner-gated surface,
+  not an optional follow-up (see design.md Risks; enforced by a tripwire test that fails the day
+  `authorize` gains a production consumer).
 - **Operations:** existing sessions keep working as `guest`; the owner re-logs-in once to pick
   up the role. No new required configuration.
