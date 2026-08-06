@@ -36,13 +36,18 @@ export async function startFixtureServer(
 
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? '', 'http://localhost');
+    // Node always sets the method on a server-side request (`IncomingMessage` types it as optional
+    // only because it doubles as a client response). Resolve it once, so the recorded request and
+    // the route lookup can never disagree — and an absent method 404s rather than looking up a key
+    // that begins with the word "undefined".
+    const method = request.method ?? '';
     requests.push({
-      method: request.method ?? '',
+      method,
       path: url.pathname,
       query: Object.fromEntries(url.searchParams),
       headers: request.headers as Record<string, string | undefined>,
     });
-    const fixture = routes.get(`${request.method} ${url.pathname}`);
+    const fixture = routes.get(`${method} ${url.pathname}`);
     if (fixture === undefined) {
       response.writeHead(404);
       response.end();

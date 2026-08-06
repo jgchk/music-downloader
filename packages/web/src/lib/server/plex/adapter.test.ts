@@ -90,7 +90,7 @@ describe('PlexTvAccess.checkPin', () => {
     expect(outcome).toEqual({ kind: 'authorized', token: 'user-token' });
     const [url, init] = stub.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://plex.test/api/v2/pins/9');
-    expect((init.headers as Record<string, string>)['Accept']).toBe('application/json');
+    expect((init.headers as Record<string, string>).Accept).toBe('application/json');
   });
 
   it('reports a not-yet-approved pin (null, absent, or blank token) as pending — authorized implies a usable token', async () => {

@@ -9,7 +9,7 @@ function ok(json: unknown): HttpResponse {
   return { status: 200, body: JSON.stringify(json) };
 }
 
-function http(routes: Array<[string, HttpResponse]>): HttpClient {
+function http(routes: [string, HttpResponse][]): HttpClient {
   return {
     send: ({ url }) => {
       const hit = routes.find(([match]) => url.includes(match));
@@ -37,15 +37,18 @@ const recordingFixture = (id: string): HttpResponse =>
  * stay plain. The seed keeps intent legible.
  */
 function uuid(seed: string): string {
-  const hex = [...seed]
-    .map((character) => character.codePointAt(0)!.toString(16).padStart(2, '0'))
+  // `Array.from`, not a spread: the seeds are ASCII literals, so walking them by code point is
+  // exact here — and saying so explicitly keeps it clear no rich-text handling is intended.
+  const hex = Array.from(seed, (character) =>
+    character.codePointAt(0)!.toString(16).padStart(2, '0'),
+  )
     .join('')
     .padEnd(32, '0')
     .slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-function resolver(routes: Array<[string, HttpResponse]>): MusicBrainzMetadata {
+function resolver(routes: [string, HttpResponse][]): MusicBrainzMetadata {
   return new MusicBrainzMetadata(silentLogger(), http(routes));
 }
 

@@ -35,7 +35,7 @@ function mergeSegments(parts: readonly DiffSegment[]): DiffSegment[] {
   const merged: DiffSegment[] = [];
   for (const part of parts) {
     const last = merged.at(-1);
-    if (last !== undefined && last.changed === part.changed) {
+    if (last?.changed === part.changed) {
       merged[merged.length - 1] = { text: last.text + part.text, changed: last.changed };
     } else {
       merged.push(part);

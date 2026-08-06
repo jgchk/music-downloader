@@ -148,7 +148,11 @@ async function waitFor(
     const hit = files.find((f) => f.filename === filename);
     if (hit !== undefined && isMatch(hit.state ?? '')) return hit;
     if (Date.now() > deadline) {
-      throw new Error(`timed out waiting for ${label} on ${filename} (last: ${hit?.state})`);
+      // Spell the absent case rather than interpolating a nullish value: `hit` is undefined when no
+      // transfer by that filename came back at all, which is a different diagnosis from one that
+      // came back in the wrong state — and `(last: undefined)` reads the same for both.
+      const last = hit === undefined ? 'no transfer by that name' : (hit.state ?? 'no state');
+      throw new Error(`timed out waiting for ${label} on ${filename} (last: ${last})`);
     }
     await sleep(2000);
   }
@@ -178,7 +182,10 @@ async function tearDown(files: readonly LabTransfer[]): Promise<void> {
   for (const file of files) {
     if (file.id === undefined) continue;
     const isTerminal = (file.state ?? '').toLowerCase().includes('completed');
-    await call('DELETE', `${downloadsPath(PEER)}/${file.id}?remove=${isTerminal}`);
+    // `String(...)`, not bare interpolation: this boolean is going onto the wire as slskd's
+    // `?remove=` query value, so the `true`/`false` spelling is part of the request contract
+    // rather than an incidental stringification.
+    await call('DELETE', `${downloadsPath(PEER)}/${file.id}?remove=${String(isTerminal)}`);
   }
 }
 

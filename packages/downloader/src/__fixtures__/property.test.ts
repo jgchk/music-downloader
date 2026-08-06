@@ -37,9 +37,9 @@ describe('the property harness reports failures well enough to reproduce them', 
       assertProperty(alwaysBelowFive);
     };
 
-    expect(failure).toThrowError(/seed: \d+/);
-    expect(failure).toThrowError(/path: "[\d:]*"/);
-    expect(failure).toThrowError(/Counterexample: \[5]/);
+    expect(failure).toThrow(/seed: \d+/);
+    expect(failure).toThrow(/path: "[\d:]*"/);
+    expect(failure).toThrow(/Counterexample: \[5]/);
   });
 
   it('carries the violated invariant into the thrown message, not only onto the error cause', () => {
@@ -49,7 +49,7 @@ describe('the property harness reports failures well enough to reproduce them', 
 
     expect(() => {
       assertProperty(named);
-    }).toThrowError(/a settled acquisition re-entered an active phase/);
+    }).toThrow(/a settled acquisition re-entered an active phase/);
   });
 
   it('fails an awaiting property just as loudly as a synchronous one', async () => {
@@ -58,7 +58,7 @@ describe('the property harness reports failures well enough to reproduce them', 
       return n < 5;
     });
 
-    await expect(assertAsyncProperty(failing)).rejects.toThrowError(/Counterexample: \[5]/);
+    await expect(assertAsyncProperty(failing)).rejects.toThrow(/Counterexample: \[5]/);
   });
 
   it('replays the identical counterexample from the reported seed and path', () => {
@@ -132,7 +132,7 @@ describe('the property corpus is pinned, so CI cannot flake', () => {
     // widen the sweep would otherwise run the gate's budget and report green.
     vi.stubEnv('FC_NUM_RUNS', raw);
 
-    await expect(loadHarness()).rejects.toThrowError(/FC_NUM_RUNS must be an integer/);
+    await expect(loadHarness()).rejects.toThrow(/FC_NUM_RUNS must be an integer/);
   });
 
   it.each([
@@ -141,6 +141,6 @@ describe('the property corpus is pinned, so CI cannot flake', () => {
   ])('refuses %s runs — a sweep that cannot run is a misconfiguration', async (_label, raw) => {
     vi.stubEnv('FC_NUM_RUNS', raw);
 
-    await expect(loadHarness()).rejects.toThrowError(/FC_NUM_RUNS must be an integer >= 1/);
+    await expect(loadHarness()).rejects.toThrow(/FC_NUM_RUNS must be an integer >= 1/);
   });
 });

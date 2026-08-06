@@ -41,7 +41,7 @@ export interface CreateLoggerOptions {
  * environment (12-factor); output defaults to stdout so the runtime aggregates it.
  */
 export function createLogger(options: CreateLoggerOptions = {}): Logger {
-  const level = options.level ?? process.env['LOG_LEVEL'] ?? DEFAULT_LOG_LEVEL;
+  const level = options.level ?? process.env.LOG_LEVEL ?? DEFAULT_LOG_LEVEL;
   const redactPaths = options.redactPaths ?? DEFAULT_REDACT_PATHS;
   const pinoOptions: PinoOptions = {
     level,

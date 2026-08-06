@@ -18,12 +18,12 @@ import { IMPORT_VOICE_PHRASE, statusPhrase } from '../../packages/web/src/lib/co
  * bind-mounted SQLite event stores (the spec's "stores are durable, not in-memory" evidence).
  */
 
-export const BASE_URL = process.env['E2E_BASE_URL'] ?? 'http://localhost:3000';
-export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? path.join(process.cwd(), '.e2e-tmp');
+export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
+export const DATA_DIR = process.env.E2E_DATA_DIR ?? path.join(process.cwd(), '.e2e-tmp');
 
 /** The harness secret run.sh handed the container — a throwaway that guards nothing real. */
 export const SESSION_SECRET =
-  process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret-0123456789abcdef';
+  process.env.E2E_SESSION_SECRET ?? 'e2e-session-secret-0123456789abcdef';
 
 /**
  * Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. The
@@ -150,7 +150,12 @@ export async function pollUntilTerminal(id: string, timeoutMs = 90_000): Promise
     const status = await readStatus(id);
     if (status !== undefined && TERMINAL.has(status)) return status;
     if (Date.now() >= deadline) {
-      throw new Error(`acquisition ${id} did not settle in time (last status: ${status})`);
+      // `readStatus` genuinely yields undefined — an unreachable page, or a render with no status
+      // marker — and that is a different diagnosis from a status that never advanced, so name it
+      // rather than interpolating the bare word "undefined".
+      throw new Error(
+        `acquisition ${id} did not settle in time (last status: ${status ?? 'none read'})`,
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -172,7 +177,7 @@ export async function pollForStatus(
     if (status !== undefined && phrases.has(status)) return status;
     if (Date.now() >= deadline) {
       throw new Error(
-        `acquisition ${id} never showed ${[...phrases].join(' / ')} (last: ${status})`,
+        `acquisition ${id} never showed ${[...phrases].join(' / ')} (last: ${status ?? 'none read'})`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));

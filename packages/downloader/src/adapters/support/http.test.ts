@@ -10,12 +10,21 @@ let base: string;
 
 beforeAll(async () => {
   server = createServer((request, response) => {
-    if (request.url === '/hang') return; // never respond — the timeout must fire
+    const { method, url } = request;
+    // Node always fills both in for a server-side request; they are optional only because
+    // `IncomingMessage` doubles as a client response type. Refuse loudly rather than echo the word
+    // "undefined" into the body, which would read as a wire-shape bug in the client under test.
+    if (method === undefined || url === undefined) {
+      response.writeHead(500);
+      response.end('malformed request line');
+      return;
+    }
+    if (url === '/hang') return; // never respond — the timeout must fire
     let body = '';
     request.on('data', (chunk: Buffer) => (body += chunk.toString()));
     request.on('end', () => {
       response.writeHead(200, { 'content-type': 'text/plain' });
-      response.end(`${request.method} ${request.url} ${body}`);
+      response.end(`${method} ${url} ${body}`);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -48,6 +57,6 @@ describe('createFetchHttpClient — timeout', () => {
   it('fails a hung request instead of waiting forever (a frozen fetch must not wedge the caller)', async () => {
     const client = createFetchHttpClient(100);
 
-    await expect(client.send({ url: `${base}/hang` })).rejects.toThrowError(/timeout|abort/i);
+    await expect(client.send({ url: `${base}/hang` })).rejects.toThrow(/timeout|abort/i);
   });
 });

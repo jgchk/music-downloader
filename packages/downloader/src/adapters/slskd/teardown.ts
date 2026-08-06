@@ -49,7 +49,7 @@ export class TransferTeardown {
         const isTerminal = isTransferComplete(transfer);
         try {
           await this.client.delIfPresent(
-            `${downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=${isTerminal}`,
+            `${downloadsPath(username)}/${encodeURIComponent(transfer.id ?? '')}?remove=${String(isTerminal)}`,
           );
           if (!isTerminal) unconfirmed.push(transfer); // cancelled — must re-poll to confirm removal
         } catch (error) {

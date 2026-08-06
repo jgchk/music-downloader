@@ -32,7 +32,7 @@ import {
  * own logic — so a regression reintroducing a recomputed/mismatched location fails here.
  */
 
-const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
+const SLSKD_ADMIN = process.env.E2E_SLSKD_ADMIN_URL ?? 'http://localhost:8082/__admin';
 
 async function slskdDeletes(): Promise<string[]> {
   const res = await fetch(`${SLSKD_ADMIN}/requests`, { signal: AbortSignal.timeout(2000) });

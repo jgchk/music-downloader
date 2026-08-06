@@ -31,7 +31,7 @@ import {
  * to its terminal outcome.
  */
 
-const APP_CONTAINER = process.env['E2E_APP_CONTAINER'] ?? 'music-e2e-app';
+const APP_CONTAINER = process.env.E2E_APP_CONTAINER ?? 'music-e2e-app';
 const BLOCK_FLAG = path.join(DATA_DIR, 'bin', 'bridge-blocked');
 
 function docker(args: string): void {

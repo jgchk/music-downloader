@@ -27,8 +27,8 @@ import {
  * acquisition runs to Fulfilled. The WireMock request journal proves the single enqueue.
  */
 
-const APP_CONTAINER = process.env['E2E_APP_CONTAINER'] ?? 'music-e2e-app';
-const SLSKD_ADMIN = process.env['E2E_SLSKD_ADMIN_URL'] ?? 'http://localhost:8082/__admin';
+const APP_CONTAINER = process.env.E2E_APP_CONTAINER ?? 'music-e2e-app';
+const SLSKD_ADMIN = process.env.E2E_SLSKD_ADMIN_URL ?? 'http://localhost:8082/__admin';
 const DOWNLOADS_PATH = '/api/v0/transfers/downloads/peer1';
 
 function docker(args: string): void {

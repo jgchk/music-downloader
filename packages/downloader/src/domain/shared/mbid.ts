@@ -10,7 +10,10 @@ import type { Brand } from './brand.js';
  */
 export type Mbid = Brand<string, 'Mbid'>;
 
-export type InvalidMbid = { readonly kind: 'InvalidMbid'; readonly value: string };
+export interface InvalidMbid {
+  readonly kind: 'InvalidMbid';
+  readonly value: string;
+}
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

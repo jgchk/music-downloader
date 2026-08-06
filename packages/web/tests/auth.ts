@@ -8,10 +8,13 @@ import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '../src/lib/server/s
  * auth-disabling configuration to lean on.
  */
 
-const SECRET = process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret-0123456789abcdef';
-const BASE_URL = process.env['E2E_BASE_URL'] || 'http://localhost:4173';
+const SECRET = process.env.E2E_SESSION_SECRET ?? 'e2e-session-secret-0123456789abcdef';
+// Empty means "no harness" exactly as unset does (a CI shell exports the variable
+// unconditionally) — mirrors playwright.config.ts, whose baseURL this cookie's domain must match.
+const harnessUrl = process.env.E2E_BASE_URL === '' ? undefined : process.env.E2E_BASE_URL;
+const BASE_URL = harnessUrl ?? 'http://localhost:4173';
 
-type StorageState = {
+interface StorageState {
   cookies: {
     name: string;
     value: string;
@@ -23,7 +26,7 @@ type StorageState = {
     sameSite: 'Lax';
   }[];
   origins: [];
-};
+}
 
 export function authenticatedStorageState(): StorageState {
   const url = new URL(BASE_URL);

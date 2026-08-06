@@ -11,7 +11,7 @@ import { plexPinCheckSchema, plexPinCreateSchema } from '../../../src/lib/server
  * drift; the workflow turns that into the single contract-drift issue.
  */
 
-const BASE = process.env['PLEX_API_BASE_URL'] ?? 'https://plex.tv/api/v2';
+const BASE = process.env.PLEX_API_BASE_URL ?? 'https://plex.tv/api/v2';
 
 const HEADERS = {
   Accept: 'application/json',
