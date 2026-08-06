@@ -22,11 +22,14 @@ const testFiles = [
 ];
 
 /**
- * The repo's actual command-line programs: the release tooling, the event-schema generators behind
+ * The repo's actual command-line programs: the event-schema generators behind
  * `pnpm contracts:events`, and the contract recorders/drift checkers run as `tsx <file>`.
+ *
+ * `scripts/**` is deliberately NOT here. The release tier has zero `process.exit` calls — it uses
+ * the better `process.exitCode` idiom, which the rule does not flag — so listing it would have
+ * disabled the rule over ~14 files (six of them unit suites) that never needed it.
  */
 const cliEntrypoints = [
-  'scripts/**/*.ts',
   'packages/*/scripts/**/*.ts',
   'packages/*/test/contract/record/**/*.ts',
   'packages/*/test/contract/drift/**/*.ts',
@@ -260,17 +263,33 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       // "Never ignore a result" (error-handling.md) made enforceable. Detection is structural (any
-      // type carrying map/mapErr/andThen/orElse/match/unwrapOr), and "handled" means the value is
-      // matched/unwrapOr'd, interrogated with isOk/isErr, returned, `yield*`-ed inside `safeTry`, or
-      // combined — passing a Result to another function is NOT recognised as consumption, so a
-      // deliberate hand-off must make its consumption structural at the call site.
+      // type carrying map/mapErr/andThen/orElse/match/unwrapOr). "Handled" is a SHORT list, and the
+      // rule's own message is the authority: match, unwrapOr, or _unsafeUnwrap. Notably NOT handled
+      // — each of these still flags: passing a Result to another function, `Result.combine`
+      // arguments, and handler-delegation idioms. So a deliberate hand-off must make its
+      // consumption structural at the call site.
+      // THREE blind spots, all verified against the pinned plugin — do not read a green lint as
+      // proof a Result is consumed:
+      // (a) `Promise<Result<T, E>>` is INVISIBLE to the rule. For an `await`, the rule tests the
+      //     awaited expression's own type, and a Promise carries none of the marker methods — so
+      //     `await sub.reset();` does not report, while `await sub.resetAsync();` (a `ResultAsync`)
+      //     does. Any signature that must be rule-enforced has to return `ResultAsync`, not
+      //     `Promise<Result<…>>`. Several production signatures are currently in this blind spot.
+      // (b) `_unsafeUnwrap` satisfies this rule while violating the errors-as-values ban on unsafe
+      //     unwraps in production — silencing the rule that way trades one violation for a worse
+      //     one; it is legitimate only in test code.
+      // (c) A Result born inside a concise-body arrow counts as consumed, so `setTimeout(() =>
+      //     save(k))` and `p.then(() => save(k))` are NOT caught — the fire-and-forget position is
+      //     exactly where the defects this change fixed lived, so review it by hand.
       // The plugin is a small maintained fork (the original died in 2021) pinned exactly; its rule
-      // is ~200 lines and archived in docs/research/result-lint-and-tier-enforcement.md — if the
-      // fork lapses on an eslint/TS bump, vendor the rule rather than dropping the enforcement.
+      // is ~200 lines, its mechanics and upstream source link recorded in
+      // docs/research/result-lint-and-tier-enforcement.md — if the fork lapses on an eslint/TS
+      // bump, vendor the rule rather than dropping the enforcement.
       'neverthrow/must-use-result': 'error',
       // Defense in depth: `ResultAsync` is a PromiseLike, not a Promise, so the base rule ignores an
-      // un-awaited one. It cannot replace must-use-result (an awaited-then-discarded Result — the
-      // shape of the two `reset()` defects this change fixed — satisfies it), only complement it.
+      // un-awaited one; `checkThenables` closes that. It cannot replace must-use-result — an
+      // awaited-then-discarded Result satisfies it. Note the converse too: because of blind spot
+      // (a) above, a discarded `Promise<Result<…>>` that IS awaited is caught by neither rule.
       '@typescript-eslint/no-floating-promises': ['error', { checkThenables: true }],
     },
   },
@@ -367,6 +386,11 @@ export default tseslint.config(
     files: cliEntrypoints,
     rules: {
       'unicorn/no-process-exit': 'off',
+      // Re-armed after the test carve-out above, which sweeps these in via `packages/*/test/**`.
+      // A recorder or drift checker is a program, not a test: it asserts nothing, so a discarded
+      // failed Result there writes a fixture from bad data and the whole tier then replays a lie.
+      // Measured cost of holding them to the production profile: zero violations.
+      'neverthrow/must-use-result': 'error',
     },
   },
   prettier,

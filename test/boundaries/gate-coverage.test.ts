@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { ESLint } from 'eslint';
 import ts from 'typescript';
@@ -83,7 +83,65 @@ function claimedByAnyProject(): Set<string> {
 /** The project root `svelte-check --tsconfig` runs over — the second half of the typecheck gate. */
 const SVELTE_CHECK_ROOT = path.join(REPO_ROOT, 'packages/web/src');
 
+/**
+ * Every tier the walk must reach. Deliberately hand-listed, unlike everything else here: the three
+ * scenarios below are all `expect(<filtered list>).toEqual([])`, so a walk that discovers NOTHING
+ * passes them all. That is not hypothetical — narrowing `REPO_ROOT`, or adding one name to
+ * `SKIPPED_DIRECTORIES`, silently shrinks the checked set while every assertion stays green. This
+ * floor turns an empty or truncated discovery into a failure, so the guard cannot erode the same
+ * silent way it exists to prevent.
+ */
+const REQUIRED_TIERS = [
+  'packages/downloader/src',
+  'packages/downloader/scripts',
+  'packages/downloader/test/contract',
+  'packages/importer/src',
+  'packages/importer/scripts',
+  'packages/importer/test/contract',
+  'packages/web/src',
+  'scripts',
+  'test/boundaries',
+  'test/e2e',
+];
+
+/**
+ * The projects some typecheck script actually runs. Membership in a tsconfig is only half the
+ * claim: `typecheck:tiers` is a hand-maintained list of `-p` flags, so a tier that lands with its
+ * own tsconfig and no `package.json` edit is claimed by a project nobody ever invokes.
+ */
+function projectsUnderTheGate(): ReadonlySet<string> {
+  const manifest = JSON.parse(readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+  const scripts = [manifest.scripts.typecheck, manifest.scripts['typecheck:tiers']].join(' ');
+  const invoked = new Set<string>();
+  for (const [, project] of scripts.matchAll(/-p\s+(\S+)/g)) {
+    // The capture group is present whenever the pattern matches; narrow rather than assert.
+    if (project !== undefined) invoked.add(path.resolve(REPO_ROOT, project));
+  }
+  // The web project is driven by `check:svelte`'s `svelte-check --tsconfig`, not by a `tsc -p`.
+  invoked.add(path.join(REPO_ROOT, 'packages/web/tsconfig.json'));
+  return invoked;
+}
+
 describe('gate coverage', () => {
+  it('reaches every tier, so the scenarios below cannot pass over an empty set', () => {
+    const sources = firstPartySources().map((file) => path.relative(REPO_ROOT, file));
+    const unreached = REQUIRED_TIERS.filter((tier) =>
+      sources.every((file) => !file.startsWith(`${tier}${path.sep}`)),
+    );
+
+    expect(unreached).toEqual([]);
+    expect(sources.filter((file) => file.endsWith('.svelte')).length).toBeGreaterThan(0);
+  });
+
+  it('runs every project it discovers — a tsconfig nobody invokes typechecks nothing', () => {
+    const invoked = projectsUnderTheGate();
+    const unwired = projectConfigs().filter((config) => !invoked.has(config));
+
+    expect(unwired.map((file) => path.relative(REPO_ROOT, file))).toEqual([]);
+  });
+
   it('typechecks every first-party TypeScript source — each one is claimed by some tsconfig', () => {
     const claimed = claimedByAnyProject();
     const orphans = firstPartySources()
