@@ -31,3 +31,6 @@ __pycache__/
 *.pyc
 .coverage
 packages/importer/test/bridge/.venv/
+
+# TypeScript incremental-build state
+*.tsbuildinfo

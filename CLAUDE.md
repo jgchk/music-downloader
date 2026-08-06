@@ -37,7 +37,7 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 
 ## Commands
 
-- `pnpm check` — the full gate: format → lint → typecheck → build → test w/ coverage. Every commit must pass it.
+- `pnpm check` — the full gate: format, lint, typecheck, build, and all test tiers, fanned out as parallel fail-fast lanes (`scripts/check.sh`; `pnpm check:serial` runs the same lanes one at a time). Every commit must pass it.
 - `pnpm test` / `pnpm test:watch` / `pnpm test:cov` — unit + integration (vitest).
 - `pnpm test:e2e` — out-of-process E2E against a live slskd (`test/e2e/run.sh`).
 - `pnpm format:write` — apply prettier fixes.

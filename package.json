@@ -9,10 +9,10 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p packages/downloader/tsconfig.build.json && tsc -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
+    "build": "tsc --noCheck -p packages/downloader/tsconfig.build.json && tsc --noCheck -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
     "typecheck": "tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json && pnpm --dir packages/web run check:svelte",
-    "lint": "eslint .",
-    "format": "prettier --check .",
+    "lint": "eslint --cache --cache-location node_modules/.cache/eslint/ --cache-strategy content .",
+    "format": "prettier --check --cache .",
     "format:write": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,7 +23,8 @@
     "test:e2e": "bash test/e2e/run.sh",
     "contracts:events": "tsx packages/downloader/scripts/contracts/generate-event-schemas.ts && tsx packages/importer/scripts/contracts/generate-event-schemas.ts",
     "version:prep": "tsx scripts/release/version-prep.ts",
-    "check": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:cov && pnpm run test:contract && pnpm run test:release && pnpm run test:bridge",
+    "check": "bash scripts/check.sh",
+    "check:serial": "bash scripts/check.sh --serial",
     "test:e2e:web": "pnpm --dir packages/web exec playwright test",
     "dev": "pnpm --dir packages/web dev"
   },
