@@ -21,6 +21,7 @@ import {
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
+import { defaultPolicies } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { createDownloaderRuntime } from './runtime.js';
 import type { DownloaderRuntime } from './runtime.js';
 
@@ -322,6 +323,53 @@ describe('createDownloaderRuntime', () => {
     const second = await testRuntime(file);
     const listed = second.facade.listAcquisitions().acquisitions;
     expect(listed.map((entry) => entry.acquisitionId)).toContain(submitted.value.acquisitionId);
+  });
+
+  it('serves a legacy v1 row upcast through the composed runtime path', async () => {
+    // The regression this pins: composition (or the store default) silently dropping the populated
+    // upcaster registry would serve raw v1 payloads at 100% unit coverage — only a boot over a
+    // legacy file proves the composed read path lifts them.
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+
+    const seeded = openEventDatabase(file);
+    const insert = seeded.prepare(
+      `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    insert.run(
+      'acq-legacy',
+      0,
+      'AcquisitionRequested',
+      1,
+      JSON.stringify({
+        type: 'AcquisitionRequested',
+        request: SUBMIT.request,
+        policies: defaultPolicies(),
+      }),
+      JSON.stringify({ acquisitionId: 'acq-legacy', occurredAt: '2026-01-01T00:00:00.000Z' }),
+    );
+    // A v1 ManualSelectionRequested: the unknown track count stored as the sentinel 0, which the
+    // registered upcaster folds to absent before evolve ever sees it.
+    insert.run(
+      'acq-legacy',
+      1,
+      'ManualSelectionRequested',
+      1,
+      JSON.stringify({
+        type: 'ManualSelectionRequested',
+        candidates: [{ releaseMbid: 'r-1', title: 'Unknown Edition', trackCount: 0 }],
+      }),
+      JSON.stringify({ acquisitionId: 'acq-legacy', occurredAt: '2026-01-01T00:00:01.000Z' }),
+    );
+    seeded.close();
+
+    const runtime = await testRuntime(file);
+    const status = runtime.facade.getAcquisition({ id: 'acq-legacy' });
+    if (!status.ok) throw new Error('legacy acquisition not served');
+    expect(status.value.status).toBe('AwaitingManualSelection');
+    expect(status.value.candidates).toEqual([{ releaseMbid: 'r-1', title: 'Unknown Edition' }]);
   });
 
   it('constructs real adapters when no overrides are given', async () => {
