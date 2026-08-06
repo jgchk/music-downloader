@@ -2,6 +2,7 @@ import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 import svelte from 'eslint-plugin-svelte';
 import unicorn from 'eslint-plugin-unicorn';
+import neverthrow from '@ninoseki/eslint-plugin-neverthrow';
 import prettier from 'eslint-config-prettier';
 
 const modulePackages = ['downloader', 'importer'];
@@ -203,6 +204,7 @@ export default tseslint.config(
     },
     plugins: {
       import: importPlugin,
+      neverthrow,
     },
     settings: {
       'import/resolver': {
@@ -221,6 +223,19 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+      // "Never ignore a result" (error-handling.md) made enforceable. Detection is structural (any
+      // type carrying map/mapErr/andThen/orElse/match/unwrapOr), and "handled" means the value is
+      // matched/unwrapOr'd, interrogated with isOk/isErr, returned, `yield*`-ed inside `safeTry`, or
+      // combined — passing a Result to another function is NOT recognised as consumption, so a
+      // deliberate hand-off must make its consumption structural at the call site.
+      // The plugin is a small maintained fork (the original died in 2021) pinned exactly; its rule
+      // is ~200 lines and archived in docs/research/result-lint-and-tier-enforcement.md — if the
+      // fork lapses on an eslint/TS bump, vendor the rule rather than dropping the enforcement.
+      'neverthrow/must-use-result': 'error',
+      // Defense in depth: `ResultAsync` is a PromiseLike, not a Promise, so the base rule ignores an
+      // un-awaited one. It cannot replace must-use-result (an awaited-then-discarded Result — the
+      // shape of the two `reset()` defects this change fixed — satisfies it), only complement it.
+      '@typescript-eslint/no-floating-promises': ['error', { checkThenables: true }],
     },
   },
   {
@@ -291,6 +306,11 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       // vitest mocks are referenced unbound in assertions (expect(fn).toHaveBeen…).
       '@typescript-eslint/unbound-method': 'off',
+      // Tests drive Result-returning functions for their effects and assert through other means
+      // (the store, a spy, a projection), so the must-use obligation reads as noise here — the
+      // production rule is what protects operators. Ratchet trigger: turn this back on (and burn
+      // down the backlog) if a test ever passes *because* it silently discarded a failed Result.
+      'neverthrow/must-use-result': 'off',
     },
   },
   prettier,

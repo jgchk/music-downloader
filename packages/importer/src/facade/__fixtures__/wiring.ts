@@ -1,8 +1,11 @@
 import { okAsync } from 'neverthrow';
+import type { Result } from 'neverthrow';
 import { POLICY } from '../../domain/import/__fixtures__/import-fixtures.js';
 import { FakeEventStore, fixedClock } from '../../application/__fixtures__/fakes.js';
 import type { EffectPorts } from '../../application/import/interpreter.js';
 import { interpretEffect } from '../../application/import/interpreter.js';
+import type { CommandError } from '../../application/import/command-handler.js';
+import type { StoredEvent } from '../../application/ports/event-store-port.js';
 import type { UseCaseDependencies } from '../../application/import/use-cases.js';
 import { createImporterFacade } from '../index.js';
 import type { ImporterFacade } from '../index.js';
@@ -27,7 +30,14 @@ export interface TestWiring {
   /** The stalled read model behind the facade — mark a stream to simulate a dead-lettered import. */
   readonly stalled: StalledReadModel;
   readonly sync: () => void;
-  readonly dispatch: (importId: string, effect: Effect) => Promise<void>;
+  /**
+   * Interpret one effect and pump the projection. The interpreter's outcome is returned rather
+   * than dropped so a test can assert on a failed dispatch instead of quietly passing on one.
+   */
+  readonly dispatch: (
+    importId: string,
+    effect: Effect,
+  ) => Promise<Result<readonly StoredEvent[], CommandError>>;
   readonly ports: EffectPorts;
   /** Swap what the stubbed tagger proposes next. */
   setProposal: (outcome: ProposeOutcome) => void;
@@ -69,8 +79,13 @@ export function testWiring(): TestWiring {
     ports,
     sync: () => status.rebuild(store.all()),
     dispatch: async (importId, effect) => {
-      await interpretEffect({ store, clock: fixedClock(), ports }, importId, effect);
+      const interpreted = await interpretEffect(
+        { store, clock: fixedClock(), ports },
+        importId,
+        effect,
+      );
       status.rebuild(store.all());
+      return interpreted;
     },
     setProposal: (outcome) => {
       proposal = outcome;
