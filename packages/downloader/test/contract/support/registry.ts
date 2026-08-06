@@ -90,3 +90,32 @@ export const stubSchemas: Record<string, ZodType> = {
   'slskd/events.json': slskdEventsSchema,
   'slskd/options.json': slskdOptionsSchema,
 };
+
+/**
+ * Scripted E2E stub filename → schema. These live under `test/e2e/stubs/<service>/scripted/`
+ * (NOT `mappings/`, so WireMock never auto-loads them): a phase registers them ad hoc via the
+ * admin API — the review-resolution phase's second-hunt script. They are files precisely so
+ * this registry can hold them to the same contract as the permanent stubs; response-less
+ * mappings (204s) and the unconsumed enqueue ack are absent by design.
+ */
+export const scriptedStubSchemas: Record<string, ZodType> = {
+  'slskd/scripted/search-create-round1.json': slskdSearchStateSchema,
+  'slskd/scripted/search-create-round2.json': slskdSearchStateSchema,
+  'slskd/scripted/search2-state-held.json': slskdSearchStateSchema,
+  'slskd/scripted/search2-state-complete.json': slskdSearchStateSchema,
+  'slskd/scripted/search2-responses.json': slskdSearchResponsesSchema,
+  'slskd/scripted/peer2-transfers-poll.json': slskdTransfersSchema,
+  'slskd/scripted/events-both-completes.json': slskdEventsSchema,
+};
+
+/**
+ * Scripted stubs deliberately outside the conformance map: response-less mappings (204s) and
+ * the enqueue acknowledgement no adapter consumes. Every file in the scripted directory must
+ * appear either here or in `scriptedStubSchemas` — enforced by the exhaustiveness check in
+ * fixtures.contract.test.ts, so a future scripted stub cannot dodge the contract silently.
+ */
+export const scriptedStubsWithoutContract: readonly string[] = [
+  'slskd/scripted/peer2-enqueue.json',
+  'slskd/scripted/peer2-transfer-delete.json',
+  'slskd/scripted/search2-delete.json',
+];

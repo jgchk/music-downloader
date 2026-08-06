@@ -1,0 +1,20 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "DELETE",
+    "urlPath": "/api/v0/transfers/downloads/peer2/transfer-2",
+    "queryParameters": {
+      "remove": {
+        "equalTo": "true"
+      }
+    },
+    "headers": {
+      "X-API-Key": {
+        "equalTo": "test-key"
+      }
+    }
+  },
+  "response": {
+    "status": 204
+  }
+}

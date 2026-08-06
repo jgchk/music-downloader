@@ -5,11 +5,14 @@ import { loadFixtures } from './support/fixture.js';
 import {
   fixtureRequiredFields,
   fixtureSchemas,
+  scriptedStubSchemas,
+  scriptedStubsWithoutContract,
   stubSchemas,
   unconsumedResponseFixtures,
   unconsumedStubMappings,
 } from './support/registry.js';
 import { CONTRACT_FIXTURE_ROOT } from './support/fixture.js';
+import { slskdDownloadFileCompleteSchema } from '../../src/adapters/slskd/schemas.js';
 
 /**
  * Conformance: every recorded fixture and every E2E stub payload must satisfy the same contract
@@ -117,5 +120,51 @@ describe('E2E stub payloads conform to the contract', () => {
     };
     const result = schema.safeParse(mapping.response.jsonBody);
     expect(result.success, `${rel}: ${JSON.stringify(result.error?.issues)}`).toBe(true);
+  });
+});
+
+describe('scripted E2E stub payloads conform to the contract', () => {
+  // Ad-hoc-registered doubles (review-resolution's second-hunt script) get exactly the same
+  // conformance gate as the permanent stubs — an inline payload would drift silently and
+  // surface only as a post-merge e2e failure, the class of bug this tier exists to prevent.
+  const cases = Object.keys(scriptedStubSchemas).map((rel) => ({ rel }));
+
+  it.each(cases)('%s validates against its schema', ({ rel }) => {
+    const mapping = JSON.parse(readFileSync(join(STUB_ROOT, rel), 'utf8')) as {
+      response: { jsonBody?: unknown };
+    };
+    const result = scriptedStubSchemas[rel]!.safeParse(mapping.response.jsonBody);
+    expect(result.success, `${rel}: ${JSON.stringify(result.error?.issues)}`).toBe(true);
+  });
+
+  it('every scripted stub on disk is either contract-mapped or deliberately excluded', () => {
+    // The e2e phase registers whatever the directory contains; this sweep stops a future file
+    // from being loaded into WireMock while validating against nothing.
+    const onDisk = readdirSync(join(STUB_ROOT, 'slskd/scripted')).map(
+      (name) => `slskd/scripted/${name}`,
+    );
+    const accounted = new Set([
+      ...Object.keys(scriptedStubSchemas),
+      ...scriptedStubsWithoutContract,
+    ]);
+    for (const rel of onDisk) {
+      expect(accounted.has(rel), `${rel} is neither contract-mapped nor excluded`).toBe(true);
+    }
+    // And the maps point at real files — a stale registry entry is drift in the other direction.
+    for (const rel of accounted) {
+      expect(onDisk.includes(rel), `${rel} is registered but not on disk`).toBe(true);
+    }
+  });
+
+  it('the scripted events journal carries decodable DownloadFileComplete payloads', () => {
+    // The events schema only asserts `data` is a string; the string-encoded payload is where a
+    // shape mistake is easiest to make — decode each one with the adapter's own schema.
+    const mapping = JSON.parse(
+      readFileSync(join(STUB_ROOT, 'slskd/scripted/events-both-completes.json'), 'utf8'),
+    ) as { response: { jsonBody: { type: string; data: string }[] } };
+    for (const record of mapping.response.jsonBody) {
+      const decoded = slskdDownloadFileCompleteSchema.safeParse(JSON.parse(record.data));
+      expect(decoded.success, JSON.stringify(decoded.error?.issues)).toBe(true);
+    }
   });
 });

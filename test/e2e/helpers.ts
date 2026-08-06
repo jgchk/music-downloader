@@ -29,13 +29,14 @@ export const SESSION_SECRET =
 
 /**
  * Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. The
- * harness stands in for the server's owner, so it mints the `owner` role — the base interface this
- * tier drives is role-independent, but an owner-gated verb must be reachable from here when one
- * ships.
+ * harness stands in for the server's owner, so it mints the `owner` role by default — the base
+ * interface this tier drives is role-independent, but an owner-gated verb must be reachable from
+ * here when one ships. A phase proving a verb needs NO privilege passes `'guest'` (auth-roles:
+ * the only other role) and drives the same routes from the floor of the role ladder.
  */
-export function sessionCookieHeader(): string {
+export function sessionCookieHeader(role: 'owner' | 'guest' = 'owner'): string {
   const cookie = signSession(
-    { plexAccountId: 'e2e', username: 'e2e-harness', role: 'owner' },
+    { plexAccountId: 'e2e', username: 'e2e-harness', role },
     SESSION_SECRET,
     Date.now(),
   );
@@ -53,29 +54,39 @@ export const MBID = '6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1';
 export const STAGED_SUBDIR = 'Test Album';
 export const STAGED_FILE = '01 Track One.flac';
 
-const FIXTURE = fileURLToPath(new URL('./fixtures/track.flac', import.meta.url));
+const FIXTURES_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url));
 
 /**
- * Seed the "downloaded" file at the location the slskd stub REPORTS for it (events.json
- * `localFilename` under the options.json downloads root, re-rooted by the app onto
- * STAGING_ROOT) — never at a path this harness recomputes from the app's own logic.
+ * Seed a "downloaded" file at the location the slskd stub REPORTS for it (a `localFilename`
+ * under the options.json downloads root, re-rooted by the app onto STAGING_ROOT) — never at a
+ * path this harness recomputes from the app's own logic. `fixture` names a file under
+ * test/e2e/fixtures (calibration provenance in fixtures/README.md).
  */
-export function seedStagedFixture(): void {
-  const dir = join(STAGING_DIR, STAGED_SUBDIR);
+export function seedFixture(fixture: string, subdir: string, file = STAGED_FILE): void {
+  const dir = join(STAGING_DIR, subdir);
   mkdirSync(dir, { recursive: true });
-  copyFileSync(FIXTURE, join(dir, STAGED_FILE));
+  copyFileSync(join(FIXTURES_DIR, fixture), join(dir, file));
+}
+
+/** The default seeding: the clean fixture at the on-disk stub's reported location. */
+export function seedStagedFixture(): void {
+  seedFixture('track.flac', STAGED_SUBDIR);
 }
 
 export async function waitForOk(url: string, timeoutMs = 120_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let lastFailure = 'no response yet';
   for (;;) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (res.ok) return;
-    } catch {
-      // not up yet
+      lastFailure = `HTTP ${String(res.status)}`;
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error); // not up yet
     }
-    if (Date.now() >= deadline) throw new Error(`timed out waiting for ${url}`);
+    if (Date.now() >= deadline) {
+      throw new Error(`timed out waiting for ${url} (last failure: ${lastFailure})`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
