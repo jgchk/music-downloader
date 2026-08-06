@@ -161,11 +161,19 @@ export class CatchUpSubscription {
     });
   }
 
-  stop(): void {
+  /**
+   * Detach the wakeup listener and the fallback timer, then wait for any in-flight drain to stop
+   * touching the store. Detaching alone only cancels the NEXT cycle: the caller closes the
+   * event-store handle the moment this resolves, so a cycle still draining would go on reading
+   * the feed and saving checkpoints against a closed database — the very error loop the detach
+   * exists to prevent, one cycle later. `inflight` is the settled barrier, so it never rejects.
+   */
+  async stop(): Promise<void> {
     this.stopWakeups?.();
     this.stopWakeups = undefined;
     this.stopInterval?.();
     this.stopInterval = undefined;
+    await this.inflight;
   }
 
   /**
@@ -244,8 +252,23 @@ export class CatchUpSubscription {
     for (;;) {
       const batch = await this.dependencies.feed.read(this.cursor, this.dependencies.batchSize);
       if (batch.isErr()) {
-        // Feed faults (producer store read, payload rendering) hold the checkpoint; the fallback
-        // poll retries — a defective payload is never exposed downstream, never skipped.
+        if (batch.error.kind === 'RenderError') {
+          // A permanent payload-rendering defect at the producer (a mapping bug, or an event that
+          // cannot satisfy its schema): retrying can never resolve it, so a plain hold would block
+          // this position — and every event behind it — forever while readiness still read `up`.
+          // Halt loudly: the checkpoint is held (never skipped) and readiness reports `down`,
+          // surfacing it for the code fix a render defect actually needs. (Precise per-event
+          // dead-lettering for a `park` consumer would need the feed to carry the failing global
+          // position; the seam error only exposes `kind`, so that is deferred.)
+          this.halted = true;
+          this.dependencies.logger.error(
+            { subscription: this.dependencies.name, cursor: this.cursor, err: batch.error },
+            'seam feed render defect (permanent); subscription halted, checkpoint held',
+          );
+          return;
+        }
+        // A transient store-read fault holds the checkpoint; the fallback poll retries — a
+        // defective batch is never exposed downstream, never skipped.
         this.dependencies.logger.error(
           { subscription: this.dependencies.name, cursor: this.cursor, err: batch.error },
           'seam feed read failed; holding checkpoint',
@@ -267,9 +290,11 @@ export class CatchUpSubscription {
   /** True when the drain may continue past `event`. */
   private async consume(event: SeamEvent): Promise<boolean> {
     const { attempts, baseDelayMs } = this.dependencies.retry;
+    let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       const outcome = await this.dependencies.handler(event);
       if (outcome.isOk()) return this.advance(event.globalSeq);
+      lastError = outcome.error;
       if (outcome.error.kind === 'Permanent') {
         // Deterministic failures gain nothing from repetition — straight to the poison policy.
         return this.poison(event, outcome.error.reason);
@@ -285,8 +310,10 @@ export class CatchUpSubscription {
       );
       if (attempt < attempts) await this.dependencies.sleep(baseDelayMs * 2 ** (attempt - 1));
     }
+    // The sustained operator signal for a standing hold: it must carry the failure itself,
+    // or a wedged seam logs an error line that never says why.
     this.dependencies.logger.error(
-      { subscription: this.dependencies.name, globalSeq: event.globalSeq },
+      { subscription: this.dependencies.name, globalSeq: event.globalSeq, err: lastError },
       'seam delivery exhausted cycle retries; holding checkpoint for redelivery',
     );
     return false;

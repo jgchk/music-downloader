@@ -366,7 +366,7 @@ describe('acquisition E2E', () => {
     // the same event arrives again with the same global position and an identical payload.
     const redelivered = subscriptionOf(openEventDatabase(':memory:'));
     await redelivered.start();
-    redelivered.stop();
+    await redelivered.stop();
     expect(received).toHaveLength(2);
     expect(received[1]).toStrictEqual(envelope);
   });

@@ -70,7 +70,7 @@ interface Booted {
   readonly shutdown: () => Promise<void>;
 }
 
-type Stoppable = { start(): Promise<void>; stop(): void };
+type Stoppable = { start(): Promise<void>; stop(): Promise<void> };
 
 export interface BootOverrides {
   readonly createDownloader?: typeof createDownloaderRuntime;
@@ -161,10 +161,12 @@ async function boot(
   } catch (error) {
     // A subscription whose start throws must not strand two booted runtimes with live pollers
     // behind a rejected boot: stop everything already started, then surface the ORIGINAL fatal —
-    // cleanup rejections are logged by stopSettled, never thrown over it.
-    acquisitions.stop();
-    verdicts.stop();
+    // cleanup rejections are logged by stopSettled, never thrown over it. The subscription stops
+    // settle alongside the runtime stops: each runtime already awaits its own subscription before
+    // closing its store, so these are the prompt detach, not the ordering guarantee.
     await stopSettled(logger, 'runtime stop failed during boot teardown', [
+      acquisitions.stop(),
+      verdicts.stop(),
       downloader.stop(),
       importer.stop(),
     ]);
@@ -172,9 +174,9 @@ async function boot(
   }
 
   const shutdown = async (): Promise<void> => {
-    acquisitions.stop();
-    verdicts.stop();
     const isClean = await stopSettled(logger, 'runtime stop failed during shutdown', [
+      acquisitions.stop(),
+      verdicts.stop(),
       downloader.stop(),
       importer.stop(),
     ]);

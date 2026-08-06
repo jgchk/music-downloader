@@ -17,6 +17,15 @@ function collectingDestination(): { stream: DestinationStream; lines: string[] }
     },
   };
 }
+/**
+ * Settle everything already queued on the microtask queue. A macrotask hop is what makes the
+ * "has NOT resolved yet" assertions below honest: any promise chain that was ready to settle has
+ * done so by the time this resolves, so a still-pending flag means genuinely still pending.
+ */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 import { CatchUpSubscription } from './catch-up-subscription.js';
 import type {
   CatchUpSubscriptionDependencies,
@@ -209,6 +218,25 @@ describe('CatchUpSubscription', () => {
     expect(await checkpointOf()).toBe(2);
   });
 
+  it('names the failure in the standing-hold log, so a wedged seam says why', async () => {
+    // The sustained operator signal for a hold that outlives the cycle. Without the failure on
+    // the line, a seam stuck behind a transient fault logs an error every poll that never says
+    // what the fault was — the operator sees "holding" forever with nothing to act on.
+    feed.events = [seamEvent(1)];
+    const stuck: ConsumeFailure = { kind: 'Transient', reason: 'IntakeDirectoryMissing' };
+    failures.set(1, [stuck, stuck, stuck]);
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const sub = subscription({ logger });
+
+    await sub.start();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      { subscription: 'seam:test', globalSeq: 1, err: stuck },
+      'seam delivery exhausted cycle retries; holding checkpoint for redelivery',
+    );
+  });
+
   it('halt policy: a poison event stops the subscription without advancing', async () => {
     feed.events = [seamEvent(1), seamEvent(2)];
     failures.set(1, [{ kind: 'Permanent', reason: 'InvalidPayload' }]);
@@ -281,6 +309,22 @@ describe('CatchUpSubscription', () => {
     feed.failReads = false;
     await sub.poll();
     expect(handled).toEqual([1]);
+  });
+
+  it('halts on a permanent render defect at the feed boundary rather than retrying forever', async () => {
+    // A RenderError is a producer mapping defect a retry can never fix: it must be distinguished
+    // from a transient store-read fault. Holding-and-retrying would block this position — and
+    // every verdict behind it — forever while `/health` still answered `up`; halting surfaces it.
+    const renderDefectFeed = {
+      read: (): Promise<Result<SeamFeedBatch, { kind: string }>> =>
+        Promise.resolve(err({ kind: 'RenderError' })),
+    };
+    const sub = subscription({ feed: renderDefectFeed });
+
+    await sub.start();
+
+    expect(sub.isHalted).toBe(true);
+    expect(await checkpointOf()).toBe(0); // held, never skipped
   });
 
   it('a checkpoint save failure holds delivery rather than losing it', async () => {
@@ -538,10 +582,48 @@ describe('CatchUpSubscription', () => {
     expect(wakeListeners).toHaveLength(1);
     expect(intervals[0]!.stopped).toBe(false);
 
-    sub.stop();
+    await sub.stop();
 
     expect(wakeListeners).toHaveLength(0);
     expect(intervals[0]!.stopped).toBe(true);
+  });
+
+  it('stop waits out an in-flight drain instead of resolving while it still writes', async () => {
+    // The runtime closes the event-store handle the moment stop() resolves. Detaching the timer
+    // only stops the NEXT cycle; a cycle already draining goes on reading the feed and saving
+    // checkpoints against a closed database — the same error loop the detach exists to prevent.
+    const gate = Promise.withResolvers<void>();
+    feed.events = [seamEvent(1)];
+    const gatedFeed = {
+      read: async (
+        fromGlobalSeq: number,
+        limit: number,
+      ): Promise<Result<SeamFeedBatch, { kind: string }>> => {
+        await gate.promise;
+        return feed.read(fromGlobalSeq, limit);
+      },
+    };
+    const sub = subscription({ feed: gatedFeed });
+
+    const draining = sub.poll(); // in flight, parked inside the gated read
+    await flushMicrotasks();
+    expect(handled).toEqual([]);
+
+    const stopping = sub.stop();
+    let hasStopped = false;
+    void stopping.then(() => {
+      hasStopped = true;
+    });
+    await flushMicrotasks();
+    expect(hasStopped).toBe(false); // the drain still holds the store
+
+    gate.resolve();
+    await stopping;
+
+    // The cycle ran to completion — and did so BEFORE stop() resolved, which is the whole claim.
+    expect(handled).toEqual([1]);
+    expect(await checkpointOf()).toBe(1);
+    await draining;
   });
 
   it('catches and logs an unexpected throw from a fire-and-forget poll, surviving the cycle', async () => {
@@ -577,7 +659,7 @@ describe('CatchUpSubscription', () => {
     feed.events = [seamEvent(1)];
     await sub.poll();
     expect(handled).toEqual([1]);
-    sub.stop();
+    await sub.stop();
   });
 
   it('uses a real interval by default and stops it cleanly', async () => {
@@ -591,7 +673,7 @@ describe('CatchUpSubscription', () => {
       await vi.advanceTimersByTimeAsync(60);
       expect(handled).toEqual([1]);
 
-      sub.stop();
+      await sub.stop();
       feed.events.push(seamEvent(2));
       await vi.advanceTimersByTimeAsync(200);
       expect(handled).toEqual([1]);

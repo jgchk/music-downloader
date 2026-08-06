@@ -277,14 +277,14 @@ export async function createImporterRuntime(
     readiness() {
       return { status: acquisitions?.isHalted ? 'down' : 'up' };
     },
-    stop() {
+    async stop() {
       reactor.stop();
-      // Stop the inbound acquisition subscription before closing the DB: its fallback poll would
-      // otherwise keep firing `feed.read`/`store.readAll` against a closed handle (error loop that
-      // also keeps the event loop alive).
-      acquisitions?.stop();
+      // Stop the inbound acquisition subscription before closing the DB, and AWAIT it: its
+      // fallback poll would otherwise keep firing `feed.read`/`store.readAll` against a closed
+      // handle (error loop that also keeps the event loop alive). Detaching the timer alone only
+      // cancels the NEXT cycle — the await is what drains the one already in flight.
+      await acquisitions?.stop();
       database.close();
-      return Promise.resolve();
     },
   });
 }

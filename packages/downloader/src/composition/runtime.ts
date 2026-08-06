@@ -323,11 +323,13 @@ export async function createDownloaderRuntime(
     readiness() {
       return { status: verdicts?.isHalted ? 'down' : 'up' };
     },
-    stop() {
-      // Stop the inbound verdict subscription BEFORE closing the db: its poll interval reads the
-      // feed and saves checkpoints against this very handle, so leaving it running past db.close()
-      // spins an error loop and keeps the event loop alive.
-      verdicts?.stop();
+    async stop() {
+      // Stop the inbound verdict subscription BEFORE closing the db, and AWAIT it: its poll
+      // interval reads the feed and saves checkpoints against this very handle, so leaving it
+      // running past db.close() spins an error loop and keeps the event loop alive. Detaching
+      // the timer alone only cancels the NEXT cycle — the await is what drains the one already
+      // in flight, which is the cycle actually holding the handle.
+      await verdicts?.stop();
       reactor.stop();
       // Latch every supervisor watch before closing the store: a watch settling after close
       // would otherwise retry its delivery against the closed handle forever — the same error
@@ -335,7 +337,6 @@ export async function createDownloaderRuntime(
       // repeated transfer next boot (the re-drive re-drives the candidate), never the acquisition.
       slskdDownload?.stop();
       database.close();
-      return Promise.resolve();
     },
   });
 }
