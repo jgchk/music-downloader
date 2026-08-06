@@ -384,6 +384,23 @@ export function statusPhrase(status: AcquisitionStatusResponseDto['status']): st
 }
 
 /**
+ * The composed import-voice phrases of {@link overallStatus}, named so the one other consumer —
+ * the out-of-process e2e tier, which scrapes the detail page's status marker — imports the same
+ * strings this module renders (e2e-blackbox blast radius: a copy change must be a compile-visible
+ * harness change, not a main-only e2e failure). Which phrases mean "terminal" or "delivered" is
+ * the harness's own grouping; this map owns only the text.
+ */
+export const IMPORT_VOICE_PHRASE = {
+  confirming: 'Delivered \u{2014} confirming the import',
+  unavailable: 'Delivered \u{2014} import status unavailable',
+  matching: 'Matching against the library',
+  awaitingReview: 'Waiting for your review',
+  applying: 'Adding to the library',
+  applied: 'In your library',
+  rejected: 'Import rejected',
+} as const;
+
+/**
  * The page's one status account, honest across both halves of the story: a delivered acquisition
  * speaks with its import's voice — including the async window where the import does not exist yet
  * (or its read failed), which must never be presented as "in your library". Tones reuse the list's
@@ -397,35 +414,35 @@ export function overallStatus(
   if (acquisition.status === 'Fulfilled') {
     switch (importSection.state) {
       case 'none': {
-        return { tone: 'pending', phrase: 'Delivered \u{2014} confirming the import' };
+        return { tone: 'pending', phrase: IMPORT_VOICE_PHRASE.confirming };
       }
       case 'unavailable': {
-        return { tone: 'pending', phrase: 'Delivered \u{2014} import status unavailable' };
+        return { tone: 'pending', phrase: IMPORT_VOICE_PHRASE.unavailable };
       }
       case 'present': {
         switch (importSection.status.status) {
           case 'empty':
           case 'requested':
           case 'proposing': {
-            return { tone: 'pending', phrase: 'Matching against the library' };
+            return { tone: 'pending', phrase: IMPORT_VOICE_PHRASE.matching };
           }
           case 'awaiting-review': {
-            return { tone: 'attention', phrase: 'Waiting for your review' };
+            return { tone: 'attention', phrase: IMPORT_VOICE_PHRASE.awaitingReview };
           }
           case 'applying': {
-            return { tone: 'pending', phrase: 'Adding to the library' };
+            return { tone: 'pending', phrase: IMPORT_VOICE_PHRASE.applying };
           }
           case 'applied': {
-            return { tone: 'fulfilled', phrase: 'In your library' };
+            return { tone: 'fulfilled', phrase: IMPORT_VOICE_PHRASE.applied };
           }
           case 'rejected': {
-            return { tone: 'failed', phrase: 'Import rejected' };
+            return { tone: 'failed', phrase: IMPORT_VOICE_PHRASE.rejected };
           }
           default: {
             // Physically unreachable in-process (closed enum), but a drifted runtime value must
             // degrade to the honest unconfirmed claim — never fall through to "In your library".
             importSection.status.status satisfies never;
-            return { tone: 'pending', phrase: 'Delivered \u{2014} confirming the import' };
+            return { tone: 'pending', phrase: IMPORT_VOICE_PHRASE.confirming };
           }
         }
       }
