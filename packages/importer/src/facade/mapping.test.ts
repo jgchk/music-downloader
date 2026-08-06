@@ -260,6 +260,32 @@ describe('statusViewToDto / pendingReviewToDto', () => {
     expect(dto.history[0]).not.toHaveProperty('projectionOnlyDebugField');
   });
 
+  it('cannot leak a domain-only field from a nested history payload onto the wire', () => {
+    // The leaf level is pinned too: hints and failure elements are explicit field projections,
+    // not spreads, so a future projection-only field inside them cannot ship either.
+    const hintsEntry = {
+      kind: 'requested',
+      at: 't1',
+      hints: { artist: 'a', album: 'b', projectionOnlyHintField: 'must-not-ship' },
+    } as unknown as ImportStatusView['history'][number];
+    const failuresEntry = {
+      kind: 'remediation-required',
+      at: 't2',
+      failures: [{ ...FAILURE, projectionOnlyFailureField: 'must-not-ship' }],
+    } as unknown as ImportStatusView['history'][number];
+
+    const dto = statusViewToDto({ ...view, history: [hintsEntry, failuresEntry] });
+
+    expect(dto.history[0]).toEqual({ kind: 'requested', at: 't1', hints: { artist: 'a', album: 'b' } });
+    expect((dto.history[0] as { hints?: object }).hints).not.toHaveProperty(
+      'projectionOnlyHintField',
+    );
+    expect(dto.history[1]).toEqual({ kind: 'remediation-required', at: 't2', failures: [FAILURE] });
+    expect(
+      (dto.history[1] as { failures: object[] }).failures[0],
+    ).not.toHaveProperty('projectionOnlyFailureField');
+  });
+
   it('maps a status view carrying an open review', () => {
     const withReview: ImportStatusView = {
       importId: toImportId('imp-2'),
