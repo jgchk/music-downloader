@@ -1,0 +1,36 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v0/transfers/downloads/peer2",
+    "headers": {
+      "X-API-Key": {
+        "equalTo": "test-key"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "username": "peer2",
+      "directories": [
+        {
+          "directory": "@@music\\Test Artist\\Test Album (Alt)",
+          "fileCount": 1,
+          "files": [
+            {
+              "id": "transfer-2",
+              "filename": "@@music\\Test Artist\\Test Album (Alt)\\01 Track One.flac",
+              "state": "Completed, Succeeded",
+              "size": 2345678,
+              "bytesTransferred": 2345678
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

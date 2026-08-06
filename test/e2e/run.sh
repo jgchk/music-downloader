@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # Out-of-process E2E orchestration (merge-modular-monolith): run the ONE real image — both module
-# runtimes + the web interface in a single process — against WireMock stubs for the two outermost
-# third parties (loop phases; phase 0 runs stub-free), and drive it over the web routes on a real
-# socket. Isolated phases (each with fresh stores — the count lives in the list, not this prose):
+# runtimes + the web interface in a single process — against WireMock stubs for the outermost
+# third parties (slskd, MusicBrainz, plex.tv; phase 0 keeps slskd/MB unreachable and uses only
+# the plex.tv stub), and drive it over the web routes on a real socket. Isolated phases (each
+# with fresh stores — the count lives in the list, not this prose):
 #
 #   phase 0  parity.spec.ts          Playwright: a real browser drives the image's web interface
-#                                    with third-party URLs the app CANNOT reach (not the stubs) —
+#                                    with slskd/MB URLs the app CANNOT reach (not the stubs) —
 #                                    the cancel test needs acquisitions to stay retrying, and the
-#                                    image is proven to boot and serve while third parties are down
+#                                    image is proven to boot and serve while those are down;
+#                                    plex.tv points at ITS stub for the login journey
 #   phase 1  full-loop.e2e.test.ts   intent → download → deposit → seam → real beets → applied
 #   phase 2  restart.e2e.test.ts     kill between fulfilment and import; durable resume, exactly once
 #   phase 3  restart-mid-download.e2e.test.ts   kill mid-transfer; re-drive to the outcome, one enqueue
 #   phase 4  nonblocking.e2e.test.ts squeeze a second acquisition past a held transfer; prompt cancel
+#   phase 5  review-resolution.e2e.test.ts     forced review-band import → reject-unusable-delivery
+#                                              over HTTP → verdict revives the hunt → second
+#                                              candidate delivers and applies (the revival loop)
 #
 # Path topology (host ./.e2e-tmp ⇄ container):
 #   music/staging  ⇄ /music/staging   STAGING_ROOT — the harness seeds the fixture at the location
@@ -84,7 +89,7 @@ wait_ready() {
   echo "ready: $name"
 }
 
-# ── stubs (loop phases 1–2 share them, state reset between; phase 0 bypasses them) ──────────────
+# ── stubs (loop phases 1–5 share them, state reset between; phase 0 uses only the plextv stub) ──
 docker run -d --name "$MB_STUB" --network host \
   -v "$(pwd)/test/e2e/stubs/musicbrainz:/home/wiremock" \
   "$WIREMOCK_IMAGE" --port "$MB_PORT" --disable-banner >/dev/null
@@ -224,5 +229,13 @@ curl -fsS -X DELETE "http://localhost:$SLSKD_PORT/__admin/requests" >/dev/null
 fresh_env
 start_app
 run_phase test/e2e/nonblocking.e2e.test.ts
+docker rm -f "$APP" >/dev/null
+
+echo "── phase 5: review-resolution revival loop"
+curl -fsS -X POST "http://localhost:$SLSKD_PORT/__admin/scenarios/reset" >/dev/null
+curl -fsS -X DELETE "http://localhost:$SLSKD_PORT/__admin/requests" >/dev/null
+fresh_env
+start_app
+run_phase test/e2e/review-resolution.e2e.test.ts
 
 echo "── e2e green"

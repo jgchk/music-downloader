@@ -1,0 +1,24 @@
+{
+  "priority": 1,
+  "scenarioName": "hunt",
+  "requiredScenarioState": "round-two",
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v0/searches",
+    "headers": {
+      "X-API-Key": {
+        "equalTo": "test-key"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "id": "search-2",
+      "isComplete": false
+    }
+  }
+}
