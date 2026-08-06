@@ -30,8 +30,9 @@ export type PlexUser = z.infer<typeof plexUserSchema>;
 
 /**
  * GET /resources — every device the account can see. Membership requires a machine-id match on an
- * entry that DECLARES a server, and that entry's `owned` flag is the session's role source. Both
- * fields are self-asserted by the resource, exactly as the identifier is (see
+ * entry that DECLARES a server, and the admitting entries' `owned` flags are the session's role
+ * source (owner iff any is owned). Both fields are self-asserted by the resource, exactly as the
+ * identifier is (see
  * `docs/research/plex-machine-identifier-trust.md`) — reading them narrows admission, it does not
  * authenticate the server. Both are optional: tolerance degrades toward denial/guest, never
  * toward grant. Their TYPES stay strict, so a plex.tv type change fails the parse loudly (a

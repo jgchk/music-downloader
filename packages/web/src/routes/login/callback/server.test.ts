@@ -147,9 +147,9 @@ describe('login callback', () => {
     const { location, jar, deleted, logger } = await outcome(plex, '?pin=55');
     expect(location).toBe('/login?error=denied');
     expect(jar.size).toBe(0);
-    // The refusal SHAPE is logged: a device presenting our machine id is the attack signal, and an
-    // operator must be able to tell it from ordinary stranger traffic and from contract drift.
-    expect(logger.info).toHaveBeenCalledWith(
+    // The refusal SHAPE is logged, and a device presenting our machine id is a PROBE — it must
+    // reach an operator alerting on `warn`, not sit in the info stream with ordinary strangers.
+    expect(logger.warn).toHaveBeenCalledWith(
       { username: 'stranger', reason: 'matched-non-server' },
       expect.stringContaining('denied'),
     );
@@ -157,6 +157,20 @@ describe('login callback', () => {
     // after a denial would make the callback replayable.
     expect(deleted).toHaveLength(1);
     expectNoTokenLogged(logger, 'tok-x');
+  });
+
+  it.each([
+    ['an ordinary stranger', 'no-machine-match'],
+    ['plex.tv dropping the capability list (drift)', 'matched-no-capabilities'],
+  ] as const)('logs %s at info, not as an attack signal', async (_case, reason) => {
+    const plex = new FakePlexAccess();
+    plex.membership = { kind: 'denied', username: 'stranger', reason };
+    const { logger } = await outcome(plex, '?pin=55');
+    expect(logger.info).toHaveBeenCalledWith(
+      { username: 'stranger', reason },
+      expect.stringContaining('denied'),
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it.each([

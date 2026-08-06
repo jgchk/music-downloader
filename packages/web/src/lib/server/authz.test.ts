@@ -13,8 +13,14 @@ import type { SessionClaims, SessionVerdict } from './session.js';
 
 const OWNER_GATED: PrivilegedAction = 'system:redrive';
 
-/** Every action the closed union carries. Adding a member here is the compiler's job to demand. */
-const EVERY_ACTION: readonly PrivilegedAction[] = ['system:redrive'];
+/**
+ * Every action the closed union carries. `satisfies Record<PrivilegedAction, true>` makes the
+ * COMPILER demand a new entry when the union grows — a plain array would silently keep passing
+ * while the property below stopped being total.
+ */
+const EVERY_ACTION = Object.keys({
+  'system:redrive': true,
+} satisfies Record<PrivilegedAction, true>) as PrivilegedAction[];
 
 // A fixed clock, never Date.now(): a decision must not depend on wall time, and a test must not
 // race one (the house pattern — see session.test.ts).
