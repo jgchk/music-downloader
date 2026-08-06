@@ -88,7 +88,10 @@ export class SlskdSearch implements SearchPort {
       resourceKey: id,
       acquisitionId,
     };
-    await this.bestEffort(this.ledger.recordCreated({ ...key, resourceId: id }), 'record search');
+    await this.bestEffort(
+      () => this.ledger.recordCreated({ ...key, resourceId: id }),
+      'record search',
+    );
     const state = await this.awaitCompletion(id);
     this.ensureConfirmedComplete(id, round, state);
     const responses = slskdSearchResponsesSchema.parse(
@@ -153,12 +156,16 @@ export class SlskdSearch implements SearchPort {
       );
       return;
     }
-    await this.bestEffort(this.ledger.markRemoved(key), 'mark search removed');
+    await this.bestEffort(() => this.ledger.markRemoved(key), 'mark search removed');
   }
 
-  /** Run a ledger write without letting a stewardship fault fail an otherwise-working search. */
-  private async bestEffort(op: ResultAsync<void, InfraError>, what: string): Promise<void> {
-    const result = await op;
+  /**
+   * Run a ledger write without letting a stewardship fault fail an otherwise-working search. The
+   * write is passed as a thunk rather than a started `ResultAsync` so the caller's Result is
+   * visibly consumed here (`neverthrow/must-use-result` cannot see a Result handed to a callee).
+   */
+  private async bestEffort(op: () => ResultAsync<void, InfraError>, what: string): Promise<void> {
+    const result = await op();
     if (result.isErr()) this.logger.warn({ err: result.error }, `ledger: ${what} failed`);
   }
 
