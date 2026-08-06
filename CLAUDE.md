@@ -32,6 +32,7 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 - [api-compatibility.md](docs/development/api-compatibility.md) — versioned APIs, no-breaking-change, single-source contracts
 - [logging.md](docs/development/logging.md) — structured logging, correlation, redaction, logs vs events
 - [coding-standards.md](docs/development/coding-standards.md) — TypeScript strict, eslint/prettier, conventions
+- [quality-gates.md](docs/development/quality-gates.md) — what earns a place in the commit gate, the promotion ladder, the latency budget
 - [twelve-factor.md](docs/development/twelve-factor.md) — the twelve-factor method as we apply it
 - [development-workflow.md](docs/development/development-workflow.md) — trunk-based dev, jujutsu, conventional commits, CI/CD
 

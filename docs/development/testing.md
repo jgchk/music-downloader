@@ -30,6 +30,8 @@ Only when every rung fails — a genuine crash barrier the type system cannot se
 
 A waiver is reviewed like an `any`: rare, justified inline, and rejected if a rung of the ladder would have worked. The gate then still means something exact: every line is either specified behavior or an explicitly reviewed waiver.
 
+Beware the trade in the other direction, too: never take a coverage waiver to satisfy some *other* check. A lint rule that can only be satisfied by adding an unreachable branch has failed admission, not the code — see [quality-gates.md](quality-gates.md).
+
 ## The pyramid
 
 Many fast unit tests over pure logic; fewer integration tests over adapters against fakes; fewest end-to-end tests over the wired system. Push logic down into the pure core so most of it is covered by the cheap, fast tier. Never reach for a real external service where a fake proves the same behavior.
