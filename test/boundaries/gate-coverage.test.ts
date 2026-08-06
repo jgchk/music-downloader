@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ESLint } from 'eslint';
@@ -12,30 +12,45 @@ import { afterAll, describe, expect, it } from 'vitest';
  * neither a tsconfig nor the lint run, and the rules stop applying to it without a single failure.
  * These scenarios fail *naming the uncovered file* instead.
  *
- * A guard against silent erosion must not erode silently itself, so three of its own failure modes
- * are pinned here too: a skip that prunes more than it names, a config diagnostic read as "this
- * project claims nothing", and a read of output a concurrent `pnpm check` lane generates.
+ * A guard against silent erosion must not erode silently itself, so its own failure modes are
+ * pinned in the second describe below, one scenario each: a skip that prunes more than it names, a
+ * config diagnostic read as "this project claims nothing", a read of output a concurrent
+ * `pnpm check` lane generates, a discovery that finds nothing and so passes every `toEqual([])`, a
+ * declared lane reach nothing compares against that lane, and a project credited to a script that
+ * no longer names it.
  */
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 /**
- * Generated output and third-party trees, matched by name because these names are reserved by the
- * tools that produce them — no first-party source directory is ever called one of them. Skipping
- * them is also what keeps this walk deterministic: every one is written by some other `pnpm check`
- * lane while this one runs.
+ * Third-party and tool-owned trees, matched by *name* — and only names whose owning tool reserves
+ * them: a package manager's (`node_modules`), a language runtime's (`__pycache__`), or a
+ * dot-directory, which no first-party source tree is. Names we picked ourselves (`dist`, `build`,
+ * `coverage`) are anchored in `GENERATED_PATHS` instead, because a basename skip prunes every
+ * directory sharing the name — a real `scripts/build/` of first-party source included. The scenario
+ * 'skips by basename only where a tool owns the name' holds this set to that rule, so the claim is
+ * checked rather than asserted in prose.
  */
 const GENERATED_DIRECTORY_NAMES = new Set([
   'node_modules',
-  'dist',
-  'coverage',
-  'build',
+  '__pycache__',
   '.svelte-kit',
   '.venv',
   '.e2e-tmp',
   '.git',
   '.jj',
-  '__pycache__',
+]);
+
+/**
+ * Generated output whose directory name is ours rather than a tool's, matched by *anchored path*
+ * so the name alone prunes nothing. Skipping these is also what keeps the walk deterministic: every
+ * one is written by some other `pnpm check` lane while this one runs.
+ */
+const GENERATED_PATHS = new Set([
+  'coverage',
+  'packages/downloader/dist',
+  'packages/importer/dist',
+  'packages/web/build',
 ]);
 
 /**
@@ -55,11 +70,17 @@ function repoRelative(absolute: string): string {
   return relative.startsWith('..') ? absolute : relative.split(path.sep).join('/');
 }
 
-function isSkippedDirectory(absolute: string): boolean {
+/** True for anything under a tool-owned name or an anchored generated tree, at any depth. */
+function isGeneratedPath(file: string): boolean {
+  const relative = repoRelative(file);
   return (
-    GENERATED_DIRECTORY_NAMES.has(path.basename(absolute)) ||
-    SKIPPED_PATHS.has(repoRelative(absolute))
+    relative.split('/').some((segment) => GENERATED_DIRECTORY_NAMES.has(segment)) ||
+    [...GENERATED_PATHS].some((tree) => relative === tree || relative.startsWith(`${tree}/`))
   );
+}
+
+function isSkippedDirectory(absolute: string): boolean {
+  return isGeneratedPath(absolute) || SKIPPED_PATHS.has(repoRelative(absolute));
 }
 
 /** Every directory the walk descends into, root first — the exact reach of the discovery below. */
@@ -142,8 +163,13 @@ function filesClaimedBy(configPaths: readonly string[]): ProjectMembership {
   return { claimed, problems, readFiles };
 }
 
+const WEB_PACKAGE = path.join(REPO_ROOT, 'packages/web');
+
 /** The one project this guard proves by containment rather than by membership — see below. */
-const WEB_PROJECT = path.join(REPO_ROOT, 'packages/web/tsconfig.json');
+const WEB_PROJECT = path.join(WEB_PACKAGE, 'tsconfig.json');
+
+/** The project `svelte-kit sync` writes; `packages/web/tsconfig.json` extends it. */
+const GENERATED_WEB_PROJECT = path.join(WEB_PACKAGE, '.svelte-kit/tsconfig.json');
 
 /**
  * The projects whose membership is read from disk. `packages/web/tsconfig.json` is deliberately
@@ -156,25 +182,71 @@ function gatedProjectConfigs(): string[] {
 }
 
 /**
- * What the `web` lane's `svelte-check --tsconfig ./tsconfig.json` covers, stated rather than read.
- * `svelte-kit sync` generates that project's `include` from SvelteKit's fixed conventions — the
- * source root, the test roots, and the vite config — so the reach is a property of the framework's
- * layout, not of whether a sibling lane has run yet. Everything the walk finds under these paths is
- * inside the typecheck gate; anything else under `packages/web` must be claimed by a real project.
- * This is the same containment argument the `.svelte` scenario already rests on, applied to the
- * whole lane: `tsc` cannot claim a component, and neither can it claim these without the generated
- * config.
+ * What the `web` lane's `svelte-check --tsconfig ./tsconfig.json` covers, declared here instead of
+ * parsed at coverage time — parsing the generated project as part of the coverage answer is what
+ * would make this lane's verdict depend on whether the `web` lane has run yet.
+ *
+ * A declaration nothing compares against reality is only a claim, and a SvelteKit bump that drops
+ * `../test/**` from the generated `include` would move a whole contract tier out of the typecheck
+ * gate while every scenario here stayed green. So 'declares the web lane exactly as the generated
+ * project defines it' re-derives both lists from that config *whenever it is on disk* and fails on
+ * any drift; absence is never a failure there, which is what keeps the race gone.
+ *
+ * `WEB_LANE_EXCLUSIONS` is load-bearing, not bookkeeping. The generated config excludes
+ * `../src/service-worker.js`, `../src/service-worker.ts`, `../src/service-worker.d.ts` and the
+ * matching `../src/service-worker/` subtrees — so a `packages/web/src/service-worker.ts` would be
+ * claimed by no project *and* excluded by the web lane, i.e. typechecked by nothing. Subtracting
+ * the exclusions is what makes such a file surface as an orphan instead of passing silently.
  */
 const WEB_LANE_REACH = [
   'packages/web/src',
   'packages/web/test',
   'packages/web/tests',
+  'packages/web/vite.config.js',
   'packages/web/vite.config.ts',
+];
+
+const WEB_LANE_EXCLUSIONS = [
+  'packages/web/src/service-worker',
+  'packages/web/src/service-worker.d.ts',
+  'packages/web/src/service-worker.js',
+  'packages/web/src/service-worker.ts',
 ];
 
 function isInsideWebLane(file: string): boolean {
   const relative = repoRelative(file);
-  return WEB_LANE_REACH.some((entry) => relative === entry || relative.startsWith(`${entry}/`));
+  const isUnder = (entry: string): boolean =>
+    relative === entry || relative.startsWith(`${entry}/`);
+  return (
+    WEB_LANE_REACH.some((entry) => isUnder(entry)) &&
+    WEB_LANE_EXCLUSIONS.every((entry) => !isUnder(entry))
+  );
+}
+
+/** Code-unit order, so the declarations above read the way this sorts them. */
+function byPath(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+/**
+ * The repo-relative roots a set of generated `include`/`exclude` patterns names: each pattern
+ * resolved against the generated config's own directory, then cut at its first glob segment. Sorted,
+ * so the declarations above can be compared to it directly. Patterns naming generated trees — the
+ * config's own `types/`, its ambient declarations, `node_modules` — reach nothing this walk can see,
+ * so they drop out rather than becoming entries no source could ever match.
+ */
+function webLaneRootsFrom(patterns: readonly string[]): string[] {
+  const roots = new Set<string>();
+  for (const pattern of patterns) {
+    const resolved = repoRelative(path.resolve(path.dirname(GENERATED_WEB_PROJECT), pattern));
+    const segments = resolved.split('/');
+    const globAt = segments.findIndex((segment) => segment.includes('*'));
+    const root = (globAt === -1 ? segments : segments.slice(0, globAt)).join('/');
+    if (root === '' || isGeneratedPath(path.join(REPO_ROOT, root))) continue;
+    roots.add(root);
+  }
+  return [...roots].toSorted(byPath);
 }
 
 /**
@@ -201,24 +273,47 @@ const REQUIRED_TIERS = [
   'test/e2e',
 ];
 
+/** A package's `scripts` block. Taken as a parameter below so a scenario can mangle one. */
+type ScriptReader = (packageDirectory: string) => Record<string, string | undefined>;
+
+const scriptsOf: ScriptReader = (packageDirectory) => {
+  const manifest = JSON.parse(
+    readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'),
+  ) as { scripts?: Record<string, string> };
+  return manifest.scripts ?? {};
+};
+
+/** Every project a command names — `tsc -p` and `svelte-check --tsconfig` alike — resolved against
+ * the package whose script runs it. */
+function projectsNamedIn(script: string, packageDirectory: string): string[] {
+  const found: string[] = [];
+  for (const [, project] of script.matchAll(/(?:^|\s)(?:-p|--tsconfig)\s+(\S+)/g)) {
+    // The capture group is present whenever the pattern matches; narrow rather than assert.
+    if (project !== undefined) found.push(path.resolve(packageDirectory, project));
+  }
+  return found;
+}
+
 /**
  * The projects some typecheck script actually runs. Membership in a tsconfig is only half the
  * claim: `typecheck:tiers` is a hand-maintained list of `-p` flags, so a tier that lands with its
  * own tsconfig and no `package.json` edit is claimed by a project nobody ever invokes.
+ *
+ * The web project is the awkward one — it is typechecked by `svelte-check --tsconfig` in a second
+ * manifest, so BOTH links are read rather than assumed: the root typecheck must still delegate to
+ * `packages/web run check:svelte`, and that script must still name the project. Hard-asserting the
+ * web project here (as this once did) meant either link could break with the guard still reporting
+ * full coverage — the exact silent erosion it exists to catch.
  */
-function projectsUnderTheGate(): ReadonlySet<string> {
-  const manifest = JSON.parse(readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as {
-    scripts: Record<string, string>;
-  };
-  const scripts = [manifest.scripts.typecheck, manifest.scripts['typecheck:tiers']].join(' ');
-  const invoked = new Set<string>();
-  for (const [, project] of scripts.matchAll(/-p\s+(\S+)/g)) {
-    // The capture group is present whenever the pattern matches; narrow rather than assert.
-    if (project !== undefined) invoked.add(path.resolve(REPO_ROOT, project));
+function projectsUnderTheGate(readScripts: ScriptReader = scriptsOf): ReadonlySet<string> {
+  const rootScripts = readScripts(REPO_ROOT);
+  const rootTypecheck = [rootScripts.typecheck, rootScripts['typecheck:tiers']].join(' ');
+  const invoked = projectsNamedIn(rootTypecheck, REPO_ROOT);
+  if (/--dir\s+packages\/web\s+run\s+check:svelte/.test(rootTypecheck)) {
+    const checkSvelte = readScripts(WEB_PACKAGE)['check:svelte'] ?? '';
+    invoked.push(...projectsNamedIn(checkSvelte, WEB_PACKAGE));
   }
-  // The web project is driven by `check:svelte`'s `svelte-check --tsconfig`, not by a `tsc -p`.
-  invoked.add(path.join(REPO_ROOT, 'packages/web/tsconfig.json'));
-  return invoked;
+  return new Set(invoked);
 }
 
 /** Broken configs live outside the repo: a malformed `tsconfig.json` inside it fails other lanes. */
@@ -231,6 +326,53 @@ function temporaryDirectory(): string {
 }
 
 describe('gate coverage', () => {
+  it('parses every project it reads without a diagnostic', () => {
+    const { problems } = filesClaimedBy(gatedProjectConfigs());
+
+    expect(problems).toEqual([]);
+  });
+
+  it('runs every project it discovers — a tsconfig nobody invokes typechecks nothing', () => {
+    const invoked = projectsUnderTheGate();
+    const unwired = projectConfigs().filter((config) => !invoked.has(config));
+
+    expect(unwired.map((file) => repoRelative(file))).toEqual([]);
+  });
+
+  it('typechecks every first-party TypeScript source — each one is claimed by some tsconfig', () => {
+    const { claimed } = filesClaimedBy(gatedProjectConfigs());
+    const orphans = firstPartySources()
+      .filter((file) => file.endsWith('.ts'))
+      .filter((file) => !claimed.has(file) && !isInsideWebLane(file));
+
+    expect(orphans.map((file) => repoRelative(file))).toEqual([]);
+  });
+
+  it('typechecks every component — `tsc` cannot claim .svelte, so svelte-check must reach them all', () => {
+    // `ts.getParsedCommandLineOfConfigFile` never lists a `.svelte` file: the compiler does not know
+    // the extension. Components are typechecked by the `web` lane's `svelte-check --tsconfig`
+    // instead — so the coverage question for them is whether any component has escaped that lane's
+    // reach.
+    const strays = firstPartySources()
+      .filter((file) => file.endsWith('.svelte'))
+      .filter((file) => !isInsideWebLane(file));
+
+    expect(strays.map((file) => repoRelative(file))).toEqual([]);
+  });
+
+  it('lints every first-party source — none is excluded by the eslint ignores', async () => {
+    const eslint = new ESLint({ cwd: REPO_ROOT });
+    const sources = firstPartySources();
+
+    const ignored = await Promise.all(
+      sources.map(async (file) => ((await eslint.isPathIgnored(file)) ? file : null)),
+    );
+
+    expect(ignored.filter((file) => file !== null).map((file) => repoRelative(file))).toEqual([]);
+  });
+});
+
+describe('gate coverage: the guard itself', () => {
   afterAll(() => {
     for (const root of temporaryRoots) rmSync(root, { recursive: true, force: true });
   });
@@ -259,19 +401,9 @@ describe('gate coverage', () => {
     // sync` writes makes this guard's verdict a race: run first and the project resolves to
     // nothing (or to a default include), run second and it resolves to the real membership.
     const { claimed, readFiles } = filesClaimedBy(gatedProjectConfigs());
-    const generated = [...readFiles, ...claimed].filter((file) =>
-      repoRelative(file)
-        .split('/')
-        .some((segment) => GENERATED_DIRECTORY_NAMES.has(segment)),
-    );
+    const generated = [...readFiles, ...claimed].filter((file) => isGeneratedPath(file));
 
     expect(generated.map((file) => repoRelative(file))).toEqual([]);
-  });
-
-  it('parses every project it reads without a diagnostic', () => {
-    const { problems } = filesClaimedBy(gatedProjectConfigs());
-
-    expect(problems).toEqual([]);
   });
 
   it('prunes the trees it names and nothing else — a skip must not match by basename', () => {
@@ -280,61 +412,93 @@ describe('gate coverage', () => {
     // Production source that happens to sit in a directory sharing the Python tier's name. A
     // basename skip prunes it, and every coverage scenario here then passes over the hole.
     expect(walked).toContain('packages/importer/src/adapters/beets/bridge');
-    // The skips that are meant to skip still do.
+    // The skips that are meant to skip still do — by name at depth, and by anchored path.
     expect(walked).not.toContain('packages/importer/test/bridge');
     expect(walked).not.toContain('node_modules');
     expect(walked).not.toContain('packages/web/.svelte-kit');
-    expect(walked).not.toContain('packages/importer/test/bridge/.venv');
+    expect(walked).not.toContain('packages/downloader/dist');
   });
 
-  it('reaches every tier, so the scenarios below cannot pass over an empty set', () => {
-    const sources = firstPartySources().map((file) => path.relative(REPO_ROOT, file));
+  it("descends into first-party source that shares a build tool's directory name", () => {
+    // The hazard anchoring exists to remove, exercised on a tree of this guard's own making: a
+    // `build` (or `dist`, or `coverage`) directory holding real source must be walked, not pruned.
+    const root = temporaryDirectory();
+    mkdirSync(path.join(root, 'scripts', 'build'), { recursive: true });
+
+    expect(walkedDirectories(root)).toContain(path.join(root, 'scripts', 'build'));
+  });
+
+  it('skips by basename only where a tool owns the name — every other skip is anchored', () => {
+    // Dot-directories and the two names a package manager / language runtime reserve. Anything else
+    // is a name we chose, and a name we chose can collide with first-party source.
+    const chosenByUs = [...GENERATED_DIRECTORY_NAMES].filter(
+      (name) => !name.startsWith('.') && name !== 'node_modules' && name !== '__pycache__',
+    );
+
+    expect(chosenByUs).toEqual([]);
+  });
+
+  it('reaches every tier, so the coverage scenarios cannot pass over an empty set', () => {
+    const sources = firstPartySources().map((file) => repoRelative(file));
     const unreached = REQUIRED_TIERS.filter((tier) =>
-      sources.every((file) => !file.startsWith(`${tier}${path.sep}`)),
+      sources.every((file) => !file.startsWith(`${tier}/`)),
     );
 
     expect(unreached).toEqual([]);
     expect(sources.filter((file) => file.endsWith('.svelte')).length).toBeGreaterThan(0);
   });
 
-  it('runs every project it discovers — a tsconfig nobody invokes typechecks nothing', () => {
-    const invoked = projectsUnderTheGate();
-    const unwired = projectConfigs().filter((config) => !invoked.has(config));
+  it('holds a web source outside the lane when the generated project excludes it', () => {
+    // Inside `WEB_LANE_REACH`, claimed by no project, and excluded by the web lane: typechecked by
+    // nothing. It must read as outside the lane so the orphan scenario names it.
+    const serviceWorker = path.join(REPO_ROOT, 'packages/web/src/service-worker.ts');
 
-    expect(unwired.map((file) => path.relative(REPO_ROOT, file))).toEqual([]);
+    expect(isInsideWebLane(serviceWorker)).toBe(false);
+    expect(isInsideWebLane(path.join(REPO_ROOT, 'packages/web/src/app.ts'))).toBe(true);
   });
 
-  it('typechecks every first-party TypeScript source — each one is claimed by some tsconfig', () => {
-    const { claimed } = filesClaimedBy(gatedProjectConfigs());
-    const orphans = firstPartySources()
-      .filter((file) => file.endsWith('.ts'))
-      .filter((file) => !claimed.has(file) && !isInsideWebLane(file));
+  it('declares the web lane exactly as the generated project defines it', (ctx) => {
+    // Read only to check the declaration, never to compute coverage — so absence (a cold clone
+    // whose `web` lane has not run) skips instead of failing, and no verdict depends on lane order.
+    // `readConfigFile` reports an unreadable or half-written file as a value rather than throwing.
+    const read = ts.readConfigFile(GENERATED_WEB_PROJECT, ts.sys.readFile);
+    if (read.error !== undefined)
+      ctx.skip('`svelte-kit sync` has not written the generated project yet');
+    const generated = read.config as { include?: string[]; exclude?: string[] };
 
-    expect(orphans.map((file) => path.relative(REPO_ROOT, file))).toEqual([]);
+    expect(webLaneRootsFrom(generated.include ?? [])).toEqual(WEB_LANE_REACH);
+    expect(webLaneRootsFrom(generated.exclude ?? [])).toEqual(WEB_LANE_EXCLUSIONS);
   });
 
-  it('typechecks every component — `tsc` cannot claim .svelte, so svelte-check must reach them all', () => {
-    // `ts.getParsedCommandLineOfConfigFile` never lists a `.svelte` file: the compiler does not know
-    // the extension. Components are typechecked by the `web` lane's `svelte-check --tsconfig`
-    // instead — so the coverage question for them is whether any component has escaped that lane's
-    // reach.
-    const strays = firstPartySources()
-      .filter((file) => file.endsWith('.svelte'))
-      .filter((file) => !isInsideWebLane(file));
+  it('credits the web project only while `check:svelte` still names it', () => {
+    // The manifest read through a reader that drops the `--tsconfig` flag, so the erosion is
+    // exercised without leaving a mangled `package.json` behind. That the real script still names
+    // the project is the repo-level 'runs every project it discovers' claim, not this one.
+    const withoutTheFlag: ScriptReader = (packageDirectory) =>
+      packageDirectory === WEB_PACKAGE
+        ? { ...scriptsOf(packageDirectory), 'check:svelte': 'svelte-kit sync && svelte-check' }
+        : scriptsOf(packageDirectory);
 
-    expect(strays.map((file) => path.relative(REPO_ROOT, file))).toEqual([]);
+    const credited = [...projectsUnderTheGate(withoutTheFlag)].map((file) => repoRelative(file));
+
+    expect(credited).not.toContain('packages/web/tsconfig.json');
   });
 
-  it('lints every first-party source — none is excluded by the eslint ignores', async () => {
-    const eslint = new ESLint({ cwd: REPO_ROOT });
-    const sources = firstPartySources();
+  it('credits the web project only while the root typecheck still delegates to that script', () => {
+    // The second link: `svelte-check` runs one manifest away, so a root typecheck that stops
+    // invoking it takes the whole web lane out of the gate however well `check:svelte` reads.
+    const withoutTheDelegation: ScriptReader = (packageDirectory) =>
+      packageDirectory === REPO_ROOT
+        ? {
+            ...scriptsOf(packageDirectory),
+            typecheck: 'tsc --noEmit -p packages/downloader/tsconfig.json',
+          }
+        : scriptsOf(packageDirectory);
 
-    const ignored = await Promise.all(
-      sources.map(async (file) => ((await eslint.isPathIgnored(file)) ? file : null)),
+    const credited = [...projectsUnderTheGate(withoutTheDelegation)].map((file) =>
+      repoRelative(file),
     );
 
-    expect(
-      ignored.filter((file) => file !== null).map((file) => path.relative(REPO_ROOT, file)),
-    ).toEqual([]);
+    expect(credited).not.toContain('packages/web/tsconfig.json');
   });
 });
