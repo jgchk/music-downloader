@@ -17,18 +17,23 @@ import { plexAuthUrl } from '$lib/server/plex/auth-url.js';
  * is a modeled 503 re-render, never a grant.
  */
 
+/**
+ * The query is user-writable, so an unknown code degrades to the generic message and never reaches
+ * the page as raw text. Membership is tested rather than asserted: the previous
+ * `LOGIN_ERROR_MESSAGES[code as keyof typeof …] ?? invalid` cast told the type system every string
+ * was a key, which made the `??` — the part actually doing the degrading — read as dead code.
+ */
+function errorMessageFor(code: string): string {
+  return Object.hasOwn(LOGIN_ERROR_MESSAGES, code)
+    ? LOGIN_ERROR_MESSAGES[code as keyof typeof LOGIN_ERROR_MESSAGES]
+    : LOGIN_ERROR_MESSAGES.invalid;
+}
+
 export const load: PageServerLoad = ({ locals, url }) => {
   // Already signed in (the gate verified the cookie even on this open route): nothing to do here.
   if (locals.session !== undefined) redirect(303, '/');
   const code = url.searchParams.get('error');
-  // The query is user-writable: unknown codes degrade to the generic message, never raw text.
-  return {
-    error:
-      code === null
-        ? undefined
-        : (LOGIN_ERROR_MESSAGES[code as keyof typeof LOGIN_ERROR_MESSAGES] ??
-          LOGIN_ERROR_MESSAGES.invalid),
-  };
+  return { error: code === null ? undefined : errorMessageFor(code) };
 };
 
 export const actions: Actions = {
