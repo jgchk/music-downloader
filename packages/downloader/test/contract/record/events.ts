@@ -17,8 +17,9 @@ import {
 /**
  * Records the frozen published-payload fixtures: real payloads rendered by the real mapping over a
  * deterministic fixture history. Run once per schema version (`pnpm tsx test/contract/record/events.ts`);
- * committed fixtures are FROZEN — never regenerate an existing version (webhook retries legitimately
- * deliver old-version events after deploys, so every historical version must stay verifiable).
+ * committed fixtures are FROZEN — never regenerate an existing version (the durable catch-up
+ * subscriptions replay old-version events from the log after deploys, so every historical version
+ * must stay verifiable against the consumer's tolerant reader).
  */
 
 const OCCURRED_AT = '2026-07-19T12:00:00.000Z';

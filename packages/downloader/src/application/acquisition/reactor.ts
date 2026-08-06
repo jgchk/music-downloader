@@ -24,8 +24,11 @@ type DispatchOutcome =
   | { readonly kind: 'retry'; readonly effect: Effect; readonly error: CommandError };
 
 /**
- * The durable reactor / process manager (bootstrap D8): the one component that fires real
- * effects, so it must survive crashes without losing or wedging work. It resumes from a durable
+ * The durable reactor / process manager (bootstrap D8): the one component that dispatches
+ * domain effects, so it must survive crashes without losing or wedging work. (Since the slskd
+ * supervisor, v3.16.0, source-side observation I/O — polling, teardown, abandon — runs
+ * autonomously in the adapter; the exclusivity claim here covers the domain Effect union, not
+ * every side effect in the module.) It resumes from a durable
  * checkpoint (at-least-once delivery) and advances the checkpoint only once an event's effect is
  * dispatched OR durably parked; after a restart, pending work is re-derived from folded state and
  * re-dispatched through the idempotent path (reactor-durability D3) — the download adapter
