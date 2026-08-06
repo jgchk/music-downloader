@@ -15,6 +15,16 @@ export function downloadsPath(username: string): string {
   return `/api/v0/transfers/downloads/${encodeURIComponent(username)}`;
 }
 
+/**
+ * The path as thrown messages may carry it: the downloads route embeds the URL-encoded peer
+ * username (third-party PII), and these messages travel into parked-effect `lastError` fields and
+ * dead-letter payloads where pino's structured redaction cannot follow. The route shape survives
+ * for diagnosis; the peer segment does not.
+ */
+function redactedPath(path: string): string {
+  return path.replace(/(\/transfers\/downloads\/)[^/?]+/, '$1<peer>');
+}
+
 export interface SlskdConfig {
   readonly baseUrl?: string;
   readonly apiKey?: string;
@@ -77,7 +87,7 @@ export class SlskdClient {
     const response = await this.dispatch('GET', path);
     if (response.status === 404) return notFound;
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`slskd responded ${response.status} for GET ${path}`);
+      throw new Error(`slskd responded ${response.status} for GET ${redactedPath(path)}`);
     }
     return response.body === '' ? undefined : JSON.parse(response.body);
   }
@@ -91,7 +101,7 @@ export class SlskdClient {
     const response = await this.dispatch('DELETE', path);
     if (response.status === 404) return;
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`slskd responded ${response.status} for DELETE ${path}`);
+      throw new Error(`slskd responded ${response.status} for DELETE ${redactedPath(path)}`);
     }
   }
 
@@ -102,7 +112,7 @@ export class SlskdClient {
   ): Promise<unknown> {
     const response = await this.dispatch(method, path, body);
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`slskd responded ${response.status} for ${method} ${path}`);
+      throw new Error(`slskd responded ${response.status} for ${method} ${redactedPath(path)}`);
     }
     return response.body === '' ? undefined : JSON.parse(response.body);
   }

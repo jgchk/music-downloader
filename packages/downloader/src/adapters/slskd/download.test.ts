@@ -710,10 +710,14 @@ describe('SlskdDownload', () => {
 
     const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
 
-    expect(started._unsafeUnwrapErr()).toMatchObject({
+    const infraError = started._unsafeUnwrapErr();
+    expect(infraError).toMatchObject({
       kind: 'InfraError',
       operation: 'slskd.download',
     });
+    // The durable observable of the redaction decision: this message lands in parked-effect
+    // lastError fields and dead-letter payloads, where structured redaction cannot reach.
+    expect(infraError.message).not.toContain('u1');
   });
 
   it('surfaces a 429 enqueue response as a retryable InfraError', async () => {
