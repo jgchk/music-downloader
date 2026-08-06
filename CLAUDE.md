@@ -46,7 +46,9 @@ Runtime: Node ≥24, pnpm 11. After switching Node versions locally, run `pnpm r
 
 ## PRs with `jj` + `gh`
 
-jj keeps git's `HEAD` detached, so any `gh` subcommand that infers "the current branch" fails with `not on any branch` — and a `gh pr merge` printing that error has usually **still merged** (verify with `gh pr view <#> --json state`). Never let `gh` touch or infer local branch state, and never judge commit/push state from `git status`/`git log` (stale in colocated repos) — trust `jj st` and `jj bookmark list --all`. Run `gh` from the colocated main repo, not a bare workspace (`not a git repository`).
+jj keeps git's `HEAD` detached, so any `gh` subcommand that infers "the current branch" fails with `not on any branch` — and a `gh pr merge` printing that error has usually **still merged** (verify with `gh pr view <#> --json state`). Never let `gh` touch or infer local branch state, and never judge commit/push state from `git status`/`git log` (stale in colocated repos) — trust `jj st` and `jj bookmark list --all`. Run `gh` **and `jj git push`** from the colocated main repo, not a bare workspace: in a bare workspace `jj git push` can land the push on the remote and _then_ die with `not a git repository`, leaving local state claiming "already matches" — trust the PR head SHA (`gh pr view <#> --json headRefOid`), not the error.
+
+**The commit type is release semantics.** CI's `version-check` derives the expected version from conventional-commit types since the last release: a `feat`/`fix` on the PR demands the matching `version:prep` bump or the check fails. Tooling/docs-only PRs (`.claude/`, `docs/`, `openspec/`) must use `chore`/`docs` so no release is demanded. When a check fails, read just the failing step with `gh run view --job <job-id> --log-failed`.
 
 The reliable flow:
 
