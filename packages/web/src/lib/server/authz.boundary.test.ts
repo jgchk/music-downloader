@@ -33,7 +33,8 @@ const ROLE_READERS = [
   'lib/server/authz.ts',
   'lib/server/session.ts',
   'lib/server/plex/adapter.ts',
-  // The login callback threads the derived role into the mint; it never branches on it.
+  // The login callback threads the derived role into the mint and the grant log line; it
+  // never branches on it.
   'routes/login/callback/+server.ts',
   // The unit fake mirrors the port's granted shape.
   'lib/server/plex/__fixtures__/fake.ts',
@@ -41,13 +42,19 @@ const ROLE_READERS = [
 
 const EXEMPT = new Set(ROLE_READERS);
 
-function sourceFiles(directory: string): string[] {
+/** Every production source file, with no exemptions applied. */
+function allSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(entryPath);
+    if (entry.isDirectory()) return allSourceFiles(entryPath);
     if (!/\.(ts|svelte)$/.test(entry.name) || entry.name.includes('.test.')) return [];
-    return EXEMPT.has(entryPath) ? [] : [entryPath];
+    return [entryPath];
   });
+}
+
+/** …minus the modules whose job IS reading a role. */
+function sourceFiles(directory: string): string[] {
+  return allSourceFiles(directory).filter((file) => !EXEMPT.has(file));
 }
 
 const relative = (file: string): string => path.relative(SOURCE_ROOT, file);
@@ -86,8 +93,18 @@ describe('the authorization seam is the only role reader', () => {
     // That is harmless only while nothing asks the permission question. Whoever adds the first
     // consumer must land the account-identity pin (PLEX_OWNER_ACCOUNT_ID / plex.tv's `ownerId`)
     // in the same change — deleting this test without doing so re-opens a privilege escalation.
-    const consumers = sourceFiles(SOURCE_ROOT).filter((file) =>
-      /\bauthorize\b/.test(readFileSync(file, 'utf8')),
+    // The pin alone is NOT enough: a role is fixed at issue and the pin verifies at login, so an
+    // `owner` cookie minted before it lands stays valid for up to SESSION_TTL_MS (7 days) after.
+    // That change must also invalidate pre-existing owner sessions (rotate SESSION_SECRET, or bump
+    // a claims version the codec refuses) or the escalation still fires for a week.
+    // Detected by IMPORT, over ALL sources minus the definition site — deliberately not the
+    // role-read exemption list (a consumer could hide in the callback or the adapter) and not a
+    // word match (prose mentioning `authorize` would false-positive). A consumer must import the
+    // module; a re-exporting barrel would itself trip this.
+    const definitionSite = path.join(SOURCE_ROOT, 'lib/server/authz.ts');
+    const importsAuthz = /from\s+['"][^'"]*\/authz(\.js)?['"]/;
+    const consumers = allSourceFiles(SOURCE_ROOT).filter(
+      (file) => file !== definitionSite && importsAuthz.test(readFileSync(file, 'utf8')),
     );
     expect(consumers.map((file) => relative(file))).toEqual([]);
   });

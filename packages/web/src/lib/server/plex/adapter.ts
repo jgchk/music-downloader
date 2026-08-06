@@ -131,7 +131,7 @@ export function resolveMembership(
     identity,
     // Owner iff ANY admitting entry is owned: duplicate machine identifiers occur in the wild
     // (cloned VMs, restored Preferences.xml), and listing ORDER must not decide privilege.
-    // An absent flag is a guest — least privilege (design D2).
+    // An absent flag is a guest — least privilege (auth-roles design D2).
     role: candidates.some((r) => r.owned === true) ? 'owner' : 'guest',
   };
 }

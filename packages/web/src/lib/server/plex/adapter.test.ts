@@ -219,20 +219,22 @@ describe('PlexTvAccess.checkMembership', () => {
     });
   });
 
-  it('decides the role independently of listing order when a machine id appears twice', async () => {
-    // Duplicate machine identifiers happen in the wild (cloned VMs, restored Preferences.xml):
-    // owner iff ANY admitting entry is owned, so plex.tv's array order cannot decide privilege.
-    const owned = { clientIdentifier: 'my-server-machine', provides: 'server', owned: true };
-    const shared = { clientIdentifier: 'my-server-machine', provides: 'server', owned: false };
-    for (const listing of [
-      [owned, shared],
-      [shared, owned],
-    ]) {
+  const OWNED_SERVER = { clientIdentifier: 'my-server-machine', provides: 'server', owned: true };
+  const SHARED_SERVER = { clientIdentifier: 'my-server-machine', provides: 'server', owned: false };
+
+  it.each([
+    ['the owned entry first', [OWNED_SERVER, SHARED_SERVER]],
+    ['the shared entry first', [SHARED_SERVER, OWNED_SERVER]],
+  ])(
+    'decides the role independently of listing order when a machine id appears twice: %s',
+    async (_case, listing) => {
+      // Duplicate machine identifiers happen in the wild (cloned VMs, restored Preferences.xml):
+      // owner iff ANY admitting entry is owned, so plex.tv's array order cannot decide privilege.
       const stub = fetchStub(jsonResponse(USER), jsonResponse(listing));
       const outcome = await unwrap(new PlexTvAccess(CONFIG, stub).checkMembership('t'));
       expect(outcome).toMatchObject({ kind: 'granted', role: 'owner' });
-    }
-  });
+    },
+  );
 
   it('finds server among a multi-value provides list, trimmed and case-insensitively', async () => {
     const stub = fetchStub(

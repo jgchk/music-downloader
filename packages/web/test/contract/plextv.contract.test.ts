@@ -99,9 +99,15 @@ describe('plex.tv contract (tier 1)', () => {
 
   it('runs the membership conversation against the recorded account, sending the token as a header on both calls', async () => {
     const result = await adapter(recordedMachineId()).checkMembership('a-token');
-    // The account identity is witnessable against the recording whatever the verdict is.
+    // The recorded account is witnessable whatever the verdict is — but the two arms carry the
+    // username in different places, so read it THROUGH the verdict. (A re-recorded listing that
+    // leads with the owner's server turns this outcome into `granted`; assuming the denied shape
+    // would fail on exactly the handoff step this tier is waiting for.)
+    const outcome = result._unsafeUnwrap();
     const user = bodyOf<{ username: string }>('user.json');
-    expect(result._unsafeUnwrap()).toMatchObject({ username: user.username });
+    expect(outcome.kind === 'granted' ? outcome.identity.username : outcome.username).toBe(
+      user.username,
+    );
 
     // Both lookups must happen with the token — their relative order is not part of the contract.
     expect(server.requests.map((r) => `${r.method} ${r.path}`).toSorted()).toEqual([
@@ -158,13 +164,19 @@ describe('plex.tv contract (tier 1)', () => {
     },
   );
 
-  it('pins the recording as pre-projection, so a half-updated fixture cannot slip through', () => {
-    // The companion to the skip above: while ANY entry lacks `provides`, none may carry it — a
-    // partially hand-edited fixture (the fabrication this tier exists to prevent) fails here.
-    const resources = recordedResources();
-    const withCapabilities = resources.filter((entry) => entry.provides !== undefined);
-    expect(withCapabilities.length === 0 || withCapabilities.length === resources.length).toBe(
-      true,
-    );
+  it('pins the recording against hand-editing while it declares itself pre-projection', () => {
+    // The companion to the skip above: a fixture whose PROVENANCE says it predates the
+    // provides/owned projection must carry neither field — someone adding `provides: "server"` by
+    // hand to revive the grant test (the fabrication this tier exists to prevent) fails here.
+    //
+    // Keyed on provenance, NOT on a field census: the recorder preserves per-entry wire absence,
+    // so a genuine re-record can legitimately produce a MIXED listing. Provenance is what the
+    // recorder rewrites, so this pin retires itself on re-record — delete it once task 4.2 lands.
+    const note = byName('resources.json').provenance.note ?? '';
+    if (!note.includes('PREDATES')) return;
+    for (const entry of recordedResources()) {
+      expect(entry.provides).toBeUndefined();
+      expect(entry.owned).toBeUndefined();
+    }
   });
 });

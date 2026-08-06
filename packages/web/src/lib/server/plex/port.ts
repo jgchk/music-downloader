@@ -42,9 +42,10 @@ export type DenialReason =
 
 /**
  * The membership verdict: the token's account either reaches an entry declaring the owner's
- * server or it does not. A grant carries the role plex.tv's ownership flag on THAT entry implies
- * — the single point where a role is derived FROM PLEX.TV FACTS. (The session codec's guest
- * default for pre-role cookies is a least-privilege floor, not a derivation.)
+ * server or it does not. A grant carries the role the ADMITTING entries' ownership flags imply
+ * (owner iff any of them is owned) — the single point where a role is derived FROM PLEX.TV FACTS.
+ * (The session codec's guest default for pre-role cookies is a least-privilege floor, not a
+ * derivation.)
  */
 export type MembershipOutcome =
   | { readonly kind: 'granted'; readonly identity: SessionIdentity; readonly role: Role }

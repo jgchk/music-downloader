@@ -102,7 +102,11 @@ coupling).
   path in this change that fails toward MAXIMUM privilege. Nothing is exploitable while no route
   asks the permission question, so the pin is a HARD PREREQUISITE of the first owner-gated surface
   (stall-surfacing), not a soft follow-up. `authz.boundary.test.ts` fails the day `authorize` gains
-  a production consumer, so this cannot be armed silently.
+  a production consumer, so this cannot be armed silently. **The pin alone is not sufficient in
+  that change either:** a role is fixed at issue and the pin verifies at login, so an `owner`
+  cookie minted before it lands stays valid for up to `SESSION_TTL_MS` (7 days) afterwards — that
+  change must also invalidate pre-existing owner sessions (rotate `SESSION_SECRET`, or bump a
+  claims version the codec refuses).
 - **[A Plex Home / managed user's `owned` flag is unverified]** → plex.tv models `home` separately
   from `owned`, and nothing here establishes what `owned` reports for a Home member on the admin's
   server. If it reports true, every Home member decodes as `owner` — the same
