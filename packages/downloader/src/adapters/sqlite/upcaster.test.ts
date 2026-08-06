@@ -6,8 +6,11 @@ describe('UpcasterRegistry', () => {
     // Steps {1→2, 3→4} with no 2→3: a v1 row walks to 2 and stops while a step from 3 remains
     // unapplied above it — a registration gap. Serving the v2 shape to evolve would be silent
     // corruption; the registry surfaces it as a value for the store's modeled error channel.
+    // Two unapplied steps (3 and 5) pin that the reported gap is the LOWEST unapplied step —
+    // the first hole an operator must fill.
     const registry = new UpcasterRegistry()
       .register('Widened', 1, (data) => ({ ...data, two: true }))
+      .register('Widened', 5, (data) => ({ ...data, six: true }))
       .register('Widened', 3, (data) => ({ ...data, four: true }));
 
     const result = registry.upcast('Widened', 1, { type: 'Widened', one: true });
@@ -35,10 +38,9 @@ describe('UpcasterRegistry', () => {
       .register('Widened', 1, (data) => ({ ...data, two: true }))
       .register('Widened', 2, (data) => ({ ...data, three: true }));
 
-    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true })._unsafeUnwrap() as Record<
-      string,
-      unknown
-    >;
+    const result = registry
+      .upcast('Widened', 1, { type: 'Widened', one: true })
+      ._unsafeUnwrap() as Record<string, unknown>;
 
     expect(result).toEqual({ type: 'Widened', one: true, two: true, three: true });
   });
@@ -50,10 +52,9 @@ describe('UpcasterRegistry', () => {
     }));
 
     // Stored at version 2: no upcaster registered for v2, so it is already current.
-    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true })._unsafeUnwrap() as Record<
-      string,
-      unknown
-    >;
+    const result = registry
+      .upcast('Widened', 2, { type: 'Widened', two: true })
+      ._unsafeUnwrap() as Record<string, unknown>;
 
     expect(result).toEqual({ type: 'Widened', two: true });
   });

@@ -62,7 +62,11 @@ export class UpcasterRegistry {
       current = step(current);
       version += 1;
     }
-    const unapplied = [...forType.keys()].filter((from) => from > version).sort((a, b) => a - b);
+    const unapplied = forType
+      .keys()
+      .filter((from) => from > version)
+      .toArray()
+      .toSorted((a, b) => a - b);
     if (unapplied.length > 0) {
       return err({ kind: 'UpcastGap', type, arrivedAt: version, unappliedFrom: unapplied[0]! });
     }

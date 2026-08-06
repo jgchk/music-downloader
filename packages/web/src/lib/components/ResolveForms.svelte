@@ -23,14 +23,14 @@
     'manual-tags': 'ManualTagsForm',
   } as const satisfies Record<ResolutionVerb, string>;
 
-  const offered = (verb: keyof typeof VERB_HOME): boolean => actions.has(verb);
+  const isOffered = (verb: keyof typeof VERB_HOME): boolean => actions.has(verb);
 </script>
 
 <!-- Labels come from the verb inventory (reviews-register-alignment D1): imperative fragments, em-dash consequences
      stating the composed contract, no parenthesized asides. The two file-deleting verbs render
      low-emphasis danger — visible up front, confirmed in-page after submit (reviews-register-alignment D5). -->
 
-{#if offered('supply-id')}
+{#if isOffered('supply-id')}
   <details data-testid="supply-id">
     <summary>Supply a release ID…</summary>
     <form method="POST" action="?/resolve">
@@ -44,35 +44,35 @@
   </details>
 {/if}
 
-{#if offered('refresh-candidates')}
+{#if isOffered('refresh-candidates')}
   <form method="POST" action="?/resolve" data-testid="refresh">
     <input type="hidden" name="verb" value="refresh-candidates" />
     <button type="submit">{actionButtonText('refresh-candidates')}</button>
   </form>
 {/if}
 
-{#if offered('import-as-is')}
+{#if isOffered('import-as-is')}
   <form method="POST" action="?/resolve" data-testid="import-as-is">
     <input type="hidden" name="verb" value="import-as-is" />
     <button type="submit">{actionButtonText('import-as-is')}</button>
   </form>
 {/if}
 
-{#if offered('accept')}
+{#if isOffered('accept')}
   <form method="POST" action="?/resolve" data-testid="accept">
     <input type="hidden" name="verb" value="accept" />
     <button type="submit">{actionButtonText('accept')}</button>
   </form>
 {/if}
 
-{#if offered('retry-enrichment')}
+{#if isOffered('retry-enrichment')}
   <form method="POST" action="?/resolve" data-testid="retry-enrichment">
     <input type="hidden" name="verb" value="retry-enrichment" />
     <button type="submit">{actionButtonText('retry-enrichment')}</button>
   </form>
 {/if}
 
-{#if offered('reject')}
+{#if isOffered('reject')}
   <form method="POST" action="?/resolve" data-testid="reject">
     <input type="hidden" name="verb" value="reject" />
     <label>Reason (optional) <input name="reason" /></label>
@@ -80,7 +80,7 @@
   </form>
 {/if}
 
-{#if offered('reject-unusable-delivery')}
+{#if isOffered('reject-unusable-delivery')}
   <form method="POST" action="?/resolve" data-testid="reject-unusable">
     <input type="hidden" name="verb" value="reject-unusable-delivery" />
     <label>

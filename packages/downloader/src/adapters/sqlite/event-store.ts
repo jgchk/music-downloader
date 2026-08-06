@@ -13,7 +13,8 @@ import type {
   StoredEvent,
 } from '../../application/ports/event-store-port.js';
 import type { EventDatabase } from './schema.js';
-import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION } from './upcaster.js';
+import type { UpcasterRegistry } from './upcaster.js';
 
 /**
  * The SQLite `EventStorePort` adapter (D7). Optimistic concurrency is enforced twice: `append`
