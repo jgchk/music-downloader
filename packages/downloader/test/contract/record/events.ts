@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { StoredEvent } from '../../../src/application/ports/event-store-port.js';
 import type { AcquisitionEvent } from '../../../src/domain/acquisition/events.js';
@@ -22,6 +22,10 @@ import {
  * committed fixtures are FROZEN — never regenerate an existing version (the durable catch-up
  * subscriptions replay old-version events from the log after deploys, so every historical version
  * must stay verifiable against the consumer's tolerant reader).
+ *
+ * Because of that freeze the default run VERIFIES rather than writes: an existing fixture is
+ * compared against a fresh render and left untouched (exit 1 on drift). Pass `--overwrite` only to
+ * record a version that has no fixture yet.
  */
 
 const OCCURRED_AT = '2026-07-19T12:00:00.000Z';
@@ -72,19 +76,43 @@ const version = historySnapshots(type).at(-1)?.version ?? 1;
 const directory = eventFixturesDirectory(type);
 const fixturePath = path.join(directory, `v${String(version)}.json`);
 mkdirSync(directory, { recursive: true });
-writeFileSync(
-  fixturePath,
-  `${JSON.stringify(
-    {
-      provenance: {
-        recordedAt: new Date().toISOString(),
-        schemaVersion: version,
-        note: 'Rendered by src/interfaces/contracts/events/mapping.ts over a deterministic fixture history. FROZEN — never regenerate.',
-      },
-      event: rendered.value,
-    },
+
+/**
+ * An existing fixture is FROZEN, and every run re-stamps `recordedAt` — so writing unconditionally
+ * would dirty the artifact even when the payload is identical, and "verified rather than
+ * regenerated" would mean restoring from a backup afterwards. Default to VERIFY: re-render, compare
+ * the payload the tier actually replays, and leave the file alone. `--overwrite` is the deliberate
+ * escape hatch, needed only when a genuinely new schema version has no fixture yet.
+ */
+if (existsSync(fixturePath) && !process.argv.includes('--overwrite')) {
+  const frozen = JSON.stringify(
+    (JSON.parse(readFileSync(fixturePath, 'utf8')) as { event: unknown }).event,
     null,
     2,
-  )}\n`,
-);
-console.log(`wrote ${fixturePath}`);
+  );
+  const current = JSON.stringify(rendered.value, null, 2);
+  if (frozen !== current) {
+    console.error(`DRIFT: ${fixturePath} is not what the mapping renders today`);
+    console.error(`frozen:\n${frozen}`);
+    console.error(`rendered:\n${current}`);
+    process.exit(1);
+  }
+  console.log(`verified ${fixturePath} — unchanged, nothing written`);
+} else {
+  writeFileSync(
+    fixturePath,
+    `${JSON.stringify(
+      {
+        provenance: {
+          recordedAt: new Date().toISOString(),
+          schemaVersion: version,
+          note: 'Rendered by src/interfaces/contracts/events/mapping.ts over a deterministic fixture history. FROZEN — never regenerate.',
+        },
+        event: rendered.value,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(`wrote ${fixturePath}`);
+}

@@ -284,7 +284,8 @@ export default tseslint.config(
       //     `Promise<Result<…>>`. Several production signatures are currently in this blind spot.
       // (b) `_unsafeUnwrap` satisfies this rule while violating the errors-as-values ban on unsafe
       //     unwraps in production — silencing the rule that way trades one violation for a worse
-      //     one; it is legitimate only in test code.
+      //     one; it is legitimate only in test code, and in the CLI entrypoints carved out below,
+      //     where an uncaught throw IS the program's error channel (see that block).
       // (c) A Result born inside a concise-body arrow counts as consumed, so `setTimeout(() =>
       //     save(k))` and `p.then(() => save(k))` are NOT caught — the fire-and-forget position is
       //     exactly where the defects this change fixed lived, so review it by hand.
@@ -397,6 +398,13 @@ export default tseslint.config(
       // A recorder or drift checker is a program, not a test: it asserts nothing, so a discarded
       // failed Result there writes a fixture from bad data and the whole tier then replays a lie.
       // Measured cost of holding them to the production profile: zero violations.
+      //
+      // Against blind spot (b) above, which calls `_unsafeUnwrap` legitimate only in test code:
+      // `_unsafeUnwrap` IS the sanctioned consumption HERE, because an uncaught throw is a CLI
+      // program's error channel — it aborts the run with a non-zero status before any fixture is
+      // written, which is exactly the outcome this re-arm exists to force. What the re-arm bans is
+      // the silent path: a failed Result dropped and the run continuing. Do not "fix" a recorder's
+      // unwrap into a caught-and-continued branch; that would be the violation, not the unwrap.
       'neverthrow/must-use-result': 'error',
     },
   },
