@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.2](https://github.com/jgchk/music-downloader/compare/v3.17.1...v3.17.2) (2026-08-06)
+
+### Bug Fixes
+
+* **importer:** revive the hunt-replacement delivery the intake seam was swallowing ([2273f0f](https://github.com/jgchk/music-downloader/commit/2273f0fff52b1399c6ffd0b129870beecebee8ea))
 ## [3.17.1](https://github.com/jgchk/music-downloader/compare/v3.17.0...v3.17.1) (2026-08-06)
 
 ### Bug Fixes
