@@ -15,13 +15,13 @@ import { FakeDeadLetterStore, silentLogger } from '../application/__fixtures__/f
 import { createLogger } from '../application/logging/logger.js';
 import type { DownloadObserverPort, DownloadResult } from '../application/ports/outbound-ports.js';
 import {
+  defaultPolicies,
   matchingCandidate,
   requestedHistory,
   sampleTarget,
 } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
-import { defaultPolicies } from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
 import { createDownloaderRuntime } from './runtime.js';
 import type { DownloaderRuntime } from './runtime.js';
 

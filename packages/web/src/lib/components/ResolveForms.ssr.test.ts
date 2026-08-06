@@ -1,18 +1,10 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
+import { RESOLUTION_ACTIONS } from '$lib/resolution-actions.js';
 import ResolveForms from './ResolveForms.svelte';
 
-const ALL_ON = {
-  actions: new Set([
-    'supply-id',
-    'refresh-candidates',
-    'import-as-is',
-    'reject',
-    'reject-unusable-delivery',
-    'accept',
-    'retry-enrichment',
-  ]),
-};
+// Derived from the verb inventory, so a new verb exercises this suite without a hand-edit.
+const ALL_ON = { actions: new Set(Object.keys(RESOLUTION_ACTIONS)) };
 
 describe('ResolveForms (SSR)', () => {
   it('renders nothing when no verb is enabled', () => {

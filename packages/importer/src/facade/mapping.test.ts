@@ -242,8 +242,16 @@ describe('statusViewToDto / pendingReviewToDto', () => {
         reasons: ['unusable'],
       },
     ]);
-    // The wire copy is a fresh projection, never the projection's own objects.
-    expect(dto.history[7]).not.toBe(history[7]);
+  });
+
+  it('projects fresh wire objects, never the projection\u2019s own', () => {
+    const entry: ImportStatusView['history'][number] = {
+      kind: 'remediation-required',
+      at: 't',
+      failures: [FAILURE],
+    };
+    const dto = statusViewToDto({ ...view, history: [entry] });
+    expect(dto.history[0]).not.toBe(entry);
   });
 
   it('cannot leak a domain-only history field onto the wire', () => {
