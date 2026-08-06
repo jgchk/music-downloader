@@ -7,7 +7,7 @@ import type { ImportEvent } from './events.js';
 import { react } from './react.js';
 import type { Effect } from './react.js';
 import { evolve, foldEvents } from './state.js';
-import type { ImportPhase } from './state.js';
+import type { ImportPhase, ImportState } from './state.js';
 import { arbEvent } from './__fixtures__/arbitraries.js';
 import { arbAnyHistory, arbReachableStates } from './__fixtures__/decider-runner.js';
 
@@ -133,9 +133,55 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
     // The reactor slices the stream before reacting, so `react` reads the state *as of* the event
     // it is given — which is what lets it narrow on phase and reach for the directory and mode the
     // fold just settled. An apply is the effect with the most to get wrong, so it is the one pinned.
-    let appliesChecked = 0;
+    // Per ARM, not per effect type: `Apply` has two lawful shapes and a counter spanning both
+    // would go green having only ever seen one of them.
+    let intakeAppliesChecked = 0;
+    let retryAppliesChecked = 0;
     let deletionsChecked = 0;
     let proposalsChecked = 0;
+
+    /** Judge one effect against the state as of the event that produced it. */
+    function expectEffectMatchesState(effect: Effect, event: ImportEvent, asOf: ImportState): void {
+      switch (effect.type) {
+        case 'Apply': {
+          // Two lawful shapes: the apply beets was just told to run, over the intake directory
+          // (`applying`), and the in-place re-import of an already-moved library location
+          // (`applied` with its remediation retrying). Nothing else may produce an apply.
+          if (asOf.phase === 'applying') {
+            intakeAppliesChecked += 1;
+            expect(effect.directory).toBe(asOf.directory);
+            expect(effect.mode).toEqual(asOf.mode);
+          } else if (asOf.phase === 'applied') {
+            retryAppliesChecked += 1;
+            expect(effect.directory).toBe(asOf.location);
+            expect(effect.mode).toEqual(asOf.mode);
+          } else {
+            expect.unreachable(`an apply effect from phase ${asOf.phase}`);
+          }
+          return;
+        }
+        case 'DeleteIntake': {
+          deletionsChecked += 1;
+          expect(asOf.phase).toBe('awaiting-review');
+          expect(effect.directory).toBe('directory' in asOf ? asOf.directory : undefined);
+          return;
+        }
+        case 'Propose': {
+          // The most-fired effect, and previously asserted only by membership in the known-effect
+          // set. It carries the intake directory, and a proposal pointed at the wrong directory
+          // would re-read someone else's files.
+          proposalsChecked += 1;
+          expect(effect.directory).toBe(
+            event.type === 'ImportRequested'
+              ? event.directory
+              : 'directory' in asOf
+                ? asOf.directory
+                : undefined,
+          );
+          return;
+        }
+      }
+    }
 
     assertProperty(
       fc.property(arbHistory, (history) => {
@@ -143,43 +189,14 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
           const asOf = foldEvents(history.slice(0, index + 1));
 
           for (const effect of react(event, asOf)) {
-            if (effect.type === 'Apply') {
-              appliesChecked += 1;
-              // Two lawful shapes: the apply beets was just told to run, over the intake directory
-              // (`applying`), and the in-place re-import of an already-moved library location
-              // (`applied` with its remediation retrying). Nothing else may produce an apply.
-              if (asOf.phase === 'applying') {
-                expect(effect.directory).toBe(asOf.directory);
-                expect(effect.mode).toEqual(asOf.mode);
-              } else if (asOf.phase === 'applied') {
-                expect(effect.directory).toBe(asOf.location);
-                expect(effect.mode).toEqual(asOf.mode);
-              } else {
-                expect.unreachable(`an apply effect from phase ${asOf.phase}`);
-              }
-            } else if (effect.type === 'DeleteIntake') {
-              deletionsChecked += 1;
-              expect(asOf.phase).toBe('awaiting-review');
-              expect(effect.directory).toBe('directory' in asOf ? asOf.directory : undefined);
-            } else {
-              // `Propose` — the most-fired effect, and previously asserted only by membership in
-              // the known-effect set. It carries the intake directory and the search hints, and a
-              // proposal pointed at the wrong directory would re-read someone else's files.
-              proposalsChecked += 1;
-              expect(effect.directory).toBe(
-                event.type === 'ImportRequested'
-                  ? event.directory
-                  : 'directory' in asOf
-                    ? asOf.directory
-                    : undefined,
-              );
-            }
+            expectEffectMatchesState(effect, event, asOf);
           }
         }
       }),
     );
 
-    expect(appliesChecked).toBeGreaterThan(0);
+    expect(intakeAppliesChecked).toBeGreaterThan(0);
+    expect(retryAppliesChecked).toBeGreaterThan(0);
     expect(deletionsChecked).toBeGreaterThan(0);
     expect(proposalsChecked).toBeGreaterThan(0);
   });

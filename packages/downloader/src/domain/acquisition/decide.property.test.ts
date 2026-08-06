@@ -54,23 +54,30 @@ const ALL_PHASES: readonly AcquisitionPhase[] = [
  * The commands that may answer a *terminal* state with an error — not "the commands a caller
  * issues": `CancelAcquisition` is caller-issued too, and converges on a settled acquisition. These
  * two are the ones whose refusal the caller must learn about (a submission onto a live stream is a
- * duplicate; an edition choice that arrives too late did nothing). Every other command is an effect
- * *result* re-entering, and a result that arrives after the acquisition settled is late news, not a
- * protocol violation.
+ * duplicate; an edition choice that arrives too late did nothing). Every other command except
+ * `CancelAcquisition` is an effect *result* re-entering, and a result that arrives after the
+ * acquisition settled is late news, not a protocol violation; a cancellation of something already
+ * settled is simply redundant, so it converges too.
  */
 const REFUSABLE_ON_TERMINAL: ReadonlySet<AcquisitionCommandType> = new Set<AcquisitionCommandType>([
   'SubmitAcquisition',
   'SelectEdition',
 ]);
 
-/** The closed `DomainError` union: an error outside it would be an unmodelled failure channel. */
-const DOMAIN_ERROR_KINDS: ReadonlySet<DomainError['kind']> = new Set<DomainError['kind']>([
-  'AlreadyExists',
-  'IllegalTransition',
-  'UnknownEdition',
-]);
+/**
+ * The closed `DomainError` union, as an exhaustive `Record` so a new error kind is a compile error
+ * here — a hand-written list would neither fail to compile nor fail the "every kind reached" sweep.
+ */
+const DOMAIN_ERROR_KIND_TABLE: Record<DomainError['kind'], true> = {
+  AlreadyExists: true,
+  IllegalTransition: true,
+  UnknownEdition: true,
+};
+const DOMAIN_ERROR_KINDS: readonly DomainError['kind'][] = Object.keys(
+  DOMAIN_ERROR_KIND_TABLE,
+) as DomainError['kind'][];
 
-const KNOWN_EVENT_TYPES: ReadonlySet<string> = new Set(Object.keys(eventArbitraryByType));
+const KNOWN_EVENT_TYPES: readonly string[] = Object.keys(eventArbitraryByType);
 
 /** Sort names so the coverage assertions compare sets, not incidental insertion order. */
 const byName = (a: string, b: string): number => a.localeCompare(b);
@@ -125,11 +132,11 @@ describe('decide is total: every reachable state answers every command with a va
           const decision = decide(intruder(state), state);
 
           if (decision.isErr()) {
-            expect(DOMAIN_ERROR_KINDS.has(decision.error.kind)).toBe(true);
+            expect(DOMAIN_ERROR_KINDS).toContain(decision.error.kind);
             continue;
           }
           for (const event of decision.value) {
-            expect(KNOWN_EVENT_TYPES.has(event.type)).toBe(true);
+            expect(KNOWN_EVENT_TYPES).toContain(event.type);
           }
         }
       }),
@@ -207,12 +214,12 @@ describe('the one defeasible edge: an external verdict may revive a fulfilment',
 
           revivals += 1;
           // The exact reject-and-advance shape of every other rejection: the verdict is recorded,
-          // the candidate rejected so its files are cleaned up, and the ladder takes its next move.
-          expect(revived.map((event) => event.type).slice(0, 2)).toEqual([
-            'FulfillmentRejected',
-            'CandidateRejected',
-          ]);
-          expect(revived).toHaveLength(3);
+          // the candidate rejected so its files are cleaned up, and the ladder takes its next move
+          // — which is a selection, a fresh search, or exhaustion, and nothing else.
+          const [first, second, third, ...rest] = revived.map((event) => event.type);
+          expect([first, second]).toEqual(['FulfillmentRejected', 'CandidateRejected']);
+          expect(['CandidateSelected', 'SearchRequested', 'AcquisitionExhausted']).toContain(third);
+          expect(rest).toEqual([]);
 
           const stranger = decide(
             {
@@ -223,7 +230,9 @@ describe('the one defeasible edge: an external verdict may revive a fulfilment',
             state,
           )._unsafeUnwrap();
 
-          convergences += 1;
+          // Counted separately from `revivals` so each side of the guard has to be reached on its
+          // own; incrementing both together would let one arm carry the other.
+          if (stranger.length === 0) convergences += 1;
           // A verdict naming someone else is stale news about a candidate this acquisition never
           // delivered — absorbed in silence, never mis-attached to the fulfilled one.
           expect(stranger).toEqual([]);
@@ -238,7 +247,14 @@ describe('the one defeasible edge: an external verdict may revive a fulfilment',
 
 describe('no reachable state violates an acquisition invariant', () => {
   /** How many times each guarded invariant actually got to assert something. */
-  const reached = { menu: 0, budget: 0, working: 0, inFlightCancellation: 0 };
+  const reached = {
+    menu: 0,
+    budget: 0,
+    working: 0,
+    workingNonEmpty: 0,
+    inFlight: 0,
+    inFlightCancellation: 0,
+  };
 
   /** The invariants types cannot express, checked on every state the fold passes through. */
   function expectInvariants(run: DriveResult): void {
@@ -261,10 +277,12 @@ describe('no reachable state violates an acquisition invariant', () => {
       if ('working' in state) {
         reached.working += 1;
         const workingKeys = state.working.map((ranked) => candidateKey(ranked.candidate.identity));
+        if (workingKeys.length > 0) reached.workingNonEmpty += 1;
         // A rejected candidate is never offered again.
         expect(workingKeys.filter((key) => progress.rejected.includes(key))).toEqual([]);
         // The candidate in flight has left the untried set — it can never be selected twice.
         if ('current' in state) {
+          reached.inFlight += 1;
           expect(workingKeys).not.toContain(candidateKey(state.current.identity));
         }
       }
@@ -289,6 +307,8 @@ describe('no reachable state violates an acquisition invariant', () => {
     expect(reached.menu).toBeGreaterThan(0);
     expect(reached.budget).toBeGreaterThan(0);
     expect(reached.working).toBeGreaterThan(0);
+    expect(reached.workingNonEmpty).toBeGreaterThan(0);
+    expect(reached.inFlight).toBeGreaterThan(0);
     expect(reached.inFlightCancellation).toBeGreaterThan(0);
   });
 

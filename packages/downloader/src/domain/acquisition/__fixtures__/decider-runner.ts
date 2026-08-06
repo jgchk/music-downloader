@@ -127,10 +127,10 @@ export const arbCorruptedHistory: fc.Arbitrary<readonly AcquisitionEvent[]> = fc
   .tuple(
     arbDecidedHistory,
     fc.array(fc.tuple(fc.nat(), arbEvent), { minLength: 1, maxLength: 4 }),
-    // Always some events AFTER the decided history as well. Splicing at a random position is
-    // overwhelmingly likely to land mid-stream, but the interesting corruption for the absorption
-    // properties is an event arriving *after* the stream settled — a terminal phase is the last
-    // thing a decided history reaches, so only a tail splice reliably tests it.
+    // Always some events AFTER the decided history as well. A random splice position lands at the
+    // tail only about one time in n, and the corruption the absorption properties care about is an
+    // event arriving *once the stream has settled* — which, when a plan does reach a terminal, is
+    // the tail. Leaving that to chance is what let a seeded absorption defect survive a sweep.
     fc.array(arbEvent, { minLength: 1, maxLength: 3 }),
   )
   .map(([decided, splices, tail]) => {

@@ -73,11 +73,13 @@ than falling back: a knob that silently does nothing is worse than one that is m
 because a nightly configured to widen the sweep would otherwise report green having run the
 gate's budget.
 
-Cost: **+72 tests, +~0.9s of aggregated vitest execution** across the two context projects
-(7.9s → 8.8s of `tests` time; wall-clock for `pnpm test` over both projects 3.77s → 3.84s,
-since the property files run in parallel with everything else). **`pnpm check` wall-clock
-is unchanged at ~12.5s** (measured 2026-08-06; lane timings move with any web change): its critical lane is `web` (~12.4s), not `test` (~10.5s), so the
-property tier does not sit on the critical path at all. No `numRuns` reduction was needed.
+Cost, re-measured 2026-08-06 after the review sweep: **+79 tests (1612 → 1691) and +~2.1s of
+aggregated vitest execution** across the two context projects (7.7s → 9.8s of `tests` time).
+Wall-clock for `pnpm test` over both projects moves 3.67s → 4.00s, because the property files
+run in parallel with everything else. **`pnpm check` wall-clock is unchanged at ~12.5s**: its
+critical lane is `web` (~12.4s), not `test` (~11s), so the property tier does not sit on the
+critical path at all. No `numRuns` reduction was needed. (Lane timings move with any web
+change; re-measure rather than trusting these numbers after one.)
 
 Placement detail: `__fixtures__/` is already excluded from `tsconfig.build.json` and from
 the root coverage config, so generators, runners and the harness stay out of the build and
@@ -120,7 +122,7 @@ conflict-behavior test suite — the model run generalizes it.
 
   The sweep earned its keep: **eight properties passed against a defect on the first
   attempt** and were rewritten before they bit. Two were literally vacuous (comparing a
-  value with itself); two asserted a literal the test's own runner had just written; two
+  value with itself); one asserted a literal the test's own runner had just written (in both packages); two
   reduced to `isOk() || isErr()`, true by construction for any `Result`; and two never
   reached a deep enough state to meet the defect. Three generators had to be reshaped
   before the cases their properties claimed to cover were exercised at all (the empty
@@ -135,6 +137,21 @@ conflict-behavior test suite — the model run generalizes it.
 - **A property failure can be cryptic** — mitigation: each property's assertion message
   names the violated invariant in constitution language, and the seed/path repro line is
   the first thing printed.
+
+## Deferred follow-ups (raised by the review sweep, deliberately not done here)
+
+- **`react`'s `CandidateSelected` arm could read `state.current` instead of `event.candidate`**
+  (`packages/downloader/src/domain/acquisition/react.ts`). The sibling `DownloadStarted` arm already
+  reads the state. On any history the decider can mint the two are identical; they diverge only on a
+  corrupted stream, where a spliced `CandidateSelected` is ignored by the tolerant fold while `react`
+  still names the event's candidate. The transfer-effect property is therefore scoped to
+  `arbDecidedHistory`; making the one-word change would let it hold over every register. **Not done
+  here** because it is a production behaviour change on a `skip_specs: true`, test-only change that
+  must not demand a release, and the divergence is unreachable from any lawful history. Worth doing
+  as its own `fix:` — and then widening the property's register.
+- **The importer's `dead-letters`, `parked-effects` and `event-bus` adapters have no model.** They
+  carry stateful retry/park semantics with no property twin; the event-store model now covers both
+  packages, but those three remain example-tested only.
 
 ## Migration Plan
 
