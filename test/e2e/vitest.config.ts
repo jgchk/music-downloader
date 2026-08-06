@@ -9,8 +9,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['test/e2e/**/*.e2e.test.ts'],
-    testTimeout: 90_000,
-    hookTimeout: 90_000,
+    // A backstop, not a pace-setter: every wait in this tier is a polling probe carrying its own
+    // tighter deadline and diagnostic message (the longest single probe budgets 180s, and one
+    // test chains several). The ceiling must outlast the longest chain so a failure is always
+    // the probe's named timeout — never vitest's opaque "test timed out".
+    testTimeout: 600_000,
+    hookTimeout: 180_000,
     fileParallelism: false,
   },
 });

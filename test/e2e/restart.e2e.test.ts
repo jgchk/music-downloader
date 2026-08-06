@@ -7,6 +7,7 @@ import {
   DATA_DIR,
   DELIVERED_NARRATION,
   IMPORTER_DB,
+  IMPORT_VOICE_PHRASE,
   MBID,
   countEvents,
   pollForEvent,
@@ -67,7 +68,7 @@ describe('restart resilience (durable stores + subscription checkpoint)', () => 
     expect(countEvents(IMPORTER_DB, 'ImportApplied')).toBe(1);
 
     // And the interface still tells the same story after the restart.
-    expect(await pollUntilTerminal(acquisitionId)).toBe('In your library');
+    expect(await pollUntilTerminal(acquisitionId)).toBe(IMPORT_VOICE_PHRASE.applied);
     expect(await reviewQueueEmpty()).toBe(true);
   });
 });

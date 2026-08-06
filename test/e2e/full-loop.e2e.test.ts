@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -6,9 +6,9 @@ import {
   DEPOSIT_DIR,
   DOWNLOADER_DB,
   IMPORTER_DB,
+  IMPORT_VOICE_PHRASE,
   LIBRARY_DIR,
   MBID,
-  STAGED_SUBDIR,
   countEvents,
   eventTypes,
   pollForEvent,
@@ -71,7 +71,7 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     // stub, stateful poll) → real ffmpeg probe of the seeded FLAC → real filesystem deposit →
     // seam → beets auto-apply — settled only when the page says "In your library".
     const status = await pollUntilTerminal(acquisitionId);
-    expect(status).toBe('In your library');
+    expect(status).toBe(IMPORT_VOICE_PHRASE.applied);
     expect(existsSync(join(DEPOSIT_DIR, 'Test_Artist', 'Test_Album_(2020)'))).toBe(true);
 
     // Seam handoff: the importer's catch-up subscription consumed acquisition.fulfilled and
@@ -81,7 +81,12 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     // Importer side: real beets (inside the image, MusicBrainz pointed at the stub's ws/2 XML)
     // proposes the hint-pinned candidate and auto-applies it into the beets library.
     await pollForEvent(IMPORTER_DB, 'ImportApplied', 120_000);
-    expect(existsSync(LIBRARY_DIR)).toBe(true);
+    // The applied import physically landed: exactly one audio file inside the library tree
+    // (run.sh pre-creates the directory itself, so its existence alone would prove nothing).
+    const libraryAudio = readdirSync(LIBRARY_DIR, { recursive: true }).filter((entry) =>
+      String(entry).endsWith('.flac'),
+    );
+    expect(libraryAudio).toHaveLength(1);
 
     // Terminal outcome observable over the interface: the acquisition reports Fulfilled and the
     // review queue's explicit empty marker proves nothing waits on a human.

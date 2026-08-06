@@ -2,10 +2,12 @@ import { execSync } from 'node:child_process';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BASE_URL,
+  IMPORT_VOICE_PHRASE,
   MBID,
   pollUntilTerminal,
   readStatus,
   seedStagedFixture,
+  statusPhrase,
   submitAcquisition,
   waitForOk,
 } from './helpers.js';
@@ -107,7 +109,7 @@ describe('restart resumption mid-download (reactor-durability)', () => {
     // The download is provably mid-flight: enqueued at the source, polling sees it in progress.
     await pollUntil(async () => (await enqueueCount()) === 1, 'the enqueue to reach the source');
     await pollUntil(
-      async () => (await readStatus(acquisitionId)) === 'Downloading',
+      async () => (await readStatus(acquisitionId)) === statusPhrase('Downloading'),
       'the acquisition to be downloading',
     );
 
@@ -119,7 +121,7 @@ describe('restart resumption mid-download (reactor-durability)', () => {
 
     // The startup re-drive re-derives the Download effect and the adapter re-attaches to the
     // source's transfer: the acquisition reaches its terminal outcome instead of orphaning.
-    expect(await pollUntilTerminal(acquisitionId, 180_000)).toBe('In your library');
+    expect(await pollUntilTerminal(acquisitionId, 180_000)).toBe(IMPORT_VOICE_PHRASE.applied);
 
     // The candidate was never downloaded a second time: one enqueue across both process lives.
     expect(await enqueueCount()).toBe(1);
