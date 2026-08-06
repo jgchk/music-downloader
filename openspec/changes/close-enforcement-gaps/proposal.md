@@ -26,6 +26,15 @@ feasible everywhere, no ratchet warranted.
   the waivers-justified-like-an-`any` doctrine. The rule stays **off in test tiers** via a
   commented override (336 findings there; ratchet trigger recorded). `no-floating-promises`
   gains `checkThenables` as defense-in-depth only.
+- **The rule's own blind spot is closed where it hid the live defect.** Review found that a
+  `Promise<Result<…>>` return type is invisible to `must-use-result` (only `Result`/`ResultAsync`
+  are seen), and that `start()` — the *live-path* twin of `reset()`, on every boot — collapsed a
+  faulted checkpoint read into `unwrapOr(0)`: a checkpoint-store fault booted silently as a fresh
+  consumer, replayed the producer's entire feed, and still reported readiness `up`. Both
+  subscriptions now halt on an unreadable checkpoint (nothing delivered, checkpoint untouched,
+  module readiness `down`), `reset()` and `pollCatchUp` return `ResultAsync` so the new rule can
+  see them, and `reset()` is serialized against the drain so its success arm cannot be falsified
+  by a concurrent advance. Design D15/D16.
 - **Every first-party tier enters both gates.** Small per-tier tsconfigs extending
   `tsconfig.base.json` (the low-ceremony attested shape), wired into `pnpm typecheck`; the
   tiers deleted from eslint `ignores` so projectService covers them with the production
@@ -55,14 +64,18 @@ feasible everywhere, no ratchet warranted.
 
 - `module-architecture`: the lint/typecheck gates' coverage becomes a stated requirement —
   every first-party source tier inside both gates, and a discarded `Result` is a build break.
+- `cross-module-delivery`: a subscription whose durable checkpoint cannot be read halts and
+  reports its module down rather than inferring position 0, and a checkpoint reset is serialized
+  against delivery so a successful reset means the durable checkpoint really holds the requested
+  position.
 
 ## Impact
 
 - **Code:** eslint config (rule, overrides, zones, ignores), per-tier tsconfigs +
-  `pnpm typecheck` wiring, the two `reset()` fixes (`fix:`, both modules' catch-up
-  subscriptions) with red-first regression tests, mechanical violation cleanup across the five
-  tiers, the logging-helper refactor or justified disables.
-- **Version:** `fix:` patch bump (the reset defect is production behavior).
+  `pnpm typecheck` wiring, the two `reset()` fixes and the two `start()` boot-fault fixes
+  (`fix:`, both modules' catch-up subscriptions) with red-first regression tests, mechanical
+  violation cleanup across the five tiers, the logging-helper thunk refactor.
+- **Version:** `fix:` patch bump (the reset and boot-fault defects are production behavior).
 - **Dependencies:** none on other drafted changes; S-queue batches touch some of the same test
   files, so this ships after the S-queue drains to keep rebases trivial.
 - **Risk retired:** both review-sweep enforcement Importants; the silent-success operator

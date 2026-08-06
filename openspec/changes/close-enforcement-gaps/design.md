@@ -29,7 +29,13 @@ preferred fix: split the helper so callers pass the already-unwrapped error (con
 becomes visible to the rule at the call site's `match`/`isErr`), keeping the repo at zero
 waivers. Fallback (if the split contorts the API): per-site disables, each with a one-line
 justification, per the waiver doctrine. Decided at implementation by which diff reads better —
-both shapes are pre-approved.
+both shapes are pre-approved. *Taken at implementation:* a third shape neither option anticipated,
+and the best of the three — the helper takes the write as a **thunk** (`() => ResultAsync<…>`)
+rather than an already-started `ResultAsync`. Handing a live Result to a callee is invisible to the
+rule at the call site *and* at the helper, which is why the six findings looked like false
+positives; with a thunk the helper visibly runs and consumes it, so the consumption is structural
+and no waiver is needed. Zero waivers preserved (commit `640025d2`, the two slskd best-effort ledger
+writes).
 
 **D3 — The reset() fixes.** Both catch-up subscriptions' `reset()` discard `checkpoints.save`'s
 Result; fix propagates the failure as the modeled outcome the caller already expects
@@ -118,9 +124,57 @@ small projects serially in ~10s and is not the critical path. No lane restructur
 
 **D13 — The test-tier carve-out is scoped to test *code*, not `*.test.ts`.** The tiers' helpers,
 fixture builders, and recorders are test code by any reading, so the shared `testFiles` glob covers
-`test/**`, `packages/*/test/**`, and `packages/web/tests/**` alongside `**/*.test.ts`. Only
-`unicorn/name-replacements` was added to the existing carve-outs (59 hits, all identifiers mirroring
-wire shapes); scripts' 21 hits were fixed properly, as D5 intended.
+`test/**`, `packages/*/test/**`, and `packages/web/tests/**` alongside `**/*.test.ts`. Two rules
+were added to the pre-existing carve-outs: `unicorn/name-replacements` (59 hits, all identifiers
+mirroring wire shapes) and `neverthrow/must-use-result` (per the proposal's test-tier exclusion,
+re-armed for the CLI entrypoints those globs sweep in — see D12's block). Scripts' 21
+name-replacement hits were fixed properly, as D5 intended. Cycle 3 also re-pointed the two
+carve-out blocks that still named `**/*.test.ts` directly at the shared `testFiles` constant: the
+tiers' helpers are test code by the same reading, and a block naming its own glob is exactly the
+drift the constant exists to prevent. The full divergence is now six named rules, enumerated in the
+constant's doc comment so it stays checkable.
+
+**D15 — The boot-time checkpoint fault halts the subscription; it does not refuse the boot, and it
+never guesses 0.** Review cycle 3 found `start()`'s `unwrapOr(0)` asserting a durable fact it does
+not know: a faulted checkpoint read booted as "fresh consumer at 0", replaying the producer's whole
+feed while readiness still reported `up` (the web runtime's `try/catch` only catches throws, and
+nothing threw). This is the live-path twin of the `reset()` defect D3 fixed, so it is fixed here —
+shipping the "never ignore a Result" rule while its own charter's live-path instance stayed broken
+would be the change failing its thesis.
+
+Three policies were weighed. *Guess 0* (the status quo) is rejected outright: it manufactures a
+durable fact. *Refuse to boot* matches the seam-watermark precedent (v3.17.2 refuses boot on a
+rebuild failure) but is disproportionate here — the composed monolith boots both modules and the web
+UI in one process, so a single subscription's store fault would crash-loop the container and take
+away the very UI an operator would diagnose it from; the module's own `schedulePoll` comment already
+names that blast radius as the thing to avoid. *Halt and report down* is chosen: the subscription
+sets the same `halted` flag a poison event sets, delivers nothing, leaves the durable checkpoint
+untouched, and surfaces through the readiness signal each module already exposes (`/health` renders
+a module's `down` as `degraded`, naming it). It fails safe on both axes the review cared about — no
+replay, no false `up` — while confining the blast radius to the seam that actually broke. Wakeup and
+interval wiring still registers, so an operator `reset` to a chosen position resumes delivery on a
+recovered store without a restart.
+
+Rejected refinement: making the load *self-healing* by retrying it on each fallback poll (a
+`cursor: number | undefined` "position unknown" state). It is strictly nicer for a fault that clears
+on its own, but the realistic faults here — a corrupt or unreadable module-owned SQLite file — are
+persistent, and it buys that narrow case with new state in the class whose whole job is to be
+obviously correct under crashes. Recorded as the follow-up if a transient case is ever observed.
+
+**D16 — `reset()` returns `ResultAsync`, and is serialized against the drain.** Two defects behind
+one signature. (a) `Promise<Result<…>>` is invisible to `must-use-result` — verified empirically on
+this repo's pins: in one probe file the discarded `ResultAsync` call was flagged and the discarded
+`Promise<Result>` call was not — so the rule this change exists to add could not police the very
+method D3 fixed. `reset()` now returns `ResultAsync`, and so does `pollCatchUp`, the one other
+production signature with the blind spot and no production caller (cheap, no call sites to churn).
+The nine remaining `Promise<Result>` production signatures are left as a follow-up rather than
+sprawling: the two runtime factories are long `async` boot functions, and `SeamFeed.read` /
+`OutboundFeed.read` / `ConsumeHandler` are a *structural* port whose shape is mirrored by fakes
+across four test tiers. (b) The Ok arm over-promised under concurrency: unserialized, a poll's
+`advance` could land just behind the reset's save, leaving the durable checkpoint ahead of
+`toGlobalSeq` while `reset` reported the replay armed. A `resetting` gate now drops polls for the
+duration and the reset awaits the in-flight cycle out; the drain's coalescing semantics are
+untouched (a dropped tick is re-fired by the interval).
 
 ## Open Questions
 
