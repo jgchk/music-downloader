@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.1](https://github.com/jgchk/music-downloader/compare/v3.17.0...v3.17.1) (2026-08-06)
+
+### Bug Fixes
+
+* **ci:** publish the exact e2e-gated image instead of rebuilding ([1852b5d](https://github.com/jgchk/music-downloader/commit/1852b5d80652cd02e19b069357d89e97f6d00ec3))
+* **release:** fail version:prep loudly when the version anchor finds no purchase ([3af055e](https://github.com/jgchk/music-downloader/commit/3af055e38a1dc3aac0aed4227ccb7b68540b709e))
 ## [3.17.0](https://github.com/jgchk/music-downloader/compare/v3.16.2...v3.17.0) (2026-08-06)
 
 ### Features
