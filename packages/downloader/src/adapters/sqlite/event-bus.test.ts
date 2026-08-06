@@ -117,6 +117,21 @@ describe('pollCatchUp', () => {
     expect(result._unsafeUnwrap()).toBe(7);
   });
 
+  it('converts a throwing follower into a modeled fault, never a rejection', async () => {
+    // `handler` is typed `(event) => void | Promise<void>` — a follower with no error channel of
+    // its own, so a throw is an in-contract input here. It must not reject a declared ResultAsync.
+    const store = { readAll: vi.fn().mockReturnValue(okAsync([storedAt(1)])) };
+
+    const result = await pollCatchUp(store, 0, () => {
+      throw new Error('follower bug');
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'event-bus.pollCatchUp',
+    });
+  });
+
   it('surfaces an infrastructure fault from the store', async () => {
     const store = { readAll: vi.fn().mockReturnValue(errAsync(infraError('readAll', 'boom'))) };
 
