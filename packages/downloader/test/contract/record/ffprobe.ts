@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { CONTRACT_FIXTURE_ROOT } from '../support/fixture.js';
 
 /**
@@ -21,10 +21,10 @@ import { CONTRACT_FIXTURE_ROOT } from '../support/fixture.js';
  * Review the printed summary before committing.
  */
 
-const OUT_DIR = join(CONTRACT_FIXTURE_ROOT, 'ffprobe');
+const OUT_DIR = path.join(CONTRACT_FIXTURE_ROOT, 'ffprobe');
 
 function ffprobeVersion(): string {
-  return execFileSync('ffprobe', ['-version'], { encoding: 'utf8' }).split('\n')[0]!.trim();
+  return execFileSync('ffprobe', ['-version'], { encoding: 'utf8' }).split('\n', 1)[0]!.trim();
 }
 
 /** Synthesize a sample with ffmpeg, capture its ffprobe stdout, and write the fixture envelope. */
@@ -60,7 +60,7 @@ function record(args: {
       stdout: JSON.parse(stdout) as unknown,
     };
     mkdirSync(OUT_DIR, { recursive: true });
-    writeFileSync(join(OUT_DIR, args.outName), `${JSON.stringify(fixture, null, 2)}\n`);
+    writeFileSync(path.join(OUT_DIR, args.outName), `${JSON.stringify(fixture, null, 2)}\n`);
     console.log(`wrote ffprobe/${args.outName}`);
   } finally {
     rmSync(args.sample, { force: true });
@@ -71,7 +71,7 @@ function main(): void {
   // A deterministic 1s stereo 44.1kHz/16-bit sine tone as FLAC: exercises real bit-depth (via
   // `bits_per_raw_sample`), sample-rate, duration, and format-bitrate fields, no external file.
   record({
-    sample: join(tmpdir(), `contract-ffprobe-${process.pid}.flac`),
+    sample: path.join(tmpdir(), `contract-ffprobe-${process.pid}.flac`),
     encodeArgs: ['-sample_fmt', 's16', '-ar', '44100', '-ac', '2'],
     source:
       'ffprobe on a synthesized 1s stereo 44.1kHz/16-bit FLAC (test/contract/record/ffprobe.ts)',
@@ -81,7 +81,7 @@ function main(): void {
   // The same tone as WAV `pcm_s16le`: ffprobe reports bit depth as a NUMERIC `bits_per_sample` with
   // no `bits_per_raw_sample`, so this fixture pins the adapter's numeric-fallback bit-depth branch.
   record({
-    sample: join(tmpdir(), `contract-ffprobe-${process.pid}.wav`),
+    sample: path.join(tmpdir(), `contract-ffprobe-${process.pid}.wav`),
     encodeArgs: ['-c:a', 'pcm_s16le', '-sample_fmt', 's16', '-ar', '44100', '-ac', '2'],
     source:
       'ffprobe on a synthesized 1s stereo 44.1kHz/16-bit WAV pcm_s16le (test/contract/record/ffprobe.ts)',

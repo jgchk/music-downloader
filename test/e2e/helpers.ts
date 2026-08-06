@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // The PRODUCTION session codec, imported — not reimplemented — so the harness's minted cookies
 // can never drift from what the image's unmodified gate verifies (out-of-process-e2e).
@@ -11,8 +11,6 @@ import { SESSION_COOKIE, signSession } from '../../packages/web/src/lib/server/s
 // radius). Which phrases mean "terminal" or "delivered" stays this harness's own grouping.
 import { IMPORT_VOICE_PHRASE, statusPhrase } from '../../packages/web/src/lib/copy.js';
 
-export { IMPORT_VOICE_PHRASE, statusPhrase };
-
 /**
  * Shared driver utilities for the out-of-process E2E tier. The suite is a browserless HTTP client
  * over the SAME web routes the UI serves — form-encoded actions, HTML reads parsed via the
@@ -21,7 +19,7 @@ export { IMPORT_VOICE_PHRASE, statusPhrase };
  */
 
 export const BASE_URL = process.env['E2E_BASE_URL'] ?? 'http://localhost:3000';
-export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e-tmp');
+export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? path.join(process.cwd(), '.e2e-tmp');
 
 /** The harness secret run.sh handed the container — a throwaway that guards nothing real. */
 export const SESSION_SECRET =
@@ -43,18 +41,18 @@ export function sessionCookieHeader(role: 'owner' | 'guest' = 'owner'): string {
   return `${SESSION_COOKIE}=${cookie}`;
 }
 
-export const STAGING_DIR = join(DATA_DIR, 'music', 'staging');
-export const DEPOSIT_DIR = join(DATA_DIR, 'music', 'deposit');
-export const LIBRARY_DIR = join(DATA_DIR, 'music', 'library');
-export const DOWNLOADER_DB = join(DATA_DIR, 'data', 'downloader', 'events.db');
-export const IMPORTER_DB = join(DATA_DIR, 'data', 'importer', 'events.db');
+export const STAGING_DIR = path.join(DATA_DIR, 'music', 'staging');
+export const DEPOSIT_DIR = path.join(DATA_DIR, 'music', 'deposit');
+export const LIBRARY_DIR = path.join(DATA_DIR, 'music', 'library');
+export const DOWNLOADER_DB = path.join(DATA_DIR, 'data', 'downloader', 'events.db');
+export const IMPORTER_DB = path.join(DATA_DIR, 'data', 'importer', 'events.db');
 
 /** The one release the stubs know; keep in agreement with test/e2e/stubs mappings. */
 export const MBID = '6e29d5f7-4b0f-4b62-8862-1c62ae2a1eb1';
 export const STAGED_SUBDIR = 'Test Album';
 export const STAGED_FILE = '01 Track One.flac';
 
-const FIXTURES_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url));
+const FIXTURES_DIR = fileURLToPath(new URL('fixtures/', import.meta.url));
 
 /**
  * Seed a "downloaded" file at the location the slskd stub REPORTS for it (a `localFilename`
@@ -63,9 +61,9 @@ const FIXTURES_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url));
  * test/e2e/fixtures (calibration provenance in fixtures/README.md).
  */
 export function seedFixture(fixture: string, subdir: string, file = STAGED_FILE): void {
-  const dir = join(STAGING_DIR, subdir);
+  const dir = path.join(STAGING_DIR, subdir);
   mkdirSync(dir, { recursive: true });
-  copyFileSync(join(FIXTURES_DIR, fixture), join(dir, file));
+  copyFileSync(path.join(FIXTURES_DIR, fixture), path.join(dir, file));
 }
 
 /** The default seeding: the clean fixture at the on-disk stub's reported location. */
@@ -196,7 +194,8 @@ export async function reviewQueueEmpty(): Promise<boolean> {
     headers: { Cookie: sessionCookieHeader() },
   });
   if (!res.ok) throw new Error(`GET /reviews returned ${res.status}`);
-  return (await res.text()).includes('data-testid="empty"');
+  const body = await res.text();
+  return body.includes('data-testid="empty"');
 }
 
 /**
@@ -242,3 +241,5 @@ export async function pollForEvent(
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
+
+export { IMPORT_VOICE_PHRASE, statusPhrase } from '../../packages/web/src/lib/copy.js';

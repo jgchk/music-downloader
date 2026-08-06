@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 
 /**
  * A recorded contract fixture: one real request/response interaction captured from live plex.tv,
@@ -29,12 +29,12 @@ export const CONTRACT_FIXTURE_ROOT = new URL('../fixtures/', import.meta.url).pa
 
 /** Load every `*.json` fixture under `fixtures/<service>/`, paired with its filename. */
 export function loadFixtures(service: string): { name: string; fixture: ContractFixture }[] {
-  const dir = join(CONTRACT_FIXTURE_ROOT, service);
-  return readdirSync(dir)
+  const directory = path.join(CONTRACT_FIXTURE_ROOT, service);
+  return readdirSync(directory)
     .filter((name) => name.endsWith('.json'))
-    .sort()
+    .toSorted((a, b) => a.localeCompare(b))
     .map((name) => ({
       name,
-      fixture: JSON.parse(readFileSync(join(dir, name), 'utf8')) as ContractFixture,
+      fixture: JSON.parse(readFileSync(path.join(directory, name), 'utf8')) as ContractFixture,
     }));
 }

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AcquisitionEvent } from '../../src/domain/acquisition/events.js';
 import {
@@ -22,10 +22,10 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-const FIXTURE_DIR = new URL('./fixtures/events/', import.meta.url).pathname;
+const FIXTURE_DIR = new URL('fixtures/events/', import.meta.url).pathname;
 
 describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount)', () => {
-  const fixture = readJson(join(FIXTURE_DIR, 'manual-selection.requested/v1.json')) as {
+  const fixture = readJson(path.join(FIXTURE_DIR, 'manual-selection.requested/v1.json')) as {
     event: Record<string, unknown>;
   };
 
@@ -82,7 +82,7 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
       { type: 'AcquisitionRequested', request: sampleGroupRequest, policies: defaultPolicies() },
       buildUpcasterRegistry().upcast('ManualSelectionRequested', 2, {
         ...v2Event,
-      } as unknown as Record<string, unknown>),
+      }),
     ]);
 
     expect(folded.phase).toBe('AwaitingManualSelection');

@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 import {
@@ -15,7 +15,7 @@ import {
  * reshaped output fails here before it can ship.
  */
 
-const FIXTURE_DIR = new URL('./fixtures/beets-bridge/', import.meta.url).pathname;
+const FIXTURE_DIR = new URL('fixtures/beets-bridge/', import.meta.url).pathname;
 const REQUIREMENTS = new URL('../../src/adapters/beets/bridge/requirements.txt', import.meta.url)
   .pathname;
 
@@ -38,7 +38,7 @@ const schemaForVerb: Record<Fixture['verb'], z.ZodType> = {
 
 const fixtures: Fixture[] = readdirSync(FIXTURE_DIR)
   .filter((name) => name.endsWith('.json'))
-  .map((name) => JSON.parse(readFileSync(join(FIXTURE_DIR, name), 'utf8')) as Fixture);
+  .map((name) => JSON.parse(readFileSync(path.join(FIXTURE_DIR, name), 'utf8')) as Fixture);
 
 function pinnedBeetsVersion(): string {
   const pin = /beets\[[^\]]*\]==([0-9.]+)/u.exec(readFileSync(REQUIREMENTS, 'utf8'));
@@ -49,7 +49,11 @@ function pinnedBeetsVersion(): string {
 describe('recorded bridge fixtures', () => {
   it('cover every verb and both mood families (outcomes and refusals)', () => {
     const verbs = new Set(fixtures.map((fixture) => fixture.verb));
-    expect([...verbs].sort()).toEqual(['apply', 'propose', 'validate']);
+    expect([...verbs].toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'apply',
+      'propose',
+      'validate',
+    ]);
     expect(fixtures.some((fixture) => fixture.name.includes('doomed'))).toBe(true);
     expect(fixtures.some((fixture) => fixture.name.includes('applied'))).toBe(true);
   });

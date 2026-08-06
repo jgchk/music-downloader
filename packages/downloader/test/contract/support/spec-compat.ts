@@ -14,6 +14,15 @@ export interface SpecViolation {
   readonly problem: string;
 }
 
+/**
+ * The slice of an OpenAPI document the callers name directly — everything below reads the rest
+ * structurally, one `unknown` at a time. Parsed spec JSON is read through this rather than as `any`.
+ */
+export type OpenApiSpec = Record<string, unknown> & {
+  readonly paths?: Record<string, unknown>;
+  readonly components?: unknown;
+};
+
 type Json = Record<string, unknown>;
 
 function asObject(value: unknown): Json | undefined {
@@ -107,7 +116,7 @@ export function checkSlskdSpec(spec: Json, operations: readonly SlskdOperation[]
         violations.push({ operation: label, problem: 'request body schema missing or unresolved' });
       } else {
         for (const field of op.requestBody.fields) {
-          if (!(field in properties)) {
+          if (!Object.hasOwn(properties, field)) {
             violations.push({ operation: label, problem: `request field "${field}" missing` });
           }
         }

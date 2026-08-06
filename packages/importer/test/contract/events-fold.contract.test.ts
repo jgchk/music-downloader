@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ImportEvent } from '../../src/domain/import/events.js';
 import { foldEvents } from '../../src/domain/import/state.js';
@@ -28,14 +28,14 @@ import { buildUpcasterRegistry } from '../../src/adapters/sqlite/upcaster.js';
  * v1→v2 step must rewrite it before the pure domain ever sees it.
  */
 
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8'));
+function readJson(filePath: string): unknown {
+  return JSON.parse(readFileSync(filePath, 'utf8'));
 }
 
-const FIXTURE_DIR = new URL('./fixtures/events/', import.meta.url).pathname;
+const FIXTURE_DIR = new URL('fixtures/events/', import.meta.url).pathname;
 
 function upcastFixture(type: string, relative: string): ImportEvent {
-  const fixture = readJson(join(FIXTURE_DIR, relative)) as { event: Record<string, unknown> };
+  const fixture = readJson(path.join(FIXTURE_DIR, relative)) as { event: Record<string, unknown> };
   return buildUpcasterRegistry().upcast(type, 1, fixture.event);
 }
 

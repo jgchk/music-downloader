@@ -69,15 +69,15 @@ const HOLD_MAPPING = {
       username: 'peer1',
       directories: [
         {
-          directory: '@@music\\Test Artist\\Test Album',
+          directory: String.raw`@@music\Test Artist\Test Album`,
           fileCount: 1,
           files: [
             {
               id: 'transfer-1',
-              filename: '@@music\\Test Artist\\Test Album\\01 Track One.flac',
+              filename: String.raw`@@music\Test Artist\Test Album\01 Track One.flac`,
               state: 'InProgress',
-              size: 1234567,
-              bytesTransferred: 617283,
+              size: 1_234_567,
+              bytesTransferred: 617_283,
             },
           ],
         },

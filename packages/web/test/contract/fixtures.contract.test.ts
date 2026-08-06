@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ZodType } from 'zod';
 import {
@@ -35,8 +35,8 @@ const SCHEMAS: Record<string, ZodType> = {
 
 describe('plex.tv fixtures', () => {
   it('cover exactly the consumed surface', () => {
-    expect(fixtures.map((f) => f.name).sort()).toEqual(
-      [...Object.keys(SCHEMAS), 'pin-check-expired.json'].sort(),
+    expect(fixtures.map((f) => f.name).toSorted((a, b) => a.localeCompare(b))).toEqual(
+      [...Object.keys(SCHEMAS), 'pin-check-expired.json'].toSorted((a, b) => a.localeCompare(b)),
     );
   });
 
@@ -96,9 +96,9 @@ describe('plex.tv fixtures', () => {
   });
 
   it('contains no token-shaped or secret-bearing text anywhere in the raw files', () => {
-    const dir = join(CONTRACT_FIXTURE_ROOT, 'plextv');
-    for (const name of readdirSync(dir)) {
-      const raw = readFileSync(join(dir, name), 'utf8');
+    const directory = path.join(CONTRACT_FIXTURE_ROOT, 'plextv');
+    for (const name of readdirSync(directory)) {
+      const raw = readFileSync(path.join(directory, name), 'utf8');
       // A real transient token would be a long opaque string tied to these key names; the only
       // permitted value for authToken is the placeholder, and no other credential key may appear.
       expect(raw).not.toMatch(/"authToken"\s*:\s*"(?!plex-user-token-scrubbed")/);
@@ -124,11 +124,13 @@ describe('E2E plex.tv stub payloads conform to the contract', () => {
   };
 
   it('every mapping is schema-governed (a new stub must register here)', () => {
-    expect(readdirSync(STUB_ROOT).sort()).toEqual(Object.keys(STUB_SCHEMAS).sort());
+    expect(readdirSync(STUB_ROOT).toSorted((a, b) => a.localeCompare(b))).toEqual(
+      Object.keys(STUB_SCHEMAS).toSorted((a, b) => a.localeCompare(b)),
+    );
   });
 
   it.each(Object.entries(STUB_SCHEMAS))('%s validates against its schema', (name, schema) => {
-    const mapping = JSON.parse(readFileSync(join(STUB_ROOT, name), 'utf8')) as {
+    const mapping = JSON.parse(readFileSync(path.join(STUB_ROOT, name), 'utf8')) as {
       response: { jsonBody: unknown };
     };
     const parsed = schema.safeParse(mapping.response.jsonBody);

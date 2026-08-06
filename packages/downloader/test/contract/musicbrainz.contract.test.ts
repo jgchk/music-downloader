@@ -56,7 +56,8 @@ describe('MusicBrainz contract (tier 1)', () => {
     const mbid = mbidFromPath('release-lookup.json');
     const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'album' };
 
-    const result = (await adapter().resolve(request))._unsafeUnwrap();
+    const resolution = await adapter().resolve(request);
+    const result = resolution._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid } });
 
@@ -71,7 +72,8 @@ describe('MusicBrainz contract (tier 1)', () => {
     const mbid = mbidFromPath('recording-lookup.json');
     const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'track' };
 
-    const result = (await adapter().resolve(request))._unsafeUnwrap();
+    const resolution = await adapter().resolve(request);
+    const result = resolution._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { type: 'track', mbid } });
     const sent = server.requests.find((r) => r.path === `/recording/${mbid}`)!;
@@ -93,14 +95,13 @@ describe('MusicBrainz contract (tier 1)', () => {
     const RESOLVED_EDITION = 'be701edc-c9c7-484a-9ed2-aeef051c19be';
     expect(mbidFromPath('release-lookup.json')).toBe(RESOLVED_EDITION);
 
-    const result = (
-      await adapter().resolve({
-        kind: 'descriptor',
-        targetType: 'album',
-        artist: 'Pink Floyd',
-        title: 'The Dark Side of the Moon',
-      })
-    )._unsafeUnwrap();
+    const resolution = await adapter().resolve({
+      kind: 'descriptor',
+      targetType: 'album',
+      artist: 'Pink Floyd',
+      title: 'The Dark Side of the Moon',
+    });
+    const result = resolution._unsafeUnwrap();
 
     const search = server.requests.find((r) => r.path === '/release')!;
     expect(search.query).toMatchObject(byName('release-search.json').request.query!);
@@ -121,14 +122,13 @@ describe('MusicBrainz contract (tier 1)', () => {
     expect(recordings).toHaveLength(5);
     expect(recordings?.every((recording) => recording.score === 100)).toBe(true);
 
-    const result = (
-      await adapter().resolve({
-        kind: 'descriptor',
-        targetType: 'track',
-        artist: 'Nirvana',
-        title: 'Smells Like Teen Spirit',
-      })
-    )._unsafeUnwrap();
+    const resolution = await adapter().resolve({
+      kind: 'descriptor',
+      targetType: 'track',
+      artist: 'Nirvana',
+      title: 'Smells Like Teen Spirit',
+    });
+    const result = resolution._unsafeUnwrap();
 
     const search = server.requests.find((r) => r.path === '/recording')!;
     expect(search.query).toMatchObject(byName('recording-search.json').request.query!);
@@ -170,7 +170,8 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
       mbid: releaseGroupMbid,
       targetType: 'album',
     };
-    const result = (await rgAdapter().resolve(request))._unsafeUnwrap();
+    const resolution = await rgAdapter().resolve(request);
+    const result = resolution._unsafeUnwrap();
 
     const browse = rgServer.requests.find((r) => r.path === '/release')!;
     expect(browse.query).toMatchObject(browseEntry.fixture.request.query!);
@@ -205,9 +206,12 @@ describe('MusicBrainz release-group no-official contract (tier 1)', () => {
       baseUrl: rgServer.baseUrl,
       userAgent: USER_AGENT,
     });
-    const result = (
-      await adapter.resolve({ kind: 'release-group', mbid: releaseGroupMbid, targetType: 'album' })
-    )._unsafeUnwrap();
+    const resolution = await adapter.resolve({
+      kind: 'release-group',
+      mbid: releaseGroupMbid,
+      targetType: 'album',
+    });
+    const result = resolution._unsafeUnwrap();
 
     const browse = rgServer.requests.find((r) => r.path === '/release')!;
     expect(browse.query).toMatchObject(browseEntry.fixture.request.query!);

@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   additivityViolations,
-  eventFixturesDir,
+  eventFixturesDirectory,
   generateJsonSchema,
   historySnapshots,
   latestSchemaPath,
@@ -54,11 +54,11 @@ describe.each(publishedEventSchemas)('published event contract: $type', (source)
   });
 
   it('parses every frozen payload fixture, of every historical version, with the current schema', () => {
-    const dir = eventFixturesDir(source.type);
+    const dir = eventFixturesDirectory(source.type);
     const fixtures = readdirSync(dir).filter((name) => name.endsWith('.json'));
     expect(fixtures.length).toBeGreaterThan(0);
     for (const name of fixtures) {
-      const fixture = readJson(join(dir, name)) as { event: unknown };
+      const fixture = readJson(path.join(dir, name)) as { event: unknown };
       const parsed = source.schema.safeParse(fixture.event);
       expect(parsed.success, `${name}: ${parsed.success ? '' : parsed.error.message}`).toBe(true);
     }

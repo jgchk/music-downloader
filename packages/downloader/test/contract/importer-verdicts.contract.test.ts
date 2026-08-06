@@ -41,7 +41,7 @@ describe('the recorded release.verdict fixture', () => {
         candidate: {
           username: 'peer1',
           path: 'peer1/Artist - Album [FLAC]',
-          sizeBytes: 123456,
+          sizeBytes: 123_456,
         },
         verdict: 'rejected',
         reasons: ['corrupt rip', 'transcoded from lossy'],
@@ -56,7 +56,7 @@ describe('the recorded release.verdict fixture', () => {
       candidate: {
         username: 'peer1',
         path: 'peer1/Artist - Album [FLAC]',
-        sizeBytes: 123456,
+        sizeBytes: 123_456,
       },
       reasons: ['corrupt rip', 'transcoded from lossy'],
     });

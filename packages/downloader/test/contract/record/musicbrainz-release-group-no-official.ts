@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import {
   releaseGroupCandidateIds,
   releaseGroupEditionCandidates,
@@ -19,7 +19,7 @@ import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.
 
 const BASE_URL = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'music-downloader-contract/0.0 (https://github.com/anthropics/music-downloader)';
-const OUT_DIR = join(CONTRACT_FIXTURE_ROOT, 'musicbrainz');
+const OUT_DIR = path.join(CONTRACT_FIXTURE_ROOT, 'musicbrainz');
 
 // Great White Wonder — the canonical Bob Dylan bootleg: every edition is non-official, and the
 // browse carries the sparse presentation data (null country/format) the candidates must tolerate.
@@ -33,7 +33,7 @@ async function get(path: string, rawQuery: string): Promise<ContractFixture> {
   const response = await fetch(`${BASE_URL}${path}?${rawQuery}`, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
   });
-  const body = (await response.json()) as unknown;
+  const body = await response.json();
   return {
     provenance: { source: `${BASE_URL} (live)`, capturedAt, note: 'public data; no sanitization' },
     request: { method: 'GET', path, query: Object.fromEntries(new URLSearchParams(rawQuery)) },
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   // Sanity: the recorded group must still have editions but no official one, or the fixture no
   // longer records the case this change exists for.
   const releases = mbReleaseGroupBrowseSchema.parse(browse.response.body).releases;
-  if (releaseGroupCandidateIds(releases).length !== 0) {
+  if (releaseGroupCandidateIds(releases).length > 0) {
     throw new Error('release group unexpectedly has an official edition; pick another group');
   }
   if (releaseGroupEditionCandidates(releases).length === 0) {
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   }
 
   writeFileSync(
-    join(OUT_DIR, 'release-group-no-official-browse.json'),
+    path.join(OUT_DIR, 'release-group-no-official-browse.json'),
     `${JSON.stringify(browse, null, 2)}\n`,
   );
   console.log(

@@ -19,6 +19,6 @@ export function latestReleaseVersion(tags: readonly string[]): string {
   }
 
   releases.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-  const [major, minor, patch] = releases[releases.length - 1]!;
+  const [major, minor, patch] = releases.at(-1)!;
   return `${major}.${minor}.${patch}`;
 }

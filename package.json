@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc --noCheck -p packages/downloader/tsconfig.build.json && tsc --noCheck -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
     "typecheck": "tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json && pnpm --dir packages/web run check:svelte && pnpm run typecheck:tiers",
-    "typecheck:tiers": "tsc --noEmit -p tsconfig.config-files.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p test/boundaries/tsconfig.json && tsc --noEmit -p test/e2e/tsconfig.json && tsc --noEmit -p packages/downloader/scripts/tsconfig.json && tsc --noEmit -p packages/downloader/test/contract/tsconfig.json && tsc --noEmit -p packages/importer/scripts/tsconfig.json && tsc --noEmit -p packages/importer/test/contract/tsconfig.json",
+    "typecheck:tiers": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p test/boundaries/tsconfig.json && tsc --noEmit -p test/e2e/tsconfig.json && tsc --noEmit -p packages/downloader/scripts/tsconfig.json && tsc --noEmit -p packages/downloader/test/contract/tsconfig.json && tsc --noEmit -p packages/importer/scripts/tsconfig.json && tsc --noEmit -p packages/importer/test/contract/tsconfig.json",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint/ --cache-strategy content .",
     "format": "prettier --check --cache .",
     "format:write": "prettier --write .",
