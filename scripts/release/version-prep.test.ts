@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { assembleChangelog, compute, isReleaseTagTaken, run } from './version-prep.ts';
+import {
+  anchorVersion,
+  assembleChangelog,
+  compute,
+  isReleaseTagTaken,
+  run,
+} from './version-prep.ts';
 import type { ReleaseReader } from './reader.ts';
 import type { RangeCommit } from './render-changelog-section.ts';
 
@@ -215,5 +221,39 @@ describe('run (--check collision guard wiring)', () => {
 
     await expect(run(reader, true, effects)).resolves.toBeUndefined();
     expect(logs.join('')).toContain('branch is prepped for 3.5.3');
+  });
+});
+
+describe('anchorVersion', () => {
+  it('rewrites the version field, preserving the rest of the source', () => {
+    const source =
+      '{\n  "name": "music-downloader",\n  "version": "3.5.3",\n  "private": true\n}\n';
+
+    expect(anchorVersion(source, '3.5.4')).toBe(
+      '{\n  "name": "music-downloader",\n  "version": "3.5.4",\n  "private": true\n}\n',
+    );
+  });
+
+  it('accepts an unbumped prep, where the anchored version is already in place', () => {
+    const source = '{ "version": "3.5.3" }';
+
+    expect(anchorVersion(source, '3.5.3')).toBe(source);
+  });
+
+  it('returns null instead of silently writing an unanchored file when the pattern finds no purchase', () => {
+    // The rot scenario: package.json's version field changes shape (or vanishes) and the anchor
+    // regex no longer matches — String.replace would return the source unchanged, and the old
+    // shell logged "prepared" over a file it never touched.
+    const source = '{ "name": "music-downloader", "ver": "3.5.3" }';
+
+    expect(anchorVersion(source, '3.5.4')).toBeNull();
+  });
+
+  it('returns null when the replacement lands somewhere other than the real version field', () => {
+    // First-match semantics: a shape where the match is not the manifest's own version field must
+    // fail the post-condition (the parsed manifest does not carry the computed version).
+    const source = '{ "scripts": { "version": "echo" }, "version-note": "3.5.3" }';
+
+    expect(anchorVersion(source, '3.5.4')).toBeNull();
   });
 });
