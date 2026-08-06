@@ -2,29 +2,29 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
 import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
-import { arbEvent } from '../../domain/acquisition/__fixtures__/arbitraries.js';
+import type { ImportEvent } from '../../domain/import/events.js';
+import { arbEvent } from '../../domain/import/__fixtures__/arbitraries.js';
 import { SqliteEventStore } from './event-store.js';
 import { openEventDatabase } from './schema.js';
 
 /**
- * The one reference model in the property tier (decider-properties D5).
+ * The importer's half of the one reference model in the property tier (decider-properties D5).
  *
- * Everywhere else this change refuses a parallel model: the deciders are already pure functions, so
- * a second implementation would be a drifting near-duplicate. The event store is the seam where
- * that argument inverts — SQLite, a transaction, a rolled-back version check and a UNIQUE backstop
- * are genuine stateful complexity, and a map-plus-a-counter is a model small enough to be obviously
- * right. Model-based commands generalize the store's existing conflict tests from the two
- * interleavings someone wrote down to every interleaving fast-check can build.
+ * The twin of the downloader's, and it exists because the twin is not enough: this store is a
+ * near-copy of the other, and a review found that weakening its in-transaction version check to
+ * `c < expectedVersion` left all 495 importer tests green — the `UNIQUE(stream_id, version)`
+ * backstop hides the weakening for every append that actually inserts a row, so the modelled check
+ * itself was unpinned in this package. An empty append inserts nothing, which is exactly the case
+ * the model drives and the constraint cannot cover.
  *
  * The model states the contract in one line: an append succeeds exactly when `expectedVersion`
  * equals the stream's current length, and fails as `ConcurrencyConflict` otherwise.
  */
 
-const META: EventMetadata = { acquisitionId: 'acq', occurredAt: '2026-08-06T00:00:00.000Z' };
+const META: EventMetadata = { importId: 'imp', occurredAt: '2026-08-06T00:00:00.000Z' };
 
 /** Streams are drawn from a tiny pool so racing writers actually collide. */
-const STREAM_IDS = ['acq-1', 'acq-2'] as const;
+const STREAM_IDS = ['imp-1', 'imp-2'] as const;
 
 /** One entry of the catch-up feed as the model remembers it. */
 interface FeedEntry {
@@ -80,7 +80,7 @@ class AppendCommand implements fc.AsyncCommand<StoreModel, RealStore> {
   constructor(
     private readonly streamId: string,
     private readonly expectedVersion: number,
-    private readonly events: readonly AcquisitionEvent[],
+    private readonly events: readonly ImportEvent[],
   ) {}
 
   check(): boolean {
@@ -211,7 +211,7 @@ describe('the SQLite store agrees with an expected-version model on every interl
     fc.constantFrom(...STREAM_IDS).map((streamId) => new ReadStreamCommand(streamId)),
     fc
       .tuple(
-        fc.integer({ min: 0, max: 3 }),
+        fc.integer({ min: 0, max: 1 }),
         // A page size small enough to actually truncate; `undefined` is the reactor's unbounded read.
         fc.option(fc.integer({ min: 1, max: 2 }), { nil: undefined }),
       )

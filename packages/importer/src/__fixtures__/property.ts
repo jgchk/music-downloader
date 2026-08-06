@@ -46,8 +46,8 @@ export const DEFAULT_NUM_RUNS = 100;
 /**
  * An integer override read from the environment.
  *
- * Absent means "use the pinned default". **Present-but-unusable is a hard failure, never a silent
- * fallback** — a nightly configured with `FC_NUM_RUNS=10_000` (a plausible typo in a repo that
+ * Absent — or blank, which shells produce by accident — means "use the pinned default".
+ * Any other **present-but-unusable value is a hard failure, never a silent fallback** — a nightly configured with `FC_NUM_RUNS=10_000` (a plausible typo in a repo that
  * writes `20_260_806` two lines up) would otherwise run the gate's 100 cases and report green,
  * making the misconfiguration invisible in exactly the run that was supposed to widen the sweep.
  * Failing fast on malformed config is the twelve-factor rule; a throw at module load is how a test

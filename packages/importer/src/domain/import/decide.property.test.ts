@@ -36,15 +36,21 @@ const ALL_PHASES: readonly ImportPhase[] = [
   'rejected',
 ];
 
-/** The closed `DomainError` union: an error outside it would be an unmodelled failure channel. */
-const DOMAIN_ERROR_KINDS: readonly DomainError['kind'][] = [
-  'UnknownImport',
-  'NoOpenReview',
-  'InvalidResolution',
-  'UnknownCandidate',
-  'NoRetainedCandidate',
-  'CycleInFlight',
-];
+/**
+ * The closed `DomainError` union, as an exhaustive `Record` so a new error kind is a compile error
+ * here — a hand-written list would neither fail to compile nor fail the "every kind reached" sweep.
+ */
+const DOMAIN_ERROR_KIND_TABLE: Record<DomainError['kind'], true> = {
+  UnknownImport: true,
+  NoOpenReview: true,
+  InvalidResolution: true,
+  UnknownCandidate: true,
+  NoRetainedCandidate: true,
+  CycleInFlight: true,
+};
+const DOMAIN_ERROR_KINDS: readonly DomainError['kind'][] = Object.keys(
+  DOMAIN_ERROR_KIND_TABLE,
+) as DomainError['kind'][];
 
 const KNOWN_EVENT_TYPES: readonly string[] = Object.keys(eventArbitraryByType);
 
@@ -222,6 +228,8 @@ describe('no reachable state violates an import invariant', () => {
     // The watermark is the stream's convergence guarantee: folded as a max across cycles so a
     // manual resubmission (which carries no source) cannot erase it and reopen the stream to
     // redeliveries of deliveries already imported.
+    let comparisons = 0;
+
     assertProperty(
       fc.property(arbCommandSequence, (plan) => {
         const run = driveCommands(plan);
@@ -229,11 +237,18 @@ describe('no reachable state violates an import invariant', () => {
           if (index === 0) continue;
           const previous = watermarkOf(run.states[index - 1]!);
           if (previous === undefined) continue;
+          comparisons += 1;
 
-          expect(watermarkOf(state) ?? -Infinity).toBeGreaterThanOrEqual(previous);
+          // Once a stream has a watermark it can never lose it — that is the whole point of the
+          // max-across-cycles fold, so an absent one here is a violation, not a case to tolerate.
+          const current = watermarkOf(state);
+          if (current === undefined) expect.unreachable('a stream lost its seam watermark');
+          expect(current).toBeGreaterThanOrEqual(previous);
         }
       }),
     );
+
+    expect(comparisons).toBeGreaterThan(0);
   });
 });
 
@@ -306,6 +321,7 @@ describe('a delivery is never silently dropped, and never duplicated', () => {
 describe('a settled review still owes its intake deletion', () => {
   it('answers a further resolution with silence but still deletes when told the intake is gone', () => {
     let settledReviews = 0;
+    let redeliveredResolutions = 0;
 
     assertProperty(
       fc.property(arbCommandSequence, arbBlindCommandStep, (plan, intruder) => {
@@ -315,6 +331,7 @@ describe('a settled review still owes its intake deletion', () => {
 
           const command = intruder(state);
           if (command.type === 'ResolveReview') {
+            redeliveredResolutions += 1;
             // The rejection is recorded; a redelivered resolution changes nothing.
             expect(decide(command, state)._unsafeUnwrap()).toEqual([]);
           }
@@ -326,6 +343,7 @@ describe('a settled review still owes its intake deletion', () => {
     );
 
     expect(settledReviews).toBeGreaterThan(0);
+    expect(redeliveredResolutions).toBeGreaterThan(0);
   });
 });
 
