@@ -306,7 +306,7 @@ describe('createDownloaderRuntime', () => {
 
       // No further feed polls fired after stop: the interval was cleared, so nothing reads the
       // feed (or saves checkpoints) against the now-closed handle.
-      expect(reads.length).toBe(readsAtStop);
+      expect(reads).toHaveLength(readsAtStop);
     } finally {
       vi.useRealTimers();
     }

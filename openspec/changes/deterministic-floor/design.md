@@ -65,9 +65,67 @@ fix) and retitles the change's release impact to `fix:`.
 
 ### D3 — Admission tally lives in this design doc
 
-Filled in during implementation, one line per rule with findings:
-`rule — admitted/rejected — count — reason`. This is the evidence the spec delta's
-"admitted, not accumulated" requirement points at.
+One line per rule with findings: `rule — admitted/rejected — count — reason`. This is the
+evidence the spec delta's "admitted, not accumulated" requirement points at.
+
+#### strict typed tiers — 537 findings, 17 rules with findings
+
+126 production, 411 test-tier. Notably **zero** `no-unsafe-*`: those already ship in
+`recommendedTypeChecked`, so the boundary-parsing exposure was already covered and the fallout is
+smaller and duller than the proposal assumed. 64 findings were autofixable; 4 rules rejected:
+
+| rule | count | reason |
+| --- | --- | --- |
+| `no-non-null-assertion` | 38 | 34 are indices already bounded by their own loop or a length guard. With `noUncheckedIndexedAccess` **and** 100% branch coverage both enforced, replacing one adds an unreachable branch that must then be waived with `v8 ignore` — trading a visible assertion for an invisible one. |
+| `no-empty-function` | 34 | An empty body is how `.map(() => {})` narrows `ResultAsync<T, E>` to `ResultAsync<void, E>`, and how a test double implements a port it does not exercise. 34/34 false. |
+| `no-invalid-void-type` | 31 | Every finding is `okAsync<void, E>()`, `errAsync<void, E>()` or `Promise.withResolvers<void>()`. `allowInGenericTypeArguments` covers type references, not call-site type arguments — no option separates them. 31/31 false. |
+| `no-unnecessary-condition` | 11 | TypeScript does not invalidate property narrowing across an `await`, so the wakeup-coalescing `pending` flag and the slskd watch `aborted` latch read as always-falsy. Obeying it would delete live conditions and break both. 6/11 false; the 5 true ones are pure clarity. |
+
+Two rules were tuned rather than disabled (`restrict-template-expressions` with `allowNumber` and
+every other allowance pinned explicitly; `no-confusing-void-expression` with `ignoreArrowShorthand`).
+
+#### sonarjs (`recommended`, 279 rules) — 130 findings, 18 rules with findings
+
+**Admitted: 1.**
+
+| rule | count | reason |
+| --- | --- | --- |
+| `prefer-specific-assertions` | 8 | ~0% FP, all 8 a keystroke to fix. `expect(x.length).toBe(n)` → `toHaveLength(n)`; the e2e site's `includes(…)).toBe(true)` → `toContain(…)` turns "expected false to be true" into a printed haystack, in the tier where reproducing a failure costs most. |
+
+**Rejected: 17.** No rule other than the above found a genuine defect; the four likeliest
+candidates were each traced to ground and are false.
+
+| rule | count | reason |
+| --- | --- | --- |
+| `void-use` | 39 | Every finding is `void expr` discarding a return inside a void-returning callback (`(l) => void lines.push(l)`) — the idiom that satisfies the signature, not fire-and-forget. |
+| `cognitive-complexity` | 15 | Charges +1 nesting per guard inside a switch arm, so it fires on every exhaustive decide/evolve/react decider — the pattern the codebase is built on. 2 arguable wins / 15 ≈ 87% FP. |
+| `no-clear-text-protocols` | 14 | Fake-hostname fixture URLs only (`http://slskd:1234`). The one production `http://` is a localhost default the rule already exempts. |
+| `no-unused-vars` | 13 | Pure duplicate of the configured `@typescript-eslint/no-unused-vars`, minus its `^_` exemption — it flags only the destructuring-rest omit idiom, whose binding cannot be removed. |
+| `no-os-command-from-path` | 9 | `git`/`jj` in release tooling, `ffmpeg`/`ffprobe` in the fixture recorder — dev-machine tools. The shipped bare-name spawns are pinned in the Docker image and were not flagged. |
+| `no-floating-point-equality` | 6 | Exact round-trip/passthrough assertions with zero arithmetic; a tolerance would weaken the very property under test ("preserves the value"). |
+| `super-linear-regex` | 4 | Quadratic in form, unreachable in fact: remote-sourced paths are slash-sanitized at the producer, so `/\/+$/` fails in O(1) at every start position. No attacker reach. |
+| `hardcoded-secret-signatures` | 4 | `createHmac` with in-file literal test secrets (`'unit-test-secret'`). An independent high-entropy sweep found zero real credentials in the repo. |
+| `no-nested-conditional` | 4 | Fires on the standard comparator idiom (`a < b ? -1 : a > b ? 1 : 0`) and short band ladders; no finding is harder to read than its "fixed" form. |
+| `concise-regex` | 3 | `[0-9]` ≡ `\d` here, and the flagged regex deliberately mirrors an upstream implementation verbatim so the changelog assembles identically. |
+| `no-redundant-optional` | 3 | The `\| undefined` marks intentionally-meaningful explicit `undefined` (matched by `in`-checks) and becomes mandatory under `exactOptionalPropertyTypes`. |
+| `no-fallthrough` | 2 | tsc's `noFallthroughCasesInSwitch` is already on and is type-aware; this rule is syntactic and flags exhaustive-union inner switches it cannot see are total. Adding `break`s would be dead code that also suppresses the tsc guard. |
+| `no-nested-template-literals` | 2 | One arguable readability nit in an error string; the other a one-level nest inside a replacer callback. |
+| `duplicates-in-character-class` | 1 | An intentional `\s` ∪ control-range union where neither member is removable without changing behaviour. |
+| `no-nested-assignment` | 1 | One parenthesised monotonic counter in a test-fixture factory. |
+| `publicly-writable-directories` | 1 | One `/tmp` string in a contract-test config bag, never written to. |
+| `no-skipped-tests` | 1 | Playwright's conditional `test.skip(cond, reason)` environment gate — the legitimate form, and the repo's only skip. |
+
+**Consequence for the config.** Only the admitted rule is enabled — not `recommended` with
+seventeen `'off'` lines. That is itself an admission-contract call, and the measurement is the
+argument: the full set cost **+15.7s (+63%)** on cold lint, the gate's longest lane, while the
+single admitted rule costs **+0.3s (+1.2%)**. A rule that is switched off still costs the time to
+decide it does not apply. Task 2.4 (drop the plugin on a zero-admission triage) therefore does not
+fire — one rule was admitted, so the dependency stays and earns its place.
+
+**Two follow-ups surfaced by the triage, independent of the lint decision:** `slskd/download.ts`
+`runWatch` is a genuinely long supervisor loop (complexity 28, nested try/catch/finally, six
+mutable locals), and the `walk` schema-differ is duplicated **verbatim** across both packages'
+`scripts/contracts/event-schemas.ts`.
 
 ### D4 — `quality-gates.md` is constitutional, not OpenSpec
 

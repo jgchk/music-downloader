@@ -42,6 +42,7 @@
     "eslint-config-prettier": "^10.0.0",
     "eslint-import-resolver-typescript": "^4.0.0",
     "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-svelte": "^3.22.0",
     "eslint-plugin-unicorn": "^72.0.0",
     "prettier": "^3.4.2",

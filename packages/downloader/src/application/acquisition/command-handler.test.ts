@@ -56,7 +56,7 @@ describe('applyCommand', () => {
       candidate: matchingCandidate('a').identity,
     });
     expect(result._unsafeUnwrap()).toEqual([]);
-    expect(d.store.all().length).toBe(before);
+    expect(d.store.all()).toHaveLength(before);
   });
 
   it('re-decides against the fresh stream when an append loses the optimistic-concurrency race', async () => {

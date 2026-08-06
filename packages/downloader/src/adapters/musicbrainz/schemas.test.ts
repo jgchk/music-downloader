@@ -64,7 +64,7 @@ describe('MusicBrainz contract schemas', () => {
       'artist-credit': [{ name: 'Artist' }],
     });
 
-    expect(parsed.length).toBe(200_000);
+    expect(parsed).toHaveLength(200_000);
   });
 
   it('rejects a recording whose length is not a number', () => {

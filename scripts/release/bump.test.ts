@@ -78,7 +78,7 @@ describe('hasReleasableCommits', () => {
  */
 describe('bumpLevel', () => {
   it('is null for a chore/docs-only range', () => {
-    expect(bumpLevel(['chore(deps): bump vitest', 'docs: tidy'])).toBe(null);
+    expect(bumpLevel(['chore(deps): bump vitest', 'docs: tidy'])).toBeNull();
   });
 
   it('is patch for a fix', () => {
@@ -113,7 +113,7 @@ describe('bumpLevel', () => {
   });
 
   it('is null for an empty range', () => {
-    expect(bumpLevel([])).toBe(null);
+    expect(bumpLevel([])).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import svelte from 'eslint-plugin-svelte';
 import unicorn from 'eslint-plugin-unicorn';
 import neverthrow from '@ninoseki/eslint-plugin-neverthrow';
 import prettier from 'eslint-config-prettier';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 const modulePackages = ['downloader', 'importer'];
 
@@ -277,11 +278,30 @@ export default tseslint.config(
     plugins: {
       import: importPlugin,
       neverthrow,
+      sonarjs,
     },
     settings: importSettings,
     rules: {
       'import/no-restricted-paths': restrictedPathsRule,
       '@typescript-eslint/consistent-type-imports': 'error',
+      // The one rule admitted from eslint-plugin-sonarjs. The `recommended` set (279 rules) was run
+      // repo-wide once and triaged rule-by-rule: 18 rules had findings, 130 in total, and exactly
+      // one cleared the admission bar (docs/development/quality-gates.md). The tally, with a reason
+      // per rejected rule, is in openspec/changes/deterministic-floor/design.md D3.
+      //
+      // Enabling the one admitted rule rather than `recommended`-minus-seventeen is itself an
+      // admission-contract call, and the measurement is the argument: the full set cost +15.7s
+      // (+63%) on cold lint — the gate's longest lane — while this single rule costs +0.3s (+1.2%).
+      // A rule that is switched off still costs the time to decide it does not apply. This block is
+      // also why the plugin survives at all; task 2.4 drops the dependency on a zero-admission run.
+      //
+      // It lives in the PRODUCTION profile rather than the test-code block even though only test
+      // code can trip it (it rewrites `expect(x.length).toBe(n)` into `toHaveLength(n)` and
+      // `includes(…)).toBe(true)` into `toContain(…)`). Scoping it to the test globs would make it
+      // the first rule test code has that production lacks, inverting this config's one-way
+      // invariant — tiers run the production profile MINUS named carve-outs — and the rule-profile
+      // suite fails on exactly that. Repo-wide it simply never matches outside a test.
+      'sonarjs/prefer-specific-assertions': 'error',
       // ── strict-tier carve-outs (deterministic-floor) ──────────────────────────────────────────
       // Three rules from `strictTypeChecked` are rejected under the admission contract
       // (docs/development/quality-gates.md): each one's findings on THIS repo were reviewed

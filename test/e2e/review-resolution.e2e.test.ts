@@ -272,7 +272,7 @@ describe('review-resolution revival loop (reject-unusable-delivery over HTTP, cr
       expect(await enqueueCount('peer1')).toBe(1);
       expect(await enqueueCount('peer2')).toBe(1);
       const settledQueueHtml = await reviewQueueHtml();
-      expect(settledQueueHtml.includes('data-testid="empty"')).toBe(true);
+      expect(settledQueueHtml).toContain('data-testid="empty"');
       expect(existsSync(LIBRARY_DIR)).toBe(true);
       expect(existsSync(DEPOSIT_RELEASE_DIR)).toBe(true); // the re-deposited second delivery
 
