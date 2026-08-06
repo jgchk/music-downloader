@@ -524,6 +524,20 @@ describe('CatchUpSubscription', () => {
     });
   });
 
+  it('reports a rejecting checkpoint store as a modeled failure, not a rejection', async () => {
+    // The store port is declared to answer with a Result. An adapter that rejects instead is a
+    // defect, but it must still reach the operator through the reset's declared error channel.
+    const rejectingCheckpoints = {
+      load: (name: string) => checkpoints.load(name),
+      save: () => ResultAsync.fromSafePromise<void, never>(Promise.reject(new Error('store gone'))),
+    };
+    const sub = subscription({ checkpoints: rejectingCheckpoints });
+
+    const outcome = await sub.reset(0);
+
+    expect(outcome._unsafeUnwrapErr()).toMatchObject({ operation: 'checkpoint.reset' });
+  });
+
   it('stop detaches the wakeup listener and the fallback interval', async () => {
     const sub = subscription();
     await sub.start();
