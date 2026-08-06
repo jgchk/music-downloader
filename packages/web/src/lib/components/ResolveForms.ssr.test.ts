@@ -3,18 +3,20 @@ import { describe, expect, it } from 'vitest';
 import ResolveForms from './ResolveForms.svelte';
 
 const ALL_ON = {
-  supplyId: true,
-  refresh: true,
-  importAsIs: true,
-  reject: true,
-  rejectUnusable: true,
-  accept: true,
-  retryEnrichment: true,
+  actions: new Set([
+    'supply-id',
+    'refresh-candidates',
+    'import-as-is',
+    'reject',
+    'reject-unusable-delivery',
+    'accept',
+    'retry-enrichment',
+  ]),
 };
 
 describe('ResolveForms (SSR)', () => {
   it('renders nothing when no verb is enabled', () => {
-    const { body } = render(ResolveForms, { props: {} });
+    const { body } = render(ResolveForms, { props: { actions: new Set<string>() } });
     for (const id of [
       'supply-id',
       'refresh',
@@ -70,7 +72,7 @@ describe('ResolveForms (SSR)', () => {
   });
 
   it('opens the release-ID form behind an ellipsis summary and never names the matcher', () => {
-    const { body } = render(ResolveForms, { props: { supplyId: true } });
+    const { body } = render(ResolveForms, { props: { actions: new Set(['supply-id']) } });
     expect(body).toContain('Supply a release ID…');
     expect(body).toContain('Search with this release ID');
     expect(body).toContain('from any connected source');
