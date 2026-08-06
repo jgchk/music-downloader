@@ -15,22 +15,27 @@ const modulePackages = ['downloader', 'importer'];
  * Every test-code carve-out below is scoped to this list and nothing else. For test code proper
  * the divergence from production is five named rules: `@typescript-eslint/unbound-method`,
  * `unicorn/name-replacements`, `neverthrow/must-use-result`,
- * `unicorn/no-top-level-assignment-in-function`, and `unicorn/consistent-function-scoping` (the
- * last two shared with other file sets). It is NOT the same five everywhere these globs reach:
- * the CLI entrypoints below live inside each package's own `test` tree, so they are swept in here
- * and then re-armed — for them `neverthrow/must-use-result` is back to `error` and
- * `unicorn/no-process-exit` is additionally off. (Glob literals are spelled out in the line
- * comments below, never here: a block comment cannot contain a star followed by a slash without
- * closing itself, which is how this paragraph once silently truncated the whole config.)
- * A carve-out that names its own glob instead of this constant is the drift
- * this comment exists to prevent. The production profile is otherwise identical, per
- * module-architecture ("Test tiers SHALL run the production rule profile except for short, named,
- * documented carve-outs").
+ * `unicorn/no-top-level-assignment-in-function` (shared with the Svelte file set), and
+ * `unicorn/consistent-function-scoping`.
  *
- * Both sets are derived from the resolved config and compared against these names in
+ * It is NOT that same five everywhere these globs reach, and the CLI entrypoints below split two
+ * ways. The ones living inside a package's own `test` tree (the contract recorders and drift
+ * checkers) ARE swept in here and then re-armed, so for them `neverthrow/must-use-result` is back
+ * to `error` and `unicorn/no-process-exit` is additionally off — a different five. The schema
+ * generators under each package's `scripts` tree are matched by no glob in this constant at all,
+ * so nothing is re-armed for them and they diverge from production by `unicorn/no-process-exit`
+ * alone. (Glob literals are spelled out in the line comments below, never here: a block comment
+ * cannot contain a star followed by a slash without closing itself, which is how this paragraph
+ * once silently truncated the whole config.)
+ *
+ * A carve-out that names its own glob instead of this constant is the drift this comment exists to
+ * prevent. The production profile is otherwise identical, per module-architecture ("Test tiers
+ * SHALL run the production rule profile except for short, named, documented carve-outs").
+ *
+ * All three sets are derived from the resolved config and compared against these names in
  * `test/boundaries/rule-profile.test.ts` — an enumeration nothing checks is a claim, and this one
- * was wrong in both directions before that suite existed (it counted a rule production never
- * enabled, and it described the CLI entrypoints as diverging by the same set).
+ * has been wrong twice: it once counted a rule production never enabled, and it once described
+ * every CLI entrypoint as diverging by the same set.
  */
 const testFiles = [
   '**/*.test.ts',
@@ -43,9 +48,10 @@ const testFiles = [
  * The repo's actual command-line programs: the event-schema generators behind
  * `pnpm contracts:events`, and the contract recorders/drift checkers run as `tsx <file>`.
  *
- * `scripts/**` is deliberately NOT here. The release tier has zero `process.exit` calls — it uses
- * the better `process.exitCode` idiom, which the rule does not flag — so listing it would have
- * disabled the rule over ~14 files (six of them unit suites) that never needed it.
+ * The root `scripts` tree is deliberately NOT here. The release tier has zero `process.exit` calls
+ * — it uses the better `process.exitCode` idiom, which the rule does not flag — so listing it would
+ * have disabled the rule across that whole tree, unit suites included, to no purpose. (No file
+ * count is quoted: it moves with every script added and nothing checks it.)
  */
 const cliEntrypoints = [
   'packages/*/scripts/**/*.ts',
@@ -285,10 +291,13 @@ export default tseslint.config(
       //
       // The rule's MESSAGE names three ways to handle one ("match, unwrapOr or _unsafeUnwrap") and
       // that message is not the whole story — read the acceptance set, not the message. A Result is
-      // accepted, i.e. NOT reported, in any of these six positions:
+      // accepted, i.e. NOT reported, in any of these seven positions:
       //   1. a handled method is called on it — match, unwrapOr, _unsafeUnwrap — possibly after a
       //      chain of member accesses;
-      //   2. it is assigned to a variable and every reference to that variable is itself accepted;
+      //   2. it is assigned to a variable and AT LEAST ONE reference to that variable is itself
+      //      accepted. Not "every": the check is a `.some(…)`, so a single `if (r.isOk())` licenses
+      //      every other bare hand-off of `r` in the same scope. This is the direction that bites —
+      //      the rule is LOOSER here than it reads;
       //   3. `isOk()`/`isErr()` is called on such a reference (checked, not handled);
       //   4. it is `yield*`-delegated inside a `safeTry` callback;
       //   5. it is returned — INCLUDING the implicit return of a concise-body arrow;
@@ -296,6 +305,10 @@ export default tseslint.config(
       //      Result-like. That is the `Result.combine([a, b])` / `ResultAsync.combine([…])` shape,
       //      and it is accepted. (This comment previously claimed combine arguments still flag.
       //      They do not — the rule has a dedicated acceptance path for them.)
+      //   7. its parent node is TypeScript syntax. The rule bails on any parent whose AST type
+      //      starts with `TS`, so `f() as Whatever`, `f()!`, and `f() satisfies …` are all silently
+      //      accepted. A cast or a non-null assertion therefore DISARMS this rule on that
+      //      expression — worth knowing before "fixing" a report with one.
       // What still flags is a Result handed to another function in any OTHER argument position, so
       // a deliberate hand-off must make its consumption structural at the call site (see the
       // best-effort ledger thunks for the shape that works).
@@ -316,9 +329,12 @@ export default tseslint.config(
       //     concise-body arrow "returns" the Result to a caller that discards it. That position is
       //     exactly where the defects this change fixed lived, so review it by hand.
       // (d) `.svelte` files are NOT covered at all. This block is `files: ['**/*.ts']`, and the
-      //     component block below cannot host the rule: it is deliberately not type-aware (svelte
-      //     -check does that job), while `must-use-result` needs the type checker to recognise a
-      //     Result at all. So a `<script lang="ts">` that discards one is invisible to lint. The
+      //     component block below does not host the rule: that block is deliberately not type-aware
+      //     (svelte-check does that job), while `must-use-result` needs the type checker to
+      //     recognise a Result at all. Not a hard limit — svelte-eslint-parser does support
+      //     `projectService` with `extraFileExtensions` — a standing policy choice, so reversing it
+      //     is a decision, not a discovery. So a `<script lang="ts">` that discards one is
+      //     invisible to lint. The
       //     exposure is small by construction — components consume facades through `locals` and
       //     hold no business rules (design D8) — but it is a hole, not a covered case.
       // The plugin is a small maintained fork (the original died in 2021) pinned exactly; its rule
@@ -380,9 +396,10 @@ export default tseslint.config(
   },
   {
     // Svelte components: the plugin's recommended set with TypeScript script blocks. Not
-    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step. The
-    // cost is that every type-aware rule is absent here, `neverthrow/must-use-result` included:
-    // a `<script lang="ts">` that discards a Result is invisible to lint (blind spot (d) above).
+    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step. That is a
+    // policy choice, not a parser limit, and its cost is that every type-aware rule is absent here,
+    // `neverthrow/must-use-result` included: a `<script lang="ts">` that discards a Result is
+    // invisible to lint (blind spot (d) above).
     files: ['**/*.svelte'],
     extends: [...svelte.configs['flat/recommended']],
     languageOptions: {

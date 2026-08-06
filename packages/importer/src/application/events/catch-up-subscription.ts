@@ -165,8 +165,8 @@ export class CatchUpSubscription {
   /**
    * Detach the wakeup listener and the fallback timer, then wait for any in-flight drain to stop
    * touching the store. Detaching alone only cancels the NEXT cycle: the caller closes the
-   * event-store handle the moment this resolves, so a cycle still draining would go on reading
-   * the feed and saving checkpoints against a closed database — the very error loop the detach
+   * event-store handle immediately after this resolves, so a cycle still draining would go on
+   * reading the feed and saving checkpoints against a closed database — the very error loop the detach
    * exists to prevent, one cycle later. `inflight` is the settled barrier, so it never rejects.
    */
   async stop(): Promise<void> {
@@ -256,7 +256,7 @@ export class CatchUpSubscription {
         if (batch.error.kind === 'RenderError') {
           // A permanent payload-rendering defect at the producer (a mapping bug, or an event that
           // cannot satisfy its schema): retrying can never resolve it, so a plain hold would block
-          // this position — and every verdict behind it — forever while readiness still read `up`.
+          // this position — and every event behind it — forever while readiness still read `up`.
           // Halt loudly: the checkpoint is held (never skipped) and readiness reports `down`,
           // surfacing it for the code fix a render defect actually needs. (Precise per-event
           // dead-lettering for a `park` consumer would need the feed to carry the failing global

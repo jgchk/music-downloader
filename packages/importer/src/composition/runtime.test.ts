@@ -53,6 +53,9 @@ function fakeTagger(): TaggerPort {
   };
 }
 
+/** The position the gated feed reports having scanned - the save the shutdown races. */
+const SCANNED_TO = 7;
+
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups) await cleanup();
@@ -322,6 +325,59 @@ describe('createImporterRuntime', () => {
 
     // The directory never appears: the checkpoint holds and no import is created.
     expect(runtime.facade.listImports().imports).toHaveLength(0);
+  });
+
+  it('lets an in-flight acquisition drain finish before it closes the store', async () => {
+    // Stopping the subscription clears its poll interval, which only cancels the NEXT cycle. This
+    // is the one already draining: stop() must not close the database out from under it, or its
+    // checkpoint save lands on a closed handle, is swallowed as a modeled failure, and everything
+    // that cycle consumed is redelivered on the next boot. Only a durable read after the runtime
+    // is down can show which happened, so the checkpoint is read back from the file.
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+
+    const result = await createImporterRuntime(config({ databaseFile: file }), silentLogger(), {
+      tagger: fakeTagger(),
+      intake: { deleteRelease: () => okAsync<void>(undefined) },
+    });
+    const runtime = result._unsafeUnwrap();
+
+    // A batch that carries no event still advances the checkpoint past everything it scanned, so
+    // this isolates the store write the shutdown races — no delivery, no handler, just the save.
+    // The feed parks its first read, so a cycle is provably mid-drain when stop() is called.
+    const gate = Promise.withResolvers<void>();
+    let isFirstRead = true;
+    const feed: SeamFeed = {
+      read: async () => {
+        if (isFirstRead) {
+          isFirstRead = false;
+          await gate.promise;
+        }
+        return ok({ events: [], scannedTo: SCANNED_TO });
+      },
+    };
+    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+    const draining = subscription.start();
+    // Let start() get past its checkpoint load and into the gated read before stopping: the
+    // barrier stop() waits on is the in-flight cycle, and until the cycle exists there is nothing
+    // to wait for. (In production the composition root awaits start() before wiring shutdown.)
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const stopping = runtime.stop();
+    gate.resolve();
+    await stopping;
+    await draining;
+
+    // Reopened after the runtime is down: the durable checkpoint records the drained position,
+    // which is only possible if the save happened while the handle was still open.
+    const reopened = openEventDatabase(file);
+    cleanups.push(() => {
+      reopened.close();
+    });
+    const checkpoint = await new SqliteCheckpointStore(reopened).load('seam:acquisitions');
+
+    expect(checkpoint._unsafeUnwrap()).toBe(SCANNED_TO);
   });
 
   it('constructs the real bridge when no tagger override is given, surfacing its failure as a value', async () => {
