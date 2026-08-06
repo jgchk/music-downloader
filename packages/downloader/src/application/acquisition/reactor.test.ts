@@ -145,6 +145,47 @@ describe('Reactor.start', () => {
     expect(bus.subscriberCount()).toBe(1);
   });
 
+  it('holds the whole drain at a faulted event — a later healthy event is not reached', async () => {
+    // The hold is ordered, not per-stream: when event N cannot be processed or parked durably,
+    // the drain stops at N for the next wakeup to retry — it must never skip ahead, or the
+    // cursor moves past the fault and N is orphaned under at-least-once. Every earlier hold
+    // test ended its backlog AT the faulted event, so a skip-ahead regression (return →
+    // continue) passed the whole suite (S3 review sweep). The fault is per-stream so the later
+    // event stays genuinely processable — reaching it is the bug. The drain is woken over the
+    // bus AFTER an empty start: start()'s own re-drive pass would legitimately dispatch both
+    // streams' pending effects and mask the ordering.
+    class StreamReadFaultingStore extends FakeEventStore {
+      override readStream(streamId: string): ReturnType<FakeEventStore['readStream']> {
+        return streamId === 'acq-1'
+          ? errAsync(infraError('readStream', 'acq-1 fold read fault'))
+          : super.readStream(streamId);
+      }
+    }
+    store = new StreamReadFaultingStore();
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'error',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const ports = stubPorts();
+    await reactor(ports, { logger }).start(); // empty store: no drain work, no re-drive work
+
+    await seed(requestedHistory(), 'acq-1'); // seq 1: its process faults and must hold the drain
+    await seed(requestedHistory(), 'acq-2'); // seq 2: healthy — reachable only by skipping ahead
+    bus.publish(store.all());
+    await vi.waitFor(() => {
+      expect(lines.join('')).toContain('reactor stream read failed');
+    });
+    // Let the drain chain fully settle: under the skip-ahead bug, acq-2's dispatch and its
+    // checkpoint advance happen in the awaits after the logged fault.
+    for (let index = 0; index < 20; index += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    expect(ports.metadata.resolve).not.toHaveBeenCalled(); // acq-2's effect never dispatched
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined(); // nothing advanced past the fault
+  });
+
   it('re-drives an already-checkpointed in-flight download after a restart', async () => {
     // Resumption is required: the ensure-start re-fires idempotently and the ADAPTER reconciles
     // against the source's live transfers instead of enqueueing twice (reactor-durability D3).
