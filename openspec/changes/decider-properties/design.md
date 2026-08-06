@@ -57,6 +57,24 @@ stay inside the seconds-order `pnpm check` budget — if a suite breaches it, `n
 drops locally and a CI-only env bump (`FC_NUM_RUNS`) raises it there. Seed pinned in CI
 (fixed constant in config) so CI never flakes; local runs may unpin for exploration.
 
+**Measured at adoption (task 1.2 / 5.1).** The harness is one module per package,
+`packages/<pkg>/src/__fixtures__/property.ts`, exporting `propertyRun` (the pinned seed
+`20260806`, `numRuns` 100, `includeErrorInReport`) plus `assertProperty` /
+`assertAsyncProperty`. It is duplicated across the two packages rather than shared: the
+contexts never import each other, so a shared copy would be a shared kernel. `FC_SEED` and
+`FC_NUM_RUNS` override the pinned corpus for local exploration; anything that is not a
+positive integer is ignored, so the gate cannot be weakened by a stray value.
+
+Cost: **+72 tests, +~0.9s of aggregated vitest execution** across the two context projects
+(7.9s → 8.8s of `tests` time; wall-clock for `pnpm test` over both projects 3.77s → 3.84s,
+since the property files run in parallel with everything else). **`pnpm check` wall-clock
+is unchanged at ~12.5s**: its critical lane is `web` (~12.4s), not `test` (~10.5s), so the
+property tier does not sit on the critical path at all. No `numRuns` reduction was needed.
+
+Placement detail: `__fixtures__/` is already excluded from `tsconfig.build.json` and from
+the root coverage config, so generators, runners and the harness stay out of the build and
+out of the coverage denominator with no new configuration and no waivers (D4).
+
 ### D4 — Coverage interaction
 
 Generators and property helpers are test code and outside the 100% production-coverage
@@ -80,7 +98,22 @@ conflict-behavior test suite — the model run generalizes it.
 - **Generator drift** (arbitraries not covering new commands/events): closed unions +
   exhaustiveness checks make an unhandled variant a compile error inside the arbitrary
   builders where feasible; otherwise a completeness property (every schema variant is
-  generable) pins it.
+  generable) pins it. *Implemented as both:* a `Record<…Type, Arbitrary<…>>` per union (the
+  key set is checked by the compiler) plus a completeness property asserting each key's
+  generator really produces that key's variant.
+- **A vacuously-true property** — the failure mode a property tier is uniquely prone to: a
+  generator constrained until the assertion is never reached, or never reached on an
+  interesting state. Three defences, all mechanized: (a) the suites assert they visited
+  every phase and issued every command across the pinned corpus; (b) properties whose
+  assertion is conditional count the times they reached it and fail if that count is zero;
+  (c) adoption was validated by a **falsification sweep** — 36 deliberate defects seeded
+  one at a time into `decide`, `evolve`, `react`, the upcasters and the store, each
+  required to fail at least one property. Four early properties passed against a defect
+  and were rewritten as a result (two were literally vacuous, comparing a value with
+  itself); two store generators had to be reshaped before the empty-append and paged-read
+  cases were exercised at all. One seeded defect proved an *equivalent* mutant (registering
+  an upcaster at an unreachable version is a no-op under the registry's non-contiguous
+  chain) and was replaced rather than counted.
 - **Wall-clock creep**: budget in D3, measured at adoption, recorded here.
 - **A property failure can be cryptic** — mitigation: each property's assertion message
   names the violated invariant in constitution language, and the seed/path repro line is
@@ -92,8 +125,37 @@ Pure addition to the test tiers; no runtime surface, no migration. If a property
 real defect during adoption, the fix ships red-first inside this change as `fix:` with
 whatever spec delta the defect implies.
 
+### D6 — First target aggregate: downloader Acquisition (decided at implementation)
+
+The sequencing note said the mutation gate's survivor data would pick the first aggregate.
+**That data was unavailable**: `mutation-gate` has not been implemented, let alone run, so
+the choice was made by reading the two deciders instead. It is recorded here so a later
+mutation baseline can argue with it on evidence.
+
+**Acquisition went first.** It is the richer target on every axis that matters to a
+property suite:
+
+| | Acquisition (downloader) | Import (importer) |
+| --- | --- | --- |
+| Phases | 13 | 7 |
+| Event variants | 20 | 9 |
+| Command variants | 16 | 7 |
+
+More decisive than the counts: Acquisition carries more invariants *types cannot express*
+— terminal absorption with exactly one defeasible edge (the external-verdict revival), the
+`CancelledStaging` sub-union, the retry-budget bounds that are the termination guarantee,
+and the never-re-offer relation between the working set and the rejected set. Those are
+what a property suite exists to state; the simpler aggregate would have taught the harness
+less. Import followed (task 3.1) and contributed its own distinct properties — the seam
+watermark, the delivery-never-dropped guarantee, and the settled-but-owed review — which is
+the evidence that "second" did not mean "mechanical repeat".
+
+**Caveat for a later reader.** This ordering optimizes for invariant richness, which is a
+proxy. Once `mutation-gate` produces survivor data it may show the weakest branches sit
+elsewhere; if so, the right response is to *deepen* the generators where survivors cluster,
+not to redo this ordering.
+
 ## Open Questions
 
-- None blocking. Which aggregate goes first (downloader Acquisition vs importer Import) is
-  decided at implementation by the mutation gate's survivor data, per the proposal's
-  sequencing rationale.
+- None blocking. The first-aggregate question is settled in D6 (Acquisition), on
+  code-shape reasoning rather than the mutation-survivor data the sequencing note assumed.
