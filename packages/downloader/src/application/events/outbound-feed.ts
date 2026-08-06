@@ -13,7 +13,16 @@ import type { PublishedEventMapping, RenderError } from '../ports/published-even
  * checkpoint holds. The producer does not know its consumers.
  */
 
-/** One published event on the feed, identified by its gapless global position. */
+/**
+ * One published event on the feed, identified by its gapless global position. The position is
+ * the event's durable identity for the store's lifetime — stable across redeliveries and
+ * restarts (it is the append-ordered store sequence, never renumbered) — so consumers may
+ * persist it and compare later deliveries against it. Rebuilding this store into a fresh
+ * database would renumber positions and break any such persisted comparison — asymmetrically:
+ * renumbering UP fails loud (duplicate cycles), renumbering DOWN fails silent (every future
+ * delivery converges against a stale-high watermark). That is a migration event, not an
+ * operation.
+ */
 export interface OutboundFeedEvent {
   readonly globalSeq: number;
   readonly type: string;

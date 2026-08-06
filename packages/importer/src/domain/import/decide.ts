@@ -19,7 +19,14 @@ export type DomainError =
   | { readonly kind: 'InvalidResolution'; readonly detail: string }
   | { readonly kind: 'UnknownCandidate'; readonly candidate: string }
   /** reject-unusable-delivery needs a retained delivered candidate; this import has none. */
-  | { readonly kind: 'NoRetainedCandidate' };
+  | { readonly kind: 'NoRetainedCandidate' }
+  /**
+   * A NEW seam delivery (position past the stream watermark) arrived while a cycle is still in
+   * flight. Converging would acknowledge — and permanently drop — the delivery, so the caller
+   * must hold and retry once the cycle settles (the seam consumer maps this to its transient
+   * hold). Distinct from a stale redelivery, which converges silently.
+   */
+  | { readonly kind: 'CycleInFlight' };
 
 type Decision = Result<readonly ImportEvent[], DomainError>;
 
@@ -151,9 +158,30 @@ function decideResolution(state: ImportState, resolution: Resolution): Decision 
 export function decide(command: ImportCommand, state: ImportState): Decision {
   switch (command.type) {
     case 'SubmitImport': {
-      // Idempotent by stream: a live import converges on itself; a settled terminal starts a
-      // fresh cycle for the re-deposited directory.
-      if (state.phase !== 'empty' && !isTerminal(state)) return NOTHING;
+      // Idempotent by stream, with the seam watermark (the max feed position any cycle ever
+      // recorded) deciding what counts as new. On a LIVE cycle: an unsourced or stale-position
+      // submission converges on the cycle itself, but a NEW delivery (past the watermark, or
+      // sourced onto a stream with no watermark) must not be swallowed — the cycle in flight
+      // will settle, and only a refusal lets the caller hold and land it afterwards. On a
+      // settled terminal: a stale-position submission converges (a full feed replay is a
+      // no-op; no caller — a second consumer, a redrive — can duplicate a cycle for a delivery
+      // the stream has already seen), anything else starts a fresh cycle for the re-deposited
+      // directory. The watermarked guarantees cover watermarked streams only: pre-watermark
+      // history has nothing to compare, so a sourced resubmission onto a pre-watermark
+      // terminal starts a fresh cycle — the shipped consumer's converge-first ordering is
+      // what protects that legacy population.
+      const incoming = command.source?.feedPosition;
+      if (state.phase !== 'empty' && !isTerminal(state)) {
+        const watermark = state.seamWatermark;
+        if (incoming !== undefined && (watermark === undefined || incoming > watermark)) {
+          return err({ kind: 'CycleInFlight' });
+        }
+        return NOTHING;
+      }
+      const watermark = state.phase === 'empty' ? undefined : state.seamWatermark;
+      if (watermark !== undefined && incoming !== undefined && incoming <= watermark) {
+        return NOTHING;
+      }
       return ok([
         {
           type: 'ImportRequested',

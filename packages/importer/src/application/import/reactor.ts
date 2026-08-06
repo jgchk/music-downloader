@@ -19,13 +19,20 @@ import type { CommandError } from './command-handler.js';
  * the checkpoint unadvanced — or a domain rejection (a stale/illegal outcome the stream has already
  * settled), which retrying can never resolve. Only the former is retryable.
  */
-function isRetryable(error: CommandError): boolean {
+/** Exported for its exhaustiveness pin: the union must stay fully classified. */
+export function isRetryable(error: CommandError): boolean {
   // Exhaustive over the closed `CommandError` union (no `default`) so a future error variant is a
   // compile-time decision here, not a silent collapse to `false` that would drop a retryable fault.
   switch (error.kind) {
     case 'InfraError':
     case 'ConcurrencyConflict': {
       // A transient infrastructure fault or an optimistic-concurrency race: retrying can resolve it.
+      return true;
+    }
+    case 'CycleInFlight': {
+      // A live cycle refuses a new delivery until it settles; retrying is exactly the contract
+      // (the reactor never submits imports, so this arm is unreachable from effects — kept for
+      // the exhaustive match over the command-error union).
       return true;
     }
     case 'UnknownImport':

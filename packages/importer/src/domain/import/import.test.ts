@@ -75,6 +75,65 @@ describe('submission', () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: 'ImportRequested' });
   });
+
+  it('converges a resubmission at or before the stream watermark, even on a settled terminal', () => {
+    // The seam's redelivery guarantee lives in the domain: no caller — a consumer, a redrive —
+    // can duplicate a cycle for a delivery this stream already imported.
+    const history = [requested({ source: { ...SOURCE, feedPosition: 7 } }), REJECTED];
+    const stale = { ...SUBMIT, source: { ...SOURCE, feedPosition: 7 } };
+    expect(given(history).execute(stale)._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('converges a strictly earlier position too — a full feed replay is a no-op', () => {
+    const history = [requested({ source: { ...SOURCE, feedPosition: 7 } }), REJECTED];
+    const replayed = { ...SUBMIT, source: { ...SOURCE, feedPosition: 3 } };
+    expect(given(history).execute(replayed)._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('starts a fresh cycle for a later-position delivery on a settled terminal', () => {
+    const history = [requested({ source: { ...SOURCE, feedPosition: 7 } }), REJECTED];
+    const newer = { ...SUBMIT, source: { ...SOURCE, feedPosition: 9 } };
+    const events = given(history).execute(newer)._unsafeUnwrap();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: 'ImportRequested', source: { feedPosition: 9 } });
+  });
+
+  it('the watermark survives a manual resubmission — a later replacement still lands', () => {
+    // A manual cycle carries no source; if it erased the watermark, every later delivery for
+    // the acquisition would read as pre-watermark and converge — the drop this fix removes.
+    const manualCycle = [
+      requested({ source: { ...SOURCE, feedPosition: 5 } }),
+      REJECTED,
+      { type: 'ImportRequested', directory: DIRECTORY, policy: POLICY } as const,
+      REJECTED,
+    ];
+    const stale = { ...SUBMIT, source: { ...SOURCE, feedPosition: 5 } };
+    expect(given(manualCycle).execute(stale)._unsafeUnwrap()).toEqual([]);
+    const newer = { ...SUBMIT, source: { ...SOURCE, feedPosition: 6 } };
+    const landed = given(manualCycle).execute(newer)._unsafeUnwrap();
+    expect(landed).toHaveLength(1);
+    expect(landed[0]).toMatchObject({ type: 'ImportRequested', source: { feedPosition: 6 } });
+  });
+
+  it('refuses a NEW delivery while a cycle is in flight — the caller holds, nothing is dropped', () => {
+    const live = [requested({ source: { ...SOURCE, feedPosition: 5 } })];
+    const newer = { ...SUBMIT, source: { ...SOURCE, feedPosition: 8 } };
+    expect(given(live).execute(newer)._unsafeUnwrapErr()).toEqual({ kind: 'CycleInFlight' });
+  });
+
+  it('refuses a sourced delivery on a live watermark-less cycle — settling decides its fate', () => {
+    const live = [requested()];
+    const sourced = { ...SUBMIT, source: { ...SOURCE, feedPosition: 8 } };
+    expect(given(live).execute(sourced)._unsafeUnwrapErr()).toEqual({ kind: 'CycleInFlight' });
+  });
+
+  it('still converges a stale-position submission on a live cycle', () => {
+    const live = [requested({ source: { ...SOURCE, feedPosition: 5 } })];
+    const stale = { ...SUBMIT, source: { ...SOURCE, feedPosition: 5 } };
+    expect(given(live).execute(stale)._unsafeUnwrap()).toEqual([]);
+    const earlier = { ...SUBMIT, source: { ...SOURCE, feedPosition: 3 } };
+    expect(given(live).execute(earlier)._unsafeUnwrap()).toEqual([]);
+  });
 });
 
 describe('recording a proposal', () => {

@@ -100,6 +100,12 @@ export interface ImportSnapshot {
   readonly location?: string;
   readonly openReview?: OpenReview;
   readonly rejection?: { readonly reason: string; readonly filesDeleted: boolean };
+  /**
+   * The STREAM's seam convergence watermark: the highest delivery feed position any cycle ever
+   * recorded (a max across cycles, so a manual resubmission cannot erase it). The intake seam
+   * consumer converges anything at or before it.
+   */
+  readonly seamWatermark?: number;
 }
 
 function openReviewOf(state: ImportState): OpenReview | undefined {
@@ -164,6 +170,7 @@ export class Import {
         state.phase === 'rejected'
           ? { reason: state.reason, filesDeleted: state.filesDeleted }
           : undefined,
+      seamWatermark: state.phase === 'empty' ? undefined : state.seamWatermark,
     };
   }
 }

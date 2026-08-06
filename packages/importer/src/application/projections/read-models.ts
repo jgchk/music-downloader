@@ -62,6 +62,13 @@ export interface ImportStatusView {
   readonly openReview?: OpenReview;
   readonly rejection?: { readonly reason: string; readonly filesDeleted: boolean };
   /**
+   * The stream's seam convergence watermark — the highest delivery feed position any cycle ever
+   * recorded (absent for purely-manual streams and pre-watermark history; a max across cycles,
+   * so a manual resubmission cannot erase it). The intake seam consumer converges any event at
+   * or before it; only a later position is a new delivery.
+   */
+  readonly seamWatermark?: number;
+  /**
    * Whether the import has settled — the domain's own terminality, decided here rather than left
    * for a consumer to re-derive from the phase enum (the decided-lifecycle-flags pattern the
    * downloader's `cancellable` established). A consumer paces liveness (e.g. page refresh) off
@@ -145,6 +152,7 @@ export function projectStatus(
     location: snapshot.location,
     openReview: snapshot.openReview,
     rejection: snapshot.rejection,
+    seamWatermark: snapshot.seamWatermark,
     settled: imported.isTerminal,
     history: stored.map((entry) => ({
       ...historyEntry(entry.event),

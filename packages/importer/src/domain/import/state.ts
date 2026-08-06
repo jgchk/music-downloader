@@ -34,6 +34,13 @@ interface Requested {
   readonly policy: ImportPolicy;
   /** Provenance of an event-driven submission, incl. the retained delivered candidate (if any). */
   readonly source?: ImportSource;
+  /**
+   * The STREAM's seam convergence watermark: the highest `ImportSource.feedPosition` any cycle
+   * of this stream ever recorded. Folded as a max across cycles — deliberately not the current
+   * cycle's own position — so a manual resubmission (which carries no source) cannot erase the
+   * watermark and reopen the stream to redeliveries of already-imported deliveries.
+   */
+  readonly seamWatermark?: number;
 }
 
 /** The remediation review riding on an applied import (D7). */
@@ -110,6 +117,7 @@ function requestedOf(state: Exclude<ImportState, EmptyState>): Requested {
     hints: state.hints,
     policy: state.policy,
     source: state.source,
+    seamWatermark: state.seamWatermark,
   };
 }
 
@@ -165,6 +173,16 @@ function evolveResolved(state: AwaitingReviewState, resolution: Resolution): Imp
   }
 }
 
+/** The stream watermark folds as a max across cycles; absent only when both sides are absent. */
+function maxWatermark(
+  previous: number | undefined,
+  incoming: number | undefined,
+): number | undefined {
+  if (previous === undefined) return incoming;
+  if (incoming === undefined) return previous;
+  return Math.max(previous, incoming);
+}
+
 export function evolve(state: ImportState, event: ImportEvent): ImportState {
   switch (event.type) {
     case 'ImportRequested': {
@@ -177,6 +195,10 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         hints: event.hints,
         policy: event.policy,
         source: event.source,
+        seamWatermark: maxWatermark(
+          state.phase === 'empty' ? undefined : state.seamWatermark,
+          event.source?.feedPosition,
+        ),
         candidates: [],
       };
     }

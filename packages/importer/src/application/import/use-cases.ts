@@ -9,7 +9,6 @@ import type {
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
 import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
-import type { AcquisitionId } from '../../domain/shared/acquisition-id.js';
 import type {
   ImportStatusProjection,
   ImportStatusView,
@@ -70,14 +69,6 @@ export function submitImport(
   }).map(() => ({ importId }));
 }
 
-/** The import an acquisition already submitted, if any — the intake consumer's convergence check. */
-export function findAcquisitionImport(
-  dependencies: UseCaseDependencies,
-  acquisitionId: AcquisitionId,
-): ImportId | undefined {
-  return dependencies.status.importIdForAcquisition(acquisitionId);
-}
-
 export function resolveReview(
   dependencies: UseCaseDependencies,
   importId: ImportId,
@@ -97,7 +88,8 @@ export function getImport(
 /**
  * The import that an acquisition was submitted as, if any — the read behind the web layer's
  * download-through-import timeline. Served from the same reverse index the intake consumer uses
- * (`importIdForAcquisition`), so it is an O(1) lookup, never a scan of all imports.
+ * (`importIdForAcquisition`): an O(1) index step, then a single-stream projection — never a
+ * scan of all imports.
  */
 export function getImportForAcquisition(
   dependencies: UseCaseDependencies,

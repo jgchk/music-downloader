@@ -15,7 +15,6 @@ import { ImportStatusProjection, StalledReadModel } from '../projections/read-mo
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import type { UseCaseDependencies } from './use-cases.js';
 import {
-  findAcquisitionImport,
   getImport,
   getImportForAcquisition,
   importIdFor,
@@ -95,8 +94,8 @@ describe('submitImport', () => {
       source: { acquisitionId: 'acq-1' },
     });
     d.status.rebuild(d.store.all());
-    expect(findAcquisitionImport(d, toAcquisitionId('acq-1'))).toBe(importIdFor(DIRECTORY));
-    expect(findAcquisitionImport(d, toAcquisitionId('acq-2'))).toBeUndefined();
+    expect(getImportForAcquisition(d, 'acq-1')?.importId).toBe(importIdFor(DIRECTORY));
+    expect(getImportForAcquisition(d, 'acq-2')).toBeUndefined();
   });
 });
 
