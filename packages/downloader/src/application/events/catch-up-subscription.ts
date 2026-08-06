@@ -1,3 +1,4 @@
+import { ResultAsync } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Logger } from '../logging/logger.js';
 import type { InfraError } from '../ports/errors.js';
@@ -74,6 +75,20 @@ export interface CatchUpSubscriptionDependencies {
   readonly interval?: (function_: () => void, ms: number) => () => void;
 }
 
+/**
+ * Mark a drain cycle as SETTLED for the reset barrier without adopting its outcome. A defect throw
+ * from the cycle stays the awaiting `poll` caller's to handle (it re-raises there); this copy exists
+ * only so a reset can tell when the drain has stopped touching the checkpoint, and swallowing the
+ * rejection *here* is what keeps the barrier from surfacing as an unhandled rejection of its own.
+ */
+const settled = async (cycle: Promise<void>): Promise<void> => {
+  try {
+    await cycle;
+  } catch {
+    // Deliberately not handled here — see above.
+  }
+};
+
 const defaultInterval = (function_: () => void, ms: number): (() => void) => {
   const handle = setInterval(function_, ms);
   return () => clearInterval(handle);
@@ -84,6 +99,8 @@ export class CatchUpSubscription {
   private halted = false;
   private running = false;
   private pending = false;
+  private resetting = false;
+  private inflight: Promise<void> | undefined;
   private stopWakeups: (() => void) | undefined;
   private stopInterval: (() => void) | undefined;
 
@@ -98,15 +115,24 @@ export class CatchUpSubscription {
   async start(): Promise<void> {
     const checkpoint = await this.dependencies.checkpoints.load(this.dependencies.name);
     if (checkpoint.isErr()) {
-      // Collapsing a faulted read into "fresh consumer at 0" would silently replay the whole feed;
-      // the operator must be able to tell a real fresh start apart from a checkpoint-store fault.
+      // The checkpoint is the only record of what this consumer has already seen, so a faulted
+      // read knows nothing — collapsing it into "fresh consumer at 0" would assert a durable fact
+      // and redeliver the producer's entire history while readiness still read `up`. Halt on the
+      // unknown position instead: nothing is delivered, the durable checkpoint is left untouched,
+      // and this module's readiness reports `down` (the same loud-but-contained signal a poison
+      // event raises) so an operator sees a degraded module rather than a silent full replay.
+      // Recovery is a restart once the store reads, or an explicit `reset` to a chosen position —
+      // never a guess. The wakeup and poll wiring below still registers, so a `reset` that lands
+      // on a recovered store resumes delivery without a restart.
+      this.halted = true;
       this.dependencies.logger.error(
         { subscription: this.dependencies.name, err: checkpoint.error },
-        'checkpoint load failed; resuming from the log start',
+        'checkpoint load failed; subscription halted without delivering (position unknown)',
       );
+    } else {
+      this.cursor = checkpoint.value;
     }
-    this.cursor = checkpoint.unwrapOr(0);
-    await this.poll();
+    await this.poll(); // a no-op while halted: the drain never runs on an unknown position
     this.stopWakeups = this.dependencies.wakeups?.subscribe(() => {
       this.schedulePoll();
     });
@@ -141,37 +167,59 @@ export class CatchUpSubscription {
    * checkpoint is the source of truth, so the save happens first and the in-memory cursor and halt
    * move only once it lands: an operator who is told the replay was armed must never be looking at
    * a subscription that will resume from the old position on the next restart.
+   *
+   * Serialized against the drain — an in-flight cycle is awaited out and no new one may start
+   * while the save is in flight. Unserialized, an `advance` landing just behind the save would
+   * leave the durable checkpoint ahead of `toGlobalSeq` while this call reported `Ok`, which is
+   * exactly the false "replay armed" the ordering above exists to prevent.
    */
-  async reset(toGlobalSeq = 0): Promise<Result<void, InfraError>> {
-    const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
-    if (saved.isErr()) {
-      this.dependencies.logger.error(
-        { subscription: this.dependencies.name, globalSeq: toGlobalSeq, err: saved.error },
-        'checkpoint reset failed; replay not armed',
-      );
+  reset(toGlobalSeq = 0): ResultAsync<void, InfraError> {
+    return new ResultAsync(this.resetWhenDrained(toGlobalSeq));
+  }
+
+  private async resetWhenDrained(toGlobalSeq: number): Promise<Result<void, InfraError>> {
+    this.resetting = true;
+    try {
+      await this.inflight;
+      const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
+      if (saved.isErr()) {
+        this.dependencies.logger.error(
+          { subscription: this.dependencies.name, globalSeq: toGlobalSeq, err: saved.error },
+          'checkpoint reset failed; replay not armed',
+        );
+        return saved;
+      }
+      this.cursor = toGlobalSeq;
+      this.halted = false;
       return saved;
+    } finally {
+      this.resetting = false;
     }
-    this.cursor = toGlobalSeq;
-    this.halted = false;
-    return saved;
   }
 
   /** Serialized drain: concurrent calls coalesce into one more pass, never interleave. */
   async poll(): Promise<void> {
-    if (this.halted) return;
+    if (this.halted || this.resetting) return;
     if (this.running) {
       this.pending = true;
       return;
     }
     this.running = true;
+    const cycles = this.runCycles();
+    this.inflight = settled(cycles);
     try {
-      do {
-        this.pending = false;
-        await this.drain();
-      } while (this.pending && !this.halted);
+      await cycles;
     } finally {
       this.running = false;
+      this.inflight = undefined;
     }
+  }
+
+  private async runCycles(): Promise<void> {
+    do {
+      this.pending = false;
+      await this.drain();
+    } while (this.pending && !this.halted);
   }
 
   private async drain(): Promise<void> {

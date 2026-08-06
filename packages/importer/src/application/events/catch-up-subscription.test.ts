@@ -269,7 +269,7 @@ describe('CatchUpSubscription', () => {
     expect(await checkpointOf()).toBe(0); // held, never skipped
   });
 
-  it('replays from the log start and surfaces the fault when the checkpoint load fails', async () => {
+  it('halts on a faulted checkpoint read instead of replaying the whole feed from zero', async () => {
     feed.events = [seamEvent(1)];
     checkpoints.failLoad = true;
     const logger = silentLogger();
@@ -278,11 +278,14 @@ describe('CatchUpSubscription', () => {
 
     await sub.start();
 
-    // Fell back to cursor 0 and drained from the log start — loudly, never a silent skip.
-    expect(handled).toEqual([1]);
+    // A faulted read knows nothing about what this consumer has already seen; treating it as
+    // "fresh consumer at 0" would redeliver the producer's entire history behind a healthy-
+    // looking readiness. Nothing is delivered, and the module reports itself down.
+    expect(handled).toEqual([]);
+    expect(sub.isHalted).toBe(true);
     expect(errorSpy).toHaveBeenCalledWith(
       { subscription: 'seam:test', err: infraError('checkpoint.load', 'boom') },
-      'checkpoint load failed; replaying from the log start',
+      'checkpoint load failed; subscription halted without delivering (position unknown)',
     );
   });
 
@@ -382,6 +385,48 @@ describe('CatchUpSubscription', () => {
     await sub.reset();
 
     expect(sub.isHalted).toBe(true);
+  });
+
+  it('a failed reset leaves the in-memory cursor on the durable checkpoint, not the requested one', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    const sub = subscription();
+    await sub.start();
+    checkpoints.failSaves = true;
+
+    const outcome = await sub.reset();
+    checkpoints.failSaves = false;
+    await sub.poll();
+
+    // Moving the cursor before the save lands would replay everything the durable checkpoint
+    // still covers — on a reset the operator was explicitly told had failed.
+    expect(outcome.isErr()).toBe(true);
+    expect(handled).toEqual([1, 2]);
+  });
+
+  it('reset waits out an in-flight drain, so its Ok arm is the durable truth', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    const gate = Promise.withResolvers<void>();
+    const arrival = Promise.withResolvers<void>();
+    const sub = subscription({
+      handler: async (event) => {
+        arrival.resolve();
+        await gate.promise;
+        handled.push(event.globalSeq);
+        return ok(undefined);
+      },
+    });
+    const draining = sub.poll();
+    await arrival.promise;
+
+    const resetting = sub.reset();
+    await sub.poll(); // a poll landing mid-reset is dropped, never raced against the save
+    gate.resolve();
+    const outcome = await resetting;
+    await draining;
+
+    // An advance from the drain must not land behind the reset's save and falsify its Ok.
+    expect(outcome.isOk()).toBe(true);
+    expect(await checkpointOf()).toBe(0);
   });
 
   it('reset lifts a halt so a fixed poison event can be reattempted', async () => {

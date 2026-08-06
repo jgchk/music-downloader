@@ -1,4 +1,4 @@
-import { err, ok } from 'neverthrow';
+import { ResultAsync, err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Logger } from '../../application/logging/logger.js';
 import type { InfraError } from '../../application/ports/errors.js';
@@ -50,7 +50,17 @@ export class InProcessEventBus implements EventBus {
  * projection or resumes the reactor after a restart, independent of the ephemeral in-process bus.
  * Composition schedules repeated calls; each call advances the caller's cursor.
  */
-export async function pollCatchUp(
+export function pollCatchUp(
+  store: Pick<EventStorePort, 'readAll'>,
+  fromGlobalSeq: number,
+  handler: (event: StoredEvent) => void | Promise<void>,
+): ResultAsync<number, InfraError> {
+  // `ResultAsync`, not `Promise<Result>`: the lint rule that makes a discarded Result a build
+  // break reads the declared return type, and a bare `Promise<Result>` is invisible to it.
+  return new ResultAsync(drainFrom(store, fromGlobalSeq, handler));
+}
+
+async function drainFrom(
   store: Pick<EventStorePort, 'readAll'>,
   fromGlobalSeq: number,
   handler: (event: StoredEvent) => void | Promise<void>,
