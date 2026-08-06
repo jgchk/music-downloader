@@ -1,5 +1,3 @@
-import { err, ok } from 'neverthrow';
-import type { Result } from 'neverthrow';
 import type { ImportEvent } from '../../domain/import/events.js';
 
 /**
@@ -16,17 +14,6 @@ export const CURRENT_SCHEMA_VERSION = 2;
 /** Transforms one on-disk event payload from version N to version N+1. */
 export type Upcaster = (data: Record<string, unknown>) => Record<string, unknown>;
 
-/**
- * A registration gap: the chain walk stopped at `arrivedAt` while a step registered from
- * `unappliedFrom` (above it) could never apply. Serving the arrived shape to `evolve` would be
- * silent corruption, so the walk refuses as a value instead.
- */
-export interface UpcastGap {
-  readonly kind: 'UpcastGap';
-  readonly type: string;
-  readonly arrivedAt: number;
-  readonly unappliedFrom: number;
-}
 
 export class UpcasterRegistry {
   // event type -> (fromVersion -> upcaster that produces fromVersion + 1)
@@ -41,36 +28,28 @@ export class UpcasterRegistry {
   }
 
   /**
-   * Apply the chain of registered upcasters from `schemaVersion` up to the latest known shape.
-   * With nothing registered for the type, this is a pass-through: the stored payload is declared
-   * already-current and is returned untouched. A walk that stops below a still-registered step is
-   * a registration gap — refused as a value, never served stale (absence of a step from the
-   * arrival version upward is the declaration that no shape change exists there, so a remaining
-   * higher step can only mean a hole in the chain).
+   * Apply every registered step at or above the stored version, in ascending order. The schema
+   * version is a STORE-WIDE counter, so a type's chain is expected non-contiguous — it skips the
+   * versions it did not participate in, and the absence of a step at a version IS the declaration
+   * that the type's shape did not change there. That makes this walk total: with no steps
+   * registered for the type (or none at/above the stored version — including a future writer's
+   * stamp), the payload is declared already-current and passes through untouched. The remaining
+   * authoring risk — a shape change nobody wrote a step for — is indistinguishable from
+   * no-change-by-declaration at read time; it is guarded where it can be: the contract tier
+   * replays frozen legacy fixtures through the production registry.
    */
-  upcast(
-    type: string,
-    schemaVersion: number,
-    data: Record<string, unknown>,
-  ): Result<ImportEvent, UpcastGap> {
+  upcast(type: string, schemaVersion: number, data: Record<string, unknown>): ImportEvent {
     const forType = this.upcasters.get(type);
-    if (forType === undefined) return ok(data as unknown as ImportEvent);
+    if (forType === undefined) return data as unknown as ImportEvent;
 
-    let version = schemaVersion;
-    let current = data;
-    for (let step = forType.get(version); step !== undefined; step = forType.get(version)) {
-      current = step(current);
-      version += 1;
-    }
-    const unapplied = forType
-      .keys()
-      .filter((from) => from > version)
+    const steps = forType
+      .entries()
+      .filter(([from]) => from >= schemaVersion)
       .toArray()
-      .toSorted((a, b) => a - b);
-    if (unapplied.length > 0) {
-      return err({ kind: 'UpcastGap', type, arrivedAt: version, unappliedFrom: unapplied[0]! });
-    }
-    return ok(current as unknown as ImportEvent);
+      .toSorted(([a], [b]) => a - b);
+    let current = data;
+    for (const [, step] of steps) current = step(current);
+    return current as unknown as ImportEvent;
   }
 }
 
