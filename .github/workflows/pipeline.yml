@@ -25,6 +25,7 @@ jobs:
   version-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # observed ~20s; a wedge should fail in minutes, not GitHub's 6h default
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,6 +43,7 @@ jobs:
   # Static checks that need no runtime dependencies; runs in parallel with tests. Gates the release.
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # observed ~75s
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -65,6 +67,7 @@ jobs:
   # adapter tests; Chromium is the browser-mode runner for the web client project.
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # observed ~100s; Chromium + apt installs dominate on a cold cache
     steps:
       - uses: actions/checkout@v7
       - name: Install ffmpeg
@@ -97,6 +100,7 @@ jobs:
     if: github.event_name == 'push'
     needs: [quality, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # observed ~3.5min warm; a cold-cache build + full E2E stays well under this
     permissions:
       contents: write # create the release tag + GitHub Release
       packages: write # push the GHCR image
@@ -138,14 +142,18 @@ jobs:
             type=raw,value=latest
             type=sha
 
-      # Build once, load locally as `music-downloader:e2e`, cache to gha so the publish step below
-      # reuses the exact same layers (no rebuild).
+      # Build ONCE, load locally as `music-downloader:e2e`. This is the only build in the job: the
+      # publish step below re-tags and pushes these exact bytes, so the published artifact is
+      # byte-for-byte the image the E2E gate ran (a rebuild — even fully cache-hit — re-executes
+      # non-hermetic Dockerfile steps like apt-get/pip and can publish an untested image). The
+      # metadata labels are applied here so the gated image already carries them.
       - name: Build image (load, no push)
         uses: docker/build-push-action@v7
         with:
           context: .
           load: true
           tags: music-downloader:e2e
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -159,8 +167,8 @@ jobs:
         run: pnpm --dir packages/web exec playwright install --with-deps chromium
 
       # THE GATE: stand up the freshly built image + WireMock stubs, drive it end to end over a real
-      # socket — a real browser first (parity phase), then the two loop phases — tear down. A failure
-      # here fails the job and blocks the publish + release steps below.
+      # socket — a real browser first (parity phase), then the loop phases (run.sh owns the list) —
+      # tear down. A failure here fails the job and blocks the publish + release steps below.
       - name: Out-of-process E2E gate
         env:
           E2E_SKIP_BUILD: '1'
@@ -177,16 +185,19 @@ jobs:
 
       # Everything below is the release, guarded on the version not already being tagged. Order:
       # publish the image, then tag + GitHub Release — so `latest`/semver only move on a green E2E.
-      - name: Publish image
+      # Publish = re-tag + push of the ALREADY-GATED local image. Never rebuild here: the guarantee
+      # is that what lands in GHCR is the artifact the E2E gate exercised, not a cache-dependent
+      # reconstruction of it. (Single-platform image — the build above uses the runner's platform —
+      # so a plain docker push carries the exact manifest.)
+      - name: Publish image (the e2e-gated bytes)
         if: steps.ver.outputs.released == 'false'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker tag music-downloader:e2e "$tag"
+            docker push "$tag"
+          done <<< "${{ steps.meta.outputs.tags }}"
 
       - name: Tag + GitHub Release
         if: steps.ver.outputs.released == 'false'
