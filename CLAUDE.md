@@ -44,6 +44,22 @@ Hard rules. A change that violates one is wrong regardless of anything else:
 
 Runtime: Node ≥24, pnpm 11. After switching Node versions locally, run `pnpm rebuild better-sqlite3` (native module).
 
+## PRs with `jj` + `gh`
+
+jj keeps git's `HEAD` detached, so any `gh` subcommand that infers "the current branch" fails with `not on any branch` — and a `gh pr merge` printing that error has usually **still merged** (verify with `gh pr view <#> --json state`). Never let `gh` touch or infer local branch state, and never judge commit/push state from `git status`/`git log` (stale in colocated repos) — trust `jj st` and `jj bookmark list --all`. Run `gh` from the colocated main repo, not a bare workspace (`not a git repository`).
+
+The reliable flow:
+
+```sh
+jj git fetch && jj rebase -b <bookmark> -d 'main@origin'  # sync FIRST — concurrent sessions move main mid-ship (recurring collision)
+jj git push --bookmark <bookmark>
+gh pr create --head <bookmark> --base main …              # explicit --head; refer to the PR by number from here on
+gh pr checks <#> --watch
+gh pr merge <#> --rebase                                  # rebase-merge only; NO --delete-branch (remote auto-deletes; local: jj git fetch)
+```
+
+If checks took a while, fetch + rebase again before merging — "head branch is not up to date" means main moved underneath you.
+
 ## Stack
 
 Node · TypeScript (strict) · pnpm workspace · neverthrow · zod · pino · vitest · SQLite · ffmpeg (downloader) · beets via a stateless Python bridge CLI behind an outbound port (importer, the one non-TS component, pinned in the Docker image). VCS: jujutsu (`jj`), git-backed — see Non-negotiables.
