@@ -87,6 +87,33 @@ describe('SlskdClient', () => {
     await expect(client.get('/api/v0/searches/s1')).rejects.toThrow('slskd responded 500');
   });
 
+  it('keeps the peer username out of every thrown message (dead-letter-bound strings)', async () => {
+    // These messages land in parked-effect lastError fields and dead-letter payloads, where the
+    // pino redaction paths cannot follow (redaction covers structured fields, not string
+    // interpolation). The downloads path embeds the URL-encoded peer username, so the thrown
+    // message must carry the route shape, never the raw path.
+    const { http } = recordingClient({ status: 500, body: 'boom' });
+    const client = new SlskdClient(http);
+    const path = '/api/v0/transfers/downloads/peer%40name.42';
+
+    for (const attempt of [
+      client.get(path),
+      client.getOr(path, {}),
+      client.delIfPresent(`${path}/t-1?remove=false`),
+    ]) {
+      let thrown: Error | undefined;
+      try {
+        await attempt;
+      } catch (error) {
+        thrown = error as Error;
+      }
+      expect(thrown, 'expected a non-2xx throw').toBeDefined();
+      expect(thrown!.message).toContain('500');
+      expect(thrown!.message).not.toContain('peer%40name.42');
+      expect(thrown!.message).toContain('/transfers/downloads/');
+    }
+  });
+
   describe('getOr', () => {
     it('returns the fallback for a 404 (an absent collection is a state, not a fault)', async () => {
       const { http } = recordingClient({ status: 404, body: '' });

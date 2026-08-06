@@ -202,7 +202,9 @@ export class SlskdDownload implements DownloadPort {
         // matching every other GET/POST path in this adapter. Marking it a candidate failure would
         // manufacture AcquisitionExhausted from a transient slskd overload.
         // The peer username stays out of the message: this string reaches dead-letter payloads,
-        // where the redaction paths cannot follow it. The debug line above carries it structured.
+        // where pino's structured redaction cannot follow interpolated text. The debug line above
+        // carries the username as a structured field, which the composed logger's redaction paths
+        // scrub from shipped lines — so the peer is deliberately recoverable nowhere downstream.
         throw new Error(`slskd responded ${enqueue.status} for the download enqueue POST`);
       }
       if (enqueue.status < 200 || enqueue.status >= 300) {
