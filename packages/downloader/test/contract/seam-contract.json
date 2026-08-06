@@ -1,0 +1,6 @@
+{
+  "description": "The seam-error kinds this module's outbound feed publishes to a consuming module. A consumer switches on these strings across its anti-corruption layer, where no import may carry the type across the module boundary - so this file is the artifact that carries them instead, and both producer and consumer pin themselves against it (seam-feed-errors.contract.test.ts in each package).",
+  "feedErrorKinds": {
+    "permanentRenderDefect": "RenderError"
+  }
+}
