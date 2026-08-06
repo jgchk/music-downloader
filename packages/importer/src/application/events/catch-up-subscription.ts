@@ -203,9 +203,11 @@ export class CatchUpSubscription {
   /** True when the drain may continue past `event`. */
   private async consume(event: SeamEvent): Promise<boolean> {
     const { attempts, baseDelayMs } = this.dependencies.retry;
+    let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       const outcome = await this.dependencies.handler(event);
       if (outcome.isOk()) return this.advance(event.globalSeq);
+      lastError = outcome.error;
       if (outcome.error.kind === 'Permanent') {
         // Deterministic failures gain nothing from repetition — straight to the poison policy.
         return this.poison(event, outcome.error.reason);
@@ -221,8 +223,10 @@ export class CatchUpSubscription {
       );
       if (attempt < attempts) await this.dependencies.sleep(baseDelayMs * 2 ** (attempt - 1));
     }
+    // The sustained operator signal for a standing hold: it must carry the failure itself,
+    // or a wedged seam logs an error line that never says why.
     this.dependencies.logger.error(
-      { subscription: this.dependencies.name, globalSeq: event.globalSeq },
+      { subscription: this.dependencies.name, globalSeq: event.globalSeq, err: lastError },
       'seam delivery exhausted cycle retries; holding checkpoint for redelivery',
     );
     return false;

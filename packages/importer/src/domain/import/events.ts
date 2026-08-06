@@ -42,6 +42,15 @@ export interface DeliveredCandidate {
 export interface ImportSource {
   readonly acquisitionId: AcquisitionId;
   readonly candidate?: DeliveredCandidate;
+  /**
+   * The delivery's position in the intake seam's feed — this cycle's contribution to the
+   * stream's convergence watermark (folded as a max across cycles in state). A delivery at or
+   * before the watermark is a redelivery of something this stream already consumed and
+   * converges; only a later position is a NEW delivery (the revival loop's replacement after a
+   * rejection). Absent on submissions recorded before the watermark existed and on manual
+   * (non-seam) submissions.
+   */
+  readonly feedPosition?: number;
 }
 
 /**

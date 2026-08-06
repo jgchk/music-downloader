@@ -45,6 +45,21 @@ asserted from outside: the staged first-delivery directory is gone after resolut
 destructive verb's documented consequence. This doubles as the black-box witness for the
 consequence copy's determinism principle.
 
+**D5 — Seam convergence by feed-position watermark (task 4.2's fix).** The phase proved the
+revival wire broken: the intake consumer's blanket acquisition-id dedupe swallowed the
+replacement delivery. Considered and rejected: candidate-identity comparison (rests on a
+downloader-internal never-re-offer invariant the contract doesn't carry, and makes the
+tolerant-reader candidate degrade load-bearing). Chosen: each seam cycle records its event's
+feed position; the STREAM keeps a max-folded watermark (survives manual resubmissions); at or
+before the watermark converges (replay is a no-op), later positions are new deliveries. The
+decider owns both halves — stale positions converge even on terminals, and a new delivery on a
+live cycle is refused (`CycleInFlight`) rather than converged, so a stale projection can only
+ever under-converge into a hold, never acknowledge-and-drop. A new delivery meeting an
+unsettled cycle holds transiently (redelivery lands it after settlement); if the cycle
+dead-letters the hold stands, named per-acquisition in the seam's error log — bounded
+escalation is `stalled-work-recovery`'s remit. Pre-watermark history converges as before,
+announced by an operator-visible warn (transition-scoped).
+
 ## Risks / Trade-offs
 
 - **[Beets scoring drift breaks the band calibration]** → The explicit review-queued setup

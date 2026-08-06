@@ -198,8 +198,17 @@ export async function createImporterRuntime(
   // This read-model projection is kept live only by the bus — no catch-up cursor; it is fully
   // rebuilt from `readAll(0)` above at every boot. Trade-off: the event bus wraps each handler in
   // its own try/catch, so if an `apply` here throws, the bus swallows and logs it and the in-memory
-  // read model diverges from the log until the next restart (which rebuilds it). Acceptable because
-  // it is a queryable projection, not a decision input, and the divergence self-heals on reboot.
+  // read model diverges from the log until the next restart (which rebuilds it). Acceptable
+  // because queries merely go stale, and the seam consumer's three projection reads (index
+  // presence, `seamWatermark`, `settled`) all fail SAFE under divergence — the projection folds
+  // only appended events, so it can lag the store but never lead it: a stale-low watermark or a
+  // missing entry sends the event onward, where the directory probe holds it or the decider
+  // re-derives convergence from the store itself (converge, fresh cycle, or its CycleInFlight
+  // refusal, which the consumer holds as transient); a stale `settled` likewise ends in the
+  // decider's store-truth answer. For watermarked streams nothing is wrongly acknowledged and
+  // the worst case is a hold until this projection heals at the next boot's rebuild;
+  // pre-watermark streams degrade to the consumer's announced converge-drop (or, unindexed,
+  // to the decider's fresh-cycle path) — the transition-scoped legacy behavior.
   bus.subscribe((stored) => {
     status.apply(stored);
   });
@@ -252,6 +261,7 @@ export async function createImporterRuntime(
           sourceRoot: options.sourceRoot,
           intakeRoot: config.intakeRoot,
           directoryExists: overrides.directoryExists ?? realDirectoryExists,
+          warn: logger.warn.bind(logger),
         }),
         policy: 'halt',
         logger,

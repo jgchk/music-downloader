@@ -1,5 +1,6 @@
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isRetryable } from './reactor.js';
 import { Import } from '../../domain/import/import.js';
 import {
   DIRECTORY,
@@ -698,5 +699,13 @@ describe('Reactor — sibling effects of one event', () => {
     expect(deadLetters.letters).toHaveLength(1);
     expect(stalled.isStalled('imp-1')).toBe(true);
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+  });
+});
+
+describe('isRetryable', () => {
+  it('classifies CycleInFlight as retryable — a live cycle settles, then the submission lands', () => {
+    // Unreachable from effect dispatch today (the reactor never submits imports), but the
+    // command-error union must stay fully classified; this pins the arm's direction.
+    expect(isRetryable({ kind: 'CycleInFlight' })).toBe(true);
   });
 });

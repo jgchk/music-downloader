@@ -22,6 +22,7 @@ const importerErrors: ImporterFacadeError[] = [
   { kind: 'InvalidResolution', detail: 'verb not applicable' },
   { kind: 'UnknownCandidate', candidate: 'mb/abc' },
   { kind: 'NoRetainedCandidate' },
+  { kind: 'CycleInFlight' },
   { kind: 'ConcurrencyConflict', streamId: 'imp-1', expectedVersion: 1 },
   { kind: 'InfraError', operation: 'bridge.apply', message: 'timeout' },
 ];
@@ -47,6 +48,7 @@ describe('statusOf', () => {
     ['InvalidResolution', 400],
     ['UnknownCandidate', 400],
     ['NoRetainedCandidate', 409],
+    ['CycleInFlight', 409],
   ] as const)('%s -> %d (importer)', (kind, status) => {
     const error = importerErrors.find((entry) => entry.kind === kind)!;
     expect(statusOf(error)).toBe(status);
@@ -77,6 +79,7 @@ describe('messageOf', () => {
     ['InvalidResolution', 'Invalid resolution'],
     ['UnknownCandidate', 'Unknown candidate'],
     ['NoRetainedCandidate', 'tracked download'],
+    ['CycleInFlight', 'still in progress'],
     ['ConcurrencyConflict', 'reload'],
     ['InfraError', 'Something went wrong'],
   ] as const)('renders the importer %s error as a human message', (kind, needle) => {

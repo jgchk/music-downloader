@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
+import { importIdFor, submitImport } from '../../application/import/use-cases.js';
+import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
 import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { intakeEventConsumer } from './intake-consumer.js';
@@ -8,9 +10,12 @@ import type { IntakeConsumerOptions } from './intake-consumer.js';
 const SOURCE_ROOT = '/downloads/import';
 const INTAKE_ROOT = '/music/intake';
 
-function fulfilledEvent(overrides: Partial<Record<string, unknown>> = {}): SeamEvent {
+function fulfilledEvent(
+  overrides: Partial<Record<string, unknown>> = {},
+  globalSeq = 1,
+): SeamEvent {
   return {
-    globalSeq: 1,
+    globalSeq,
     type: (overrides['type'] as string | undefined) ?? 'acquisition.fulfilled',
     timestamp: '2026-07-18T12:00:00.000Z',
     data: {
@@ -39,6 +44,7 @@ function consumer(
     sourceRoot: SOURCE_ROOT,
     intakeRoot: INTAKE_ROOT,
     directoryExists: () => Promise.resolve(true),
+    warn: () => {},
     ...overrides,
   });
 }
@@ -59,6 +65,7 @@ describe('the intake event consumer', () => {
       source: {
         acquisitionId: 'acq-1',
         candidate: { username: 'peer1', path: 'peer1/x', sizeBytes: 1000 },
+        feedPosition: 1,
       },
     });
   });
@@ -96,6 +103,196 @@ describe('the intake event consumer', () => {
     expect(wiring.store.all()).toHaveLength(before);
   });
 
+  // The review-resolution revival loop's last hop (e2e-review-resolution-loop): after a
+  // reject-unusable-delivery verdict the downloader re-hunts and delivers a REPLACEMENT under
+  // the same acquisition — a NEW event at a later feed position. The acquisition-id convergence
+  // must not swallow it; everything at or before the cycle's watermark still converges. Pinned
+  // out-of-process by test/e2e/review-resolution.e2e.test.ts.
+
+  /** Given: a first delivery consumed (feed position 1) whose import cycle settled rejected. */
+  async function givenARejectedFirstDelivery(wiring: TestWiring): Promise<void> {
+    const consume = consumer(wiring);
+    await consume(fulfilledEvent());
+    const importId = importIdFor(`${INTAKE_ROOT}/Radiohead - Kid A`);
+    const appended = await wiring.store.append(
+      importId,
+      1,
+      [{ type: 'ImportRejected', reason: 'unusable delivery', filesDeleted: true }],
+      { importId, occurredAt: 'T1' },
+    );
+    appended._unsafeUnwrap();
+    wiring.sync();
+  }
+
+  it('a replacement delivery after a rejected import starts a fresh import cycle', async () => {
+    const wiring = testWiring();
+    await givenARejectedFirstDelivery(wiring);
+
+    const replacement = await consumer(wiring)(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+
+    expect(replacement.isOk()).toBe(true);
+    const requested = wiring.store.all().filter((entry) => entry.type === 'ImportRequested');
+    expect(requested).toHaveLength(2);
+    expect(requested[1]?.event).toMatchObject({
+      source: {
+        acquisitionId: 'acq-1',
+        candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 },
+        feedPosition: 2,
+      },
+    });
+  });
+
+  it('a redelivery of the rejected delivery itself still converges', async () => {
+    const wiring = testWiring();
+    await givenARejectedFirstDelivery(wiring);
+    const before = wiring.store.all().length;
+
+    const again = await consumer(wiring)(fulfilledEvent());
+
+    expect(again.isOk()).toBe(true);
+    expect(wiring.store.all()).toHaveLength(before);
+  });
+
+  it('a new delivery holds while the current cycle has not settled', async () => {
+    // The pending-rejection window (and any live cycle): converging would acknowledge — and
+    // permanently drop — a delivery; the hold lets redelivery land it once the cycle settles.
+    const wiring = testWiring();
+    const consume = consumer(wiring);
+    await consume(fulfilledEvent());
+    wiring.sync();
+    const before = wiring.store.all().length;
+
+    const outcome = await consume(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+
+    expect(outcome._unsafeUnwrapErr()).toEqual({
+      kind: 'Transient',
+      reason: 'ExistingCycleNotSettled:acq-1',
+    });
+    expect(wiring.store.all()).toHaveLength(before);
+  });
+
+  it('a replay of a strictly earlier position converges — a full feed replay is a no-op', async () => {
+    const wiring = testWiring();
+    await givenARejectedFirstDelivery(wiring);
+    const consume = consumer(wiring);
+    // The replacement (position 2) starts the second cycle; the projection then reflects it.
+    await consume(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+    wiring.sync();
+    const before = wiring.store.all().length;
+
+    const replayed = await consume(fulfilledEvent());
+
+    expect(replayed.isOk()).toBe(true);
+    expect(wiring.store.all()).toHaveLength(before);
+  });
+
+  it('a stale projection cannot make the seam drop a delivery — the decider refuses instead', async () => {
+    // Divergence drill: the projection still shows the settled FIRST cycle while the store
+    // already holds the live second cycle. The consumer's fast-path lets the newer event
+    // through; the decider re-derives from the store and refuses (CycleInFlight), so the
+    // outcome is a transient hold — never an acknowledgement that drops the delivery.
+    const wiring = testWiring();
+    await givenARejectedFirstDelivery(wiring);
+    const consume = consumer(wiring);
+    await consume(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+    // Deliberately NO sync: the projection still believes cycle one (settled, watermark 1).
+    const before = wiring.store.all().length;
+
+    const outcome = await consume(
+      fulfilledEvent({ candidate: { username: 'peer3', path: 'peer3/z', sizeBytes: 3000 } }, 3),
+    );
+
+    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'CycleInFlight' });
+    expect(wiring.store.all()).toHaveLength(before);
+  });
+
+  it('a manual resubmission does not erase the watermark — the next replacement still lands', async () => {
+    const wiring = testWiring();
+    await givenARejectedFirstDelivery(wiring);
+    // An operator manually resubmits the same directory (no seam source), and that cycle is
+    // later rejected too.
+    const importId = importIdFor(`${INTAKE_ROOT}/Radiohead - Kid A`);
+    await submitImport(wiring.deps, { directory: `${INTAKE_ROOT}/Radiohead - Kid A` });
+    const rerejected = await wiring.store.append(
+      importId,
+      3,
+      [{ type: 'ImportRejected', reason: 'still wrong', filesDeleted: true }],
+      { importId, occurredAt: 'T2' },
+    );
+    rerejected._unsafeUnwrap();
+    wiring.sync();
+
+    const replacement = await consumer(wiring)(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+
+    expect(replacement.isOk()).toBe(true);
+    const requested = wiring.store.all().filter((entry) => entry.type === 'ImportRequested');
+    expect(requested).toHaveLength(3);
+    expect(requested[2]?.event).toMatchObject({ source: { feedPosition: 2 } });
+  });
+
+  it('names the dead-lettered case in the hold reason — the wedge is self-describing', async () => {
+    const wiring = testWiring();
+    const consume = consumer(wiring);
+    await consume(fulfilledEvent());
+    wiring.sync();
+    wiring.stalled.mark(importIdFor(`${INTAKE_ROOT}/Radiohead - Kid A`));
+
+    const outcome = await consume(
+      fulfilledEvent({ candidate: { username: 'peer2', path: 'peer2/y', sizeBytes: 2000 } }, 2),
+    );
+
+    expect(outcome._unsafeUnwrapErr()).toEqual({
+      kind: 'Transient',
+      reason: 'ExistingCycleStalled:acq-1',
+    });
+  });
+
+  it('an import without a watermark converges every redelivery — the pre-watermark behavior', async () => {
+    const wiring = testWiring();
+    await submitImport(wiring.deps, {
+      directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
+      source: { acquisitionId: toAcquisitionId('acq-1') },
+    });
+    wiring.sync();
+    const before = wiring.store.all().length;
+
+    const outcome = await consumer(wiring)(fulfilledEvent({}, 5));
+
+    expect(outcome.isOk()).toBe(true);
+    expect(wiring.store.all()).toHaveLength(before);
+  });
+
+  it('the pre-watermark convergence announces itself — the one deliberate drop is never silent', async () => {
+    const wiring = testWiring();
+    await submitImport(wiring.deps, {
+      directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
+      source: { acquisitionId: toAcquisitionId('acq-1') },
+    });
+    wiring.sync();
+    const warnings: { context: Record<string, unknown>; message: string }[] = [];
+    const consume = consumer(wiring, {
+      warn: (context, message) => {
+        warnings.push({ context, message });
+      },
+    });
+
+    await consume(fulfilledEvent({}, 5));
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.context).toMatchObject({ acquisitionId: 'acq-1', globalSeq: 5 });
+    expect(warnings[0]?.message).toContain('resubmit');
+  });
+
   it('a malformed payload of the known type is a permanent (poison) failure', async () => {
     const wiring = testWiring();
     const consume = consumer(wiring);
@@ -123,7 +320,7 @@ describe('the intake event consumer', () => {
 
     expect(outcome._unsafeUnwrapErr()).toEqual({
       kind: 'Transient',
-      reason: 'IntakeDirectoryMissing',
+      reason: `IntakeDirectoryMissing: ${INTAKE_ROOT}/Radiohead - Kid A`,
     });
     expect(wiring.store.all()).toHaveLength(0);
   });
@@ -138,8 +335,26 @@ describe('the intake event consumer', () => {
 
     // A probe that throws (EACCES/EIO/…) must not masquerade as IntakeDirectoryMissing — it is
     // held under its own reason so a genuine infra fault is distinguishable in the logs.
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'IntakeProbeFailed' });
+    expect(outcome._unsafeUnwrapErr()).toEqual({
+      kind: 'Transient',
+      reason: 'IntakeProbeFailed: EACCES: permission denied',
+    });
     expect(wiring.store.all()).toHaveLength(0);
+  });
+
+  it('a probe rejecting with a non-Error still carries its detail in the hold reason', async () => {
+    const wiring = testWiring();
+    const consume = consumer(wiring, {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the vendor-shaped worst case
+      directoryExists: () => Promise.reject('EIO'),
+    });
+
+    const outcome = await consume(fulfilledEvent());
+
+    expect(outcome._unsafeUnwrapErr()).toEqual({
+      kind: 'Transient',
+      reason: 'IntakeProbeFailed: EIO',
+    });
   });
 
   it('an append fault is transient, passing the append error kind through as the hold reason', async () => {
