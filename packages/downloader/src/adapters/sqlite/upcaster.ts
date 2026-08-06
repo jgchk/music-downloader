@@ -21,7 +21,6 @@ export const CURRENT_SCHEMA_VERSION = 2;
 /** Transforms one on-disk event payload from version N to version N+1. */
 export type Upcaster = (data: Record<string, unknown>) => Record<string, unknown>;
 
-
 export class UpcasterRegistry {
   // event type -> (fromVersion -> upcaster that produces fromVersion + 1)
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();

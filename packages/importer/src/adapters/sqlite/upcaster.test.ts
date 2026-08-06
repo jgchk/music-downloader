@@ -27,13 +27,12 @@ describe('buildUpcasterRegistry', () => {
   it('lifts a v1 ReviewResolved rejection and leaves a v2 one alone', () => {
     const registry = buildUpcasterRegistry();
 
-    expect(
-      registry
-        .upcast('ReviewResolved', 1, legacyRejectResolvedData(['corrupt rip'])),
-    ).toEqual({
-      type: 'ReviewResolved',
-      resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
-    });
+    expect(registry.upcast('ReviewResolved', 1, legacyRejectResolvedData(['corrupt rip']))).toEqual(
+      {
+        type: 'ReviewResolved',
+        resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
+      },
+    );
 
     const v2 = {
       type: 'ReviewResolved',
@@ -75,8 +74,10 @@ describe('UpcasterRegistry', () => {
       .register('Widened', 1, (data) => ({ ...data, two: true }))
       .register('Widened', 2, (data) => ({ ...data, three: true }));
 
-    const result = registry
-      .upcast('Widened', 1, { type: 'Widened', one: true }) as Record<string, unknown>;
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result).toEqual({ type: 'Widened', one: true, two: true, three: true });
   });
@@ -88,8 +89,10 @@ describe('UpcasterRegistry', () => {
     }));
 
     // Stored at version 2: no upcaster registered for v2, so it is already current.
-    const result = registry
-      .upcast('Widened', 2, { type: 'Widened', two: true }) as Record<string, unknown>;
+    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result).toEqual({ type: 'Widened', two: true });
   });
@@ -133,8 +136,10 @@ describe('UpcasterRegistry', () => {
 
     // A newer writer stamped v5; this reader knows only a v1→v2 step. With no upcaster registered at
     // or above v5, the payload is already at-or-beyond the reader's latest shape and flows through.
-    const result = registry
-      .upcast('Widened', 5, { type: 'Widened', future: true }) as Record<string, unknown>;
+    const result = registry.upcast('Widened', 5, { type: 'Widened', future: true }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result).toEqual({ type: 'Widened', future: true });
   });

@@ -37,7 +37,6 @@ interface EventRow {
 /** Thrown inside the append transaction to roll it back on a version mismatch. */
 class ConcurrencyBreak extends Error {}
 
-
 function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE';
 }

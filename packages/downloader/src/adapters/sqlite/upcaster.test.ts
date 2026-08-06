@@ -61,8 +61,10 @@ describe('UpcasterRegistry', () => {
       .register('Widened', 1, (data) => ({ ...data, two: true }))
       .register('Widened', 2, (data) => ({ ...data, three: true }));
 
-    const result = registry
-      .upcast('Widened', 1, { type: 'Widened', one: true }) as Record<string, unknown>;
+    const result = registry.upcast('Widened', 1, { type: 'Widened', one: true }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result).toEqual({ type: 'Widened', one: true, two: true, three: true });
   });
@@ -74,8 +76,10 @@ describe('UpcasterRegistry', () => {
     }));
 
     // Stored at version 2: no upcaster registered for v2, so it is already current.
-    const result = registry
-      .upcast('Widened', 2, { type: 'Widened', two: true }) as Record<string, unknown>;
+    const result = registry.upcast('Widened', 2, { type: 'Widened', two: true }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result).toEqual({ type: 'Widened', two: true });
   });

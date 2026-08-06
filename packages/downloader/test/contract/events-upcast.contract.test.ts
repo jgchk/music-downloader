@@ -29,10 +29,9 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
   };
 
   function upcastFixture(): AcquisitionEvent {
-    return buildUpcasterRegistry()
-      .upcast('ManualSelectionRequested', 1, {
-        ...fixture.event,
-      });
+    return buildUpcasterRegistry().upcast('ManualSelectionRequested', 1, {
+      ...fixture.event,
+    });
   }
 
   it('drops the legacy trackCount: 0 sentinel to absent, and passes a real count through', () => {
@@ -79,10 +78,9 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
 
     const folded = foldEvents([
       { type: 'AcquisitionRequested', request: sampleGroupRequest, policies: defaultPolicies() },
-      buildUpcasterRegistry()
-        .upcast('ManualSelectionRequested', 2, {
-          ...v2Event,
-        } as unknown as Record<string, unknown>),
+      buildUpcasterRegistry().upcast('ManualSelectionRequested', 2, {
+        ...v2Event,
+      } as unknown as Record<string, unknown>),
     ]);
 
     expect(folded.phase).toBe('AwaitingManualSelection');
