@@ -12,14 +12,25 @@ const modulePackages = ['downloader', 'importer'];
  * (contract, boundaries, e2e, Playwright) — including the tiers' non-`.test.ts` helpers, fixture
  * builders, and recorders, which are test code by any reading.
  *
- * Every test-code carve-out below is scoped to this list and nothing else, so the divergence from
- * production is exactly six named rules: `@typescript-eslint/no-non-null-assertion`,
- * `@typescript-eslint/unbound-method`, `unicorn/name-replacements`, `neverthrow/must-use-result`,
+ * Every test-code carve-out below is scoped to this list and nothing else. For test code proper
+ * the divergence from production is five named rules: `@typescript-eslint/unbound-method`,
+ * `unicorn/name-replacements`, `neverthrow/must-use-result`,
  * `unicorn/no-top-level-assignment-in-function`, and `unicorn/consistent-function-scoping` (the
- * last two shared with other file sets). A carve-out that names its own glob instead of this
- * constant is the drift this comment exists to prevent. The production profile is otherwise
- * identical, per module-architecture ("Test tiers SHALL run the production rule profile except for
- * short, named, documented carve-outs").
+ * last two shared with other file sets). It is NOT the same five everywhere these globs reach:
+ * the CLI entrypoints below live inside each package's own `test` tree, so they are swept in here
+ * and then re-armed — for them `neverthrow/must-use-result` is back to `error` and
+ * `unicorn/no-process-exit` is additionally off. (Glob literals are spelled out in the line
+ * comments below, never here: a block comment cannot contain a star followed by a slash without
+ * closing itself, which is how this paragraph once silently truncated the whole config.)
+ * A carve-out that names its own glob instead of this constant is the drift
+ * this comment exists to prevent. The production profile is otherwise identical, per
+ * module-architecture ("Test tiers SHALL run the production rule profile except for short, named,
+ * documented carve-outs").
+ *
+ * Both sets are derived from the resolved config and compared against these names in
+ * `test/boundaries/rule-profile.test.ts` — an enumeration nothing checks is a claim, and this one
+ * was wrong in both directions before that suite existed (it counted a rule production never
+ * enabled, and it described the CLI entrypoints as diverging by the same set).
  */
 const testFiles = [
   '**/*.test.ts',
@@ -269,13 +280,27 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      // "Never ignore a result" (error-handling.md) made enforceable. Detection is structural (any
-      // type carrying map/mapErr/andThen/orElse/match/unwrapOr). "Handled" is a SHORT list, and the
-      // rule's own message is the authority: match, unwrapOr, or _unsafeUnwrap. Notably NOT handled
-      // — each of these still flags: passing a Result to another function, `Result.combine`
-      // arguments, and handler-delegation idioms. So a deliberate hand-off must make its
-      // consumption structural at the call site.
-      // THREE blind spots, all verified against the pinned plugin — do not read a green lint as
+      // "Never ignore a result" (error-handling.md) made enforceable. Detection is structural: a
+      // type counts as Result-like when it carries ALL of map/mapErr/andThen/orElse/match/unwrapOr.
+      //
+      // The rule's MESSAGE names three ways to handle one ("match, unwrapOr or _unsafeUnwrap") and
+      // that message is not the whole story — read the acceptance set, not the message. A Result is
+      // accepted, i.e. NOT reported, in any of these six positions:
+      //   1. a handled method is called on it — match, unwrapOr, _unsafeUnwrap — possibly after a
+      //      chain of member accesses;
+      //   2. it is assigned to a variable and every reference to that variable is itself accepted;
+      //   3. `isOk()`/`isErr()` is called on such a reference (checked, not handled);
+      //   4. it is `yield*`-delegated inside a `safeTry` callback;
+      //   5. it is returned — INCLUDING the implicit return of a concise-body arrow;
+      //   6. it is an element of an ARRAY LITERAL passed to a call that itself returns a
+      //      Result-like. That is the `Result.combine([a, b])` / `ResultAsync.combine([…])` shape,
+      //      and it is accepted. (This comment previously claimed combine arguments still flag.
+      //      They do not — the rule has a dedicated acceptance path for them.)
+      // What still flags is a Result handed to another function in any OTHER argument position, so
+      // a deliberate hand-off must make its consumption structural at the call site (see the
+      // best-effort ledger thunks for the shape that works).
+      //
+      // FOUR blind spots, all verified against the pinned plugin — do not read a green lint as
       // proof a Result is consumed:
       // (a) `Promise<Result<T, E>>` is INVISIBLE to the rule. For an `await`, the rule tests the
       //     awaited expression's own type, and a Promise carries none of the marker methods — so
@@ -286,9 +311,16 @@ export default tseslint.config(
       //     unwraps in production — silencing the rule that way trades one violation for a worse
       //     one; it is legitimate only in test code, and in the CLI entrypoints carved out below,
       //     where an uncaught throw IS the program's error channel (see that block).
-      // (c) A Result born inside a concise-body arrow counts as consumed, so `setTimeout(() =>
-      //     save(k))` and `p.then(() => save(k))` are NOT caught — the fire-and-forget position is
+      // (c) Acceptance path 5 above is also a blind spot in the fire-and-forget position:
+      //     `setTimeout(() => save(k))` and `p.then(() => save(k))` are NOT caught, because the
+      //     concise-body arrow "returns" the Result to a caller that discards it. That position is
       //     exactly where the defects this change fixed lived, so review it by hand.
+      // (d) `.svelte` files are NOT covered at all. This block is `files: ['**/*.ts']`, and the
+      //     component block below cannot host the rule: it is deliberately not type-aware (svelte
+      //     -check does that job), while `must-use-result` needs the type checker to recognise a
+      //     Result at all. So a `<script lang="ts">` that discards one is invisible to lint. The
+      //     exposure is small by construction — components consume facades through `locals` and
+      //     hold no business rules (design D8) — but it is a hole, not a covered case.
       // The plugin is a small maintained fork (the original died in 2021) pinned exactly; its rule
       // is ~200 lines, its mechanics and upstream source link recorded in
       // docs/research/result-lint-and-tier-enforcement.md — if the fork lapses on an eslint/TS
@@ -348,7 +380,9 @@ export default tseslint.config(
   },
   {
     // Svelte components: the plugin's recommended set with TypeScript script blocks. Not
-    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step.
+    // type-aware — type safety for .svelte comes from svelte-check in the typecheck step. The
+    // cost is that every type-aware rule is absent here, `neverthrow/must-use-result` included:
+    // a `<script lang="ts">` that discards a Result is invisible to lint (blind spot (d) above).
     files: ['**/*.svelte'],
     extends: [...svelte.configs['flat/recommended']],
     languageOptions: {
@@ -372,7 +406,10 @@ export default tseslint.config(
   {
     files: testFiles,
     rules: {
-      '@typescript-eslint/no-non-null-assertion': 'off',
+      // NB: `@typescript-eslint/no-non-null-assertion` is deliberately NOT switched off here.
+      // `recommendedTypeChecked` never enables it (it lives in `strict`), so an `'off'` would have
+      // been dead config diverging from nothing — while implying production bans `!`, which it does
+      // not. Turning it on for production is a real change (29 sites), tracked as a follow-up.
       // vitest mocks are referenced unbound in assertions (expect(fn).toHaveBeen…).
       '@typescript-eslint/unbound-method': 'off',
       // Test code names things after the vocabulary of the thing under test — a recorded HTTP
