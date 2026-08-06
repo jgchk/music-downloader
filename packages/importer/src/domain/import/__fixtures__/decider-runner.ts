@@ -1,4 +1,5 @@
 import fc from 'fast-check';
+import type { Result } from 'neverthrow';
 import type { ImportCommand } from '../commands.js';
 import { decide } from '../decide.js';
 import type { DomainError } from '../decide.js';
@@ -14,13 +15,20 @@ import type { CommandStep } from './arbitraries.js';
  * The twin of the acquisition runner in the other context; it makes no assertions of its own.
  */
 
-/** One command's turn: what was asked, and what the decider answered. */
+/**
+ * One command's turn: what was asked, and what the decider answered — the answer kept as the
+ * `Result` `decide` actually returned.
+ *
+ * An earlier shape flattened it to `{ emitted; error? }`, which *invented* an illegal state
+ * (events alongside an error) that `Result` makes unrepresentable, and then invited a property to
+ * police it. That property could only ever assert what this constructor wrote, so it was deleted
+ * along with the flattening. Record the outcome; let the type forbid the impossible.
+ */
 export interface DecisionRecord {
   readonly command: ImportCommand;
   /** The state the command was decided against. */
   readonly before: ImportState;
-  readonly emitted: readonly ImportEvent[];
-  readonly error?: DomainError;
+  readonly outcome: Result<readonly ImportEvent[], DomainError>;
 }
 
 export interface DriveResult {
@@ -28,7 +36,6 @@ export interface DriveResult {
   /** Every state the fold passed through, mid-batch ones included. */
   readonly states: readonly ImportState[];
   readonly decisions: readonly DecisionRecord[];
-  readonly finalState: ImportState;
 }
 
 export function driveCommands(steps: readonly CommandStep[]): DriveResult {
@@ -40,20 +47,17 @@ export function driveCommands(steps: readonly CommandStep[]): DriveResult {
   for (const step of steps) {
     const command = step(state);
     const before = state;
-    const decision = decide(command, state);
-    if (decision.isErr()) {
-      decisions.push({ command, before, emitted: [], error: decision.error });
-      continue;
-    }
-    for (const event of decision.value) {
+    const outcome = decide(command, state);
+    decisions.push({ command, before, outcome });
+    if (outcome.isErr()) continue;
+    for (const event of outcome.value) {
       state = evolve(state, event);
       events.push(event);
       states.push(state);
     }
-    decisions.push({ command, before, emitted: decision.value });
   }
 
-  return { events, states, decisions, finalState: state };
+  return { events, states, decisions };
 }
 
 /** The stream's seam convergence watermark, read uniformly across phases (`empty` carries none). */
@@ -74,13 +78,21 @@ export const arbDecidedHistory: fc.Arbitrary<readonly ImportEvent[]> = arbComman
  * impossible event on a deep phase, which is exactly where a nearly-total fold breaks.
  */
 export const arbCorruptedHistory: fc.Arbitrary<readonly ImportEvent[]> = fc
-  .tuple(arbDecidedHistory, fc.array(fc.tuple(fc.nat(), arbEvent), { minLength: 1, maxLength: 4 }))
-  .map(([decided, splices]) => {
+  .tuple(
+    arbDecidedHistory,
+    fc.array(fc.tuple(fc.nat(), arbEvent), { minLength: 1, maxLength: 4 }),
+    // Always some events AFTER the decided history as well. Splicing at a random position is
+    // overwhelmingly likely to land mid-stream, but the interesting corruption for the absorption
+    // properties is an event arriving *after* the stream settled — a terminal phase is the last
+    // thing a decided history reaches, so only a tail splice reliably tests it.
+    fc.array(arbEvent, { minLength: 1, maxLength: 3 }),
+  )
+  .map(([decided, splices, tail]) => {
     const history = [...decided];
     for (const [position, event] of splices) {
       history.splice(position % (history.length + 1), 0, event);
     }
-    return history;
+    return [...history, ...tail];
   });
 
 /** Every register at once: the fold owes its guarantees to all three. */

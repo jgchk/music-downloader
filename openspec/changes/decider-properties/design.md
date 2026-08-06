@@ -60,15 +60,23 @@ drops locally and a CI-only env bump (`FC_NUM_RUNS`) raises it there. Seed pinne
 **Measured at adoption (task 1.2 / 5.1).** The harness is one module per package,
 `packages/<pkg>/src/__fixtures__/property.ts`, exporting `propertyRun` (the pinned seed
 `20260806`, `numRuns` 100, `includeErrorInReport`) plus `assertProperty` /
-`assertAsyncProperty`. It is duplicated across the two packages rather than shared: the
-contexts never import each other, so a shared copy would be a shared kernel. `FC_SEED` and
-`FC_NUM_RUNS` override the pinned corpus for local exploration; anything that is not a
-positive integer is ignored, so the gate cannot be weakened by a stray value.
+`assertAsyncProperty`. It is duplicated across the two packages rather than shared — not
+because sharing would be a shared kernel (it holds no domain concepts; the repo already
+shares eslint/vitest/tsconfig), but because there is no dev-only test-support package to
+put it in, it is under a hundred lines, and an independent seed per context is a feature.
+
+`FC_SEED` and `FC_NUM_RUNS` override the pinned corpus for local exploration. `FC_SEED`
+accepts any safe integer, *including negative ones* — fast-check reports seeds signed, so
+refusing them would silently run the pinned corpus and tell an investigator their
+counterexample does not reproduce. A present-but-malformed value **fails the run** rather
+than falling back: a knob that silently does nothing is worse than one that is missing,
+because a nightly configured to widen the sweep would otherwise report green having run the
+gate's budget.
 
 Cost: **+72 tests, +~0.9s of aggregated vitest execution** across the two context projects
 (7.9s → 8.8s of `tests` time; wall-clock for `pnpm test` over both projects 3.77s → 3.84s,
 since the property files run in parallel with everything else). **`pnpm check` wall-clock
-is unchanged at ~12.5s**: its critical lane is `web` (~12.4s), not `test` (~10.5s), so the
+is unchanged at ~12.5s** (measured 2026-08-06; lane timings move with any web change): its critical lane is `web` (~12.4s), not `test` (~10.5s), so the
 property tier does not sit on the critical path at all. No `numRuns` reduction was needed.
 
 Placement detail: `__fixtures__/` is already excluded from `tsconfig.build.json` and from
@@ -108,12 +116,21 @@ conflict-behavior test suite — the model run generalizes it.
   assertion is conditional count the times they reached it and fail if that count is zero;
   (c) adoption was validated by a **falsification sweep** — 36 deliberate defects seeded
   one at a time into `decide`, `evolve`, `react`, the upcasters and the store, each
-  required to fail at least one property. Four early properties passed against a defect
-  and were rewritten as a result (two were literally vacuous, comparing a value with
-  itself); two store generators had to be reshaped before the empty-append and paged-read
-  cases were exercised at all. One seeded defect proved an *equivalent* mutant (registering
-  an upcaster at an unreachable version is a no-op under the registry's non-contiguous
-  chain) and was replaced rather than counted.
+  required to fail at least one property.
+
+  The sweep earned its keep: **eight properties passed against a defect on the first
+  attempt** and were rewritten before they bit. Two were literally vacuous (comparing a
+  value with itself); two asserted a literal the test's own runner had just written; two
+  reduced to `isOk() || isErr()`, true by construction for any `Result`; and two never
+  reached a deep enough state to meet the defect. Three generators had to be reshaped
+  before the cases their properties claimed to cover were exercised at all (the empty
+  append, the paged read, the mid-download cancellation). One seeded defect proved an
+  *equivalent* mutant — registering an upcaster at an unreachable version is a no-op under
+  the registry's non-contiguous chain — and was replaced rather than counted.
+
+  The lasting lesson is in defence (b): **every conditional assertion carries a counter**.
+  A guard (`if (…) continue`) is how a property silently stops asserting, and a counter
+  asserted non-zero after the sweep is the only thing that notices.
 - **Wall-clock creep**: budget in D3, measured at adoption, recorded here.
 - **A property failure can be cryptic** — mitigation: each property's assertion message
   names the violated invariant in constitution language, and the seed/path repro line is
@@ -138,8 +155,8 @@ property suite:
 | | Acquisition (downloader) | Import (importer) |
 | --- | --- | --- |
 | Phases | 13 | 7 |
-| Event variants | 20 | 9 |
-| Command variants | 16 | 7 |
+| Event variants | 21 | 9 |
+| Command variants | 15 | 7 |
 
 More decisive than the counts: Acquisition carries more invariants *types cannot express*
 — terminal absorption with exactly one defeasible edge (the external-verdict revival), the

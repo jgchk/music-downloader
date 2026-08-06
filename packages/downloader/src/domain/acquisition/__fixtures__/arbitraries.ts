@@ -38,8 +38,9 @@ import type { AcquisitionState } from '../state.js';
  * - **Advancing** arbitraries ({@link arbAdvancingStep}) read the state they are applied to and
  *   choose a command that is lawful there. Without them a uniform draw would spend almost every
  *   run bouncing off `IllegalTransition` in `Pending`, and the reachable-state invariants would
- *   hold *vacuously* — the classic way a property suite becomes decorative. `phasesTouched` exists
- *   to prove that did not happen: the invariant suite asserts every phase was actually visited.
+ *   hold *vacuously* — the classic way a property suite becomes decorative. The `phasesSeen` sweep in
+ *   `decide.property.test.ts` exists to prove that did not happen: it asserts every phase was
+ *   actually visited and every command actually issued.
  *
  * Both unions are covered by exhaustive `Record<…Type, …>` maps, so adding a command or event
  * variant without a generator is a compile error here (design "generator drift" risk) rather than
@@ -55,7 +56,7 @@ import type { AcquisitionState } from '../state.js';
  * one) is what lets candidates be built to *match* it — ranking is a gate, so a generated target no
  * candidate could match would leave the working set permanently empty and the ladder unreachable.
  */
-export const arbitraryTarget: Target = createTarget({
+export const matchedTarget: Target = createTarget({
   type: 'album',
   artist: 'Fugazi',
   title: 'Repeater',
@@ -74,7 +75,7 @@ export const otherTarget: Target = createTarget({
   tracks: [{ position: 1, title: 'Good Morning, Captain', durationMs: 461_000 }],
 })._unsafeUnwrap();
 
-export const arbTarget: fc.Arbitrary<Target> = fc.constantFrom(arbitraryTarget, otherTarget);
+export const arbTarget: fc.Arbitrary<Target> = fc.constantFrom(matchedTarget, otherTarget);
 
 /**
  * A small identity pool (3 peers x 2 paths x 2 sizes = 12 identities). Deliberately small: the
@@ -90,8 +91,8 @@ export const arbCandidateIdentity: fc.Arbitrary<CandidateIdentity> = fc
   })
   .map((input) => asCandidateIdentity(input));
 
-/** Files mirroring {@link arbitraryTarget}: lossless and structurally aligned, so they clear the gate. */
-const matchingFiles = arbitraryTarget.tracks.map((track) => ({
+/** Files mirroring {@link matchedTarget}: lossless and structurally aligned, so they clear the gate. */
+const matchingFiles = matchedTarget.tracks.map((track) => ({
   name: `${String(track.position).padStart(2, '0')} ${track.title}.flac`,
   sizeBytes: 1,
   codec: 'flac',
@@ -162,27 +163,46 @@ export const arbEditionCandidates: fc.Arbitrary<readonly EditionCandidate[]> = f
   { maxLength: 3 },
 );
 
+/**
+ * Request kinds, weighted toward `release-group`: it is the only kind that can pause for a manual
+ * edition choice, and the `AwaitingManualSelection` phase (plus its off-menu refusal) is otherwise
+ * reached too rarely for the invariants that live there to be asserted at all.
+ */
+/**
+ * NOTE: the ids below are minted with `asMbid`, which brands without validating — `parseMbid`
+ * would reject every one of them (it requires a UUID). That is deliberate: well-formedness is an
+ * edge concern the facade already parses, and short readable ids keep counterexamples legible.
+ */
 export const arbRequest: fc.Arbitrary<AcquisitionRequest> = fc.oneof(
-  fc.record({
-    kind: fc.constant('musicbrainz' as const),
-    mbid: fc.constantFrom('release-1', 'release-2').map((id) => asMbid(id)),
-    targetType: fc.constantFrom('album' as const, 'track' as const),
-  }),
-  fc.record({
-    kind: fc.constant('release-group' as const),
-    mbid: fc.constantFrom('group-1', 'group-2').map((id) => asMbid(id)),
-    targetType: fc.constant('album' as const),
-  }),
-  fc.record(
-    {
-      kind: fc.constant('descriptor' as const),
+  {
+    weight: 1,
+    arbitrary: fc.record({
+      kind: fc.constant('musicbrainz' as const),
+      mbid: fc.constantFrom('release-1', 'release-2').map((id) => asMbid(id)),
       targetType: fc.constantFrom('album' as const, 'track' as const),
-      artist: fc.constantFrom('Fugazi', 'Slint'),
-      title: fc.constantFrom('Repeater', 'Spiderland'),
-      album: fc.constantFrom('Repeater'),
-    },
-    { requiredKeys: ['kind', 'targetType', 'artist', 'title'] },
-  ),
+    }),
+  },
+  {
+    weight: 3,
+    arbitrary: fc.record({
+      kind: fc.constant('release-group' as const),
+      mbid: fc.constantFrom('group-1', 'group-2').map((id) => asMbid(id)),
+      targetType: fc.constant('album' as const),
+    }),
+  },
+  {
+    weight: 1,
+    arbitrary: fc.record(
+      {
+        kind: fc.constant('descriptor' as const),
+        targetType: fc.constantFrom('album' as const, 'track' as const),
+        artist: fc.constantFrom('Fugazi', 'Slint'),
+        title: fc.constantFrom('Repeater', 'Spiderland'),
+        album: fc.constantFrom('Repeater'),
+      },
+      { requiredKeys: ['kind', 'targetType', 'artist', 'title'] },
+    ),
+  },
 );
 
 /**
@@ -206,12 +226,13 @@ export const arbPolicies: fc.Arbitrary<AcquisitionPolicies> = fc
 // --- Blind event arbitraries (the `evolve` adversary) ------------------------------------------
 
 /**
- * One arbitrary per event variant. The `Record` key set is the compile-time drift guard (a new
- * variant without a generator does not typecheck); that each generator actually produces its own
- * key's variant is pinned at runtime by the completeness property in the suite.
+ * One arbitrary per event variant. Two compile-time guards, not one: the `Record` key set means a
+ * new variant without a generator does not typecheck, and the `Extract` value type means a
+ * generator filed under the wrong key does not either. The completeness property in the suite is
+ * the runtime belt to that braces.
  */
 export const eventArbitraryByType: {
-  readonly [K in AcquisitionEventType]: fc.Arbitrary<AcquisitionEvent>;
+  readonly [K in AcquisitionEventType]: fc.Arbitrary<Extract<AcquisitionEvent, { type: K }>>;
 } = {
   AcquisitionRequested: fc.record({
     type: fc.constant('AcquisitionRequested' as const),
@@ -242,7 +263,7 @@ export const eventArbitraryByType: {
     ranked: arbCandidates.map((candidates) =>
       rankCandidates(
         candidates,
-        arbitraryTarget,
+        matchedTarget,
         DEFAULT_QUALITY_POLICY,
         createMatchPolicy(0.5)._unsafeUnwrap(),
       ),
@@ -360,6 +381,9 @@ function identityOfStaging(
   return staging.kind === 'settled' ? staging.current.identity : staging.pending.identity;
 }
 
+/** A release id that is never on a generated menu — the off-menu choice `decide` must refuse. */
+const OFF_MENU_EDITION = asMbid('edition-off-menu');
+
 /** A stand-in for "nobody in flight": lets a report still be *generated* against any state. */
 const ABSENT_IDENTITY: CandidateIdentity = asCandidateIdentity({
   username: 'nobody',
@@ -373,11 +397,14 @@ function reportedIdentity(state: AcquisitionState): CandidateIdentity {
 }
 
 /**
- * One arbitrary per command variant, same drift guard as {@link eventArbitraryByType}: the key set
- * is checked by the compiler, the key-to-payload agreement by the completeness property.
+ * One arbitrary per command variant, same pair of compile-time guards as
+ * {@link eventArbitraryByType}: the key set and the key-to-payload agreement are both checked by
+ * the compiler, with the completeness property as the runtime belt.
  */
 export const blindStepArbitraryByCommandType: {
-  readonly [K in AcquisitionCommandType]: fc.Arbitrary<CommandStep>;
+  readonly [K in AcquisitionCommandType]: fc.Arbitrary<
+    (state: AcquisitionState) => Extract<AcquisitionCommand, { type: K }>
+  >;
 } = {
   SubmitAcquisition: fc
     .tuple(arbRequest, arbPolicies)
@@ -462,6 +489,9 @@ export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
     // Which lawful arm to take where a phase offers several, and whether to report exactly.
     branch: fc.integer({ min: 0, max: 5 }),
     exactReference: fc.boolean(),
+    // Rarely, choose an edition that is not on the menu. Kept rare on purpose: it is a dead end
+    // for the acquisition, so a coin-flip here would starve every phase past the pause.
+    offMenuEdition: fc.integer({ min: 0, max: 2 }).map((draw) => draw === 0),
   })
   .map((draw): CommandStep => {
     return (state) => {
@@ -471,22 +501,30 @@ export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
         }
         case 'Pending': {
           if (draw.branch === 0) return { type: 'RecordMetadataFailed' };
-          if (draw.branch === 1) {
+          if (draw.branch <= 2) {
             return { type: 'RecordManualSelectionRequested', candidates: draw.editions };
           }
           return { type: 'RecordTarget', target: draw.target };
         }
         case 'AwaitingManualSelection': {
+          // Mostly choose from the menu so the acquisition advances — but sometimes choose off it,
+          // because the menu IS the contract and an off-menu choice is the `UnknownEdition`
+          // protocol violation. Without this arm that error kind is never reached at all.
+          if (draw.offMenuEdition) return { type: 'SelectEdition', releaseMbid: OFF_MENU_EDITION };
           const chosen = state.candidates[draw.branch % state.candidates.length];
           return {
             type: 'SelectEdition',
-            releaseMbid: chosen?.releaseMbid ?? asMbid('edition-9'),
+            releaseMbid: chosen?.releaseMbid ?? OFF_MENU_EDITION,
           };
         }
         case 'Searching': {
           return { type: 'RecordSearchResults', candidates: draw.candidates };
         }
         case 'Downloading': {
+          // A cancellation while the transfer is live: the only way to reach `Cancelled` with
+          // `in-flight` staging, and therefore the only way the deferred-cleanup invariants and the
+          // `AbortDownload` reaction get asserted at all.
+          if (draw.branch === 5) return { type: 'CancelAcquisition' };
           if (draw.branch === 0) {
             return { type: 'RecordDownloadStarted', candidate: reportedIdentity(state) };
           }

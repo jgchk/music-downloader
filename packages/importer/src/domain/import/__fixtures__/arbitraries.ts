@@ -171,7 +171,7 @@ const arbManualTags: fc.Arbitrary<ManualTags> = fc
  * remediation verbs vs the two rejections — so an unhandled new verb must not slip through.
  */
 export const resolutionArbitraryByKind: {
-  readonly [K in ResolutionKind]: fc.Arbitrary<Resolution>;
+  readonly [K in ResolutionKind]: fc.Arbitrary<Extract<Resolution, { kind: K }>>;
 } = {
   'apply-candidate': fc.record(
     {
@@ -231,11 +231,12 @@ const arbReviewCause: fc.Arbitrary<ReviewCause> = fc.oneof(
 // --- Blind event arbitraries (the `evolve` adversary) ------------------------------------------
 
 /**
- * One arbitrary per event variant. The `Record` key set is the compile-time drift guard; that each
- * generator produces its own key's variant is pinned at runtime by the completeness property.
+ * One arbitrary per event variant. Two compile-time guards: the `Record` key set rejects a missing
+ * generator, and the `Extract` value type rejects one filed under the wrong key. The completeness
+ * property in the suite is the runtime belt to those braces.
  */
 export const eventArbitraryByType: {
-  readonly [K in ImportEventType]: fc.Arbitrary<ImportEvent>;
+  readonly [K in ImportEventType]: fc.Arbitrary<Extract<ImportEvent, { type: K }>>;
 } = {
   ImportRequested: fc.record(
     {
@@ -311,7 +312,9 @@ export type CommandStep = (state: ImportState) => ImportCommand;
  * these reads the state — they are the blind adversary for the totality properties.
  */
 export const blindStepArbitraryByCommandType: {
-  readonly [K in ImportCommandType]: fc.Arbitrary<CommandStep>;
+  readonly [K in ImportCommandType]: fc.Arbitrary<
+    (state: ImportState) => Extract<ImportCommand, { type: K }>
+  >;
 } = {
   SubmitImport: fc
     .record(
