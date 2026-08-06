@@ -29,6 +29,7 @@
     "dev": "pnpm --dir packages/web dev"
   },
   "devDependencies": {
+    "@ninoseki/eslint-plugin-neverthrow": "0.2.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",

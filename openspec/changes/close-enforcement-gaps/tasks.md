@@ -6,15 +6,15 @@ Sequencing: after the S-queue drains (S2/S3 touch overlapping test files).
 
 ## 1. The Result rule
 
-- [ ] 1.1 Add `@ninoseki/eslint-plugin-neverthrow` pinned; `must-use-result` in the production
+- [x] 1.1 Add `@ninoseki/eslint-plugin-neverthrow` pinned; `must-use-result` in the production
       profile; test tiers excluded via a commented override naming the ratchet trigger;
       `no-floating-promises` + `checkThenables` as defense-in-depth.
-- [ ] 1.2 Fix both `reset()` discarded `checkpoints.save`s (red first: save-failure fake proves
+- [x] 1.2 Fix both `reset()` discarded `checkpoints.save`s (red first: save-failure fake proves
       reset reports the failure) — `fix:`, both modules.
-- [ ] 1.3 Resolve the six logging-helper false positives refactor-first (structural
+- [x] 1.3 Resolve the six logging-helper false positives refactor-first (structural
       consumption); fall back to per-site justified disables only if the refactor contorts the
       helper. Zero-waiver posture preserved if structurally possible.
-- [ ] 1.4 Fix the third true positive (the facade fixture discard).
+- [x] 1.4 Fix the third true positive (the facade fixture discard).
 
 ## 2. Tier coverage — typecheck
 
