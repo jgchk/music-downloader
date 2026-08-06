@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.16.2](https://github.com/jgchk/music-downloader/compare/v3.16.1...v3.16.2) (2026-08-06)
+
+### Bug Fixes
+
+* **downloader:** default the event store to the populated upcaster registry ([0f7fdbd](https://github.com/jgchk/music-downloader/commit/0f7fdbdd9446ce02233bfecdef7b14894e010c85))
+* **downloader:** encode the stalled flag tag-or-omit on the wire ([5de2876](https://github.com/jgchk/music-downloader/commit/5de2876a1a1f354f37159607815f4d5f832d562e))
+* **importer:** project history onto the wire per kind, never by spread ([1f98ad3](https://github.com/jgchk/music-downloader/commit/1f98ad3db34914c4f2275bfd2a737296419759b0))
+* **importer:** replay legacy events through the production upcaster registry ([0fbbb9e](https://github.com/jgchk/music-downloader/commit/0fbbb9e60982e8887020b24ecafa5cac9fa0222c))
+* **web:** honest degrade arms and one-voice register at the wire lookups ([e69a6b3](https://github.com/jgchk/music-downloader/commit/e69a6b34a2343006df5ac5b3bb2a1e8413f861a3))
+* **web:** restore compile pressure on the resolution-verb seams ([fd52753](https://github.com/jgchk/music-downloader/commit/fd52753d5a17ecd83a8c5e6f7f7856512ed155cd))
 ## [3.16.1](https://github.com/jgchk/music-downloader/compare/v3.16.0...v3.16.1) (2026-08-05)
 
 ### Bug Fixes
