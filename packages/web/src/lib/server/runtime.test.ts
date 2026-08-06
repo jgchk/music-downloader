@@ -53,7 +53,7 @@ function fakeSubscription(log: string[], name: string) {
 function fakeRuntimes(
   log: string[],
   statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {},
-  failures: { acquisitionsStart?: boolean } = {},
+  failures: { acquisitionsStart?: boolean; acquisitionsStopThrows?: boolean } = {},
 ) {
   // Each seam must be wired to the OTHER module's feed and wakeups; capturing what each connect call
   // received lets a test catch a cross-wiring (e.g. handing the verdict seam the downloader's own
@@ -84,14 +84,27 @@ function fakeRuntimes(
     connectAcquisitionFeed: (feed: unknown, options: { sourceRoot: string }, wakeups: unknown) => {
       log.push(`acquisitions:connect:${options.sourceRoot}`);
       captured.acquisition = { feed, wakeups };
-      return failures.acquisitionsStart
-        ? {
-            start: () => Promise.reject(new Error('subscription start defect')),
-            stop: () => {
-              log.push('acquisitions:stop');
-            },
-          }
-        : fakeSubscription(log, 'acquisitions');
+      if (failures.acquisitionsStart) {
+        return {
+          start: () => Promise.reject(new Error('subscription start defect')),
+          stop: () => {
+            log.push('acquisitions:stop');
+          },
+        };
+      }
+      if (failures.acquisitionsStopThrows) {
+        let hasThrown = false;
+        return {
+          start: () => Promise.resolve(),
+          stop: () => {
+            // Throw once (the scenario under test); settle quietly for the afterEach reset.
+            if (hasThrown) return;
+            hasThrown = true;
+            throw new Error('sync stop defect');
+          },
+        };
+      }
+      return fakeSubscription(log, 'acquisitions');
     },
     readiness: () => ({ status: statuses.importer ?? 'up' }),
     stop: () => {
@@ -245,25 +258,101 @@ describe('bootRuntimes', () => {
     expect(log).toContain('importer:stop');
   });
 
-  it('logs, rather than loses, a rejection from the signal-driven shutdown', async () => {
-    // The default registration fires `void shutdown()` from a process event: a rejection there
-    // has no awaiting caller, so unobserved it would be an unhandled rejection at teardown.
+  it('a failing stop during signal-driven shutdown is isolated, logged, and dirties the exit code', async () => {
+    // One runtime's failed stop must not skip the other's — its pollers would keep the event
+    // loop alive until SIGKILL while the exit reads clean. Each stop settles independently, the
+    // rejection is logged (never an unhandled rejection at teardown), and the exit code says so.
     const log: string[] = [];
+    const lines: string[] = [];
     const fakes = fakeRuntimes(log);
     await bootRuntimes(VALID_ENV, {
       createDownloader: fakes.createDownloader,
       createImporter: fakes.createImporter,
+      logDestination: { write: (line: string) => void lines.push(line) },
     });
-    const errorSpy = vi.spyOn(loggerOf(), 'error');
-    fakes.downloader.stop = () => Promise.reject(new Error('close raced'));
+    fakes.downloader.stop = () => {
+      log.push('downloader:stop:rejected');
+      return Promise.reject(new Error('close raced'));
+    };
+    const priorExitCode = process.exitCode;
+
+    (process.emit as (event: string) => boolean)('sveltekit:shutdown');
+
+    try {
+      await vi.waitFor(() => {
+        expect(lines.join('')).toContain('runtime stop failed during shutdown');
+      });
+      expect(log).toContain('importer:stop'); // the sibling stop still ran
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = priorExitCode; // never let this spec dirty the test process's own exit
+      fakes.downloader.stop = () => Promise.resolve(); // let afterEach tear down cleanly
+    }
+  });
+
+  it('a defect thrown inside shutdown itself is logged, never an unhandled rejection', async () => {
+    // stopSettled absorbs runtime-stop failures, but shutdown still calls the seam
+    // subscriptions' sync stop()s directly — a defect thrown there rejects the fire-and-forget
+    // shutdown call, which has no awaiting caller. The last-resort catch must observe it.
+    const log: string[] = [];
+    const lines: string[] = [];
+    const fakes = fakeRuntimes(log, {}, { acquisitionsStopThrows: true });
+    await bootRuntimes(VALID_ENV, {
+      createDownloader: fakes.createDownloader,
+      createImporter: fakes.createImporter,
+      logDestination: { write: (line: string) => void lines.push(line) },
+    });
 
     (process.emit as (event: string) => boolean)('sveltekit:shutdown');
 
     await vi.waitFor(() => {
-      const messages = errorSpy.mock.calls.map((call) => String(call.at(-1)));
-      expect(messages).toContain('shutdown failed');
+      expect(lines.join('')).toContain('shutdown failed');
     });
-    fakes.downloader.stop = () => Promise.resolve(); // let afterEach tear down cleanly
+  });
+
+  it('the original boot fatal wins over a failing stop during teardown', async () => {
+    // The seam subscription's start throws AND the downloader's stop rejects during cleanup:
+    // the caller must still see the subscription defect (the actual fatal), with the cleanup
+    // rejection logged — never thrown over it — and the importer's stop still runs.
+    const log: string[] = [];
+    const lines: string[] = [];
+    const fakes = fakeRuntimes(log, {}, { acquisitionsStart: true });
+    fakes.downloader.stop = () => {
+      log.push('downloader:stop:rejected');
+      return Promise.reject(new Error('close raced'));
+    };
+
+    await expect(
+      bootRuntimes(VALID_ENV, {
+        createDownloader: fakes.createDownloader,
+        createImporter: fakes.createImporter,
+        onShutdownSignal: vi.fn(),
+        logDestination: { write: (line: string) => void lines.push(line) },
+      }),
+    ).rejects.toThrow(/subscription start defect/);
+    expect(log).toContain('importer:stop');
+    expect(lines.join('')).toContain('runtime stop failed during boot teardown');
+  });
+
+  it('the importer startup error wins over a failing downloader stop', async () => {
+    const log: string[] = [];
+    const lines: string[] = [];
+    const fakes = fakeRuntimes(log);
+    fakes.downloader.stop = () => Promise.reject(new Error('close raced'));
+    const failingImporter = vi.fn((() =>
+      Promise.resolve(
+        err({ kind: 'BeetsConfigUnusable', detail: 'bad yaml' }),
+      )) as unknown as typeof createImporterRuntime);
+
+    await expect(
+      bootRuntimes(VALID_ENV, {
+        createDownloader: fakes.createDownloader,
+        createImporter: failingImporter,
+        onShutdownSignal: vi.fn(),
+        logDestination: { write: (line: string) => void lines.push(line) },
+      }),
+    ).rejects.toThrow(/importer startup failed: bad yaml/);
+    expect(lines.join('')).toContain('runtime stop failed during boot teardown');
   });
 
   it('composes the access surface: the configured session secret and the real plex.tv adapter', async () => {

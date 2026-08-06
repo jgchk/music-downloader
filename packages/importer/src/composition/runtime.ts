@@ -32,6 +32,11 @@ import { intakeEventConsumer } from '../interfaces/events/intake-consumer.js';
 import { createImporterFacade } from '../facade/index.js';
 import type { ImporterFacade } from '../facade/index.js';
 
+// The module's log-redaction defaults, exposed on the runtime surface: the composed process
+// constructs the ONE pino root both runtimes share, so redaction must be composed there — a
+// module-internal default the composition root cannot see would never apply to a shipped line.
+export { DEFAULT_REDACT_PATHS } from '../application/logging/logger.js';
+
 /**
  * The importer module's runtime factory (merge-modular-monolith D8): everything the module runs
  * in a composed process — store, bus, projection, reactor, the validated beets bridge — behind

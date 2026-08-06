@@ -6,7 +6,7 @@ import type { DownloaderFacade } from '@music/downloader';
 import type { ImporterFacade } from '@music/importer';
 import type { DownloaderReadiness } from '@music/downloader/runtime';
 import type { ImporterReadiness } from '@music/importer/runtime';
-import type { Logger } from 'pino';
+import type { DestinationStream, Logger } from 'pino';
 import { loadComposedConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { PlexTvAccess } from './plex/adapter.js';
@@ -77,6 +77,28 @@ export interface BootOverrides {
   readonly createImporter?: typeof createImporterRuntime;
   /** Shutdown-signal registration seam; production wires adapter-node's `sveltekit:shutdown`. */
   readonly onShutdownSignal?: (shutdown: () => Promise<void>) => void;
+  /** Log-capture seam for boot/teardown specs; production writes to stdout. */
+  readonly logDestination?: DestinationStream;
+}
+
+/**
+ * Settle every stop and log the failures: a teardown must never mask the error that caused it,
+ * and one runtime's failed stop must never skip the other's (its pollers would keep the event
+ * loop alive until SIGKILL). Returns whether every stop settled cleanly.
+ */
+async function stopSettled(
+  logger: Logger,
+  message: string,
+  stops: readonly Promise<void>[],
+): Promise<boolean> {
+  const settled = await Promise.allSettled(stops);
+  const failed = settled.filter(
+    (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+  );
+  for (const failure of failed) {
+    logger.error({ err: failure.reason }, message);
+  }
+  return failed.length === 0;
 }
 
 // Boot-once singleton state held on one object so the memoization writes are property
@@ -105,7 +127,7 @@ async function boot(
   const config = loadComposedConfig(environment);
   if (config.isErr()) throw new Error(config.error);
 
-  const logger = createLogger(config.value.logLevel);
+  const logger = createLogger(config.value.logLevel, overrides.logDestination);
 
   const downloaderResult = await (overrides.createDownloader ?? createDownloaderRuntime)(
     config.value.downloader,
@@ -121,7 +143,8 @@ async function boot(
     logger,
   );
   if (importerResult.isErr()) {
-    await downloader.stop();
+    // Settled, never bare-awaited: a failing downloader stop must not mask the startup error.
+    await stopSettled(logger, 'runtime stop failed during boot teardown', [downloader.stop()]);
     throw new Error(`importer startup failed: ${importerResult.error.detail}`);
   }
   const importer: ImporterRuntime = importerResult.value;
@@ -137,21 +160,28 @@ async function boot(
     await verdicts.start();
   } catch (error) {
     // A subscription whose start throws must not strand two booted runtimes with live pollers
-    // behind a rejected boot: stop everything already started, then surface the fatal.
+    // behind a rejected boot: stop everything already started, then surface the ORIGINAL fatal —
+    // cleanup rejections are logged by stopSettled, never thrown over it.
     acquisitions.stop();
     verdicts.stop();
-    await downloader.stop();
-    await importer.stop();
+    await stopSettled(logger, 'runtime stop failed during boot teardown', [
+      downloader.stop(),
+      importer.stop(),
+    ]);
     throw error;
   }
 
   const shutdown = async (): Promise<void> => {
     acquisitions.stop();
     verdicts.stop();
-    await downloader.stop();
-    await importer.stop();
+    const isClean = await stopSettled(logger, 'runtime stop failed during shutdown', [
+      downloader.stop(),
+      importer.stop(),
+    ]);
     runtime.booted = undefined;
     runtime.booting = undefined;
+    // A dirty teardown must not report a clean exit: pollers may be alive until SIGKILL.
+    if (!isClean) process.exitCode = 1;
   };
   (overrides.onShutdownSignal ?? ((handler) => registerProcessShutdown(handler, logger)))(shutdown);
 

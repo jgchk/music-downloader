@@ -53,6 +53,11 @@ import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
 import { createDownloaderFacade } from '../facade/index.js';
 import type { DownloaderFacade } from '../facade/index.js';
 
+// The module's log-redaction defaults, exposed on the runtime surface: the composed process
+// constructs the ONE pino root both runtimes share, so redaction must be composed there — a
+// module-internal default the composition root cannot see would never apply to a shipped line.
+export { DEFAULT_REDACT_PATHS } from '../application/logging/logger.js';
+
 /**
  * The downloader module's runtime factory (merge-modular-monolith D8): everything the module runs
  * in a composed process — store, bus, projections, reactor, sweep — behind one constructor, with
