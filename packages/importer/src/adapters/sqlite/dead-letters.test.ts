@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteDeadLetterStore } from './dead-letters.js';
 import { openEventDatabase } from './schema.js';
 
@@ -9,9 +9,24 @@ const LETTER = {
   occurredAt: '2026-07-21T12:00:00.000Z',
 };
 
+const openDatabases: ReturnType<typeof openEventDatabase>[] = [];
+
+function freshDatabase(): ReturnType<typeof openEventDatabase> {
+  const database = openEventDatabase(':memory:');
+  openDatabases.push(database);
+  return database;
+}
+
+afterEach(() => {
+  for (const database of openDatabases) {
+    if (database.open) database.close();
+  }
+  openDatabases.length = 0;
+});
+
 describe('SqliteDeadLetterStore', () => {
   it('records and lists parked events per subscription, in position order', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
 
     await store.record({ ...LETTER, globalSeq: 9 });
     await store.record(LETTER);
@@ -23,7 +38,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('re-parking the same position upserts instead of failing (redelivery converges)', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
 
     await store.record(LETTER);
     const again = await store.record({ ...LETTER, error: 'InvalidPayload (retry)' });
@@ -35,7 +50,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('round-trips a reactor letter carrying its owning stream, and clears by stream', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     const reactorLetter = { ...LETTER, subscription: 'import-reactor', streamId: 'imp-1' };
 
     await store.record(reactorLetter);
@@ -51,7 +66,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('scopes clearStream to its subscription — another subscription’s same-stream letter survives', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     await store.record({ ...LETTER, subscription: 'import-reactor', streamId: 'imp-1' });
     const bystander = { ...LETTER, subscription: 'seam:acquisitions', streamId: 'imp-1' };
     await store.record(bystander);
@@ -65,7 +80,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('prunes letters older than the retention horizon, keeping newer ones', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     await store.record({ ...LETTER, globalSeq: 1, occurredAt: '2026-06-01T00:00:00.000Z' });
     await store.record({ ...LETTER, globalSeq: 2, occurredAt: '2026-07-21T12:00:00.000Z' });
 
@@ -77,7 +92,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('scopes prune to its subscription — another subscription’s aged letters are untouched', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     // The reactor's boot-time retention prune of 'import-reactor' must never touch the seam's letters.
     const seamAged = {
       ...LETTER,
@@ -99,18 +114,25 @@ describe('SqliteDeadLetterStore', () => {
     expect(listResult9._unsafeUnwrap()).toEqual([seamAged]);
   });
 
-  it('surfaces storage faults as infra errors', async () => {
-    const database = openEventDatabase(':memory:');
-    const store = new SqliteDeadLetterStore(database);
-    database.close();
-
-    const recordResult = await store.record(LETTER);
-    expect(recordResult.isErr()).toBe(true);
-    const listResult10 = await store.list('seam:acquisitions');
-    expect(listResult10.isErr()).toBe(true);
-    const clearStreamResult3 = await store.clearStream('import-reactor', 'imp-1');
-    expect(clearStreamResult3.isErr()).toBe(true);
-    const pruneResult = await store.prune('seam:acquisitions', '2026-07-01T00:00:00.000Z');
-    expect(pruneResult.isErr()).toBe(true);
+  describe('surfaces a faulted connection as an infra error', () => {
+    it.each([
+      ['record', (store: SqliteDeadLetterStore) => store.record(LETTER)],
+      ['list', (store: SqliteDeadLetterStore) => store.list('seam:acquisitions')],
+      [
+        'clearStream',
+        (store: SqliteDeadLetterStore) => store.clearStream('import-reactor', 'imp-1'),
+      ],
+      [
+        'prune',
+        (store: SqliteDeadLetterStore) =>
+          store.prune('seam:acquisitions', '2026-07-01T00:00:00.000Z'),
+      ],
+    ] as const)('%s', async (_operation, call) => {
+      const database = freshDatabase();
+      const store = new SqliteDeadLetterStore(database);
+      database.close();
+      const result = await call(store);
+      expect(result.isErr()).toBe(true);
+    });
   });
 });

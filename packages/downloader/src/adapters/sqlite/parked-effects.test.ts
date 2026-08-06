@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteParkedEffectStore } from './parked-effects.js';
 import { openEventDatabase } from './schema.js';
 
@@ -11,9 +11,24 @@ const ENTRY = {
   lastError: 'mb: down',
 };
 
+const openDatabases: ReturnType<typeof openEventDatabase>[] = [];
+
+function freshDatabase(): ReturnType<typeof openEventDatabase> {
+  const database = openEventDatabase(':memory:');
+  openDatabases.push(database);
+  return database;
+}
+
+afterEach(() => {
+  for (const database of openDatabases) {
+    if (database.open) database.close();
+  }
+  openDatabases.length = 0;
+});
+
 describe('SqliteParkedEffectStore', () => {
   it('parks an entry and finds it by stream', async () => {
-    const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
+    const store = new SqliteParkedEffectStore(freshDatabase());
 
     await store.park(ENTRY);
 
@@ -24,7 +39,7 @@ describe('SqliteParkedEffectStore', () => {
   });
 
   it('re-parking the same stream upserts the scheduling state (one park per stream)', async () => {
-    const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
+    const store = new SqliteParkedEffectStore(freshDatabase());
 
     await store.park(ENTRY);
     await store.park({
@@ -41,7 +56,7 @@ describe('SqliteParkedEffectStore', () => {
   });
 
   it('lists only entries due at the given instant, oldest scheduling first', async () => {
-    const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
+    const store = new SqliteParkedEffectStore(freshDatabase());
     await store.park({ ...ENTRY, streamId: 'acq-later', nextRetryAt: '2026-07-22T13:00:00.000Z' });
     await store.park({ ...ENTRY, streamId: 'acq-due-2', nextRetryAt: '2026-07-22T12:00:05.000Z' });
     await store.park({ ...ENTRY, streamId: 'acq-due-1', nextRetryAt: '2026-07-22T12:00:01.000Z' });
@@ -53,7 +68,7 @@ describe('SqliteParkedEffectStore', () => {
   });
 
   it('clears an entry on success and clearing an absent stream is a no-op', async () => {
-    const store = new SqliteParkedEffectStore(openEventDatabase(':memory:'));
+    const store = new SqliteParkedEffectStore(freshDatabase());
     await store.park(ENTRY);
 
     const clearResult = await store.clear('acq-1');
@@ -67,18 +82,18 @@ describe('SqliteParkedEffectStore', () => {
     expect(dueResult2._unsafeUnwrap()).toEqual([]);
   });
 
-  it('surfaces storage faults as infra errors', async () => {
-    const database = openEventDatabase(':memory:');
-    const store = new SqliteParkedEffectStore(database);
-    database.close();
-
-    const parkResult = await store.park(ENTRY);
-    expect(parkResult.isErr()).toBe(true);
-    const findResult5 = await store.find('acq-1');
-    expect(findResult5.isErr()).toBe(true);
-    const dueResult3 = await store.due('2026-07-23T00:00:00.000Z');
-    expect(dueResult3.isErr()).toBe(true);
-    const clearResult3 = await store.clear('acq-1');
-    expect(clearResult3.isErr()).toBe(true);
+  describe('surfaces a faulted connection as an infra error', () => {
+    it.each([
+      ['park', (store: SqliteParkedEffectStore) => store.park(ENTRY)],
+      ['find', (store: SqliteParkedEffectStore) => store.find('acq-1')],
+      ['due', (store: SqliteParkedEffectStore) => store.due('2026-07-23T00:00:00.000Z')],
+      ['clear', (store: SqliteParkedEffectStore) => store.clear('acq-1')],
+    ] as const)('%s', async (_operation, call) => {
+      const database = freshDatabase();
+      const store = new SqliteParkedEffectStore(database);
+      database.close();
+      const result = await call(store);
+      expect(result.isErr()).toBe(true);
+    });
   });
 });
