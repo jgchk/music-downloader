@@ -1,0 +1,26 @@
+{
+  "service": "slskd",
+  "pinnedVersion": "0.22.5",
+  "capturedAt": "2026-08-06",
+  "source": "slskd 0.22.5 DownloadService.cs (the terminal catch in the download task, which overwrites the library's disposition) + Soulseek.NET 7.0.3 TransferStates.cs, read at the tag; every terminal state additionally witnessed by a fixture recorded from a running instance of this version",
+  "note": "The transfer states the PINNED slskd can put on a download row. Soulseek.NET defines more flags than this, but slskd 0.22.5's own catch rewrites the terminal record — OperationCanceledException to Completed|Cancelled, everything else to Completed|Errored — so the library's Rejected/TimedOut/Aborted dispositions never survive to the API. Failure differentiation therefore lives entirely in the `exception` text, not in the state. A unit stub naming a state outside `reachable` is testing a provider that does not exist; the vocabulary test enforces that. This record is version-scoped on purpose: bumping slskd (0.26 makes TimedOut terminal, starts downloads as `Queued, Locally`, and lets a failed transfer return to queued) must mean re-recording and rewriting this file, not editing a stub until it passes.",
+
+  "reachable": {
+    "Requested": "asked of the peer, no answer yet",
+    "Queued, Locally": "momentary, before the peer is asked",
+    "Queued, Remotely": "the peer deferred us into its queue",
+    "Initializing": "the peer accepted and the connection is coming up",
+    "InProgress": "bytes are moving",
+    "Completed, Succeeded": "the file arrived",
+    "Completed, Cancelled": "we cancelled it",
+    "Completed, Errored": "everything else that went wrong, whatever the cause"
+  },
+
+  "terminal": ["Completed, Succeeded", "Completed, Cancelled", "Completed, Errored"],
+
+  "unreachable": {
+    "Completed, Rejected": "Soulseek.NET raises it, slskd 0.22.5 overwrites it with Completed|Errored before the API can serve it — the peer's refusal survives only as the exception text 'Transfer rejected: …'",
+    "Completed, TimedOut": "same overwrite; a timeout reaches us as Completed|Errored with 'timed out' in the exception. Becomes genuinely terminal in slskd 0.26",
+    "Completed, Aborted": "same overwrite; raised for a size mismatch"
+  }
+}

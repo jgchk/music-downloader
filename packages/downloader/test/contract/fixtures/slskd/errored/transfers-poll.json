@@ -1,0 +1,46 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "Completed, Errored after the peer vanished mid-flight"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "username": "peer1",
+      "directories": [
+        {
+          "directory": "corpus\\Lab Artist\\Lab Album",
+          "fileCount": 1,
+          "files": [
+            {
+              "id": "0cae4074-6421-4718-b779-3f6c20e04c49",
+              "username": "peer1",
+              "direction": "Download",
+              "filename": "corpus\\Lab Artist\\Lab Album\\01 - Slot Hog.flac",
+              "size": 944302,
+              "startOffset": 0,
+              "state": "Completed, Errored",
+              "requestedAt": "2026-08-06T16:40:33.426955",
+              "enqueuedAt": "2026-08-06T16:40:33.436715",
+              "startedAt": "2026-08-06T16:40:33.4404673Z",
+              "endedAt": "2026-08-06T16:40:35.5515478Z",
+              "bytesTransferred": 2244,
+              "averageSpeed": 1062.9627813813827,
+              "exception": "Transfer failed: Read error: Remote connection closed",
+              "bytesRemaining": 942058,
+              "elapsedTime": "00:00:02.1110805",
+              "percentComplete": 0.23763584107626584,
+              "remainingTime": "00:14:46.2568064"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

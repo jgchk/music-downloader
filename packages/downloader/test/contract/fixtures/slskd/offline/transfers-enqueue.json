@@ -1,0 +1,16 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "nothing cached, so slskd asks the server and reports the peer as offline"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 500,
+    "body": "User peer1 appears to be offline"
+  }
+}

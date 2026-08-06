@@ -7,6 +7,7 @@ import {
   mbReleaseSearchSchema,
 } from '../../../src/adapters/musicbrainz/schemas.js';
 import {
+  slskdEnqueueRejectionSchema,
   slskdEventsSchema,
   slskdOptionsSchema,
   slskdSearchResponsesSchema,
@@ -21,7 +22,8 @@ import {
  * double, and the runtime adapter can never disagree about a payload's shape. Absence here is an
  * ARTIFACT-level statement only ("this recorded body is not consumed"), declared explicitly in
  * the unconsumed lists below — never an endpoint-level one: the same endpoint can have consumed
- * shapes this tier has not yet witnessed (see the note on the enqueue rejection body below).
+ * shapes recorded under different scenarios (the transfer enqueue's 201 ack carries nothing, while
+ * its 500 rejection body is the whole account of a failed enqueue).
  */
 
 /** Recorded-fixture filename → schema. */
@@ -33,26 +35,64 @@ export const fixtureSchemas: Record<string, ZodType> = {
   'musicbrainz/release-group-browse.json': mbReleaseGroupBrowseSchema,
   'musicbrainz/release-group-lookup.json': mbReleaseSchema,
   'musicbrainz/release-group-no-official-browse.json': mbReleaseGroupBrowseSchema,
-  'slskd/search-create.json': slskdSearchStateSchema,
-  'slskd/search-state.json': slskdSearchStateSchema,
-  'slskd/search-responses.json': slskdSearchResponsesSchema,
-  'slskd/transfers-poll.json': slskdTransfersSchema,
-  'slskd/events.json': slskdEventsSchema,
-  'slskd/options.json': slskdOptionsSchema,
+  // The live-network cross-check: real heterogeneous peers, recorded from the maintainer's slskd.
+  // The lab cannot fake a search answered by hundreds of different client implementations, so this
+  // set stays as the witness that the lab's shapes are the network's shapes.
+  'slskd/live/search-create.json': slskdSearchStateSchema,
+  'slskd/live/search-state.json': slskdSearchStateSchema,
+  'slskd/live/search-responses.json': slskdSearchResponsesSchema,
+  'slskd/live/transfers-poll.json': slskdTransfersSchema,
+  'slskd/live/events.json': slskdEventsSchema,
+  'slskd/live/options.json': slskdOptionsSchema,
+  // The lab's happy path, recorded as one coupled session (search → enqueue → poll → events).
+  'slskd/full-flow/search-create.json': slskdSearchStateSchema,
+  'slskd/full-flow/search-state.json': slskdSearchStateSchema,
+  'slskd/full-flow/search-responses.json': slskdSearchResponsesSchema,
+  'slskd/full-flow/transfers-poll.json': slskdTransfersSchema,
+  'slskd/full-flow/events.json': slskdEventsSchema,
+  'slskd/full-flow/options.json': slskdOptionsSchema,
+  // One scenario per transfer state the classifier consumes — all of them the same endpoint, which
+  // is why the fixtures are nested by scenario rather than named flat.
+  'slskd/queued/transfers-poll.json': slskdTransfersSchema,
+  'slskd/cancelled/transfers-poll.json': slskdTransfersSchema,
+  'slskd/rejection/transfers-poll.json': slskdTransfersSchema,
+  'slskd/errored/transfers-poll.json': slskdTransfersSchema,
+  // The enqueue rejections, whose *body* is the consumed contract — there is no transfer row to
+  // read for the offline and stalled cases, so this text is the entire account of the failure.
+  // (On the pinned slskd these arrive as 500s and take the infrastructure path first; the
+  // classifier reads them for diagnostics only — see `enqueueRejectionReason`.)
+  'slskd/rejection/transfers-enqueue.json': slskdEnqueueRejectionSchema,
+  'slskd/offline/transfers-enqueue.json': slskdEnqueueRejectionSchema,
+  'slskd/unreachable/transfers-enqueue.json': slskdEnqueueRejectionSchema,
+  'slskd/stalled/transfers-enqueue.json': slskdEnqueueRejectionSchema,
 };
 
 /**
  * Recorded ARTIFACTS whose response body the adapters do not consume (the request side is still
  * replay-asserted). This is a statement about the artifact, not the endpoint: the transfer-enqueue
- * 201 ack's body is unconsumed, but the SAME endpoint's 4xx rejection body IS consumed
- * (enqueueRejectionReason's peer-unavailable classification) and is unwitnessed pending the
- * slskd-contract-truth change (task 2.3 records it live). Declaring an artifact here lets the
- * conformance suite skip schema validation without a silent early-return: every fixture on disk
- * must appear either in {@link fixtureSchemas} or here, exactly. The moment an adapter consumes
- * one of these responses, MOVE the entry to {@link fixtureSchemas} (and
- * {@link fixtureRequiredFields} where a guard branches on a field) — do not let it linger here.
+ * 201 ack carries nothing, while the SAME endpoint's 500 rejection body is consumed contract and is
+ * schema-bound above. Declaring an artifact here lets the conformance suite skip schema validation
+ * without a silent early-return: every fixture on disk must appear either in
+ * {@link fixtureSchemas} or here, exactly. The moment an adapter consumes one of these responses,
+ * MOVE the entry to {@link fixtureSchemas} (and {@link fixtureRequiredFields} where a guard
+ * branches on a field) — do not let it linger here.
  */
-export const unconsumedResponseFixtures: readonly string[] = ['slskd/transfers-enqueue.json'];
+export const unconsumedResponseFixtures: readonly string[] = [
+  'slskd/live/transfers-enqueue.json', // 201 empty-body ack
+  'slskd/full-flow/transfers-enqueue.json', // 201 empty-body ack
+  'slskd/queued/transfers-enqueue.json', // 201 empty-body ack
+  'slskd/full-flow/search-delete.json', // 204 body-less ack
+  'slskd/cancelled/transfers-cancel.json', // 204 body-less ack
+  // A 404 with no body at all. The *status* is consumed — it is how the adapter learns a user has
+  // no transfers, which is state and not a fault — but there is nothing to validate a schema
+  // against, so the meaning is pinned by the replay test instead.
+  'slskd/absent/transfers-poll.json',
+  // The queue-position endpoint answers a bare integer. Recorder-only surface: it exists to make
+  // `placeInQueue` appear in the poll that follows it (slskd only asks the peer when something
+  // calls this), and no adapter reads its response — which is also why it is absent from the
+  // consumed-operations manifest.
+  'slskd/queued/transfers-position.json',
+];
 
 /**
  * E2E stub mappings whose response body the TS adapters do not consume, under the same
@@ -65,7 +105,7 @@ export const unconsumedStubMappings: readonly string[] = [
   'musicbrainz/beets-release-ws2.json', // consumed by beets (Python), governed by the bridge tier's beets pin
   'slskd/search-delete.json', // 204 body-less ack
   'slskd/transfers-delete.json', // 204 body-less ack
-  'slskd/transfers-enqueue.json', // 201 empty-body ack; the 4xx rejection body is the slskd-contract-truth 2.3 item
+  'slskd/transfers-enqueue.json', // 201 empty-body ack (the rejection body is witnessed by the recorded lab fixtures)
 ];
 
 /**
@@ -75,7 +115,8 @@ export const unconsumedStubMappings: readonly string[] = [
  * force a deliberate decision instead of silently disarming a guard.
  */
 export const fixtureRequiredFields: Record<string, readonly string[]> = {
-  'slskd/search-state.json': ['isComplete', 'state', 'responseCount'],
+  'slskd/live/search-state.json': ['isComplete', 'state', 'responseCount'],
+  'slskd/full-flow/search-state.json': ['isComplete', 'state', 'responseCount'],
 };
 
 /** E2E WireMock stub filename → schema. */

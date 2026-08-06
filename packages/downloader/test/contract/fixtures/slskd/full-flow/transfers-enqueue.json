@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "accepted enqueue — a 201 whose body the adapter does not consume"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 201
+  }
+}

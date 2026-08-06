@@ -1,0 +1,16 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "the peer never answered — slskd gives up with a wait timeout, not an offline report"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 500,
+    "body": "One or more errors occurred. (One or more errors occurred. (The wait timed out after 15000 milliseconds))"
+  }
+}

@@ -74,7 +74,11 @@ describe('recorded fixtures conform to the contract', () => {
   const witnessed = Object.entries(fixtureRequiredFields).map(([key, fields]) => ({ key, fields }));
 
   it.each(witnessed)('$key witnesses its consumed integrity fields', ({ key, fields }) => {
-    const [service, name] = key.split('/');
+    // A fixture name is a path relative to its service directory, so it may itself contain a
+    // slash (`live/search-state.json`) — split off only the service.
+    const separator = key.indexOf('/');
+    const service = key.slice(0, separator);
+    const name = key.slice(separator + 1);
     const match = fixtures.find((f) => f.service === service && f.name === name);
     expect(match, `${key} fixture missing`).toBeDefined();
     const body = match!.fixture.response.body as Record<string, unknown>;
