@@ -13,11 +13,12 @@ import type {
 } from './catch-up-subscription.js';
 
 /**
- * Settle everything already queued on the microtask queue. A macrotask hop is what makes the
+ * Let the event loop take one full turn. A `setImmediate` hop is a MACROTASK, so it runs only
+ * after the microtask queue has fully drained - which is what makes the
  * "has NOT resolved yet" assertions below honest: any promise chain that was ready to settle has
  * done so by the time this resolves, so a still-pending flag means genuinely still pending.
  */
-function flushMicrotasks(): Promise<void> {
+function settleEventLoopTurn(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
@@ -289,12 +290,22 @@ describe('CatchUpSubscription', () => {
       read: (): Promise<Result<SeamFeedBatch, { kind: string }>> =>
         Promise.resolve(err({ kind: 'RenderError' })),
     };
-    const sub = subscription({ feed: renderDefectFeed });
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const sub = subscription({ feed: renderDefectFeed, logger });
 
     await sub.start();
 
     expect(sub.isHalted).toBe(true);
     expect(await checkpointOf()).toBe(0); // held, never skipped
+    // Exactly one line, naming the defect as permanent. Falling through to the transient
+    // "holding checkpoint" log as well would tell an operator to wait for a retry that is never
+    // coming — so the halt's early return is part of the behaviour, not an optimisation.
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      { subscription: 'seam:test', cursor: 0, err: { kind: 'RenderError' } },
+      'seam feed render defect (permanent); subscription halted, checkpoint held',
+    );
   });
 
   it('halts on a faulted checkpoint read instead of replaying the whole feed from zero', async () => {
@@ -596,7 +607,7 @@ describe('CatchUpSubscription', () => {
     const sub = subscription({ feed: gatedFeed });
 
     const draining = sub.poll(); // in flight, parked inside the gated read
-    await flushMicrotasks();
+    await settleEventLoopTurn();
     expect(handled).toEqual([]);
 
     const stopping = sub.stop();
@@ -604,7 +615,7 @@ describe('CatchUpSubscription', () => {
     void stopping.then(() => {
       hasStopped = true;
     });
-    await flushMicrotasks();
+    await settleEventLoopTurn();
     expect(hasStopped).toBe(false); // the drain still holds the store
 
     gate.resolve();

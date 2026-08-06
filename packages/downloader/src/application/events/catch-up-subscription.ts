@@ -164,8 +164,8 @@ export class CatchUpSubscription {
   /**
    * Detach the wakeup listener and the fallback timer, then wait for any in-flight drain to stop
    * touching the store. Detaching alone only cancels the NEXT cycle: the caller closes the
-   * event-store handle the moment this resolves, so a cycle still draining would go on reading
-   * the feed and saving checkpoints against a closed database — the very error loop the detach
+   * event-store handle immediately after this resolves, so a cycle still draining would go on
+   * reading the feed and saving checkpoints against a closed database — the very error loop the detach
    * exists to prevent, one cycle later. `inflight` is the settled barrier, so it never rejects.
    */
   async stop(): Promise<void> {

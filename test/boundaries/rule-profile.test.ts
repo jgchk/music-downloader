@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { ESLint } from 'eslint';
 import type { Linter } from 'eslint';
 import { describe, expect, it } from 'vitest';
+import config from '../../eslint.config.js';
 
 /**
  * The lint profile itself, pinned where deleting a rule would otherwise be a silent win.
@@ -12,12 +14,20 @@ import { describe, expect, it } from 'vitest';
  * every lane stayed green and the constitutional claim "never ignore a Result" quietly stopped being
  * enforced. These scenarios fail on the deletion instead.
  *
- * The second half pins the test-code carve-out. Its doc comment enumerates the divergence from the
+ * Two complementary readings, because neither alone is enough. The per-file scenarios resolve the
+ * config for real paths, which is the only way to see what a file actually gets; but a list of
+ * sample paths can never prove a NEGATIVE — a carve-out aimed somewhere the samples do not name
+ * (`packages/*&#47;src/adapters/**`, say) would disable the rule across production while every
+ * sample stayed green. That hole was found by mutation, so the structural scenario reads the config
+ * ARRAY instead and pins every block that so much as mentions the rule. Between them: what a file
+ * gets, and that nothing else can quietly grant it.
+ *
+ * The rest pins the test-code carve-out. Its doc comment enumerates the divergence from the
  * production profile, and a hand-maintained enumeration is a claim, not a check: the comment has
- * already been wrong in both directions at once — naming a rule that was never enabled in
- * production (so switching it off diverged from nothing) while missing that the CLI entrypoints
- * swept in by the same globs diverge by a different set again. Deriving both sets from the resolved
- * config makes the comment checkable, so the next carve-out cannot land undeclared.
+ * already been wrong twice — naming a rule that was never enabled in production (so switching it
+ * off diverged from nothing), and describing every CLI entrypoint as diverging by one set when the
+ * `scripts`-tree ones are not swept into the carve-out at all. Deriving all three sets from the
+ * resolved config makes the comment checkable, so the next carve-out cannot land undeclared.
  */
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
@@ -30,11 +40,23 @@ const eslint = new ESLint({ cwd: REPO_ROOT });
  * what a glob would paper over.
  */
 const PRODUCTION_FILES = [
+  'packages/downloader/src/domain/acquisition/decide.ts',
   'packages/downloader/src/application/events/catch-up-subscription.ts',
+  'packages/downloader/src/adapters/sqlite/event-store.ts',
+  'packages/downloader/src/interfaces/contracts/events/mapping.ts',
+  'packages/downloader/src/composition/runtime.ts',
   'packages/importer/src/application/events/catch-up-subscription.ts',
   'packages/web/src/lib/server/runtime.ts',
   'scripts/release/version-prep.ts',
 ];
+
+/**
+ * The baseline every divergence below is measured against. Named separately rather than reusing
+ * the first entry above: some production files carry extra layer-scoped blocks of their own (the
+ * domain's logger ban, the web's runtime-import ban), and measuring against one of those would
+ * report those blocks as carve-out divergence. This file is in no such block.
+ */
+const PRODUCTION_BASELINE = 'packages/downloader/src/application/events/catch-up-subscription.ts';
 
 /** Test code proper: the carve-out applies in full. */
 const TEST_FILES = [
@@ -76,6 +98,36 @@ const CLI_ENTRYPOINT_DIVERGENCE = [
   'unicorn/no-top-level-assignment-in-function',
 ];
 
+/**
+ * The other kind of CLI entrypoint: the schema generators under a package's `scripts` tree. No
+ * `testFiles` glob matches them, so the carve-out never applies and there is nothing to re-arm —
+ * they diverge from production by the one rule their own block releases.
+ */
+const CLI_ENTRYPOINTS_OUTSIDE_TEST_TIERS = [
+  'packages/downloader/scripts/contracts/generate-event-schemas.ts',
+  'packages/importer/scripts/contracts/generate-event-schemas.ts',
+];
+
+const SCRIPTS_TREE_CLI_DIVERGENCE = ['unicorn/no-process-exit'];
+
+/**
+ * The `testFiles` constant and the `cliEntrypoints` constant, restated. The structural scenario
+ * compares the config's own `files` arrays against these, so moving a carve-out to a new glob has
+ * to be declared here — which is the point, since that is the move a sample-path check cannot see.
+ */
+const TEST_CODE_GLOBS = [
+  '**/*.test.ts',
+  'test/**/*.ts',
+  'packages/*/test/**/*.ts',
+  'packages/web/tests/**/*.ts',
+];
+
+const CLI_ENTRYPOINT_GLOBS = [
+  'packages/*/scripts/**/*.ts',
+  'packages/*/test/contract/record/**/*.ts',
+  'packages/*/test/contract/drift/**/*.ts',
+];
+
 type Severity = 'off' | 'warn' | 'error';
 
 /** A rule entry is a severity, or an array whose head is one; an absent rule is `off`. */
@@ -105,13 +157,22 @@ function byName(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
-/** Every rule whose resolved severity differs between the two files, sorted. */
+/**
+ * A rule entry reduced to a comparable value: its level AND its options. Comparing severity alone
+ * would miss the drift that matters most quietly — a carve-out that keeps a rule at `error` while
+ * stripping the option doing the work. `['error', { checkThenables: false }]` in the test block is
+ * a real regression that a severity-only diff reports as no divergence at all.
+ */
+function entryOf(entry: Linter.RuleEntry | undefined): string {
+  const options = Array.isArray(entry) ? entry.slice(1) : [];
+  return JSON.stringify([severityOf(entry), options]);
+}
+
+/** Every rule whose resolved level or options differ between the two files, sorted. */
 async function divergenceFrom(baseline: string, file: string): Promise<string[]> {
   const [left, right] = await Promise.all([rulesFor(baseline), rulesFor(file)]);
   const names = new Set([...Object.keys(left), ...Object.keys(right)]);
-  return [...names]
-    .filter((rule) => severityOf(left[rule]) !== severityOf(right[rule]))
-    .toSorted(byName);
+  return [...names].filter((rule) => entryOf(left[rule]) !== entryOf(right[rule])).toSorted(byName);
 }
 
 describe('the production Result rule', () => {
@@ -140,21 +201,65 @@ describe('the production Result rule', () => {
     expect(armed).toEqual(CLI_ENTRYPOINTS_IN_TEST_TIERS.map((file) => [file, 'error']));
   });
 
-  it('keeps its defence-in-depth partner armed too', async () => {
-    // `ResultAsync` is a PromiseLike, not a Promise, so `checkThenables` is what catches an
-    // un-awaited one. Dropping the option is as silent a regression as dropping the rule.
-    const rules = await rulesFor(PRODUCTION_FILES[0]!);
-    const floating = rules['@typescript-eslint/no-floating-promises'];
+  it('is mentioned by exactly three config blocks, each over the globs it declares', () => {
+    // The scenarios above resolve the config for sample paths, and no list of samples can prove a
+    // negative: a carve-out aimed at a tree none of them names — `packages/*` `/src/adapters/**`,
+    // say — would switch the rule off across production with every one of them still green. That
+    // exact mutation slipped through an earlier draft of this suite. Reading the config array
+    // instead makes the claim total: ANY block touching the rule has to be declared right here,
+    // whatever paths it targets and whichever direction it moves the severity.
+    const mentions = config
+      .filter((entry) => entry.rules?.['neverthrow/must-use-result'] !== undefined)
+      .map((entry) => ({
+        files: entry.files,
+        severity: severityOf(entry.rules?.['neverthrow/must-use-result']),
+      }));
 
-    expect(severityOf(floating)).toBe('error');
-    expect(Array.isArray(floating) ? floating[1] : undefined).toEqual({ checkThenables: true });
+    expect(mentions).toEqual([
+      { files: ['**/*.ts'], severity: 'error' },
+      { files: TEST_CODE_GLOBS, severity: 'off' },
+      { files: CLI_ENTRYPOINT_GLOBS, severity: 'error' },
+    ]);
+  });
+
+  it('keeps its defence-in-depth partner armed, with the option that does the work', async () => {
+    // `ResultAsync` is a PromiseLike, not a Promise, so `checkThenables` is what catches an
+    // un-awaited one. Dropping the OPTION is as silent a regression as dropping the rule, and a
+    // severity check cannot see it — so the whole entry is pinned, across every sampled tier
+    // rather than one file. (A test-block override of the option surfaces separately, as carve-out
+    // divergence, because that comparison is option-aware too.)
+    const armed = entryOf(['error', { checkThenables: true }]);
+    const resolved = await Promise.all(
+      PRODUCTION_FILES.map(async (file) => {
+        const rules = await rulesFor(file);
+        return [file, entryOf(rules['@typescript-eslint/no-floating-promises'])];
+      }),
+    );
+
+    expect(resolved).toEqual(PRODUCTION_FILES.map((file) => [file, armed]));
+  });
+
+  it('samples only paths that exist — a rename must not leave it pinning a phantom', () => {
+    // `calculateConfigForFile` answers happily for a path that is not on disk, so a moved file
+    // would leave every scenario above green against nothing. The non-empty floor is the same
+    // guard one step earlier: an emptied sample list would satisfy every `toEqual([])` here.
+    const samples = [
+      ...PRODUCTION_FILES,
+      PRODUCTION_BASELINE,
+      ...TEST_FILES,
+      ...CLI_ENTRYPOINTS_IN_TEST_TIERS,
+      ...CLI_ENTRYPOINTS_OUTSIDE_TEST_TIERS,
+    ];
+
+    expect(samples.length).toBeGreaterThan(0);
+    expect(samples.filter((file) => !existsSync(path.join(REPO_ROOT, file)))).toEqual([]);
   });
 });
 
 describe('the test-code carve-out', () => {
   it('diverges from the production profile in exactly the rules it names', async () => {
     const diverged = await Promise.all(
-      TEST_FILES.map(async (file) => divergenceFrom(PRODUCTION_FILES[0]!, file)),
+      TEST_FILES.map(async (file) => divergenceFrom(PRODUCTION_BASELINE, file)),
     );
 
     expect(diverged).toEqual(TEST_FILES.map(() => TEST_CODE_DIVERGENCE));
@@ -162,17 +267,32 @@ describe('the test-code carve-out', () => {
 
   it('diverges differently for a CLI entrypoint inside the test tiers', async () => {
     const diverged = await Promise.all(
-      CLI_ENTRYPOINTS_IN_TEST_TIERS.map(async (file) => divergenceFrom(PRODUCTION_FILES[0]!, file)),
+      CLI_ENTRYPOINTS_IN_TEST_TIERS.map(async (file) => divergenceFrom(PRODUCTION_BASELINE, file)),
     );
 
     expect(diverged).toEqual(CLI_ENTRYPOINTS_IN_TEST_TIERS.map(() => CLI_ENTRYPOINT_DIVERGENCE));
+  });
+
+  it('does not reach the CLI entrypoints outside the test tiers at all', async () => {
+    // The `scripts`-tree schema generators are matched by no `testFiles` glob, so the carve-out
+    // never applies to them and the re-arm has nothing to undo. Their divergence is the single
+    // rule their own block releases — the case the config comment used to fold in with the others.
+    const diverged = await Promise.all(
+      CLI_ENTRYPOINTS_OUTSIDE_TEST_TIERS.map(async (file) =>
+        divergenceFrom(PRODUCTION_BASELINE, file),
+      ),
+    );
+
+    expect(diverged).toEqual(
+      CLI_ENTRYPOINTS_OUTSIDE_TEST_TIERS.map(() => SCRIPTS_TREE_CLI_DIVERGENCE),
+    );
   });
 
   it('names no rule production never enabled — an "off" over an "off" is dead config', async () => {
     // The overclaim this suite exists to prevent, stated as a check: every rule the carve-out
     // switches off must actually be ON in production, or switching it off diverges from nothing
     // and the enumeration describes a profile the repo does not have.
-    const production = await rulesFor(PRODUCTION_FILES[0]!);
+    const production = await rulesFor(PRODUCTION_BASELINE);
     const dead = TEST_CODE_DIVERGENCE.filter((rule) => severityOf(production[rule]) === 'off');
 
     expect(dead).toEqual([]);
