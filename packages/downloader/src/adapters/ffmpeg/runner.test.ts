@@ -47,4 +47,39 @@ describe('nodeCommandRunner', () => {
       Error,
     );
   });
+
+  it('resolves within the post-kill grace even when stdio never closes (the D-state shape)', async () => {
+    // SIGKILL cannot unstick uninterruptible I/O, and 'close' additionally waits for stdio to
+    // drain — a grandchild holding the inherited stdout simulates exactly that: the child is
+    // killed at the timeout but 'close' stays pending. The run must resolve as timed out after
+    // a short grace instead of wedging the reactor's dispatch behind a pipe that never closes.
+    const script =
+      "const { spawn } = require('node:child_process');" +
+      "spawn(process.execPath, ['-e', 'setTimeout(() => undefined, 2000)'], { stdio: ['ignore', 'inherit', 'inherit'] });" +
+      'setTimeout(() => undefined, 60_000);';
+    const startedAt = Date.now();
+
+    const result = await nodeCommandRunner.run(node, ['-e', script], 100);
+
+    expect(result.timedOut).toBe(true);
+    expect(result.code).toBeNull();
+    expect(Date.now() - startedAt).toBeLessThan(1900); // resolved by grace, not by the pipe
+  });
+
+  it('never stamps a false timeout on a process that already exited', async () => {
+    // The exit→close window can span the timeout deadline when stdio is still draining (here: a
+    // grandchild holds stdout after the child exits cleanly). The timer must recognize the
+    // process as already exited and leave the result untainted — a completed decode reported as
+    // a timeout would turn a good verdict into a retryable fault.
+    const script =
+      "const { spawn } = require('node:child_process');" +
+      "spawn(process.execPath, ['-e', 'setTimeout(() => undefined, 1200)'], { stdio: ['ignore', 'inherit', 'inherit'] }).unref();" +
+      "process.stdout.write('done');";
+
+    const result = await nodeCommandRunner.run(node, ['-e', script], 300);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('done');
+  });
 });
