@@ -148,7 +148,14 @@ function historyEntryToDto(
       return {
         kind: 'requested',
         at,
-        hints: entry.hints === undefined ? undefined : { ...entry.hints },
+        hints:
+          entry.hints === undefined
+            ? undefined
+            : {
+                mbReleaseId: entry.hints.mbReleaseId,
+                artist: entry.hints.artist,
+                album: entry.hints.album,
+              },
       };
     }
     case 'proposed': {
@@ -180,7 +187,10 @@ function historyEntryToDto(
       return {
         kind: 'remediation-required',
         at,
-        failures: entry.failures.map((failure) => ({ ...failure })),
+        failures: entry.failures.map((failure) => ({
+          stage: failure.stage,
+          message: failure.message,
+        })),
       };
     }
     case 'rejected': {
