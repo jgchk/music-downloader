@@ -179,14 +179,25 @@ async function main(): Promise<void> {
 
   const resourcesResponse = await requestJson('GET', '/resources', token);
   const resources = validated('resources', resourcesResponse, plexResourcesSchema);
-  const projected = resources.map((_entry, index) => ({
+  // The consumed fields are now three: the identifier (pseudonymized), `provides` (the capability
+  // list the predicate reads — kept VERBATIM, it is plex.tv's vocabulary and carries nothing
+  // about the account), and `owned` (the role source — a boolean, likewise not identifying).
+  // Presence/absence of both is preserved from the wire so the tolerant defaults keep their
+  // real-data grounding across re-records.
+  const projected = resources.map((entry, index) => ({
     clientIdentifier: `machine-${index + 1}`,
+    ...(entry.provides === undefined ? {} : { provides: entry.provides }),
+    ...(entry.owned === undefined ? {} : { owned: entry.owned }),
   }));
   if (projected.length === 0)
     throw new Error('no resources with a clientIdentifier — token account sees no devices');
+  if (!projected.some((entry) => entry.provides?.split(',').some((c) => c.trim() === 'server')))
+    throw new Error(
+      'no resource declares provides=server — the recording cannot witness a membership grant',
+    );
   write('resources.json', {
     provenance: provenance(
-      `validated live body projected to consumed fields; ${projected.length} clientIdentifiers pseudonymized to machine-N`,
+      `validated live body projected to consumed fields; ${projected.length} clientIdentifiers pseudonymized to machine-N, provides/owned verbatim`,
     ),
     request: { method: 'GET', path: '/resources' },
     response: { status: resourcesResponse.status, body: projected },

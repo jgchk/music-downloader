@@ -71,12 +71,24 @@ coupling).
 
 ## Risks / Trade-offs
 
-- **[plex.tv could permit a hostile PMS to register an arbitrary machine identifier]** → The
-  predicate fix strictly narrows admission regardless (the known client-forgeable device hole
-  closes). Implementation carries a timeboxed verification task against plex.tv docs/community
-  sources; if server-side forgery proves possible, the recorded fallback is pinning the owner by
-  account identity via configuration — a small follow-up change, and the reason `authorize`'s
-  internals are swappable.
+- **[plex.tv could permit a hostile PMS to register an arbitrary machine identifier]** →
+  **VERIFIED 2026-08-05 (task 1.3): it can — the fallback trigger is LIVE.** See
+  [`docs/research/plex-machine-identifier-trust.md`](../../../docs/research/plex-machine-identifier-trust.md).
+  A server's machine identifier is self-asserted (`Preferences.xml`
+  `ProcessedMachineIdentifier`), the claim flow is a plain POST carrying client-chosen
+  `X-Plex-Client-Identifier` / `X-Plex-Provides: server` headers, and no source documents plex.tv
+  enforcing uniqueness or ownership of a server identifier. The threat model is also narrower than
+  assumed in the wrong direction: the attacker does not need to reach the *owner's* listing at all
+  — the gate reads the *logging-in account's* listing, so an attacker registering a forged "server"
+  under their own account sees it in their own `/resources` with `owned: true`.
+  **Consequence for this change:** the predicate fix still ships and still strictly narrows
+  admission (the trivially-exploitable device/player hole closes, and `provides: server` is a
+  precondition the fallback keeps), but it is NOT sufficient alone. The recorded fallback — pin the
+  owner by account identity via configuration (`ownerId === PLEX_OWNER_ACCOUNT_ID` for shared
+  users; `owned === true` plus a matching `/user` account id for the owner) — is now a prompt
+  follow-up change rather than a conditional one. It stays out of `auth-roles` because it adds
+  required configuration (an explicit non-goal here) and because it composes with, rather than
+  replaces, the predicate this change fixes.
 - **[`provides` formatting drift (casing, spacing, multi-value)]** → Parse as a trimmed,
   case-insensitive comma-list; the re-recorded fixture pins the real spelling.
 - **[Owner lockout if plex.tv reports `owned` unexpectedly]** → Tolerant default is `guest`, so

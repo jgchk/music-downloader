@@ -36,7 +36,11 @@ function expectLoginRedirect(run: () => unknown): void {
 
 /** Mint-a-cookie (design D7): tests sign with the known secret — the gate runs unmodified. */
 function validCookie(now = Date.now()): string {
-  return signSession({ plexAccountId: '42', username: 'jake' }, access.sessionSecret, now);
+  return signSession(
+    { plexAccountId: '42', username: 'jake', role: 'guest' },
+    access.sessionSecret,
+    now,
+  );
 }
 
 describe('server hooks', () => {
@@ -71,7 +75,7 @@ describe('server hooks', () => {
     ['a garbage cookie', 'not-a-real-cookie'],
     [
       'a cookie signed under another secret',
-      signSession({ plexAccountId: '1', username: 'x' }, 'wrong-secret', Date.now()),
+      signSession({ plexAccountId: '1', username: 'x', role: 'guest' }, 'wrong-secret', Date.now()),
     ],
   ])('redirects a gated page GET with %s to the login page without resolving', (_case, cookie) => {
     const resolve = vi.fn();

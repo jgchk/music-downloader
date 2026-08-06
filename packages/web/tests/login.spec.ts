@@ -49,13 +49,16 @@ test.describe('login journey (plex.tv stubbed)', () => {
     await expect(page).toHaveURL(/\/acquisitions$/);
   });
 
-  test('an account without the server is denied and stays outside', async ({
+  test('an account without the server is denied and stays outside — even holding our machine id on a device', async ({
     context,
     page,
     baseURL,
   }) => {
     // A browser that STARTED this login (the binding cookie) whose account turns out unshared —
-    // going straight to the callback stands in for the app.plex.tv bounce.
+    // going straight to the callback stands in for the app.plex.tv bounce. The stranger's stubbed
+    // listing carries OUR machine identifier on a client/player entry (identifiers on devices are
+    // client-chosen, and the machine id is not a secret): the gate must still refuse, because
+    // admission requires the matching entry to declare `provides: server`.
     await context.addCookies([
       {
         name: '__Host-md_login_pin',

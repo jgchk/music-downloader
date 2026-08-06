@@ -20,10 +20,15 @@ export const DATA_DIR = process.env['E2E_DATA_DIR'] ?? join(process.cwd(), '.e2e
 export const SESSION_SECRET =
   process.env['E2E_SESSION_SECRET'] ?? 'e2e-session-secret-0123456789abcdef';
 
-/** Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. */
+/**
+ * Mint-a-cookie (web-access-control design D7): a valid session for the tier's HTTP driver. The
+ * harness stands in for the server's owner, so it mints the `owner` role — the base interface this
+ * tier drives is role-independent, but an owner-gated verb must be reachable from here when one
+ * ships.
+ */
 export function sessionCookieHeader(): string {
   const cookie = signSession(
-    { plexAccountId: 'e2e', username: 'e2e-harness' },
+    { plexAccountId: 'e2e', username: 'e2e-harness', role: 'owner' },
     SESSION_SECRET,
     Date.now(),
   );

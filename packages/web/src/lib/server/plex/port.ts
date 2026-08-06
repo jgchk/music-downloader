@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { SessionIdentity } from '../session.js';
+import type { Role, SessionIdentity } from '../session.js';
 
 /**
  * The ONE port behind the access gate (design D6): the plex.tv conversation the login flow needs.
@@ -26,9 +26,13 @@ export type PinCheckOutcome =
   | { readonly kind: 'pending' }
   | { readonly kind: 'expired' };
 
-/** The membership verdict: the token's account either sees the owner's server or it does not. */
+/**
+ * The membership verdict: the token's account either reaches the owner's server or it does not.
+ * A grant carries the role plex.tv's ownership flag on THAT server implies — this is the single
+ * point where a role is ever derived (web-authorization).
+ */
 export type MembershipOutcome =
-  | { readonly kind: 'granted'; readonly identity: SessionIdentity }
+  | { readonly kind: 'granted'; readonly identity: SessionIdentity; readonly role: Role }
   | { readonly kind: 'denied'; readonly username: string };
 
 export interface PlexAccessPort {

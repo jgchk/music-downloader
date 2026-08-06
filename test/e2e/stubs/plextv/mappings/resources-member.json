@@ -7,6 +7,9 @@
   "response": {
     "status": 200,
     "headers": { "Content-Type": "application/json" },
-    "jsonBody": [{ "clientIdentifier": "e2e-machine" }, { "clientIdentifier": "another-device" }]
+    "jsonBody": [
+      { "clientIdentifier": "e2e-machine", "provides": "server", "owned": true },
+      { "clientIdentifier": "another-device", "provides": "client,player", "owned": true }
+    ]
   }
 }

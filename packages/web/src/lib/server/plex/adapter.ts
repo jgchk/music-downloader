@@ -93,11 +93,27 @@ export class PlexTvAccess implements PlexAccessPort {
       'resources',
     );
 
-    const isMember = resources.some((r) => r.clientIdentifier === this.config.machineId);
-    return isMember
-      ? { kind: 'granted', identity: { plexAccountId: String(user.id), username } }
-      : { kind: 'denied', username };
+    // The predicate (web-access-control): identifier match alone is forgeable — device/player
+    // entries carry client-chosen identifiers — so the matching entry must also BE a server.
+    const matched = resources.find(
+      (r) => r.clientIdentifier === this.config.machineId && isServerResource(r.provides),
+    );
+    if (matched === undefined) return { kind: 'denied', username };
+    // The role comes from the MATCHED server's ownership flag, never from any other resource the
+    // account happens to own; an absent flag is a guest (least privilege, design D2).
+    return {
+      kind: 'granted',
+      identity: { plexAccountId: String(user.id), username },
+      role: matched.owned === true ? 'owner' : 'guest',
+    };
   }
+}
+
+/** Does the comma-separated capability list name a server? Trimmed and case-insensitive, so
+ * formatting drift in plex.tv's list never silently widens or narrows admission. */
+function isServerResource(provides: string | undefined): boolean {
+  if (provides === undefined) return false;
+  return provides.split(',').some((capability) => capability.trim().toLowerCase() === 'server');
 }
 
 /** An operation label + HTTP status; deliberately carries neither URL query nor headers. */

@@ -67,7 +67,13 @@ export const GET: RequestHandler = async ({ cookies, locals, url }) => {
 
   cookies.set(
     SESSION_COOKIE,
-    signSession(membership.value.identity, locals.access.sessionSecret, Date.now()),
+    // The role plex.tv's ownership flag implied rides into the signed claims here and nowhere
+    // else: a session's privilege is fixed at issue and only re-login can change it.
+    signSession(
+      { ...membership.value.identity, role: membership.value.role },
+      locals.access.sessionSecret,
+      Date.now(),
+    ),
     {
       path: '/',
       httpOnly: true,
@@ -80,7 +86,7 @@ export const GET: RequestHandler = async ({ cookies, locals, url }) => {
     },
   );
   locals.logger.info(
-    { username: membership.value.identity.username },
+    { username: membership.value.identity.username, role: membership.value.role },
     'login granted: session issued',
   );
   redirect(303, '/');

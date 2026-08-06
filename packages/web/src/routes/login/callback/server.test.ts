@@ -65,7 +65,11 @@ describe('login callback', () => {
   it('issues a signed session cookie and lands the member inside (approved PIN + granted membership)', async () => {
     const plex = new FakePlexAccess();
     plex.pinCheck = { kind: 'authorized', token: 'user-token-1' };
-    plex.membership = { kind: 'granted', identity: { plexAccountId: '9', username: 'friend' } };
+    plex.membership = {
+      kind: 'granted',
+      identity: { plexAccountId: '9', username: 'friend' },
+      role: 'guest',
+    };
 
     const { location, jar, deleted, logger } = await outcome(plex, '?pin=55');
 
@@ -94,6 +98,24 @@ describe('login callback', () => {
     // …and the single-use PIN binding was consumed.
     expect(deleted).toEqual([['__Host-md_login_pin', { path: '/', secure: true }]]);
   });
+
+  it.each(['owner', 'guest'] as const)(
+    'mints a session carrying the %s role the membership check derived',
+    async (role) => {
+      const plex = new FakePlexAccess();
+      plex.pinCheck = { kind: 'authorized', token: 'user-token-1' };
+      plex.membership = {
+        kind: 'granted',
+        identity: { plexAccountId: '9', username: 'friend' },
+        role,
+      };
+
+      const { jar } = await outcome(plex, '?pin=55');
+
+      const verdict = verifySession(jar.get('__Host-md_session')!.value, SECRET, Date.now());
+      expect(verdict).toMatchObject({ kind: 'valid', claims: { role } });
+    },
+  );
 
   it('refuses a PIN this browser did not start — before any plex.tv call (hijack/fixation guard)', async () => {
     // No binding at all is the benign shape (expired binding, or a lure into a fresh browser):

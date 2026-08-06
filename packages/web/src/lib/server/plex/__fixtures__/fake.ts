@@ -24,6 +24,7 @@ export class FakePlexAccess implements PlexAccessPort {
   membership: MembershipOutcome = {
     kind: 'granted',
     identity: { plexAccountId: '1', username: 'owner' },
+    role: 'owner',
   };
   /** Flip any of these to script the Err track (plex.tv down) per operation. */
   failCreatePin = false;

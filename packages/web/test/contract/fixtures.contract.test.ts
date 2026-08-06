@@ -78,12 +78,19 @@ describe('plex.tv fixtures', () => {
     }
   });
 
-  it('holds only pseudonymized machine identifiers, one consumed field per resource', () => {
+  it('holds only pseudonymized machine identifiers and the consumed predicate fields', () => {
     const body = byName('resources.json').fixture.response.body as Record<string, unknown>[];
     expect(body.length).toBeGreaterThan(0);
     for (const entry of body) {
-      expect(Object.keys(entry)).toEqual(['clientIdentifier']);
+      // The consumed set, nothing else: the identifier is pseudonymized, while `provides` and
+      // `owned` are plex.tv's own vocabulary (a capability list and a boolean) and identify
+      // nobody — they are recorded verbatim so the predicate meets the real spelling.
+      expect(['clientIdentifier', 'provides', 'owned']).toEqual(
+        expect.arrayContaining(Object.keys(entry)),
+      );
       expect(entry['clientIdentifier']).toMatch(/^machine-\d+$/);
+      if ('provides' in entry) expect(typeof entry['provides']).toBe('string');
+      if ('owned' in entry) expect(typeof entry['owned']).toBe('boolean');
     }
   });
 
