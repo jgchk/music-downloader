@@ -73,6 +73,34 @@ describe('OutboundFeed', () => {
     expect(prefixLength).toBe(fulfilled().length);
   });
 
+  it('renders each event from its OWN stream prefix, never the interleaved global log', async () => {
+    // Two streams interleaved so each fulfilment has the OTHER stream's rows before it in the
+    // global log: a feed that folded the log instead of the event's stream prefix would
+    // over-count both. Single-stream seeds cannot discriminate this (S3 review sweep).
+    const history = fulfilled();
+    await store.append('acq-1', 0, history.slice(0, -1), {
+      acquisitionId: 'acq-1',
+      occurredAt: 'T0',
+    });
+    await seed('acq-2'); // acq-2's whole history lands between acq-1's body and its fulfilment
+    await store.append('acq-1', history.length - 1, history.slice(-1), {
+      acquisitionId: 'acq-1',
+      occurredAt: 'T0',
+    });
+    const feed = new OutboundFeed(store, mapping);
+
+    const readResult6 = await feed.read(0, 100);
+    const batch = readResult6._unsafeUnwrap();
+
+    expect(batch.events.map((event) => (event.data as { streamId: string }).streamId)).toEqual([
+      'acq-2',
+      'acq-1',
+    ]);
+    for (const event of batch.events) {
+      expect((event.data as { prefixLength: number }).prefixLength).toBe(history.length);
+    }
+  });
+
   it('bounds the scan to `limit` stored events and reports the scan boundary', async () => {
     await seed('acq-1');
     const feed = new OutboundFeed(store, mapping);
