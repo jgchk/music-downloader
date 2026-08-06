@@ -724,7 +724,11 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
 
     const entry = parked.peek('acq-1');
     expect(entry).toBeDefined();
-    expect(new Date(entry!.nextRetryAt).getTime()).toBeGreaterThan(clock.now().getTime());
+    // Exactly the policy cap from the fixed clock — "backed off" means at the cap, not merely
+    // any future instant (a 1ms reschedule would also read as later-than-now).
+    expect(entry!.nextRetryAt).toBe(
+      new Date(clock.now().getTime() + TIGHT_BUDGET.maxDelayMs).toISOString(),
+    );
 
     // The very next tick must NOT re-fire the effect: the park is no longer due.
     const fired = discardStaging.mock.calls.length;

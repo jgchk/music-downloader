@@ -468,9 +468,11 @@ export class Reactor {
         return;
       }
       // The landing itself failed on infrastructure: leaving the past-due park untouched would
-      // re-dispatch the live effect on EVERY tick — unbounded, with no backoff. The budget is
-      // spent, so only the landing is owed; back the park off at the policy cap and let the next
-      // due tick re-attempt it, like every neighbouring infra-failure path reschedules.
+      // re-dispatch the live effect on EVERY tick — unbounded, with no backoff. Back the park
+      // off at the policy cap, like every neighbouring infra-failure path reschedules. The next
+      // due tick re-enters the ordinary dispatch: the live effect re-fires once more
+      // (idempotently — at-least-once is the system-wide delivery contract) and the landing is
+      // re-attempted only if it fails again; the entry carries no landing-only mode.
       const heldOver = await this.dependencies.parked.park({
         ...entry,
         attempt,

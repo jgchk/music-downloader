@@ -38,6 +38,9 @@ let parked: FakeParkedEffectStore;
 let stalled: StalledReadModel;
 
 beforeEach(() => {
+  // The sibling-effect suite stubs the STATIC `Import.fromHistory` — without a restore, that
+  // module-level mock would leak into every test that runs after it in this file.
+  vi.restoreAllMocks();
   store = new FakeEventStore();
   checkpoints = new FakeCheckpointStore();
   bus = new FakeEventBus();
@@ -644,6 +647,10 @@ describe('Reactor — sibling effects of one event', () => {
   // The real `react()` currently yields at most one effect per event, so the multi-effect protocol
   // is pinned with a widened double on a genuine aggregate: the loop's contract — each sibling
   // settles independently — must already hold when a future reaction yields more than one.
+  // (The domain stub is the design feedback here: the settlement loop has no seam of its own yet.
+  // Known latent interaction, unpinned until a real two-effect reaction exists: the durable retry
+  // tally is keyed per globalSeq, so siblings SHARE one budget — a sibling dead-lettering on a
+  // spent tally leaves the next sibling's first retryable failure reading the same spent count.)
   function twoEffectAggregate(): void {
     const aggregate = Import.fromHistory([requested()]);
     vi.spyOn(aggregate, 'reactTo').mockReturnValue([
