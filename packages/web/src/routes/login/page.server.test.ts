@@ -56,6 +56,24 @@ describe('login page load', () => {
     const data = load(loadEvent('https://music.example/login?error=wat')) as { error?: string };
     expect(data.error).toMatch(/not valid/);
   });
+
+  it.each(['toString', '__proto__', 'constructor', 'valueOf'])(
+    'renders the inherited property name %s as the generic message, not a prototype value',
+    (code) => {
+      // The query is user-writable and unauthenticated, so an inherited key must not be reachable.
+      // Indexing the message table walks the prototype chain, so `?error=toString` once resolved to
+      // Object.prototype.toString — a Function returned where the page data declares a string, and
+      // `?error=__proto__` returned Object.prototype. The old spelling asserted the key type and
+      // leaned on `?? invalid` to degrade, which cannot fire for an inherited value because the
+      // lookup is not nullish. Membership is tested now instead of asserted.
+      const data = load(loadEvent(`https://music.example/login?error=${code}`)) as {
+        error?: string;
+      };
+
+      expect(typeof data.error).toBe('string');
+      expect(data.error).toMatch(/not valid/);
+    },
+  );
 });
 
 describe('login start action', () => {
