@@ -1,0 +1,19 @@
+// The build-tooling config files, which belong to no package's `include`. Named explicitly (not
+// globbed) so a new one is a deliberate addition and the boundaries tier can prove none is orphaned.
+// `packages/web/vite.config.ts` and `eslint.config.js` are deliberately absent — the SvelteKit
+// generated tsconfig and `test/boundaries/tsconfig.json` respectively already claim them, and a file
+// claimed by two projects breaks eslint's project service.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "allowJs": true },
+  "files": [
+    "vitest.config.ts",
+    "packages/downloader/vitest.config.ts",
+    "packages/importer/vitest.config.ts",
+    "packages/web/playwright.config.ts",
+    "packages/web/svelte.config.js",
+    "packages/web/vitest.client.config.ts",
+    "packages/web/vitest.server.config.ts",
+    "packages/web/vitest.ssr.config.ts"
+  ]
+}

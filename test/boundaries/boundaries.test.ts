@@ -8,12 +8,6 @@ import config from '../../eslint.config.js';
  * a spec scenario whose enforcement lives in lint.
  */
 
-interface FlatConfigEntry {
-  readonly files?: readonly string[];
-  readonly ignores?: readonly string[];
-  readonly rules?: Record<string, unknown>;
-}
-
 interface Zone {
   readonly target: string | readonly string[];
   readonly from: string;
@@ -21,16 +15,9 @@ interface Zone {
 }
 
 function zones(): readonly Zone[] {
-  const entry = (config as readonly Record<string, unknown>[]).find(
-    (item) =>
-      typeof item === 'object' &&
-      'rules' in item &&
-      (item.rules as Record<string, unknown>)['import/no-restricted-paths'] !== undefined,
-  );
+  const entry = config.find((item) => item.rules?.['import/no-restricted-paths'] !== undefined);
   expect(entry).toBeDefined();
-  const rule = (entry as { rules: Record<string, unknown> }).rules[
-    'import/no-restricted-paths'
-  ] as [string, { zones: readonly Zone[] }];
+  const rule = entry?.rules?.['import/no-restricted-paths'] as [string, { zones: readonly Zone[] }];
   expect(rule[0]).toBe('error');
   return rule[1].zones;
 }
@@ -59,7 +46,7 @@ describe('module boundary lint zones', () => {
   });
 
   it('confines module runtime imports to $lib/server (design D8)', () => {
-    const block = (config as readonly FlatConfigEntry[]).find(
+    const block = config.find(
       (entry) =>
         Array.isArray(entry.files) &&
         entry.files.includes('packages/web/src/**/*.ts') &&

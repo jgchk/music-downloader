@@ -10,8 +10,9 @@
 #   • `check:svelte` and the web vite build both (re)generate `.svelte-kit/` — they share the
 #     single `web` lane so nothing races on that directory. The web vitest projects use the
 #     plain svelte plugin (no svelte-kit sync), so the test lane never touches it.
-#   • The two tsc typecheck lanes and two tsc build lanes use distinct tsconfigs and therefore
-#     distinct .tsbuildinfo files; they never contend.
+#   • The tsc typecheck lanes and the two tsc build lanes use distinct tsconfigs and therefore
+#     distinct .tsbuildinfo files; they never contend. `typecheck:tiers` walks the out-of-package
+#     projects (scripts, contract, boundaries, e2e, config files) serially inside its own lane.
 #
 # CI (`pipeline.yml`) runs the underlying pnpm scripts individually and cold — this script is
 # the local loop's ergonomics, not a change to what the gate means.
@@ -41,6 +42,7 @@ NAMES=(
   lint
   typecheck:downloader
   typecheck:importer
+  typecheck:tiers
   build:downloader
   build:importer
   web
@@ -54,6 +56,7 @@ declare -A COMMANDS=(
   ["lint"]="pnpm run lint"
   ["typecheck:downloader"]="pnpm exec tsc --noEmit -p packages/downloader/tsconfig.json"
   ["typecheck:importer"]="pnpm exec tsc --noEmit -p packages/importer/tsconfig.json"
+  ["typecheck:tiers"]="pnpm run typecheck:tiers"
   ["build:downloader"]="pnpm exec tsc --noCheck -p packages/downloader/tsconfig.build.json"
   ["build:importer"]="pnpm exec tsc --noCheck -p packages/importer/tsconfig.build.json"
   ["web"]="pnpm --dir packages/web run check:svelte && pnpm --dir packages/web run build"

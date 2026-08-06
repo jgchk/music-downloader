@@ -18,10 +18,10 @@ Sequencing: after the S-queue drains (S2/S3 touch overlapping test files).
 
 ## 2. Tier coverage — typecheck
 
-- [ ] 2.1 Per-tier tsconfigs (scripts, e2e, boundaries, downloader-contract,
+- [x] 2.1 Per-tier tsconfigs (scripts, e2e, boundaries, downloader-contract,
       importer-contract) extending base, wired into `pnpm typecheck`; boundaries' config-import
       question settled (allowJs vs local d.ts).
-- [ ] 2.2 Hand-fixes: downloader-contract brand construction through real smart constructors /
+- [x] 2.2 Hand-fixes: downloader-contract brand construction through real smart constructors /
       schema parses (~13 sites); `conventional-changelog` local typings; additivity tests'
       strict-index narrowing; the two stray TS613x cleanups.
 

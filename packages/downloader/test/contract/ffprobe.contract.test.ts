@@ -26,8 +26,8 @@ function loadFixture(name: string): FfprobeFixture {
 
 /** A runner that replays the recorded ffprobe stdout and a clean decode pass. */
 function replayRunner(stdout: string): CommandRunner {
-  const probe: CommandResult = { code: 0, stdout, stderr: '' };
-  const decode: CommandResult = { code: 0, stdout: '', stderr: '' };
+  const probe: CommandResult = { code: 0, stdout, stderr: '', timedOut: false };
+  const decode: CommandResult = { code: 0, stdout: '', stderr: '', timedOut: false };
   return { run: (command) => Promise.resolve(command === 'ffprobe' ? probe : decode) };
 }
 

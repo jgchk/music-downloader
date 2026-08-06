@@ -26,7 +26,9 @@ import {
   reasonFromTransfer,
 } from '../../src/adapters/slskd/transfers.js';
 import type { Candidate } from '../../src/domain/candidate/candidate.js';
-import type { DownloadPolicy } from '../../src/domain/policy/policies.js';
+import { createDownloadPolicy } from '../../src/domain/policy/policies.js';
+import type { DownloadPolicyInput } from '../../src/domain/policy/policies.js';
+import { asCandidateIdentity } from '../../src/domain/shared/__fixtures__/candidate-identity.js';
 import { createTarget } from '../../src/domain/target/target.js';
 import type { Timer } from '../../src/adapters/slskd/timer.js';
 import { loadFixtures, loadScenario } from './support/fixture.js';
@@ -106,8 +108,16 @@ interface Driven {
   readonly progress: DownloadProgress[];
 }
 
-/** Drive the real download adapter against the currently-served scenario for one candidate. */
-async function drive(candidate: Candidate, policy: DownloadPolicy): Promise<Driven> {
+/**
+ * Drive the real download adapter against the currently-served scenario for one candidate.
+ *
+ * The policy is built through the domain's own constructor rather than taken as a literal: a
+ * `DownloadPolicy` is a branded type, and a test that forges the brand can exercise a policy the
+ * system itself can never produce (a `maxQueueWaitMs` of 0 is exactly such a value — the
+ * constructor rejects it — so the smallest legal wait, 1, is what bounds these poll loops).
+ */
+async function drive(candidate: Candidate, input: DownloadPolicyInput): Promise<Driven> {
+  const policy = createDownloadPolicy(input)._unsafeUnwrap();
   const outcomes: DownloadResult[] = [];
   const progress: DownloadProgress[] = [];
   const download = new SlskdDownload(
@@ -136,7 +146,11 @@ function candidateFor(scenario: string, filename: string): Candidate {
   const body = fixtureOf(scenario, 'transfers-poll.json').response.body as { username: string };
   const transfer = transfersIn(scenario).find((t) => t.filename === filename)!;
   return {
-    identity: { username: body.username, path: filename, sizeBytes: transfer.size ?? 0 },
+    identity: asCandidateIdentity({
+      username: body.username,
+      path: filename,
+      sizeBytes: transfer.size ?? 0,
+    }),
     files: [{ name: baseName(filename), sizeBytes: transfer.size ?? 0 }],
     source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 1 },
   };
@@ -195,7 +209,7 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
     const transfer = transfersIn('full-flow')[0]!;
     const candidate = candidateFor('full-flow', transfer.filename!);
 
-    const { outcomes } = await drive(candidate, { stallTimeoutMs: 100_000, maxQueueWaitMs: 0 });
+    const { outcomes } = await drive(candidate, { stallTimeoutMs: 100_000, maxQueueWaitMs: 1 });
 
     const downloadsPath = `/api/v0/transfers/downloads/${candidate.identity.username}`;
     const enqueue = server.requests.find((r) => r.method === 'POST' && r.path === downloadsPath)!;
@@ -477,7 +491,7 @@ describe('slskd contract — the teardown speaks its two-phase removal', () => {
     // Abandoning on the queue deadline tears down a transfer that has not reached Completed.
     await drive(candidateFor('queued', queued.filename!), {
       stallTimeoutMs: 100_000,
-      maxQueueWaitMs: 0,
+      maxQueueWaitMs: 1,
     });
 
     expect(removalsSent().length).toBeGreaterThan(0);
@@ -490,7 +504,7 @@ describe('slskd contract — the teardown speaks its two-phase removal', () => {
 
     await drive(candidateFor('full-flow', settled.filename!), {
       stallTimeoutMs: 100_000,
-      maxQueueWaitMs: 0,
+      maxQueueWaitMs: 1,
     });
 
     expect(removalsSent()).toContain('true');
@@ -521,7 +535,7 @@ describe('slskd contract — a refused enqueue today', () => {
 
     const started = await download.start('acq-contract', candidate, {
       stallTimeoutMs: 100_000,
-      maxQueueWaitMs: 0,
+      maxQueueWaitMs: 1,
     });
 
     expect(started.isErr()).toBe(true);
@@ -554,7 +568,7 @@ describe('slskd contract — the manifest declares everything the adapters send'
       const transfer = transfersIn(scenario)[0]!;
       await drive(candidateFor(scenario, transfer.filename!), {
         stallTimeoutMs: 100_000,
-        maxQueueWaitMs: 0,
+        maxQueueWaitMs: 1,
       });
       collected.push(...running.requests);
       await running.close();
