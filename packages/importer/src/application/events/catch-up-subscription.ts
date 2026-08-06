@@ -1,5 +1,6 @@
 import type { Result } from 'neverthrow';
 import type { Logger } from '../logging/logger.js';
+import type { InfraError } from '../ports/errors.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { CheckpointStore } from '../ports/event-store-port.js';
 
@@ -136,11 +137,24 @@ export class CatchUpSubscription {
     this.stopInterval = undefined;
   }
 
-  /** Reset the durable checkpoint (replay); takes effect from the next start/poll. */
-  async reset(toGlobalSeq = 0): Promise<void> {
+  /**
+   * Reset the durable checkpoint (replay); takes effect from the next start/poll. The durable
+   * checkpoint is the source of truth, so the save happens first and the in-memory cursor and halt
+   * move only once it lands: an operator who is told the replay was armed must never be looking at
+   * a subscription that will resume from the old position on the next restart.
+   */
+  async reset(toGlobalSeq = 0): Promise<Result<void, InfraError>> {
+    const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
+    if (saved.isErr()) {
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, globalSeq: toGlobalSeq, err: saved.error },
+        'checkpoint reset failed; replay not armed',
+      );
+      return saved;
+    }
     this.cursor = toGlobalSeq;
     this.halted = false;
-    await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
+    return saved;
   }
 
   /** Serialized drain: concurrent calls coalesce into one more pass, never interleave. */

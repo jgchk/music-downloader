@@ -360,6 +360,30 @@ describe('CatchUpSubscription', () => {
     expect(await checkpointOf()).toBe(2);
   });
 
+  it('reset reports a checkpoint-save failure instead of claiming the replay was recorded', async () => {
+    feed.events = [seamEvent(1), seamEvent(2)];
+    const sub = subscription();
+    await sub.start();
+    checkpoints.failSaves = true;
+
+    const outcome = await sub.reset();
+
+    expect(outcome.isErr()).toBe(true);
+    expect(await checkpointOf()).toBe(2);
+  });
+
+  it('a reset whose checkpoint save failed leaves the subscription where the durable checkpoint says', async () => {
+    feed.events = [seamEvent(1)];
+    failures.set(1, [{ kind: 'Permanent', reason: 'InvalidPayload' }]);
+    const sub = subscription();
+    await sub.start();
+    checkpoints.failSaves = true;
+
+    await sub.reset();
+
+    expect(sub.isHalted).toBe(true);
+  });
+
   it('reset lifts a halt so a fixed poison event can be reattempted', async () => {
     feed.events = [seamEvent(1)];
     failures.set(1, [{ kind: 'Permanent', reason: 'InvalidPayload' }]);
