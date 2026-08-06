@@ -174,6 +174,35 @@ describe('SqliteEventStore', () => {
     });
   });
 
+  it('upcasts by default: a store built without a registry still lifts legacy rows', async () => {
+    // The default registry is the populated one, so a wiring omission cannot silently serve
+    // un-upcast events; an empty `new UpcasterRegistry()` is an explicit, deliberate opt-out.
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'acq-1',
+        0,
+        'ManualSelectionRequested',
+        1,
+        JSON.stringify({
+          type: 'ManualSelectionRequested',
+          candidates: [{ releaseMbid: 'b', title: 'Unknown', trackCount: 0 }],
+        }),
+        '{}',
+      );
+
+    const read = (await store.readStream('acq-1'))._unsafeUnwrap();
+    expect(read[0]!.event).toEqual({
+      type: 'ManualSelectionRequested',
+      candidates: [{ releaseMbid: 'b', title: 'Unknown' }],
+    });
+  });
+
   it('upcasts stored events on read', async () => {
     const registry = new UpcasterRegistry().register(
       'AcquisitionFulfilled',

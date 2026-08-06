@@ -13,7 +13,7 @@ import type {
   StoredEvent,
 } from '../../application/ports/event-store-port.js';
 import type { EventDatabase } from './schema.js';
-import { CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
+import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 /**
  * The SQLite `EventStorePort` adapter (D7). Optimistic concurrency is enforced twice: `append`
@@ -54,7 +54,11 @@ export class SqliteEventStore implements EventStorePort {
 
   constructor(
     database: EventDatabase,
-    private readonly upcasters: UpcasterRegistry = new UpcasterRegistry(),
+    // Default to the populated registry so legacy on-disk shapes are lifted even when a caller
+    // omits the argument: a store built without one still upcasts. Passing an empty
+    // `new UpcasterRegistry()` is an explicit, deliberate opt-out (only tests that assert raw
+    // pass-through do so).
+    private readonly upcasters: UpcasterRegistry = buildUpcasterRegistry(),
     private readonly bus?: EventBus,
   ) {
     this.insertStmt = database.prepare(
