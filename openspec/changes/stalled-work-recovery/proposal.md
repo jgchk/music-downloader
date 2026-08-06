@@ -65,7 +65,10 @@ every decision below and whose pitfall checklist shapes the specs.
 - `download-management`: the undeliverable-outcome delivery loop gains bounded escalating
   backoff and a readiness consequence.
 - `runtime-baseline`: the readiness snapshot reflects persistent outcome-delivery failure, not
-  only halted subscriptions.
+  only halted subscriptions. (e2e-review-resolution-loop hand-off: a seam subscription HELD past
+  its retry budget — e.g. the intake consumer's `ExistingCycleStalled:<acquisitionId>` hold
+  behind a dead-lettered intake deletion — head-of-line-blocks the seam while readiness reads
+  `up`; a held-past-N-cycles readiness consequence belongs here.)
 - `web-ui`: stalled work tells the truth in the user register; the attention queue's charter is
   scoped to user-resolvable judgments.
 - `out-of-process-e2e`: the stall → surface → redrive → recovery phase.
