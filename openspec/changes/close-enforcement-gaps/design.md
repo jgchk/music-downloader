@@ -112,6 +112,10 @@ programs (release tooling, schema generators, contract recorders and drift check
 status *is* the interface — which is what unicorn's own rule text says. The rule stays on
 everywhere else, where a bare exit would tear down the process serving both modules and the web UI.
 
+**D14 — Gate cost, measured.** `pnpm check` went from ~22s to ~27s wall (parallel mode), the whole
+delta in the lint lane, which now covers ~66 more files; the new `typecheck:tiers` lane runs eight
+small projects serially in ~10s and is not the critical path. No lane restructuring warranted.
+
 **D13 — The test-tier carve-out is scoped to test *code*, not `*.test.ts`.** The tiers' helpers,
 fixture builders, and recorders are test code by any reading, so the shared `testFiles` glob covers
 `test/**`, `packages/*/test/**`, and `packages/web/tests/**` alongside `**/*.test.ts`. Only
