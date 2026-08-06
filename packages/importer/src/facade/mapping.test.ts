@@ -244,7 +244,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
     ]);
   });
 
-  it('projects fresh wire objects, never the projection\u2019s own', () => {
+  it('projects fresh wire objects, never the projection\u{2019}s own', () => {
     const entry: ImportStatusView['history'][number] = {
       kind: 'remediation-required',
       at: 't',
@@ -284,14 +284,18 @@ describe('statusViewToDto / pendingReviewToDto', () => {
 
     const dto = statusViewToDto({ ...view, history: [hintsEntry, failuresEntry] });
 
-    expect(dto.history[0]).toEqual({ kind: 'requested', at: 't1', hints: { artist: 'a', album: 'b' } });
+    expect(dto.history[0]).toEqual({
+      kind: 'requested',
+      at: 't1',
+      hints: { artist: 'a', album: 'b' },
+    });
     expect((dto.history[0] as { hints?: object }).hints).not.toHaveProperty(
       'projectionOnlyHintField',
     );
     expect(dto.history[1]).toEqual({ kind: 'remediation-required', at: 't2', failures: [FAILURE] });
-    expect(
-      (dto.history[1] as { failures: object[] }).failures[0],
-    ).not.toHaveProperty('projectionOnlyFailureField');
+    expect((dto.history[1] as { failures: object[] }).failures[0]).not.toHaveProperty(
+      'projectionOnlyFailureField',
+    );
   });
 
   it('maps a status view carrying an open review', () => {
