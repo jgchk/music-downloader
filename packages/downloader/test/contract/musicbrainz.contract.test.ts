@@ -10,7 +10,7 @@ import {
 } from '../../src/adapters/musicbrainz/schemas.js';
 import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
 import type { Mbid } from '../../src/domain/shared/mbid.js';
-import { asMbid } from '../../src/domain/shared/__fixtures__/mbid.js';
+import { parseMbid } from '../../src/domain/shared/mbid.js';
 import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
@@ -33,7 +33,15 @@ const byName = (name: string): ContractFixture => {
   return hit.fixture;
 };
 
-const mbidFromPath = (name: string): Mbid => asMbid(byName(name).request.path.split('/').at(-1)!);
+/**
+ * Mbids that this tier feeds back into the adapter come from the recorded bytes, so they are minted
+ * through the domain's own parser rather than a branding helper: an mbid the recording no longer
+ * carries in UUID form must fail the run, not be blessed into the domain by a cast.
+ */
+const recordedMbid = (value: string): Mbid => parseMbid(value)._unsafeUnwrap();
+
+const mbidFromPath = (name: string): Mbid =>
+  recordedMbid(byName(name).request.path.split('/').at(-1)!);
 
 let server: FixtureServer;
 
@@ -141,7 +149,7 @@ describe('MusicBrainz contract (tier 1)', () => {
 describe('MusicBrainz release-group contract (tier 1)', () => {
   const browseEntry = fixtures.find((f) => f.name === 'release-group-browse.json')!;
   const lookupEntry = fixtures.find((f) => f.name === 'release-group-lookup.json')!;
-  const releaseGroupMbid = asMbid(browseEntry.fixture.request.query!['release-group']!);
+  const releaseGroupMbid = recordedMbid(browseEntry.fixture.request.query!['release-group']!);
 
   let rgServer: FixtureServer;
   beforeEach(async () => {
@@ -185,7 +193,7 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
 // offer them for manual choice instead of resolving or failing — and fetch no edition lookup.
 describe('MusicBrainz release-group no-official contract (tier 1)', () => {
   const browseEntry = fixtures.find((f) => f.name === 'release-group-no-official-browse.json')!;
-  const releaseGroupMbid = asMbid(browseEntry.fixture.request.query!['release-group']!);
+  const releaseGroupMbid = recordedMbid(browseEntry.fixture.request.query!['release-group']!);
 
   let rgServer: FixtureServer;
   beforeEach(async () => {
