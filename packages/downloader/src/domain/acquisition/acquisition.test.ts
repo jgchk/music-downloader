@@ -179,7 +179,7 @@ describe('Acquisition.execute — happy path', () => {
     expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'AcquisitionExhausted']);
   });
 
-  it('completes a download, passes validation, and imports to fulfilment', () => {
+  it('records a completed download', () => {
     expect(
       types(
         Acquisition.fromHistory(selectedHistory([a]))
@@ -187,7 +187,9 @@ describe('Acquisition.execute — happy path', () => {
           ._unsafeUnwrap(),
       ),
     ).toEqual(['DownloadCompleted']);
+  });
 
+  it('records a passed validation', () => {
     expect(
       types(
         Acquisition.fromHistory(validatingHistory([a]))
@@ -198,7 +200,9 @@ describe('Acquisition.execute — happy path', () => {
           ._unsafeUnwrap(),
       ),
     ).toEqual(['ValidationPassed']);
+  });
 
+  it('records an import as fulfilment', () => {
     expect(
       types(
         Acquisition.fromHistory(importingHistory([a]))
@@ -667,35 +671,78 @@ describe('Acquisition.reactTo — the event → effect table', () => {
     expect(effectTypes(effects)).toEqual(['Import']);
   });
 
-  const inertEvents: AcquisitionEvent[] = [
-    { type: 'MetadataResolutionFailed' },
-    { type: 'SearchCompleted', round: 1, candidates: [] },
-    { type: 'CandidatesRanked', ranked: [] },
-    { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+  // Each inert event folded onto the state it legitimately occurs in — inertness against the
+  // Empty state alone was vacuous, because the fold ignores out-of-phase events, so ANY event
+  // reacts to nothing from Empty (S3 review sweep). The expected post-phase pins that the
+  // seeded history genuinely reached the event's honest post-state before inertness is judged.
+  const inertReactions: {
+    event: AcquisitionEvent;
+    history: readonly AcquisitionEvent[];
+    postPhase: string;
+  }[] = [
     {
-      type: 'ValidationFailed',
-      candidate: a.identity,
-      verdict: { confidence: asUnit(0), reasons: [] },
+      event: { type: 'MetadataResolutionFailed' },
+      history: requestedHistory(),
+      postPhase: 'MetadataFailed',
     },
-    { type: 'AcquisitionFulfilled', location: '/x' },
+    {
+      event: { type: 'SearchCompleted', round: 1, candidates: [] },
+      history: resolvedHistory(),
+      postPhase: 'Searching',
+    },
+    {
+      event: { type: 'CandidatesRanked', ranked: [] },
+      history: [...resolvedHistory(), { type: 'SearchCompleted', round: 1, candidates: [a] }],
+      postPhase: 'Selecting',
+    },
+    {
+      event: { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      history: startedHistory([a]),
+      postPhase: 'Downloading',
+    },
+    {
+      event: {
+        type: 'ValidationFailed',
+        candidate: a.identity,
+        verdict: { confidence: asUnit(0), reasons: [] },
+      },
+      history: validatingHistory([a]),
+      postPhase: 'Validating',
+    },
+    {
+      event: { type: 'AcquisitionFulfilled', location: '/x' },
+      history: [
+        ...importingHistory([a]),
+        { type: 'Imported', candidate: a.identity, location: '/x', files: sampleFiles },
+      ],
+      postPhase: 'Fulfilled',
+    },
     // A revival needs no effect of its own: the co-emitted CandidateRejected drives cleanup, and
     // CandidateSelected/SearchRequested drive the revival's work.
-    { type: 'FulfillmentRejected', candidate: a.identity, reasons: ['corrupt stub'] },
-    { type: 'AcquisitionExhausted' },
+    {
+      event: { type: 'FulfillmentRejected', candidate: a.identity, reasons: ['corrupt stub'] },
+      history: fulfilledHistory([a, matchingCandidate('b')]),
+      postPhase: 'Validating',
+    },
+    {
+      event: { type: 'AcquisitionExhausted' },
+      history: [
+        ...resolvedHistory(),
+        { type: 'SearchCompleted', round: 1, candidates: [] },
+        { type: 'CandidatesRanked', ranked: [] },
+      ],
+      postPhase: 'Exhausted',
+    },
   ];
 
-  it.each(inertEvents)('emits no effect for $type', (event) => {
-    expect(Acquisition.fromHistory([]).reactTo(event)).toEqual([]);
-  });
-
-  it('emits no effect for a FulfillmentRejected folded onto its revivable state', () => {
-    expect(
-      Acquisition.fromHistory([
-        ...fulfilledHistory([a, matchingCandidate('b')]),
-        { type: 'FulfillmentRejected', candidate: a.identity, reasons: [] },
-      ]).reactTo({ type: 'FulfillmentRejected', candidate: a.identity, reasons: [] }),
-    ).toEqual([]);
-  });
+  it.each(inertReactions)(
+    'emits no effect for $event.type folded onto its reachable post-state',
+    ({ event, history, postPhase }) => {
+      const acquisition = Acquisition.fromHistory([...history, event]);
+      expect(acquisition.phase).toBe(postPhase);
+      expect(acquisition.reactTo(event)).toEqual([]);
+    },
+  );
 
   it('cleans up a rejected candidate’s staged files, carried on the event (D3)', () => {
     expect(

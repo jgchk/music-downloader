@@ -6,7 +6,6 @@ import {
   StalledReadModel,
   projectStatus,
 } from './read-models.js';
-import { FakeEventStore } from '../__fixtures__/fakes.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import { asUnit } from '../../domain/shared/__fixtures__/unit.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
@@ -58,10 +57,17 @@ const history: AcquisitionEvent[] = [
   { type: 'AcquisitionFulfilled', location: '/lib/c' },
 ];
 
+// StoredEvent rows built directly — the earlier fake-store detour discarded append's
+// ResultAsync and worked only because the fake mutates synchronously (S3 review sweep).
 function stored(events: readonly AcquisitionEvent[]): readonly StoredEvent[] {
-  const store = new FakeEventStore();
-  store.append('acq-1', 0, events, { acquisitionId: 'acq-1', occurredAt: 't' });
-  return store.all();
+  return events.map((event, index) => ({
+    globalSeq: index + 1,
+    streamId: 'acq-1',
+    version: index + 1,
+    type: event.type,
+    event,
+    metadata: { acquisitionId: 'acq-1', occurredAt: 't' },
+  }));
 }
 
 describe('projectStatus', () => {

@@ -142,7 +142,8 @@ describe('evolve — the tolerant, total fold', () => {
         resolved({ kind: 'refresh-candidates' }),
       ]);
       expect(state).toMatchObject({ phase: 'proposing' });
-      expect('pinnedId' in state && state.pinnedId).toBeFalsy();
+      // Absence, not falsiness: `toBeFalsy` would also pass for a pinnedId of '' (S3 review).
+      expect('pinnedId' in state ? state.pinnedId : undefined).toBeUndefined();
     });
 
     it('settles the review but holds the phase on reject (deletion still owed)', () => {

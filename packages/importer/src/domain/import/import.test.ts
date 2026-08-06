@@ -15,6 +15,7 @@ import {
   awaitingMatchReview,
   awaitingReviewWithCandidate,
   candidate,
+  legacyIntakeReview,
   proposed,
   remediationHistory,
   requested,
@@ -301,18 +302,16 @@ describe('resolving a review', () => {
     ).toEqual({ kind: 'NoOpenReview' });
   });
 
-  it('accepts each verb against an open match review', () => {
-    for (const resolution of [
-      { kind: 'apply-candidate', ref: candidate({ distance: asDistance(0.5) }).ref },
-      { kind: 'supply-id', mbReleaseId: 'mb-2' },
-      { kind: 'refresh-candidates' },
-      { kind: 'manual-tags', tags: MANUAL_TAGS },
-      { kind: 'import-as-is' },
-      { kind: 'reject', reason: 'not this album' },
-    ] as const) {
-      const events = given(awaitingMatchReview()).execute(resolve(resolution))._unsafeUnwrap();
-      expect(events).toEqual([{ type: 'ReviewResolved', resolution }]);
-    }
+  it.each([
+    { kind: 'apply-candidate', ref: candidate({ distance: asDistance(0.5) }).ref },
+    { kind: 'supply-id', mbReleaseId: 'mb-2' },
+    { kind: 'refresh-candidates' },
+    { kind: 'manual-tags', tags: MANUAL_TAGS },
+    { kind: 'import-as-is' },
+    { kind: 'reject', reason: 'not this album' },
+  ] as const)('accepts $kind against an open match review', (resolution) => {
+    const events = given(awaitingMatchReview()).execute(resolve(resolution))._unsafeUnwrap();
+    expect(events).toEqual([{ type: 'ReviewResolved', resolution }]);
   });
 
   it('refuses to apply a candidate that was never proposed', () => {
@@ -364,19 +363,18 @@ describe('resolving a review', () => {
         .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NoRetainedCandidate' });
-    const legacy = [
-      requested({ source: { acquisitionId: toAcquisitionId('acq-legacy') } }),
-      proposed([candidate({ distance: asDistance(0.5) })]),
-      MATCH_REVIEW,
-    ];
     expect(
-      given(legacy)
+      given(legacyIntakeReview())
         .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NoRetainedCandidate' });
-    // Plain reject still resolves the same review normally.
+  });
+
+  it('resolves a plain reject on a legacy intake review normally', () => {
+    // The candidate-less refusal above is verb-specific: the same review still takes the plain
+    // reject, so a legacy import is never wedged behind the verb it cannot honour.
     expect(
-      given(legacy)
+      given(legacyIntakeReview())
         .execute(resolve({ kind: 'reject' }))
         ._unsafeUnwrap(),
     ).toEqual([{ type: 'ReviewResolved', resolution: { kind: 'reject' } }]);

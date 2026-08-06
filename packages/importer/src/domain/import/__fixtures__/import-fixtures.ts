@@ -110,6 +110,15 @@ export function awaitingReviewWithCandidate(): ImportEvent[] {
   ];
 }
 
+/** A legacy intake review: an acquisition source recorded, but no retained delivery candidate. */
+export function legacyIntakeReview(): ImportEvent[] {
+  return [
+    requested({ source: { acquisitionId: toAcquisitionId('acq-legacy') } }),
+    proposed([candidate({ distance: asDistance(0.5) })]),
+    MATCH_REVIEW,
+  ];
+}
+
 /** A history that auto-applied and landed `applied`. */
 export function appliedHistory(): ImportEvent[] {
   return [requested(), proposed([candidate()]), AUTO_APPLIED, APPLIED];
