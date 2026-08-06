@@ -5,7 +5,16 @@ import type { Role, SessionClaims } from './session.js';
  * call sites are enforcement points that name an *action* and obey the answer; this module is the
  * decision point that knows how the answer is reached. The mechanism behind it is RBAC today — a
  * table from action to the role it requires — and can become attribute- or policy-based later
- * without a single call site changing, because no caller ever learns that roles exist.
+ * without a single call site changing, because no caller may learn that roles exist (the compiler
+ * cannot express that; `authz.boundary.test.ts` does).
+ *
+ * ⚠ BEFORE GIVING THIS SEAM ITS FIRST CONSUMER, READ THIS. The `owner` role is derived from
+ * plex.tv's `owned` flag on a resource that self-asserts both its identifier and its server
+ * capability — so an attacker who registers a forged "server" under their own account is `owner`
+ * (`docs/research/plex-machine-identifier-trust.md`). Nothing is exploitable while no route asks
+ * this question, which is why gating a real action is blocked on pinning the owner by account
+ * identity first. `authz.boundary.test.ts` fails the day a production consumer appears, so this
+ * cannot be armed by accident.
  *
  * Like the session codec, this is deliberately NOT a port: a pure decision has no external actor
  * behind it, so there is nothing to fake and tests exercise the real path with minted claims.

@@ -54,6 +54,10 @@ database, no mutation after issuance. When plex.tv omits the ownership flag, the
 - **WHEN** the login membership check matches a server resource plex.tv does not mark as owned
 - **THEN** the issued session carries the guest role
 
+Note: plex.tv's ownership flag is self-asserted by the resource, so a forged server registration
+reports itself as owned. Gating any real action on the owner role therefore requires the account-
+identity pin to land first; this capability ships the role model with no such action.
+
 #### Scenario: An absent ownership flag is a guest
 
 - **WHEN** the matched server resource carries no ownership flag at all

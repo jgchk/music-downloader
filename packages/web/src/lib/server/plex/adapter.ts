@@ -1,6 +1,8 @@
 import { ResultAsync } from 'neverthrow';
 import type { ZodType } from 'zod';
+import type { SessionIdentity } from '../session.js';
 import type {
+  DenialReason,
   MembershipOutcome,
   PinCheckOutcome,
   PlexAccessPort,
@@ -13,6 +15,7 @@ import {
   plexResourcesSchema,
   plexUserSchema,
 } from './schemas.js';
+import type { PlexResources } from './schemas.js';
 
 /**
  * The plex.tv adapter behind {@link PlexAccessPort} (design D6): real HTTP against
@@ -93,25 +96,63 @@ export class PlexTvAccess implements PlexAccessPort {
       'resources',
     );
 
-    // The predicate (web-access-control): identifier match alone is forgeable — device/player
-    // entries carry client-chosen identifiers — so the matching entry must also BE a server.
-    const matched = resources.find(
-      (r) => r.clientIdentifier === this.config.machineId && isServerResource(r.provides),
+    return resolveMembership(
+      { plexAccountId: String(user.id), username },
+      resources,
+      this.config.machineId,
     );
-    if (matched === undefined) return { kind: 'denied', username };
-    // The role comes from the MATCHED server's ownership flag, never from any other resource the
-    // account happens to own; an absent flag is a guest (least privilege, design D2).
-    return {
-      kind: 'granted',
-      identity: { plexAccountId: String(user.id), username },
-      role: matched.owned === true ? 'owner' : 'guest',
-    };
   }
 }
 
+/**
+ * The membership predicate and role derivation, as a pure function of the parsed listing
+ * (web-access-control). Kept out of the HTTP method so the access-control policy can be read,
+ * tested, and later extended — the recorded follow-up pins the owner by account identity — without
+ * touching transport or parsing.
+ *
+ * Admission requires an entry that BOTH carries the configured machine identifier AND declares a
+ * server. That is a strict narrowing, NOT an attestation: device/player identifiers are
+ * client-chosen, and the server class is self-asserted by the same mechanism (see
+ * `docs/research/plex-machine-identifier-trust.md`). It closes the trivially-exploitable device
+ * shape; the account-identity pin is the recorded follow-up that makes the gate trustworthy.
+ */
+export function resolveMembership(
+  identity: SessionIdentity,
+  resources: PlexResources,
+  machineId: string,
+): MembershipOutcome {
+  const idMatches = resources.filter((r) => r.clientIdentifier === machineId);
+  // Only entries passing the WHOLE predicate are candidates — the role must never be read from an
+  // entry that failed it (a device carrying our identifier is always `owned` by whoever made it).
+  const candidates = idMatches.filter((r) => isServerResource(r.provides));
+  if (candidates.length === 0) return { kind: 'denied', ...denial(identity.username, idMatches) };
+  return {
+    kind: 'granted',
+    identity,
+    // Owner iff ANY admitting entry is owned: duplicate machine identifiers occur in the wild
+    // (cloned VMs, restored Preferences.xml), and listing ORDER must not decide privilege.
+    // An absent flag is a guest — least privilege (design D2).
+    role: candidates.some((r) => r.owned === true) ? 'owner' : 'guest',
+  };
+}
+
+/** Which refusal shape this was, so the operator can tell attack traffic from contract drift. */
+function denial(
+  username: string,
+  idMatches: readonly PlexResources[number][],
+): { username: string; reason: DenialReason } {
+  if (idMatches.length === 0) return { username, reason: 'no-machine-match' };
+  const hasCapabilities = idMatches.some((r) => r.provides !== undefined);
+  return {
+    username,
+    reason: hasCapabilities ? 'matched-non-server' : 'matched-no-capabilities',
+  };
+}
+
 /** Does the comma-separated capability list name a server? Trimmed and case-insensitive, so
- * formatting drift in plex.tv's list never silently widens or narrows admission. */
-function isServerResource(provides: string | undefined): boolean {
+ * formatting drift in plex.tv's list never silently widens or narrows admission. Exported so the
+ * contract recorder asks the question exactly the way the predicate does. */
+export function isServerResource(provides: string | undefined): boolean {
   if (provides === undefined) return false;
   return provides.split(',').some((capability) => capability.trim().toLowerCase() === 'server');
 }

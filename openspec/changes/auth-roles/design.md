@@ -14,7 +14,8 @@ the e2e harness importing `signSession` as the single implementation. The stall-
 
 **Goals:**
 
-- Close the review sweep's predicate finding by requiring the matched resource to be a server.
+- Narrow the review sweep's predicate finding by requiring the matched resource to declare a
+  server (see Risks — closing it entirely needs the account-identity pin).
 - Establish the permission-question seam (PEP/PDP split) so authorization models are swappable
   behind one signature.
 - Keep the entire change inside `packages/web`; zero facade or bounded-context impact.
@@ -30,15 +31,18 @@ the e2e harness importing `signSession` as the single implementation. The stall-
 
 ## Decisions
 
-**D1 — The predicate: identifier match AND provides-server.** Membership requires one
+**D1 — The predicate: identifier match AND provides-server.** (See Risks: the server class is
+also self-assertable, so this narrows admission rather than authenticating the server.) Membership requires one
 `/resources` entry with `clientIdentifier === PLEX_SERVER_MACHINE_ID` whose `provides`
 (comma-separated list per plex.tv) contains `server`. Alternatives: *owned-only* (locks out
 every legitimate share-guest); *account allowlist* (rebuilds the user database that
 share-is-approval exists to avoid). Device/player entries — the client-forgeable class — never
 carry `provides: "server"`, which is the finding's attack shape.
 
-**D2 — Role is the matched entry's `owned` flag, read once.** `owned === true` ⇒ `owner`, else
-(false or absent) ⇒ `guest`. Single derivation point is the adapter's membership check, which
+**D2 — Role is the admitting entry's `owned` flag, read once.** `owned === true` ⇒ `owner`, else
+(false or absent) ⇒ `guest`. Only entries that pass the WHOLE predicate are candidates, and the
+role is `owner` iff ANY of them is owned — so neither an entry that failed the predicate nor
+plex.tv's listing order can decide privilege. Single derivation point is the adapter's membership check, which
 now returns `{identity, role}`; the callback threads it into the minted session. Schema reads
 both new fields tolerantly (`owned: z.boolean().optional()`, `provides: z.string().optional()`)
 — absent fields degrade toward denial/least-privilege, never toward grant.
@@ -47,8 +51,9 @@ both new fields tolerantly (`owned: z.boolean().optional()`, `provides: z.string
 claims as an optional field defaulting to `guest` on decode. Alternative considered: rotate the
 codec (or secret) to force universal re-login. Rejected: the predicate fix does not invalidate
 any legitimately issued session, and the conservative default means no privilege appears by
-omission; the owner logs in again once to pick up `owner`. `SessionIdentity` grows the role so
-the e2e harness's minted cookies stay honest.
+omission; the owner logs in again once to pick up `owner`. The signing input grows the role — as
+`SessionSubject extends SessionIdentity`, so identity stays identity and the port keeps `identity`
+and `role` as separate facts — which also keeps the e2e harness's minted cookies honest.
 
 **D4 — The seam: `authorize(claims, action)` in a pure `lib/server/authz.ts`.** Call sites name
 an action from the closed union `PrivilegedAction`; the decision point consults a
@@ -59,11 +64,15 @@ union ships with its first member, `'system:redrive'`, declared now and mapped t
 reserved by the stall-surfacing grill, referenced by no route until that change — because a
 closed union with zero members is untestable and the name is already decided. Swapping RBAC for
 ABAC/PBAC later changes only this module's internals; the signature (and an additive optional
-`resource` parameter, if ever needed) absorbs the rest.
+`resource` parameter, if ever needed) absorbs the rest. Note that the role LADDER (the rank
+comparison making the table a minimum rather than an exact match), not just the table, is what a
+non-hierarchical model replaces.
 
 **D5 — Contract truth.** `provides` and `owned` become consumed fields: the plextv recorder's
 projection widens to capture them, the owner-account fixture is re-recorded to witness both, and
-the replay test drives the real predicate to a grant with `role: owner`. The guest-side variant
+the replay test drives the real predicate to a grant with `role: owner`. (Shipped state: the
+re-record needs an interactive plex.tv approval on the owner's account, so it is a handoff — until
+it lands the grant assertion is SKIPPED, visibly, rather than reported green; see tasks 4.2.) The guest-side variant
 (`owned` false/absent) has no recordable source — a guest token is not ours to record — so it is
 covered at the unit tier against the tolerant schema, with the fixture-absence documented in the
 contract test (the same honesty rule the recorder already follows for the events/transfers
@@ -88,7 +97,22 @@ coupling).
   users; `owned === true` plus a matching `/user` account id for the owner) — is now a prompt
   follow-up change rather than a conditional one. It stays out of `auth-roles` because it adds
   required configuration (an explicit non-goal here) and because it composes with, rather than
-  replaces, the predicate this change fixes.
+  replaces, the predicate this change fixes. **The escalation direction is the point to remember:**
+  a forger owns their forgery, so the residual bypass decodes as `owner`, not `guest` — the one
+  path in this change that fails toward MAXIMUM privilege. Nothing is exploitable while no route
+  asks the permission question, so the pin is a HARD PREREQUISITE of the first owner-gated surface
+  (stall-surfacing), not a soft follow-up. `authz.boundary.test.ts` fails the day `authorize` gains
+  a production consumer, so this cannot be armed silently.
+- **[A Plex Home / managed user's `owned` flag is unverified]** → plex.tv models `home` separately
+  from `owned`, and nothing here establishes what `owned` reports for a Home member on the admin's
+  server. If it reports true, every Home member decodes as `owner` — the same
+  privilege-appearing direction. Unverifiable without a Home account; added to the post-deploy
+  verification (task 5.2). If it proves true, the account-identity pin fixes it too (a Home
+  member's account id is not the owner's).
+- **[plex.tv changing the TYPE of `provides`/`owned`]** → Unlike absence, a type change fails the
+  whole listing parse: every login errors as `plex-unavailable` (a hard, loud, fail-closed outage
+  including for the owner) rather than coercing toward a grant. Deliberate — the denial reason
+  `matched-no-capabilities` exists to make the softer drift shape diagnosable in the logs.
 - **[`provides` formatting drift (casing, spacing, multi-value)]** → Parse as a trimmed,
   case-insensitive comma-list; the re-recorded fixture pins the real spelling.
 - **[Owner lockout if plex.tv reports `owned` unexpectedly]** → Tolerant default is `guest`, so

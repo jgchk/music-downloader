@@ -31,9 +31,13 @@ export interface SessionIdentity {
 
 /**
  * What the session may do, decided once at login from Plex server ownership (web-authorization).
- * Only `authorize` reads it; nothing else in the app branches on a role.
+ * Only `authorize` may read it; nothing else in the app branches on a role — the compiler cannot
+ * express that, so `authz.boundary.test.ts` does.
+ *
+ * Derived from the schema below so the enum and the type cannot drift apart.
  */
-export type Role = 'owner' | 'guest';
+const roleSchema = z.enum(['owner', 'guest']);
+export type Role = z.infer<typeof roleSchema>;
 
 /** The signing input: who the session is for, plus the role login derived for it. */
 export interface SessionSubject extends SessionIdentity {
@@ -49,8 +53,11 @@ const claimsSchema = z
     // Optional on the WIRE, total in the decoded value: a validly signed cookie minted before
     // roles existed decodes as a guest for its remaining lifetime, so privilege can never appear
     // by omission (web-authorization). An unrecognized role is not defaulted — it fails the parse
-    // and the cookie is invalid, because only this codec's holder could have signed it.
-    role: z.enum(['owner', 'guest']).default('guest'),
+    // and the cookie is invalid, because only this codec's holder could have signed it. (The
+    // operational consequence: adding a role and then ROLLING BACK invalidates cookies minted in
+    // between — those users log in again, fail-closed. The absence default expires on its own
+    // once every pre-role cookie has aged past SESSION_TTL_MS.)
+    role: roleSchema.default('guest'),
     expiresAt: z.number(),
   })
   .readonly();
@@ -69,7 +76,14 @@ function signature(payload: string, secret: string): Buffer {
 
 /** Mint a session cookie value: base64url claims (expiry fixed at now + TTL) + HMAC signature. */
 export function signSession(subject: SessionSubject, secret: string, now: number): string {
-  const claims: SessionClaims = { ...subject, expiresAt: now + SESSION_TTL_MS };
+  // Fields are picked, never spread: the signed surface stays closed by construction, so a caller
+  // passing a widened object cannot smuggle an extra property into the cookie.
+  const claims: SessionClaims = {
+    plexAccountId: subject.plexAccountId,
+    username: subject.username,
+    role: subject.role,
+    expiresAt: now + SESSION_TTL_MS,
+  };
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
   return `${payload}.${signature(payload, secret).toString('base64url')}`;
 }
