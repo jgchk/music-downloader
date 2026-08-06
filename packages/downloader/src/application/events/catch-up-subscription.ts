@@ -1,6 +1,7 @@
 import { ResultAsync } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { Logger } from '../logging/logger.js';
+import { infraError } from '../ports/errors.js';
 import type { InfraError } from '../ports/errors.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { CheckpointStore } from '../ports/event-store-port.js';
@@ -81,9 +82,9 @@ export interface CatchUpSubscriptionDependencies {
  * only so a reset can tell when the drain has stopped touching the checkpoint, and swallowing the
  * rejection *here* is what keeps the barrier from surfacing as an unhandled rejection of its own.
  */
-const settled = async (cycle: Promise<void>): Promise<void> => {
+const settled = async (work: Promise<unknown>): Promise<void> => {
   try {
-    await cycle;
+    await work;
   } catch {
     // Deliberately not handled here — see above.
   }
@@ -99,14 +100,19 @@ export class CatchUpSubscription {
   private halted = false;
   private running = false;
   private pending = false;
-  private resetting = false;
+  private resets = 0;
+  private resetQueue: Promise<void> = Promise.resolve();
   private inflight: Promise<void> | undefined;
   private stopWakeups: (() => void) | undefined;
   private stopInterval: (() => void) | undefined;
 
   constructor(private readonly dependencies: CatchUpSubscriptionDependencies) {}
 
-  /** True when the poison policy has stopped this subscription (checkpoint held). */
+  /**
+   * True when this subscription has stopped delivering — a poison event under the `halt` policy,
+   * an unreadable checkpoint at start, or a permanent feed render defect. The checkpoint is held
+   * in every case, and the module reports readiness `down`.
+   */
   get isHalted(): boolean {
     return this.halted;
   }
@@ -174,13 +180,25 @@ export class CatchUpSubscription {
    * exactly the false "replay armed" the ordering above exists to prevent.
    */
   reset(toGlobalSeq = 0): ResultAsync<void, InfraError> {
-    return new ResultAsync(this.resetWhenDrained(toGlobalSeq));
+    // Queued, not flagged: a boolean gate would be cleared by whichever of two overlapping resets
+    // finished first, re-admitting the drain while the other's save was still in flight — the same
+    // falsified Ok this serialization exists to prevent. `fromPromise`, not `new ResultAsync`: the
+    // latter does not catch, so a rejecting store would escape this declared error channel.
+    this.resets += 1;
+    const run = this.resetAfter(this.resetQueue, toGlobalSeq);
+    this.resetQueue = settled(run);
+    return ResultAsync.fromPromise(run, (error) =>
+      infraError('checkpoint.reset', 'checkpoint reset failed unexpectedly', error),
+    ).andThen((saved) => saved);
   }
 
-  private async resetWhenDrained(toGlobalSeq: number): Promise<Result<void, InfraError>> {
-    this.resetting = true;
+  private async resetAfter(
+    previous: Promise<void>,
+    toGlobalSeq: number,
+  ): Promise<Result<void, InfraError>> {
     try {
-      await this.inflight;
+      await previous; // this reset's turn in the queue
+      await this.inflight; // and the drain has stopped touching the checkpoint
       const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toGlobalSeq);
       if (saved.isErr()) {
         this.dependencies.logger.error(
@@ -193,13 +211,13 @@ export class CatchUpSubscription {
       this.halted = false;
       return saved;
     } finally {
-      this.resetting = false;
+      this.resets -= 1;
     }
   }
 
   /** Serialized drain: concurrent calls coalesce into one more pass, never interleave. */
   async poll(): Promise<void> {
-    if (this.halted || this.resetting) return;
+    if (this.halted || this.resets > 0) return;
     if (this.running) {
       this.pending = true;
       return;
