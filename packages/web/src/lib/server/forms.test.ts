@@ -76,6 +76,15 @@ describe('submitAcquisitionForm', () => {
 });
 
 describe('resolveReviewForm', () => {
+  it('passes hostile prototype-key verbs through untouched for the facade to refuse', () => {
+    // A hand-crafted POST can name any string as the verb. Keys inherited from Object.prototype
+    // must not resolve to functions (or throw, for __proto__) — they are unknown verbs like any
+    // other and fall through to the bare pass-through the facade's zod boundary refuses.
+    for (const hostile of ['__proto__', 'toString', 'constructor', 'hasOwnProperty']) {
+      expect(resolveReviewForm(form({ verb: hostile }))).toEqual({ verb: hostile });
+    }
+  });
+
   it('shapes apply-candidate with an optional duplicate action', () => {
     const dto = resolveReviewForm(
       form({

@@ -138,6 +138,17 @@ describe('resolve action', () => {
     });
   });
 
+  it('refuses a __proto__ verb as a modeled 400, never a thrown 500', async () => {
+    // The hostile-POST shape: Object.prototype key names must behave exactly like any unknown
+    // verb — reshaped to a bare pass-through the facade refuses — not crash the action.
+    const resolveReview = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: { kind: 'ValidationFailed', detail: 'bad verb' } });
+    const result = await actions.resolve!(eventFor({ resolveReview }, { verb: '__proto__' }));
+    expect(resolveReview).toHaveBeenCalledWith({ id: 'imp-1', resolution: { verb: '__proto__' } });
+    expect(result).toMatchObject({ status: 400 });
+  });
+
   it('treats a missing verb as non-destructive and lets the facade refuse it', async () => {
     const resolveReview = vi.fn().mockResolvedValue({ ok: false, error: { kind: 'Validation' } });
     await actions.resolve!(eventFor({ resolveReview }, {}));

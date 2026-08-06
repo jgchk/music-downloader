@@ -82,8 +82,9 @@ const noPayload: VerbReshaper = (verb) => ({ verb });
 /**
  * One reshaper per known verb, `satisfies`-proven total over the importer's verb union: a new
  * wire verb without an entry here is a compile error, not a silently payload-less POST. Unknown
- * verb strings (a stale form, a hand-crafted POST) fall through to a bare pass-through for the
- * facade to refuse — the same dual regime as the copy layer's gloss maps.
+ * verb strings (a stale form, a hand-crafted POST — including Object.prototype key names, which
+ * the `Object.hasOwn` guard keeps from resolving inherited members) fall through to a bare
+ * pass-through for the facade to refuse — the same dual regime as the copy layer's gloss maps.
  */
 const VERB_RESHAPERS = {
   'apply-candidate': (verb, data) =>
@@ -120,9 +121,8 @@ const VERB_RESHAPERS = {
 /** The review resolution form: a `verb` field plus per-verb fields, reshaped to the union. */
 export function resolveReviewForm(data: FormData): unknown {
   const verb = text(data, 'verb');
-  if (verb === undefined) return { verb };
-  const reshape = (VERB_RESHAPERS as Partial<Record<string, VerbReshaper>>)[verb];
-  return reshape === undefined ? { verb } : reshape(verb, data);
+  if (verb === undefined || !Object.hasOwn(VERB_RESHAPERS, verb)) return { verb };
+  return VERB_RESHAPERS[verb as keyof typeof VERB_RESHAPERS](verb, data);
 }
 
 function manualTracks(data: FormData): unknown[] {
