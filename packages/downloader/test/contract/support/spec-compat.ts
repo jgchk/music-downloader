@@ -39,7 +39,8 @@ function resolveRef(spec: Json, ref: unknown): Json | undefined {
   return asObject(node);
 }
 
-function pathParamNames(pathItem: Json, operation: Json): Set<string> {
+/** The parameter names an operation declares for one location (`path` or `query`). */
+function paramNames(pathItem: Json, operation: Json, location: 'path' | 'query'): Set<string> {
   const params = [
     ...((pathItem.parameters as unknown[]) ?? []),
     ...((operation.parameters as unknown[]) ?? []),
@@ -47,7 +48,7 @@ function pathParamNames(pathItem: Json, operation: Json): Set<string> {
   const names = new Set<string>();
   for (const raw of params) {
     const param = asObject(raw);
-    if (param?.in === 'path' && typeof param.name === 'string') names.add(param.name);
+    if (param?.in === location && typeof param.name === 'string') names.add(param.name);
   }
   return names;
 }
@@ -85,10 +86,17 @@ export function checkSlskdSpec(spec: Json, operations: readonly SlskdOperation[]
       continue;
     }
 
-    const declaredParams = pathParamNames(pathItem, operation);
+    const declaredPath = paramNames(pathItem, operation, 'path');
     for (const param of op.pathParams) {
-      if (!declaredParams.has(param)) {
+      if (!declaredPath.has(param)) {
         violations.push({ operation: label, problem: `path parameter {${param}} missing` });
+      }
+    }
+
+    const declaredQuery = paramNames(pathItem, operation, 'query');
+    for (const param of op.queryParams ?? []) {
+      if (!declaredQuery.has(param)) {
+        violations.push({ operation: label, problem: `query parameter "${param}" missing` });
       }
     }
 

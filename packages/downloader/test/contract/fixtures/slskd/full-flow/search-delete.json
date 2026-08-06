@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "releasing a completed search — a 204 with no body"
+  },
+  "request": {
+    "method": "DELETE",
+    "path": "/api/v0/searches/53426e38-21f7-449a-8379-97e8e74282ad"
+  },
+  "response": {
+    "status": 204
+  }
+}

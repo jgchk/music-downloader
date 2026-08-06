@@ -55,13 +55,25 @@ export async function startFixtureServer(
       });
       const fixture = routes.get(`${req.method} ${url.pathname}`);
       if (fixture !== undefined) {
-        const payload =
-          fixture.response.body === undefined ? '' : JSON.stringify(fixture.response.body);
-        res.writeHead(fixture.response.status, { 'Content-Type': 'application/json' });
-        res.end(payload);
+        const { body, status } = fixture.response;
+        // A recorded body that is already a string is served verbatim as text. slskd answers a
+        // refused enqueue with the bare exception message, not JSON — running it through
+        // JSON.stringify would wrap it in quotes and hand the adapter a string the real service
+        // never sends, which is a harness artifact posing as a recording.
+        if (typeof body === 'string') {
+          res.writeHead(status, { 'Content-Type': 'text/plain' });
+          res.end(body);
+          return;
+        }
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(body === undefined ? '' : JSON.stringify(body));
         return;
       }
       if (req.method === 'DELETE' && url.pathname.includes('/transfers/downloads/')) {
+        // slskd's documented 204 for a cancel/remove. Kept as a fallback because teardown issues one
+        // DELETE per transfer per phase and recording every combination would pin the adapter's
+        // round count rather than its contract; the `?remove=` values it sends ARE asserted, from
+        // `server.requests`, by the teardown replay test.
         res.writeHead(204);
         res.end();
         return;

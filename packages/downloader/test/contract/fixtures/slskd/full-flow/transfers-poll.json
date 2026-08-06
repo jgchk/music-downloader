@@ -1,0 +1,45 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "a succeeded transfer in its nested directories[].files[] shape"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "username": "peer1",
+      "directories": [
+        {
+          "directory": "corpus\\Lab Artist\\Lab Album",
+          "fileCount": 1,
+          "files": [
+            {
+              "id": "38777e7a-23e4-4721-9b2a-7c668d998883",
+              "username": "peer1",
+              "direction": "Download",
+              "filename": "corpus\\Lab Artist\\Lab Album\\03 - Success Path.flac",
+              "size": 8962,
+              "startOffset": 0,
+              "state": "Completed, Succeeded",
+              "requestedAt": "2026-08-06T16:40:06.7052791",
+              "enqueuedAt": "2026-08-06T16:40:07.0208874",
+              "startedAt": "2026-08-06T16:40:07.0547086Z",
+              "endedAt": "2026-08-06T16:40:15.6948976Z",
+              "bytesTransferred": 8962,
+              "averageSpeed": 1037.2458287660143,
+              "bytesRemaining": 0,
+              "elapsedTime": "00:00:08.6401890",
+              "percentComplete": 100,
+              "remainingTime": "00:00:00"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

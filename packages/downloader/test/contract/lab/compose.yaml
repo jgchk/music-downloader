@@ -1,0 +1,57 @@
+# The slskd recording lab (change: slskd-contract-truth, design D1) — RECORD TIME ONLY.
+#
+# Three real services on one private network: an open-source Soulseek server (soulfind) and two
+# pinned slskd instances that log into it. `peer` is the controlled counterparty that shares a
+# generated corpus; `sut` is the instance the recorder points at. Because both sides are ours, every
+# transfer state the classifier consumes becomes orchestratable on demand — a slot-starved queue, a
+# cancelled transfer, an enqueue rejected for an unshared file, a peer that goes offline mid-flight.
+#
+# The commit gate never runs this: `pnpm test:contract` replays frozen fixtures with no containers
+# and no network. See ./README.md for the record procedure.
+#
+# slskd is pinned to the deployed version (test/contract/slskd-spec/provenance.json) because a
+# fixture is only meaningful for the version that produced it.
+
+name: slskd-contract-lab
+
+services:
+  soulfind:
+    image: ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f66e7b880ba3de2347ba74eb1e38d9c312c86da9ade53b600ad948d23
+    # Auto-registration is on by default, so `peer` and `sut` register themselves at first login
+    # with the invented credentials below — no server setup step. No healthcheck: soulfind is
+    # listening within a second, and the recorder waits on the thing that actually matters (the
+    # peer's presence as the sut sees it) rather than on container liveness.
+
+  # The upload side. One upload slot at a crawl, so a single enqueued file occupies the slot and
+  # everything behind it sits in a genuine remote queue (UPLOAD_SLOTS has a floor of 1 — "no slots"
+  # is achieved by occupying the one, not by configuration).
+  peer:
+    image: slskd/slskd@sha256:f5150c39758353c31788e8e3d6aa9f9c2910f2a46591d810fc2f4d0bac81a96a
+    depends_on: [soulfind]
+    environment:
+      SLSKD_SLSK_ADDRESS: soulfind
+      SLSKD_SLSK_PORT: '2242'
+      SLSKD_SLSK_USERNAME: labpeer
+      SLSKD_SLSK_PASSWORD: ${SLSKD_LAB_PEER_PASSWORD:-labpeer-password}
+      SLSKD_SHARED_DIR: /corpus
+      SLSKD_UPLOAD_SLOTS: '1'
+      SLSKD_UPLOAD_SPEED_LIMIT: '1'
+      SLSKD_NO_AUTH: 'true'
+    volumes:
+      - ./corpus:/corpus:ro
+    ports:
+      - '127.0.0.1:5031:5030'
+
+  # The download side — the instance the recorder drives. Its downloads root stays inside the
+  # container: nothing here reads the staged bytes, only the paths slskd reports for them.
+  sut:
+    image: slskd/slskd@sha256:f5150c39758353c31788e8e3d6aa9f9c2910f2a46591d810fc2f4d0bac81a96a
+    depends_on: [soulfind]
+    environment:
+      SLSKD_SLSK_ADDRESS: soulfind
+      SLSKD_SLSK_PORT: '2242'
+      SLSKD_SLSK_USERNAME: labsut
+      SLSKD_SLSK_PASSWORD: ${SLSKD_LAB_SUT_PASSWORD:-labsut-password}
+      SLSKD_NO_AUTH: 'true'
+    ports:
+      - '127.0.0.1:5030:5030'

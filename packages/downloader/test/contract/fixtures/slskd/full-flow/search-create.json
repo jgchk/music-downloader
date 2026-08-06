@@ -1,0 +1,27 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "search creation"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/v0/searches"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "fileCount": 0,
+      "id": "53426e38-21f7-449a-8379-97e8e74282ad",
+      "isComplete": false,
+      "lockedFileCount": 0,
+      "responseCount": 0,
+      "responses": [],
+      "searchText": "Lab Artist Lab Album",
+      "startedAt": "2026-08-06T16:39:51.3722753Z",
+      "state": "InProgress",
+      "token": 0
+    }
+  }
+}

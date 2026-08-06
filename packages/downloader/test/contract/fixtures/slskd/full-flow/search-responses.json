@@ -1,0 +1,59 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "per-peer search responses from the lab peer"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/searches/53426e38-21f7-449a-8379-97e8e74282ad/responses"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "fileCount": 3,
+        "files": [
+          {
+            "bitDepth": 24,
+            "code": 1,
+            "extension": "flac",
+            "filename": "corpus\\Lab Artist\\Lab Album\\01 - Slot Hog.flac",
+            "length": 8,
+            "sampleRate": 44100,
+            "size": 944302,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "flac",
+            "filename": "corpus\\Lab Artist\\Lab Album\\02 - Queued Behind.flac",
+            "length": 5,
+            "sampleRate": 44100,
+            "size": 8962,
+            "isLocked": false
+          },
+          {
+            "bitDepth": 16,
+            "code": 1,
+            "extension": "flac",
+            "filename": "corpus\\Lab Artist\\Lab Album\\03 - Success Path.flac",
+            "length": 5,
+            "sampleRate": 44100,
+            "size": 8962,
+            "isLocked": false
+          }
+        ],
+        "hasFreeUploadSlot": true,
+        "lockedFileCount": 0,
+        "lockedFiles": [],
+        "queueLength": 0,
+        "token": 0,
+        "uploadSpeed": 0,
+        "username": "peer1"
+      }
+    ]
+  }
+}

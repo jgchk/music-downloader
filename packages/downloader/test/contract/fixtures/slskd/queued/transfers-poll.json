@@ -1,0 +1,60 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "Queued, Remotely with placeInQueue populated — only because the position call preceded it"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/transfers/downloads/peer1"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "username": "peer1",
+      "directories": [
+        {
+          "directory": "corpus\\Lab Artist\\Lab Album",
+          "fileCount": 2,
+          "files": [
+            {
+              "id": "03fc57e6-59e1-4c44-878a-93b296e13b12",
+              "username": "peer1",
+              "direction": "Download",
+              "filename": "corpus\\Lab Artist\\Lab Album\\01 - Slot Hog.flac",
+              "size": 944302,
+              "startOffset": 0,
+              "state": "InProgress",
+              "requestedAt": "2026-08-06T16:40:19.2103929",
+              "enqueuedAt": "2026-08-06T16:40:19.2749994",
+              "startedAt": "2026-08-06T16:40:19.2803083Z",
+              "bytesTransferred": 4182,
+              "averageSpeed": 1140.3021239676395,
+              "bytesRemaining": 940120,
+              "elapsedTime": "00:00:04.0176951",
+              "percentComplete": 0.4428667947330409,
+              "remainingTime": "00:13:44.4481705"
+            },
+            {
+              "id": "9a54d0e9-04c7-4189-ab68-f59958286aca",
+              "username": "peer1",
+              "direction": "Download",
+              "filename": "corpus\\Lab Artist\\Lab Album\\02 - Queued Behind.flac",
+              "size": 8962,
+              "startOffset": 0,
+              "state": "Queued, Remotely",
+              "requestedAt": "2026-08-06T16:40:21.2473142",
+              "enqueuedAt": "2026-08-06T16:40:21.2557732",
+              "bytesTransferred": 0,
+              "averageSpeed": 0,
+              "placeInQueue": 1,
+              "bytesRemaining": 8962,
+              "percentComplete": 0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

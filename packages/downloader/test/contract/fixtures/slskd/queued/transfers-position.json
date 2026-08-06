@@ -1,0 +1,16 @@
+{
+  "provenance": {
+    "source": "slskd recording lab (soulfind ghcr.io/soulfind-dev/soulfind@sha256:3de2e82f + slskd/slskd@sha256:f5150c39, docker compose)",
+    "capturedAt": "2026-08-06",
+    "serviceVersion": "0.22.5.0",
+    "note": "the position endpoint answers a bare integer and writes it onto the transfer row"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/v0/transfers/downloads/peer1/9a54d0e9-04c7-4189-ab68-f59958286aca/position"
+  },
+  "response": {
+    "status": 200,
+    "body": 1
+  }
+}

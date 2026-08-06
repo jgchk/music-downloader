@@ -75,7 +75,7 @@ const HOLD_MAPPING = {
             {
               id: 'transfer-1',
               filename: '@@music\\Test Artist\\Test Album\\01 Track One.flac',
-              state: 'InProgress, Transferring',
+              state: 'InProgress',
               size: 1234567,
               bytesTransferred: 617283,
             },
