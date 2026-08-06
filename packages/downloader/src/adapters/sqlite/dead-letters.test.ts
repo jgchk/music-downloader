@@ -1,8 +1,8 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteDeadLetterStore } from './dead-letters.js';
 import { openEventDatabase } from './schema.js';
 
@@ -13,9 +13,29 @@ const LETTER = {
   occurredAt: '2026-07-21T12:00:00.000Z',
 };
 
+const temporaryDirectories: string[] = [];
+const openDatabases: ReturnType<typeof openEventDatabase>[] = [];
+
+function freshDatabase(): ReturnType<typeof openEventDatabase> {
+  const database = openEventDatabase(':memory:');
+  openDatabases.push(database);
+  return database;
+}
+
+afterEach(() => {
+  for (const database of openDatabases) {
+    if (database.open) database.close();
+  }
+  openDatabases.length = 0;
+  for (const directory of temporaryDirectories) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+  temporaryDirectories.length = 0;
+});
+
 describe('SqliteDeadLetterStore', () => {
   it('records and lists parked events per subscription, in position order', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
 
     await store.record({ ...LETTER, globalSeq: 9 });
     await store.record(LETTER);
@@ -27,7 +47,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('re-parking the same position upserts instead of failing (redelivery converges)', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
 
     await store.record(LETTER);
     const again = await store.record({ ...LETTER, error: 'InvalidPayload (retry)' });
@@ -39,7 +59,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('round-trips the owning stream on reactor effect letters', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
 
     await store.record({ ...LETTER, subscription: 'acquisition-reactor', streamId: 'acq-1' });
 
@@ -51,7 +71,9 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('adds the stream column to a database created before it existed', async () => {
-    const file = path.join(mkdtempSync(path.join(tmpdir(), 'dead-letters-')), 'events.db');
+    const directory = mkdtempSync(path.join(tmpdir(), 'dead-letters-'));
+    temporaryDirectories.push(directory);
+    const file = path.join(directory, 'events.db');
     const legacy = new Database(file);
     legacy.exec(
       `CREATE TABLE dead_letters (
@@ -61,7 +83,9 @@ describe('SqliteDeadLetterStore', () => {
     );
     legacy.close();
 
-    const store = new SqliteDeadLetterStore(openEventDatabase(file));
+    const migrated = openEventDatabase(file);
+    openDatabases.push(migrated);
+    const store = new SqliteDeadLetterStore(migrated);
     await store.record({ ...LETTER, streamId: 'acq-1' });
 
     const listResult4 = await store.list('seam:verdicts');
@@ -70,7 +94,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('clears the letters of one stream without touching its neighbours', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     await store.record({ ...LETTER, subscription: 'acquisition-reactor', streamId: 'acq-1' });
     await store.record({
       ...LETTER,
@@ -87,7 +111,7 @@ describe('SqliteDeadLetterStore', () => {
   });
 
   it('prunes letters older than the retention horizon', async () => {
-    const store = new SqliteDeadLetterStore(openEventDatabase(':memory:'));
+    const store = new SqliteDeadLetterStore(freshDatabase());
     await store.record({ ...LETTER, occurredAt: '2026-06-01T00:00:00.000Z' }); // aged out
     await store.record({ ...LETTER, globalSeq: 9, occurredAt: '2026-07-20T00:00:00.000Z' });
 
@@ -98,18 +122,24 @@ describe('SqliteDeadLetterStore', () => {
     expect(letters.map((letter) => letter.globalSeq)).toEqual([9]);
   });
 
-  it('surfaces storage faults as infra errors', async () => {
-    const database = openEventDatabase(':memory:');
-    const store = new SqliteDeadLetterStore(database);
-    database.close();
-
-    const recordResult = await store.record(LETTER);
-    expect(recordResult.isErr()).toBe(true);
-    const listResult7 = await store.list('seam:verdicts');
-    expect(listResult7.isErr()).toBe(true);
-    const clearStreamResult = await store.clearStream('seam:verdicts', 'acq-1');
-    expect(clearStreamResult.isErr()).toBe(true);
-    const pruneResult = await store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z');
-    expect(pruneResult.isErr()).toBe(true);
+  describe('surfaces a faulted connection as an infra error', () => {
+    it.each([
+      ['record', (store: SqliteDeadLetterStore) => store.record(LETTER)],
+      ['list', (store: SqliteDeadLetterStore) => store.list('seam:verdicts')],
+      [
+        'clearStream',
+        (store: SqliteDeadLetterStore) => store.clearStream('seam:verdicts', 'acq-1'),
+      ],
+      [
+        'prune',
+        (store: SqliteDeadLetterStore) => store.prune('seam:verdicts', '2026-07-01T00:00:00.000Z'),
+      ],
+    ] as const)('%s', async (_operation, call) => {
+      const database = freshDatabase();
+      const store = new SqliteDeadLetterStore(database);
+      database.close();
+      const result = await call(store);
+      expect(result.isErr()).toBe(true);
+    });
   });
 });
