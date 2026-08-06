@@ -1,4 +1,4 @@
-import type { SubmitAcquisitionRequestDto } from '@music/downloader';
+import type { ResolutionVerb } from '$lib/resolution-actions.js';
 
 /**
  * Form-data translation: flat HTML form fields into the facades' nested wire DTOs. Deliberately
@@ -45,9 +45,12 @@ export function submitAcquisitionForm(data: FormData): unknown {
     .map((s) => s.trim())
     .filter((s) => s !== '');
 
-  const dto: SubmitAcquisitionRequestDto = {
-    request: request as SubmitAcquisitionRequestDto['request'],
-    qualityPolicy: compact({ order, floor: text(data, 'qualityFloor') }) as never,
+  // Built as a plain unknown record (the resolveReviewForm shape): the facade's zod boundary is
+  // the validator, and impersonating the DTO type here would silence the compile pressure a DTO
+  // shape change should exert on this reshaper.
+  const dto: Record<string, unknown> = {
+    request,
+    qualityPolicy: compact({ order, floor: text(data, 'qualityFloor') }),
     matchPolicy: compact({ threshold: number_(data, 'matchThreshold') }),
     retryPolicy: compact({
       maxSearchRounds: number_(data, 'maxSearchRounds'),
@@ -71,46 +74,55 @@ export function submitFormValues(data: FormData): Record<string, string> {
   return values;
 }
 
+/** Reshapes one verb's per-verb form fields into its resolution payload. */
+type VerbReshaper = (verb: string, data: FormData) => unknown;
+
+const noPayload: VerbReshaper = (verb) => ({ verb });
+
+/**
+ * One reshaper per known verb, `satisfies`-proven total over the importer's verb union: a new
+ * wire verb without an entry here is a compile error, not a silently payload-less POST. Unknown
+ * verb strings (a stale form, a hand-crafted POST) fall through to a bare pass-through for the
+ * facade to refuse — the same dual regime as the copy layer's gloss maps.
+ */
+const VERB_RESHAPERS = {
+  'apply-candidate': (verb, data) =>
+    compactResolution({
+      verb,
+      candidate: { dataSource: text(data, 'dataSource'), albumId: text(data, 'albumId') },
+      duplicateAction: text(data, 'duplicateAction'),
+    }),
+  'supply-id': (verb, data) => compactResolution({ verb, mbReleaseId: text(data, 'mbReleaseId') }),
+  'manual-tags': (verb, data) =>
+    compactResolution({
+      verb,
+      tags: {
+        albumArtist: text(data, 'albumArtist'),
+        album: text(data, 'album'),
+        year: number_(data, 'year'),
+        tracks: manualTracks(data),
+      },
+    }),
+  reject: (verb, data) => compactResolution({ verb, reason: text(data, 'reason') }),
+  'reject-unusable-delivery': (verb, data) => {
+    const reasons = text(data, 'reasons')
+      ?.split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+    return compactResolution({ verb, reasons });
+  },
+  'refresh-candidates': noPayload,
+  'import-as-is': noPayload,
+  accept: noPayload,
+  'retry-enrichment': noPayload,
+} satisfies Record<ResolutionVerb, VerbReshaper>;
+
 /** The review resolution form: a `verb` field plus per-verb fields, reshaped to the union. */
 export function resolveReviewForm(data: FormData): unknown {
   const verb = text(data, 'verb');
-  switch (verb) {
-    case 'apply-candidate': {
-      return compactResolution({
-        verb,
-        candidate: { dataSource: text(data, 'dataSource'), albumId: text(data, 'albumId') },
-        duplicateAction: text(data, 'duplicateAction'),
-      });
-    }
-    case 'supply-id': {
-      return compactResolution({ verb, mbReleaseId: text(data, 'mbReleaseId') });
-    }
-    case 'manual-tags': {
-      return compactResolution({
-        verb,
-        tags: {
-          albumArtist: text(data, 'albumArtist'),
-          album: text(data, 'album'),
-          year: number_(data, 'year'),
-          tracks: manualTracks(data),
-        },
-      });
-    }
-    case 'reject': {
-      return compactResolution({ verb, reason: text(data, 'reason') });
-    }
-    case 'reject-unusable-delivery': {
-      const reasons = text(data, 'reasons')
-        ?.split('\n')
-        .map((s) => s.trim())
-        .filter((s) => s !== '');
-      return compactResolution({ verb, reasons });
-    }
-    // The remaining verbs carry no payload; unknown verbs pass through for the facade to refuse.
-    default: {
-      return { verb };
-    }
-  }
+  if (verb === undefined) return { verb };
+  const reshape = (VERB_RESHAPERS as Partial<Record<string, VerbReshaper>>)[verb];
+  return reshape === undefined ? { verb } : reshape(verb, data);
 }
 
 function manualTracks(data: FormData): unknown[] {

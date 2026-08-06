@@ -116,15 +116,7 @@
 {/if}
 
 {#if confirm === undefined}
-  <ResolveForms
-    supplyId={actions.has('supply-id')}
-    refresh={actions.has('refresh-candidates')}
-    importAsIs={actions.has('import-as-is')}
-    reject={actions.has('reject')}
-    rejectUnusable={actions.has('reject-unusable-delivery')}
-    accept={actions.has('accept')}
-    retryEnrichment={actions.has('retry-enrichment')}
-  />
+  <ResolveForms {actions} />
   {#if actions.has('manual-tags')}
     <ManualTagsForm />
   {/if}
