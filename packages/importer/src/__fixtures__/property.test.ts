@@ -44,12 +44,12 @@ describe('the property harness reports failures well enough to reproduce them', 
 
   it('carries the violated invariant into the thrown message, not only onto the error cause', () => {
     const named = fc.property(fc.constant(0), () => {
-      throw new Error('a settled acquisition re-entered an active phase');
+      throw new Error('a settled review accepted a second resolution');
     });
 
     expect(() => {
       assertProperty(named);
-    }).toThrowError(/a settled acquisition re-entered an active phase/);
+    }).toThrowError(/a settled review accepted a second resolution/);
   });
 
   it('fails an awaiting property just as loudly as a synchronous one', async () => {
@@ -102,19 +102,45 @@ describe('the property corpus is pinned, so CI cannot flake', () => {
     expect(harness.propertyRun.numRuns).toBe(7);
   });
 
-  it.each([
-    ['a blank value', ' '.repeat(3)],
-    ['a non-number', 'lots'],
-    ['zero', '0'],
-    ['a negative count', '-3'],
-    ['a fraction', '1.5'],
-  ])('ignores %s and keeps the pinned corpus', async (_label, raw) => {
-    vi.stubEnv('FC_SEED', raw);
-    vi.stubEnv('FC_NUM_RUNS', raw);
+  it('replays a counterexample seed even though fast-check reports them signed', async () => {
+    // fast-check's seeds are signed 32-bit integers, so a real counterexample's seed is routinely
+    // negative. Refusing it here would silently run the pinned corpus, go green, and tell the
+    // investigator their counterexample does not reproduce.
+    vi.stubEnv('FC_SEED', '-1232878318');
+
+    const harness = await loadHarness();
+
+    expect(harness.propertyRun.seed).toBe(-1_232_878_318);
+  });
+
+  it('treats a blank value as absent and keeps the pinned corpus', async () => {
+    vi.stubEnv('FC_SEED', ' '.repeat(3));
+    vi.stubEnv('FC_NUM_RUNS', ' '.repeat(3));
 
     const harness = await loadHarness();
 
     expect(harness.propertyRun.seed).toBe(PINNED_SEED);
     expect(harness.propertyRun.numRuns).toBe(DEFAULT_NUM_RUNS);
+  });
+
+  it.each([
+    ['a non-number', 'lots'],
+    ['a fraction', '1.5'],
+    ['an underscored numeral the shell did not strip', '10_000'],
+  ])('refuses %s loudly rather than pretending it was never set', async (_label, raw) => {
+    // A knob that silently does nothing is worse than one that is missing: a nightly configured to
+    // widen the sweep would otherwise run the gate's budget and report green.
+    vi.stubEnv('FC_NUM_RUNS', raw);
+
+    await expect(loadHarness()).rejects.toThrowError(/FC_NUM_RUNS must be an integer/);
+  });
+
+  it.each([
+    ['zero', '0'],
+    ['a negative count', '-3'],
+  ])('refuses %s runs — a sweep that cannot run is a misconfiguration', async (_label, raw) => {
+    vi.stubEnv('FC_NUM_RUNS', raw);
+
+    await expect(loadHarness()).rejects.toThrowError(/FC_NUM_RUNS must be an integer >= 1/);
   });
 });

@@ -1,10 +1,11 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { assertProperty } from '../../__fixtures__/property.js';
+import { assertProperty, propertyRun } from '../../__fixtures__/property.js';
 import { candidateReferenceKey } from './events.js';
 import { decide } from './decide.js';
+import type { DomainError } from './decide.js';
 import type { ImportCommandType } from './commands.js';
-import type { ImportEventType, ResolutionKind } from './events.js';
+import type { ImportEvent, ImportEventType, Resolution, ResolutionKind } from './events.js';
 import { initialState } from './state.js';
 import type { ImportPhase } from './state.js';
 import {
@@ -15,7 +16,8 @@ import {
   eventArbitraryByType,
   resolutionArbitraryByKind,
 } from './__fixtures__/arbitraries.js';
-import { driveCommands, watermarkOf } from './__fixtures__/decider-runner.js';
+import type { CommandStep } from './__fixtures__/arbitraries.js';
+import { arbReachableStates, driveCommands, watermarkOf } from './__fixtures__/decider-runner.js';
 import type { DriveResult } from './__fixtures__/decider-runner.js';
 
 /**
@@ -34,15 +36,28 @@ const ALL_PHASES: readonly ImportPhase[] = [
   'rejected',
 ];
 
-/** Sort names so the coverage assertion compares sets, not incidental insertion order. */
+/** The closed `DomainError` union: an error outside it would be an unmodelled failure channel. */
+const DOMAIN_ERROR_KINDS: readonly DomainError['kind'][] = [
+  'UnknownImport',
+  'NoOpenReview',
+  'InvalidResolution',
+  'UnknownCandidate',
+  'NoRetainedCandidate',
+  'CycleInFlight',
+];
+
+const KNOWN_EVENT_TYPES: readonly string[] = Object.keys(eventArbitraryByType);
+
+/** Sort names so the coverage assertions compare sets, not incidental insertion order. */
 const byName = (a: string, b: string): number => a.localeCompare(b);
 
 describe('the generators cover the decider’s whole command, event, and verb surface', () => {
   it('generates every event variant, and only under its own key', () => {
-    for (const [type, arbitrary] of Object.entries(eventArbitraryByType)) {
-      const samples = fc.sample(arbitrary, { numRuns: 10, seed: 1 });
+    for (const [type, arbitrary] of Object.entries<fc.Arbitrary<ImportEvent>>(
+      eventArbitraryByType,
+    )) {
+      const samples = fc.sample(arbitrary, { numRuns: 10, seed: propertyRun.seed });
 
-      expect(samples).not.toHaveLength(0);
       expect(samples.map((event) => event.type)).toEqual(
         Array.from({ length: samples.length }, () => type as ImportEventType),
       );
@@ -50,10 +65,11 @@ describe('the generators cover the decider’s whole command, event, and verb su
   });
 
   it('generates every command variant, and only under its own key', () => {
-    for (const [type, arbitrary] of Object.entries(blindStepArbitraryByCommandType)) {
-      const samples = fc.sample(arbitrary, { numRuns: 10, seed: 1 });
+    for (const [type, arbitrary] of Object.entries<fc.Arbitrary<CommandStep>>(
+      blindStepArbitraryByCommandType,
+    )) {
+      const samples = fc.sample(arbitrary, { numRuns: 10, seed: propertyRun.seed });
 
-      expect(samples).not.toHaveLength(0);
       expect(samples.map((step) => step(initialState).type)).toEqual(
         Array.from({ length: samples.length }, () => type as ImportCommandType),
       );
@@ -61,10 +77,11 @@ describe('the generators cover the decider’s whole command, event, and verb su
   });
 
   it('generates every resolution verb, and only under its own key', () => {
-    for (const [kind, arbitrary] of Object.entries(resolutionArbitraryByKind)) {
-      const samples = fc.sample(arbitrary, { numRuns: 10, seed: 1 });
+    for (const [kind, arbitrary] of Object.entries<fc.Arbitrary<Resolution>>(
+      resolutionArbitraryByKind,
+    )) {
+      const samples = fc.sample(arbitrary, { numRuns: 10, seed: propertyRun.seed });
 
-      expect(samples).not.toHaveLength(0);
       expect(samples.map((resolution) => resolution.kind)).toEqual(
         Array.from({ length: samples.length }, () => kind as ResolutionKind),
       );
@@ -73,23 +90,35 @@ describe('the generators cover the decider’s whole command, event, and verb su
 });
 
 describe('decide is total: every reachable state answers every command with a value', () => {
-  it('returns a Result — never throws — for any command on any reachable state', () => {
+  it('never throws, on any command against any state a stream can reach', () => {
     assertProperty(
-      fc.property(arbCommandSequence, arbBlindCommandStep, (plan, intruder) => {
-        for (const state of driveCommands(plan).states) {
-          const decision = decide(intruder(state), state);
-
-          expect(decision.isOk() || decision.isErr()).toBe(true);
+      // `arbReachableStates` — not merely the decider's own output — so the corrupted-stream
+      // register is in play here too: a command landing on a state assembled from a hand-edited
+      // history is exactly what a partial `decide` would die on.
+      fc.property(arbReachableStates, arbBlindCommandStep, (states, intruder) => {
+        for (const state of states) {
+          expect(() => decide(intruder(state), state)).not.toThrow();
         }
       }),
     );
   });
 
-  it('never lets an errored decision emit events (an error is a refusal, not a partial append)', () => {
+  it('answers only in its declared channels: modelled errors, or events of known types', () => {
+    // `isOk() || isErr()` would be true by construction and assert nothing. What is worth pinning
+    // is that the *contents* stay inside the declared unions — an unmodelled error kind or an
+    // unknown event type is a real failure the type does not catch at runtime.
     assertProperty(
-      fc.property(arbCommandSequence, (plan) => {
-        for (const decision of driveCommands(plan).decisions) {
-          if (decision.error !== undefined) expect(decision.emitted).toEqual([]);
+      fc.property(arbReachableStates, arbBlindCommandStep, (states, intruder) => {
+        for (const state of states) {
+          const decision = decide(intruder(state), state);
+
+          if (decision.isErr()) {
+            expect(DOMAIN_ERROR_KINDS).toContain(decision.error.kind);
+            continue;
+          }
+          for (const event of decision.value) {
+            expect(KNOWN_EVENT_TYPES).toContain(event.type);
+          }
         }
       }),
     );
@@ -97,19 +126,30 @@ describe('decide is total: every reachable state answers every command with a va
 });
 
 describe('no reachable state violates an import invariant', () => {
+  /** How many times each guarded invariant actually got to assert something. */
+  const reached = { autoApply: 0, matchReview: 0, duplicateReview: 0, remediation: 0 };
+
   function expectInvariants(run: DriveResult): void {
     for (const decision of run.decisions) {
-      for (const event of decision.emitted) {
+      if (decision.outcome.isErr()) continue;
+      for (const event of decision.outcome.value) {
         if (event.type === 'AutoApplySelected') {
-          // Auto-apply is exactly the strong, unduplicated match — never a judgement call.
+          reached.autoApply += 1;
+          // Auto-apply is exactly the strong, unduplicated match — never a judgement call. An
+          // `Infinity` fallback here would silently void the invariant if `policy` ever moved off
+          // the state, so the impossible branch fails loudly instead.
           const state = decision.before;
-          const threshold = 'policy' in state ? state.policy.autoApplyThreshold : Infinity;
-          expect(event.distance).toBeLessThanOrEqual(threshold);
+          if (!('policy' in state))
+            expect.unreachable('auto-apply selected on a policy-less state');
+          expect(event.distance).toBeLessThanOrEqual(state.policy.autoApplyThreshold);
         }
         if (event.type === 'ReviewRequired' && event.cause.kind === 'match-review') {
+          reached.matchReview += 1;
           // `match-review` is only reached for a non-empty candidate list, so `best` is always
-          // populated — the empty case routes to `no-match` first.
-          expect(event.cause.best).toBeDefined();
+          // populated — the empty case routes to `no-match` first. (`toBeDefined` would pass for
+          // null, 0 or ''; the reference's own shape is what the review actually needs.)
+          expect(typeof event.cause.best.dataSource).toBe('string');
+          expect(typeof event.cause.best.albumId).toBe('string');
           expect(event.cause.hinted).toBe(event.cause.hintedReleaseId !== undefined);
         }
       }
@@ -117,10 +157,12 @@ describe('no reachable state violates an import invariant', () => {
 
     for (const state of run.states) {
       if (state.phase === 'awaiting-review' && state.cause.kind === 'duplicate-review') {
+        reached.duplicateReview += 1;
         // A duplicate review with nothing to compare would be a dead end.
         expect(state.cause.incumbents.length).toBeGreaterThan(0);
       }
       if (state.phase === 'applied' && state.remediation !== undefined) {
+        reached.remediation += 1;
         expect(state.remediation.failures.length).toBeGreaterThan(0);
       }
     }
@@ -132,6 +174,13 @@ describe('no reachable state violates an import invariant', () => {
         expectInvariants(driveCommands(plan));
       }),
     );
+
+    // Each invariant sits behind an event- or phase-guard; without these the suite could go green
+    // having asserted nothing at all.
+    expect(reached.autoApply).toBeGreaterThan(0);
+    expect(reached.matchReview).toBeGreaterThan(0);
+    expect(reached.duplicateReview).toBeGreaterThan(0);
+    expect(reached.remediation).toBeGreaterThan(0);
   });
 
   it('re-derives beets’ ordering: auto-apply names the lowest-distance candidate', () => {
@@ -145,7 +194,10 @@ describe('no reachable state violates an import invariant', () => {
         for (const decision of run.decisions) {
           if (decision.command.type !== 'RecordProposal') continue;
           const offered = decision.command.candidates;
-          const selected = decision.emitted.filter((event) => event.type === 'AutoApplySelected');
+          if (decision.outcome.isErr()) continue;
+          const selected = decision.outcome.value.filter(
+            (event) => event.type === 'AutoApplySelected',
+          );
           for (const event of selected) {
             selections += 1;
             const best = Math.min(...offered.map((candidate) => candidate.distance));
@@ -294,5 +346,40 @@ describe('the sweep is not vacuous: the generated plans reach the whole lifecycl
     expect([...commandsSeen].toSorted(byName)).toEqual(
       Object.keys(blindStepArbitraryByCommandType).toSorted(byName),
     );
+  });
+
+  it('puts every resolution verb through decide, not merely through the generator', () => {
+    // The generator-completeness test above proves each verb can be *built*. This proves each one
+    // is actually *decided* — without it, replacing most of the advancing generator's verbs with a
+    // single constant leaves the whole suite green.
+    const verbsSeen = new Set<ResolutionKind>();
+
+    assertProperty(
+      fc.property(arbCommandSequence, (plan) => {
+        for (const decision of driveCommands(plan).decisions) {
+          if (decision.command.type === 'ResolveReview') {
+            verbsSeen.add(decision.command.resolution.kind);
+          }
+        }
+      }),
+    );
+
+    expect([...verbsSeen].toSorted(byName)).toEqual(
+      Object.keys(resolutionArbitraryByKind).toSorted(byName),
+    );
+  });
+
+  it('refuses as well as accepts — every modelled error kind is genuinely reached', () => {
+    const kindsSeen = new Set<DomainError['kind']>();
+
+    assertProperty(
+      fc.property(arbCommandSequence, (plan) => {
+        for (const decision of driveCommands(plan).decisions) {
+          if (decision.outcome.isErr()) kindsSeen.add(decision.outcome.error.kind);
+        }
+      }),
+    );
+
+    expect([...kindsSeen].toSorted(byName)).toEqual([...DOMAIN_ERROR_KINDS].toSorted(byName));
   });
 });

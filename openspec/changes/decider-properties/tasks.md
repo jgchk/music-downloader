@@ -47,8 +47,11 @@ counterexample it finds becomes a red-first fix before the property is committed
 - [x] 5.2 Version decision: `chore`/`test:` no bump; any property-found production defect
       ships red-first here as `fix:` (patch bump) with its implied spec delta.
 
-> **5.2 outcome: no bump.** Every commit is `test:`, and the properties found **no
-> production defect** — 36 seeded defects were all caught, but none of them was real. The
-> two genuine bugs the sweep exposed were in the *test code itself* (a vacuous redelivery
-> property and an off-by-one in the store model's paging expectation), fixed before the
-> commits that carry them. `skip_specs: true` holds: no spec delta, no release.
+> **5.2 outcome: no bump.** Every commit is `test:`, and the properties found **no production
+> defect** — the seeded defects were all eventually caught, but none of them was real, and
+> "eventually" is doing honest work in that sentence: several properties passed against a seeded
+> defect on the first attempt and were rewritten before they bit (see design.md's vacuity risk).
+> Every genuine bug the exercise exposed was in the *test code itself* — a vacuous redelivery
+> property, an off-by-one in the store model's paging expectation, a property asserting the
+> runner's own literal, and generators that never reached three of the cases their properties
+> claimed to cover. `skip_specs: true` holds: no spec delta, no release.

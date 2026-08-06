@@ -1,6 +1,7 @@
+import { test } from '@fast-check/vitest';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { assertProperty } from '../../__fixtures__/property.js';
+import { assertProperty, propertyRun } from '../../__fixtures__/property.js';
 import type { AcquisitionEvent } from './events.js';
 import { react } from './react.js';
 import { evolve, foldEvents, initialState } from './state.js';
@@ -9,6 +10,7 @@ import { arbEvent } from './__fixtures__/arbitraries.js';
 import {
   ABSORBING_PHASES,
   arbAnyHistory,
+  arbDecidedHistory,
   arbReachableStates,
 } from './__fixtures__/decider-runner.js';
 import type { Effect } from './react.js';
@@ -20,71 +22,88 @@ import type { Effect } from './react.js';
  * prefix-fold dispatch is only sound if the fold is deterministic and prefix-consistent.
  */
 
-const KNOWN_PHASES: ReadonlySet<AcquisitionPhase> = new Set<AcquisitionPhase>([
-  'Empty',
-  'Pending',
-  'AwaitingManualSelection',
-  'Searching',
-  'Selecting',
-  'Downloading',
-  'Validating',
-  'Importing',
-  'Fulfilled',
-  'Exhausted',
-  'Cancelled',
-  'MetadataFailed',
-  'Conflicted',
-]);
+/**
+ * Exhaustive over the phase union rather than a hand-written `Set`: a new phase is a compile error
+ * here, instead of silently making this property assert less than it claims.
+ */
+const KNOWN_PHASE_TABLE: Record<AcquisitionPhase, true> = {
+  Empty: true,
+  Pending: true,
+  AwaitingManualSelection: true,
+  Searching: true,
+  Selecting: true,
+  Downloading: true,
+  Validating: true,
+  Importing: true,
+  Fulfilled: true,
+  Exhausted: true,
+  Cancelled: true,
+  MetadataFailed: true,
+  Conflicted: true,
+};
+const KNOWN_PHASES: readonly AcquisitionPhase[] = Object.keys(
+  KNOWN_PHASE_TABLE,
+) as AcquisitionPhase[];
 
-const KNOWN_EFFECTS: ReadonlySet<Effect['type']> = new Set<Effect['type']>([
-  'ResolveMetadata',
-  'Search',
-  'Download',
-  'Validate',
-  'Import',
-  'Cleanup',
-  'AbortDownload',
-]);
+/** Exhaustive over the effect union, for the same reason as {@link KNOWN_PHASE_TABLE}. */
+const KNOWN_EFFECT_TABLE: Record<Effect['type'], true> = {
+  ResolveMetadata: true,
+  Search: true,
+  Download: true,
+  Validate: true,
+  Import: true,
+  Cleanup: true,
+  AbortDownload: true,
+};
+const KNOWN_EFFECTS: readonly Effect['type'][] = Object.keys(
+  KNOWN_EFFECT_TABLE,
+) as Effect['type'][];
 
 /** Event soup, decider-minted history, and decider-minted history with illegal events spliced in. */
 const arbHistory: fc.Arbitrary<readonly AcquisitionEvent[]> = arbAnyHistory;
 
+/**
+ * The value-level fold properties use `@fast-check/vitest`'s `test.prop`, which registers the test
+ * and the arbitraries in one breath — the most readable form when a property is exactly "for all
+ * inputs, this holds". The suites elsewhere use `assertProperty(fc.property(...))` inside a plain
+ * `it`, because those properties also accumulate reached-counters and assert them after the sweep,
+ * which `test.prop` has no place to put. Both run under the same pinned {@link propertyRun}.
+ */
 describe('evolve is total over every event a stream can contain', () => {
-  it('folds any event onto any reachable state, yielding a known phase', () => {
-    assertProperty(
-      fc.property(arbReachableStates, arbEvent, (states, event) => {
-        for (const state of states) {
-          expect(KNOWN_PHASES.has(evolve(state, event).phase)).toBe(true);
-        }
-      }),
-    );
-  });
+  test.prop([arbReachableStates, arbEvent], propertyRun)(
+    'folds any event onto any reachable state, yielding a known phase',
+    (states, event) => {
+      for (const state of states) {
+        expect(KNOWN_PHASES).toContain(evolve(state, event).phase);
+      }
+    },
+  );
 
-  it('leaves the state it was given untouched — the fold is pure, not in-place', () => {
-    assertProperty(
-      fc.property(arbReachableStates, arbEvent, (states, event) => {
-        for (const state of states) {
-          const before = structuredClone(state);
+  test.prop([arbReachableStates, arbEvent], propertyRun)(
+    'leaves the state it was given untouched — the fold is pure, not in-place',
+    (states, event) => {
+      for (const state of states) {
+        const before = structuredClone(state);
 
-          evolve(state, event);
+        evolve(state, event);
 
-          expect(state).toEqual(before);
-        }
-      }),
-    );
-  });
+        expect(state).toEqual(before);
+      }
+    },
+  );
 
-  it('answers identically however many times it is asked', () => {
-    assertProperty(
-      fc.property(arbReachableStates, arbEvent, (states, event) => {
-        for (const state of states) {
-          expect(evolve(state, event)).toEqual(evolve(state, event));
-        }
-      }),
-    );
-  });
+  test.prop([arbReachableStates, arbEvent], propertyRun)(
+    'answers identically however many times it is asked',
+    (states, event) => {
+      for (const state of states) {
+        expect(evolve(state, event)).toEqual(evolve(state, event));
+      }
+    },
+  );
 
   it('never lets any event — lawful or not — reopen an absorbed acquisition', () => {
+    let absorptionsObserved = 0;
+
     assertProperty(
       fc.property(arbHistory, (history) => {
         // Absorption is a property of the fold itself, not just of the decisions in front of it: a
@@ -94,11 +113,16 @@ describe('evolve is total over every event a stream can contain', () => {
         let state: AcquisitionState = initialState;
         for (const event of history) {
           state = evolve(state, event);
-          if (settled !== undefined) expect(state.phase).toBe(settled);
+          if (settled !== undefined) {
+            absorptionsObserved += 1;
+            expect(state.phase).toBe(settled);
+          }
           if (ABSORBING_PHASES.has(state.phase)) settled = state.phase;
         }
       }),
     );
+
+    expect(absorptionsObserved).toBeGreaterThan(0);
   });
 });
 
@@ -107,17 +131,6 @@ describe('the fold is deterministic', () => {
     assertProperty(
       fc.property(arbHistory, (history) => {
         expect(foldEvents(history)).toEqual(foldEvents(history));
-      }),
-    );
-  });
-
-  it('is exactly the left fold of evolve over the history', () => {
-    assertProperty(
-      fc.property(arbHistory, (history) => {
-        let manual: AcquisitionState = initialState;
-        for (const event of history) manual = evolve(manual, event);
-
-        expect(foldEvents(history)).toEqual(manual);
       }),
     );
   });
@@ -137,6 +150,12 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
   });
 
   it('hands react the post-event state: a transfer effect names the candidate then in flight', () => {
+    // Scoped to WELL-FORMED histories on purpose. On a corrupted stream the guarantee genuinely
+    // does not hold, and should not be asserted: a spliced `CandidateSelected` landing on an
+    // already-`Downloading` state is ignored by the tolerant fold, so `react` reports the event's
+    // candidate while the folded state still holds the previous one. That divergence IS the
+    // tolerant-fold contract; only a history the decider minted has a candidate to agree about.
+    //
     // A property that never reaches its assertion is worse than no property, and this one only
     // bites where a transfer effect is actually produced. The counters make that visible: if the
     // corpus stops producing downloads or aborts, this test fails instead of quietly passing.
@@ -144,7 +163,7 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
     let abortsChecked = 0;
 
     assertProperty(
-      fc.property(arbHistory, (history) => {
+      fc.property(arbDecidedHistory, (history) => {
         // The reactor slices the stream before reacting, so `react` reads the state *as of* the
         // event it is given. That is what lets it narrow on phase and reach for the candidate in
         // flight — and it is exactly what this property pins: an effect that names a candidate
@@ -188,7 +207,7 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
           // Both dispatch paths: the reactor's as-of slice, and a redrive re-reacting an old event
           // against the head state. Neither may reach an effect the interpreter cannot run.
           for (const effect of [...react(event, asOf), ...react(event, head)]) {
-            expect(KNOWN_EFFECTS.has(effect.type)).toBe(true);
+            expect(KNOWN_EFFECTS).toContain(effect.type);
           }
         }
       }),

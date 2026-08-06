@@ -39,9 +39,12 @@ interface FeedEntry {
   readonly version: number;
 }
 
-/** The whole model: how long each stream is, and the global order the reactor reads. */
+/**
+ * The whole model: the global order the reactor reads. A stream's length is *derived* from it
+ * rather than tracked alongside — two fields holding one fact could disagree, and a model bug
+ * would then be indistinguishable from a store bug.
+ */
 interface StoreModel {
-  readonly lengths: Map<string, number>;
   readonly globalOrder: FeedEntry[];
 }
 
@@ -58,8 +61,14 @@ interface RealStore {
  */
 const coverage = { emptyAppendsRefused: 0, pagedReadsTruncated: 0 };
 
+/** Reset before the one test that reads them, so a second test could never inherit a stale count. */
+function resetCoverage(): void {
+  coverage.emptyAppendsRefused = 0;
+  coverage.pagedReadsTruncated = 0;
+}
+
 function lengthOf(model: StoreModel, streamId: string): number {
-  return model.lengths.get(streamId) ?? 0;
+  return model.globalOrder.filter((entry) => entry.streamId === streamId).length;
 }
 
 /** What the model says a stream holds: versions 0..n-1, in order. */
@@ -108,7 +117,6 @@ class AppendCommand implements fc.AsyncCommand<StoreModel, RealStore> {
     expect(sequences).toEqual([...sequences].toSorted(ascending));
     expect(sequences.filter((sequence) => sequence <= highestSoFar)).toEqual([]);
 
-    model.lengths.set(this.streamId, current + this.events.length);
     for (const row of stored) {
       model.globalOrder.push({
         globalSeq: row.globalSeq,
@@ -206,8 +214,7 @@ describe('the SQLite store agrees with an expected-version model on every interl
   ];
 
   it('never lands an append at the wrong version, and never reports a conflict for the right one', async () => {
-    coverage.emptyAppendsRefused = 0;
-    coverage.pagedReadsTruncated = 0;
+    resetCoverage();
 
     await assertAsyncProperty(
       fc.asyncProperty(
@@ -217,7 +224,7 @@ describe('the SQLite store agrees with an expected-version model on every interl
           try {
             await fc.asyncModelRun(
               () => ({
-                model: { lengths: new Map<string, number>(), globalOrder: [] },
+                model: { globalOrder: [] },
                 real: { store: new SqliteEventStore(database) },
               }),
               commandSequence,
