@@ -36,7 +36,7 @@ const FIXTURE_DIR = new URL('./fixtures/events/', import.meta.url).pathname;
 
 function upcastFixture(type: string, relative: string): ImportEvent {
   const fixture = readJson(join(FIXTURE_DIR, relative)) as { event: Record<string, unknown> };
-  return buildUpcasterRegistry().upcast(type, 1, fixture.event)._unsafeUnwrap();
+  return buildUpcasterRegistry().upcast(type, 1, fixture.event);
 }
 
 describe('ReviewRequired match-review legacy fold (best now required)', () => {
