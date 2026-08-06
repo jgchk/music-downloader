@@ -51,18 +51,29 @@ export interface RangeCommit {
  * its default export as `(config?: PresetConfig) => {}` (`src/index.d.ts`) — an upstream typing
  * gap, not a missing typing — so the two option bags it really hands back are named here, derived
  * from the consumers' own signatures rather than restated by hand.
+ *
+ * `NonNullable` is load-bearing. Both consumers take their option bag OPTIONALLY
+ * (`ParserOptions | undefined`, `Options<CommitKnownProps> | undefined`), so without it
+ * `{ parser: undefined, writer: undefined }` — the exact degraded shape {@link isPreset} exists to
+ * reject — satisfied this interface, and the members stayed `| undefined` downstream of the guard.
+ * The declared type now states the invariant the predicate checks.
  */
 interface Preset {
-  readonly parser: ConstructorParameters<typeof CommitParser>[0];
-  readonly writer: Parameters<typeof writeChangelogString>[2];
+  readonly parser: NonNullable<ConstructorParameters<typeof CommitParser>[0]>;
+  readonly writer: NonNullable<Parameters<typeof writeChangelogString>[2]>;
 }
 
 /**
- * The keys {@link isPreset} checks for, kept in step with {@link Preset} by `satisfies` so the
- * interface stays the single declaration of the expected shape: rename a member there and this list
- * stops typechecking.
+ * The keys {@link isPreset} checks for, kept in step with {@link Preset} BOTH ways. A list declared
+ * `satisfies readonly (keyof Preset)[]` is only a subset check — a member ADDED to the interface
+ * leaves it satisfying, so the guard silently stops checking the new bag. `Record<keyof Preset, _>`
+ * fails on a missing key and (as an object literal) on an excess one, so a rename, a removal, and
+ * an addition all break the build here.
  */
-const PRESET_KEYS = ['parser', 'writer'] as const satisfies readonly (keyof Preset)[];
+const PRESET_SHAPE = { parser: true, writer: true } satisfies Record<keyof Preset, true>;
+
+// `Object.keys` is typed `string[]`; the shape above is the declaration this narrows back to.
+const PRESET_KEYS = Object.keys(PRESET_SHAPE) as readonly (keyof Preset)[];
 
 /**
  * Validate the preset at the boundary instead of asserting it. Because its declared return type is

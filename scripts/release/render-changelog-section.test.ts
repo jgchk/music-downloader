@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderChangelogSection, type RangeCommit } from './render-changelog-section.ts';
 
 /**
@@ -25,14 +25,23 @@ const render = async (
 };
 
 describe('renderChangelogSection', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders the heading with a compare link and today (UTC) as the date', async () => {
+    // The date is the writer's own default — today — so the clock is frozen rather than the
+    // expectation recomputed from the real one, which flakes when a UTC midnight falls between the
+    // render and the assertion. Only `Date` is faked, leaving the writer's async plumbing alone.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.UTC(2026, 6, 23, 0, 30) });
+
     const section = await render([commit(fullSha('abc1234'), 'feat(web): add a thing')], {
       version: '3.2.0',
       previousVersion: '3.1.0',
     });
-    const today = new Date().toISOString().slice(0, 10);
+
     expect(section).toContain(
-      `## [3.2.0](https://github.com/jgchk/music-downloader/compare/v3.1.0...v3.2.0) (${today})`,
+      `## [3.2.0](https://github.com/jgchk/music-downloader/compare/v3.1.0...v3.2.0) (2026-07-23)`,
     );
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommitLog } from './reader.ts';
+import { isGitPathAbsent, isJjPathAbsent, parseCommitLog } from './reader.ts';
 
 /**
  * `parseCommitLog` turns a `<hash>\x1f<message>\x00`-delimited log (emitted identically by the git
@@ -31,5 +31,55 @@ describe('parseCommitLog', () => {
 
   it('returns nothing for an empty log', () => {
     expect(parseCommitLog('')).toEqual([]);
+  });
+});
+
+/**
+ * Reading a file out of a revision fails for two very different reasons, and both exit non-zero:
+ * the file is simply not in that revision (→ `''`, which the caller reassembles CHANGELOG.md
+ * around), or the read itself failed — an unresolvable revision, a revset function this jj version
+ * does not have, an unusable repository. Conflating them is data loss: an empty base CHANGELOG.md
+ * makes `version:prep` rewrite the file with the whole release history dropped, and report success.
+ * These predicates are the discriminator, pinned against the tools' real stderr.
+ */
+describe('isGitPathAbsent', () => {
+  it('is absent when the path is not in that revision', () => {
+    expect(isGitPathAbsent("fatal: path 'CHANGELOG.md' does not exist in 'HEAD'\n")).toBe(true);
+  });
+
+  it('is absent when the path is on disk but untracked in that revision', () => {
+    expect(
+      isGitPathAbsent("fatal: path 'CHANGELOG.md' exists on disk, but not in 'a1b2c3d'\n"),
+    ).toBe(true);
+  });
+
+  it('is NOT absent when the revision itself does not resolve', () => {
+    expect(isGitPathAbsent("fatal: invalid object name 'origin/main'.\n")).toBe(false);
+  });
+
+  it('is NOT absent when the repository is unusable', () => {
+    expect(
+      isGitPathAbsent(
+        'fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary.\n',
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isJjPathAbsent', () => {
+  it('is absent when the path is not in that revision', () => {
+    expect(isJjPathAbsent('Error: No such path: CHANGELOG.md\n')).toBe(true);
+  });
+
+  it('is NOT absent when the revset function is missing from this jj version', () => {
+    // The version-gated `fork_point()` the base revision is read through — the same "a dependency
+    // moved under us" failure the preset guard exists for, one binary over.
+    expect(
+      isJjPathAbsent("Error: Failed to parse revset: Function `fork_point` doesn't exist\n"),
+    ).toBe(false);
+  });
+
+  it('is NOT absent when the revision does not resolve (no `main@origin` bookmark)', () => {
+    expect(isJjPathAbsent("Error: Revision `main@origin` doesn't exist\n")).toBe(false);
   });
 });

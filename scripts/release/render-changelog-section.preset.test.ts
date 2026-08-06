@@ -29,6 +29,9 @@ describe('renderChangelogSection (preset shape)', () => {
 
     if (rendered.ok) expect.unreachable('a preset missing both option bags must not render');
     expect(rendered.reason).toContain('conventional-changelog-conventionalcommits');
+    // The reason is what the operator acts on, so it has to name the bags to go re-derive.
+    expect(rendered.reason).toContain('`parser`');
+    expect(rendered.reason).toContain('`writer`');
   });
 
   it('fails when only one of the two option bags survives the bump', async () => {
@@ -71,8 +74,16 @@ describe('run (broken preset contract)', () => {
         log: (message: string) => {
           logs.push(message);
         },
+        // Both sinks captured. This spec drives WRITE mode, and CHANGELOG.md used to be written
+        // straight to `process.cwd()` outside the injected effects — so a regression in the guard
+        // under test turned this red test into an overwrite of the repository's own CHANGELOG.md.
         manifest: {
           read: () => '{ "version": "3.5.3" }',
+          write: (content: string) => {
+            writes.push(content);
+          },
+        },
+        changelog: {
           write: (content: string) => {
             writes.push(content);
           },
