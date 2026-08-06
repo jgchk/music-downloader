@@ -196,7 +196,8 @@ describe('SqliteEventStore', () => {
         '{}',
       );
 
-    const read = (await store.readStream('acq-1'))._unsafeUnwrap();
+    const readResult = await store.readStream('acq-1');
+    const read = readResult._unsafeUnwrap();
     expect(read[0]!.event).toEqual({
       type: 'ManualSelectionRequested',
       candidates: [{ releaseMbid: 'b', title: 'Unknown' }],

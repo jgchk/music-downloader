@@ -152,7 +152,12 @@ function historyEntryToDto(
       };
     }
     case 'proposed': {
-      return { kind: 'proposed', at, candidateCount: entry.candidateCount, pinnedId: entry.pinnedId };
+      return {
+        kind: 'proposed',
+        at,
+        candidateCount: entry.candidateCount,
+        pinnedId: entry.pinnedId,
+      };
     }
     case 'auto-apply-selected': {
       return {
