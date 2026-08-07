@@ -10,6 +10,12 @@ import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { verdictEventConsumer } from './verdict-consumer.js';
 
+/** Captures the one thing this consumer can silently get wrong: an unreadable envelope. */
+const unreadable: { context: Record<string, unknown>; message: string }[] = [];
+const warned = (context: Record<string, unknown>, message: string): void => {
+  unreadable.push({ context, message });
+};
+
 const a = matchingCandidate('a');
 const b = matchingCandidate('b');
 
@@ -43,7 +49,7 @@ async function fulfilledWiring(): Promise<TestWiring> {
 describe('the verdict event consumer', () => {
   it('revives a fulfilled acquisition from a rejection verdict', async () => {
     const wiring = await fulfilledWiring();
-    const consume = verdictEventConsumer(wiring.deps);
+    const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 
     const outcome = await consume(verdictEvent());
 
@@ -59,7 +65,7 @@ describe('the verdict event consumer', () => {
 
   it('acknowledges and ignores events of other types', async () => {
     const wiring = await fulfilledWiring();
-    const consume = verdictEventConsumer(wiring.deps);
+    const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 
     const outcome = await consume(verdictEvent({ type: 'import.applied' }));
 
@@ -71,7 +77,7 @@ describe('the verdict event consumer', () => {
 
   it('a redelivered verdict converges to a no-op', async () => {
     const wiring = await fulfilledWiring();
-    const consume = verdictEventConsumer(wiring.deps);
+    const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 
     await consume(verdictEvent());
     const readStreamResult3 = await wiring.store.readStream('acq-9');
@@ -86,7 +92,7 @@ describe('the verdict event consumer', () => {
 
   it('a malformed payload of the known type is a permanent (poison) failure', async () => {
     const wiring = await fulfilledWiring();
-    const consume = verdictEventConsumer(wiring.deps);
+    const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 
     const outcome = await consume(verdictEvent({ data: { verdict: 'rejected' } }));
 
@@ -96,7 +102,7 @@ describe('the verdict event consumer', () => {
   it('an infra fault is transient — the seam redelivers', async () => {
     const wiring = await fulfilledWiring();
     wiring.store.failReads = true;
-    const consume = verdictEventConsumer(wiring.deps);
+    const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 
     const outcome = await consume(verdictEvent());
 
@@ -118,7 +124,7 @@ describe('verdict consumer — crossing the seam', () => {
       },
     };
 
-    const outcome = await verdictEventConsumer(wiring.deps)(event);
+    const outcome = await verdictEventConsumer(wiring.deps, { warn: warned })(event);
 
     expect(outcome.isOk()).toBe(true);
     const appended = wiring.store.all().filter((entry) => entry.globalSeq > before);
@@ -139,7 +145,7 @@ describe('verdict consumer — crossing the seam', () => {
     const wiring = await fulfilledWiring();
     const before = wiring.store.all().length;
 
-    const outcome = await verdictEventConsumer(wiring.deps)(verdictEvent());
+    const outcome = await verdictEventConsumer(wiring.deps, { warn: warned })(verdictEvent());
 
     expect(outcome.isOk()).toBe(true); // absence degrades the trace, never the work
     const appended = wiring.store.all().filter((entry) => entry.globalSeq > before);
@@ -148,12 +154,32 @@ describe('verdict consumer — crossing the seam', () => {
     expect(appended[0]!.metadata.correlationId).not.toBe(IMPORTER_STORY);
   });
 
+  it('announces an envelope it cannot read — that is producer drift, not history', async () => {
+    const wiring = await fulfilledWiring();
+    unreadable.length = 0;
+    const event: SeamEvent = { ...verdictEvent(), metadata: { correlationId: 'not-a-trace-id' } };
+
+    await verdictEventConsumer(wiring.deps, { warn: warned })(event);
+
+    expect(unreadable).toHaveLength(1);
+    expect(unreadable[0]!.message).toContain('cannot read');
+  });
+
+  it('stays quiet when a producer simply sends no envelope — permanent and expected', async () => {
+    const wiring = await fulfilledWiring();
+    unreadable.length = 0;
+
+    await verdictEventConsumer(wiring.deps, { warn: warned })(verdictEvent());
+
+    expect(unreadable).toEqual([]);
+  });
+
   it('mints fresh rather than trusting a malformed metadata block', async () => {
     const wiring = await fulfilledWiring();
     const before = wiring.store.all().length;
     const event: SeamEvent = { ...verdictEvent(), metadata: { correlationId: 'not-a-trace-id' } };
 
-    const outcome = await verdictEventConsumer(wiring.deps)(event);
+    const outcome = await verdictEventConsumer(wiring.deps, { warn: warned })(event);
 
     expect(outcome.isOk()).toBe(true);
     const appended = wiring.store.all().find((entry) => entry.globalSeq > before);

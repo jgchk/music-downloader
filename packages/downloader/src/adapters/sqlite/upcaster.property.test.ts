@@ -1,7 +1,8 @@
 import fc from 'fast-check';
+import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
-import type { EventMetadata } from '../../application/ports/event-store-port.js';
+import type { AppendMetadata } from '../../application/ports/event-store-port.js';
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
 import {
@@ -26,7 +27,7 @@ import { buildUpcasterRegistry } from './upcaster.js';
  * two are complementary, and neither makes the other redundant.
  */
 
-const META: EventMetadata = { acquisitionId: 'acq', occurredAt: '2026-08-06T00:00:00.000Z' };
+const META: AppendMetadata = appendMetadata('acq', '2026-08-06T00:00:00.000Z');
 
 /**
  * A v1 `ManualSelectionRequested` payload as it sat on disk before `EditionCandidate.trackCount`

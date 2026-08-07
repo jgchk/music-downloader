@@ -3,7 +3,7 @@ import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-
 import { describe, expect, it } from 'vitest';
 import { errAsync, okAsync } from 'neverthrow';
 import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
-import { testContext } from '../../application/__fixtures__/correlation.js';
+import { OTHER_STORY, STORY, testContext } from '../../application/__fixtures__/correlation.js';
 import type { CommandContext, OperationScope } from '../../application/correlation/context.js';
 import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../domain/policy/policies.js';
@@ -1576,14 +1576,23 @@ describe('SlskdDownload', () => {
 
 describe('SlskdDownload correlation pinning', () => {
   it('delivers the settled outcome under the context pinned when the watch was created', async () => {
+    // A SECOND operation runs through the adapter between the start and the settle. Without that,
+    // "the context pinned at creation" and "whatever context the adapter last saw" are the same
+    // object and the async-hop break point this pinning exists to close is never put at risk.
     const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+    const opening: OperationScope = { context: testContext(STORY), logger: silentLogger() };
+    const later: OperationScope = { context: testContext(OTHER_STORY), logger: silentLogger() };
 
-    await run(harness);
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), opening);
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
+    await harness.adapter.abort('acq-unrelated', candidate, later);
+    await harness.adapter.settled();
 
-    expect(harness.outcomes[0]!.context).toEqual(harness.scope.context);
+    expect(harness.outcomes[0]!.context).toEqual(opening.context);
+    expect(harness.outcomes[0]!.context.correlationId).toBe(STORY);
   });
 
-  it('logs its watch lines through the scope logger it was handed, not a logger of its own', async () => {
+  it('logs its watch lines through the scope logger it was handed, not the construction-time root', async () => {
     // The abandonment path warns from inside the detached watch loop — after the async gap that
     // the research names as the break point. If the supervisor reached for its constructor logger
     // there, the line would carry none of the dispatch's bindings.
@@ -1604,5 +1613,8 @@ describe('SlskdDownload correlation pinning', () => {
     await harness.adapter.settled();
 
     expect(bound.length).toBeGreaterThan(0);
+    // And the construction-time sink stayed empty — otherwise "through the scope" is unproven:
+    // any warn anywhere would satisfy the assertion above.
+    expect(harness.warnLogs).toEqual([]);
   });
 });

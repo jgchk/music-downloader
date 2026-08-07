@@ -127,7 +127,12 @@ export function intakeEventConsumer(
     const submitted = await submitImport(
       dependencies,
       { directory, hints, source: { acquisitionId, candidate, feedPosition: event.globalSeq } },
-      contextForDelivery(event.metadata, dependencies.correlation),
+      contextForDelivery(event.metadata, dependencies.correlation, (detail) => {
+        options.warn(
+          { acquisitionId, globalSeq: event.globalSeq, detail },
+          'producer sent a correlation envelope this consumer cannot read; the cross-seam trace is broken until it is fixed',
+        );
+      }),
     );
     return submitted.match(
       () => ok(undefined),

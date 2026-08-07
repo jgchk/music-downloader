@@ -87,10 +87,18 @@ export const handle: Handle = ({ event, resolve }) => {
  * id, no correlation. Here the unexpected fault is logged through the same root with a generated id
  * and request context, and the user is handed a shaped message carrying that id so they have
  * something concrete to quote instead of the framework default.
+ *
+ * The line is bound to the request's story where there is one, because the crash is the single
+ * line an operator most needs to join to the requests that led to it. There is not always one:
+ * this hook also fires for a fault raised inside `handle` itself, before the story is minted — and
+ * a missing story must never cost us the error record, so it falls back to the bare root.
  */
 export const handleError: HandleServerError = ({ error, event, status, message }) => {
   const errorId = crypto.randomUUID();
-  loggerOf().error(
+  const story: unknown = event.locals.correlationId;
+  const logger =
+    typeof story === 'string' ? loggerOf().child({ correlationId: story }) : loggerOf();
+  logger.error(
     { errorId, routeId: event.route.id, method: event.request.method, status, err: error },
     'unhandled server error',
   );

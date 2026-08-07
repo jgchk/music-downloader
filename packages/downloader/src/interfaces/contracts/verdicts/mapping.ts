@@ -31,13 +31,27 @@ export function verdictToFailureInput(
  * observability identity, and re-minting it here would break the single promise the capability
  * exists to keep: one id follows one operation through the whole system.
  *
- * An absent or unusable envelope yields a freshly minted story, so consumption is unaffected.
+ * The two failure cases are NOT the same and must not be reported as one:
+ *  - **no block at all** — a producer that predates the capability. Permanent, expected, silent.
+ *  - **a block this reader cannot parse** — a LIVE producer whose envelope has drifted from this
+ *    reader. Every cross-context trace is broken until someone fixes it, and the symptom
+ *    (traces that stop joining at the seam) is otherwise indistinguishable from the first case.
+ *    That one is announced.
+ *
+ * Either way the delivery proceeds on a fresh story: correlation may degrade the trace, never the
+ * work.
  */
-export function contextForDelivery(metadata: unknown, source: CorrelationSource): CommandContext {
+export function contextForDelivery(
+  metadata: unknown,
+  source: CorrelationSource,
+  onUnreadable: (detail: string) => void,
+): CommandContext {
+  if (metadata === undefined || metadata === null) return newOperation(source);
   const carried = inboundCorrelationSchema.safeParse(metadata);
-  // Absent, or present but unusable — the same answer either way: start our own story and get on
-  // with the delivery. A trace we cannot join is worth strictly less than the work.
-  if (!carried.success) return newOperation(source);
+  if (!carried.success) {
+    onUnreadable(carried.error.message);
+    return newOperation(source);
+  }
   const { correlationId, causation } = carried.data;
   return adoptStory(
     toCorrelationId(correlationId),

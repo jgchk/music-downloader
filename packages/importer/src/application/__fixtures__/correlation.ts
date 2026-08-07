@@ -17,7 +17,7 @@ export function fixedCorrelation(...values: readonly string[]): CorrelationSourc
   const minted = values.length > 0 ? values : [STORY, 'command-1'];
   let index = 0;
   return {
-    mint: () => minted[Math.min(index++, minted.length - 1)]!,
+    mint: () => toCorrelationId(minted[Math.min(index++, minted.length - 1)]!),
   };
 }
 

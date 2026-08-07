@@ -438,6 +438,29 @@ describe('intake consumer — crossing the seam', () => {
     expect(appended[0]!.metadata.correlationId).not.toBe(DOWNLOADER_STORY);
   });
 
+  it('announces an envelope it cannot read — that is producer drift, not history', async () => {
+    const warned: { context: Record<string, unknown>; message: string }[] = [];
+    const wiring = testWiring();
+    const event: SeamEvent = { ...fulfilledEvent(), metadata: { correlationId: 42 } };
+
+    await consumer(wiring, {
+      warn: (context, message) => void warned.push({ context, message }),
+    })(event);
+
+    expect(warned.some((entry) => entry.message.includes('cannot read'))).toBe(true);
+  });
+
+  it('stays quiet when a producer simply sends no envelope — permanent and expected', async () => {
+    const warned: { context: Record<string, unknown>; message: string }[] = [];
+    const wiring = testWiring();
+
+    await consumer(wiring, {
+      warn: (context, message) => void warned.push({ context, message }),
+    })(fulfilledEvent());
+
+    expect(warned).toEqual([]);
+  });
+
   it('mints fresh rather than trusting a malformed metadata block', async () => {
     const wiring = testWiring();
     const event: SeamEvent = { ...fulfilledEvent(), metadata: { correlationId: 42 } };

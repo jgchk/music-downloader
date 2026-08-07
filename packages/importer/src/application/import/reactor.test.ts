@@ -6,6 +6,7 @@ import {
   legacyMetadata,
   testContext,
 } from '../__fixtures__/correlation.js';
+import { toCorrelationId } from '../correlation/correlation-id.js';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isRetryable } from './reactor.js';
@@ -104,7 +105,7 @@ async function seed(history: readonly ImportEvent[]): Promise<void> {
   await store.append('imp-1', 0, history, {
     importId: 'imp-1',
     occurredAt: 't',
-    correlationId: STORY,
+    correlationId: toCorrelationId(STORY),
     causation: { kind: 'command', commandId: 'command-1' },
   });
   store.bus = bus;
@@ -815,6 +816,34 @@ describe('Reactor correlation propagation', () => {
     const appended = store.all().filter((entry) => entry.globalSeq > before);
     expect(appended.length).toBeGreaterThan(0);
     expect(appended[0]!.metadata.correlationId).toBe(OTHER_STORY);
+  });
+
+  it('warns — not debug — when a stored story exists but is unusable', async () => {
+    // A malformed id is not history: every append since this capability shipped goes through the
+    // write gate, so it means a writer is emitting bad ids right now. Reporting it at the same
+    // level as a pre-correlation row is how it stays invisible.
+    store.seedLegacy('imp-1', 0, [requested()], {
+      importId: 'imp-1',
+      occurredAt: 't',
+      correlationId: 'not-a-trace-id',
+    });
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(realInterpret(stubPorts()), {
+      logger,
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
+
+    const entry = lines
+      .map((line) => JSON.parse(line) as { level: number; msg: string })
+      .find((line) => line.msg.includes('malformed'));
+    expect(entry).toBeDefined();
+    expect(entry!.level).toBe(40); // pino warn
   });
 
   it('binds the story, stream and position onto every log line of one dispatch', async () => {

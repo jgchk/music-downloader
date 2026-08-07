@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { toCorrelationId } from '../application/correlation/correlation-id.js';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { err, ok } from 'neverthrow';
@@ -152,8 +153,11 @@ export async function createDownloaderRuntime(
   const ids = overrides.ids ?? { next: () => randomUUID() };
   // 32 lowercase hex = a W3C trace id. Chosen so a later OpenTelemetry adoption can carry this
   // exact value as its trace id instead of minting a parallel one (operation-correlation D1).
+  // 32 lowercase hex = a W3C trace id, so a later OpenTelemetry adoption can carry this exact
+  // value (see application/correlation/correlation-id.ts). This is the ONE place the format is
+  // established; every lift downstream follows from the brand rather than from trust.
   const correlation: CorrelationSource = overrides.correlation ?? {
-    mint: () => randomBytes(16).toString('hex'),
+    mint: () => toCorrelationId(randomBytes(16).toString('hex')),
   };
 
   mkdirSync(path.dirname(config.databaseFile), { recursive: true });
@@ -318,7 +322,7 @@ export async function createDownloaderRuntime(
         feed: verdictFeed,
         checkpoints,
         deadLetters,
-        handler: verdictEventConsumer(dependencies),
+        handler: verdictEventConsumer(dependencies, { warn: logger.warn.bind(logger) }),
         policy: 'halt',
         logger,
         clock,

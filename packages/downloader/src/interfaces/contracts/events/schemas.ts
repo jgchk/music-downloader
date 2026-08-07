@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { CONTEXT_NAME } from '../../../application/correlation/context.js';
+import { CORRELATION_ID_PATTERN } from '../../../application/correlation/correlation-id.js';
 
 /**
  * The outbound published-event contracts (change: acquisition-outbound-events): the single,
@@ -62,10 +64,10 @@ export const acquisitionFulfilledDataSchema = z.object({
  * must treat it as optional forever and mint fresh when it is missing.
  */
 export const publishedCorrelationSchema = z.object({
-  correlationId: z.string().regex(/^[0-9a-f]{32}$/),
+  correlationId: z.string().regex(CORRELATION_ID_PATTERN),
   causation: z.object({
     kind: z.literal('event'),
-    context: z.literal('downloader'),
+    context: z.literal(CONTEXT_NAME),
     streamId: z.string().min(1),
     version: z.number().int().nonnegative(),
   }),

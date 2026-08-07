@@ -1,4 +1,4 @@
-import { STORY, testContext } from '../application/__fixtures__/correlation.js';
+import { STORY, appendMetadata, testContext } from '../application/__fixtures__/correlation.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -411,7 +411,7 @@ describe('createDownloaderRuntime', () => {
         request: SUBMIT.request,
         policies: defaultPolicies(),
       }),
-      JSON.stringify({ acquisitionId: 'acq-legacy', occurredAt: '2026-01-01T00:00:00.000Z' }),
+      JSON.stringify(appendMetadata('acq-legacy', 't')),
     );
     // A v1 ManualSelectionRequested: the unknown track count stored as the sentinel 0, which the
     // registered upcaster folds to absent before evolve ever sees it.
@@ -424,7 +424,7 @@ describe('createDownloaderRuntime', () => {
         type: 'ManualSelectionRequested',
         candidates: [{ releaseMbid: 'r-1', title: 'Unknown Edition', trackCount: 0 }],
       }),
-      JSON.stringify({ acquisitionId: 'acq-legacy', occurredAt: '2026-01-01T00:00:01.000Z' }),
+      JSON.stringify(appendMetadata('acq-legacy', 't')),
     );
     seeded.close();
 
@@ -498,10 +498,12 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     const file = path.join(directory, 'events.db');
     const database = openEventDatabase(file);
     const store = new SqliteEventStore(database, new UpcasterRegistry());
-    const appendResult = await store.append('acq-stalled', 0, requestedHistory(), {
-      acquisitionId: 'acq-stalled',
-      occurredAt: 't',
-    });
+    const appendResult = await store.append(
+      'acq-stalled',
+      0,
+      requestedHistory(),
+      appendMetadata('acq-stalled', 't'),
+    );
     appendResult._unsafeUnwrap();
     // The reactor already processed the event and dead-lettered its effect before the restart.
     await new SqliteCheckpointStore(database).save('acquisition-reactor', 1);
@@ -606,10 +608,12 @@ describe('boot readiness (reactor-durability D4)', () => {
     const file = path.join(directory, 'events.db');
     const database = openEventDatabase(file);
     const store = new SqliteEventStore(database, new UpcasterRegistry());
-    const appendResult2 = await store.append('acq-hung', 0, requestedHistory(), {
-      acquisitionId: 'acq-hung',
-      occurredAt: 't',
-    });
+    const appendResult2 = await store.append(
+      'acq-hung',
+      0,
+      requestedHistory(),
+      appendMetadata('acq-hung', 't'),
+    );
     appendResult2._unsafeUnwrap();
     database.close();
 

@@ -94,7 +94,7 @@ export class EffectLander {
         scope.context,
       );
       if (applied.isOk()) {
-        this.dependencies.logger.error(
+        scope.logger.error(
           { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
           'effect landed; degrading to modeled failure',
         );
@@ -102,13 +102,13 @@ export class EffectLander {
       }
       if (classifyCommandError(applied.error) === 'rejection') {
         // The domain rejected the degrade: the stream has already settled past it — landed.
-        this.dependencies.logger.warn(
+        scope.logger.warn(
           { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
           'degrade rejected as stale; stream already settled',
         );
         return true;
       }
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: applied.error },
         'degrade command failed; will land again',
       );
@@ -127,14 +127,14 @@ export class EffectLander {
       occurredAt: this.dependencies.clock.now().toISOString(),
     });
     if (recorded.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: recorded.error },
         'dead-letter write failed; will land again',
       );
       return false;
     }
     this.dependencies.stalled.mark(stored.streamId);
-    this.dependencies.logger.error(
+    scope.logger.error(
       { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },
       'effect landed; dead-lettered and acquisition stalled',
     );
@@ -142,20 +142,20 @@ export class EffectLander {
   }
 
   /** Resolution clears retention (D2): the stream's letters and its stalled exposure go together. */
-  async clearStalled(streamId: string): Promise<void> {
+  async clearStalled(streamId: string, scope: OperationScope): Promise<void> {
     const cleared = await this.dependencies.deadLetters.clearStream(
       this.dependencies.subscription,
       streamId,
     );
     if (cleared.isErr()) {
       // Stay marked stalled — the letters still exist; a later successful event retries the clear.
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: streamId, err: cleared.error },
         'failed to clear resolved dead letters',
       );
       return;
     }
     this.dependencies.stalled.clear(streamId);
-    this.dependencies.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
+    scope.logger.info({ acquisitionId: streamId }, 'stalled acquisition resumed');
   }
 }

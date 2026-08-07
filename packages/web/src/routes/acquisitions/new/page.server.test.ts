@@ -1,3 +1,6 @@
+/** The story the `handle` hook would have minted for this request. */
+const STORY = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
 import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 import type { DownloaderFacade } from '@music/downloader';
@@ -10,7 +13,7 @@ function event(fields: Record<string, string>, facade: Record<string, unknown>) 
     request: { formData: () => Promise.resolve(data) },
     locals: {
       facades: { downloader: facade as unknown as DownloaderFacade },
-      correlationId: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+      correlationId: STORY,
     },
   } as never;
 }
@@ -28,11 +31,10 @@ describe('submit acquisition action', () => {
       (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-9',
     );
     expect(submitAcquisition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        request: { kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' },
-      }),
-      // The request's story, threaded from `locals` — the hook mints it, the facade adopts it.
-      expect.stringMatching(/^[0-9a-f]{32}$/),
+      { request: { kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' } },
+      // Exactly the story on `locals` — a route that minted its own would also be 32 hex, and that
+      // is the bug the mint-once-at-the-hook design forbids.
+      STORY,
     );
   });
 

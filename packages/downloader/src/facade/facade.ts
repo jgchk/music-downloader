@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import type { CommandError } from '../application/acquisition/command-handler.js';
-import {
-  isCorrelationId,
-  newOperation,
-  toCorrelationId,
-} from '../application/correlation/context.js';
+import { adoptOrMint } from '../application/correlation/context.js';
 import type { CommandContext } from '../application/correlation/context.js';
 import { parseMbid } from '../domain/shared/mbid.js';
 import {
@@ -115,18 +111,12 @@ export interface DownloaderFacade {
 
 export function createDownloaderFacade(dependencies: UseCaseDependencies): DownloaderFacade {
   /**
-   * Turn a caller's story into this module's command context. The commandId is minted here, so two
-   * commands of one story get distinct causations — causation is rewritten per hop, correlation is
-   * not. An unusable story is replaced rather than rejected: an operation with a broken trace is
-   * still an operation the user asked for.
+   * Turn a caller's story into this module's command context. The degrade rule itself lives in the
+   * correlation module — it is policy, not wire shaping, and a second interface (MCP, HTTP) would
+   * otherwise copy it a third time.
    */
   const contextFor = (story: StoryId): CommandContext =>
-    isCorrelationId(story)
-      ? {
-          correlationId: toCorrelationId(story),
-          causation: { kind: 'command', commandId: dependencies.correlation.mint() },
-        }
-      : newOperation(dependencies.correlation);
+    adoptOrMint(story, dependencies.correlation).context;
 
   return {
     async submitAcquisition(input, story) {

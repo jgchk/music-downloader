@@ -63,7 +63,6 @@ function renderFulfilled(
   const envelope = {
     type: ACQUISITION_FULFILLED_TYPE,
     timestamp: stored.metadata.occurredAt,
-    metadata: correlationOf(stored),
     data: {
       acquisitionId: stored.streamId,
       target: {
@@ -87,9 +86,18 @@ function renderFulfilled(
     },
   };
   const parsed = acquisitionFulfilledEventSchema.safeParse(envelope);
-  return parsed.success
-    ? ok(parsed.data)
-    : err(renderError(`rendered payload violates the outbound schema: ${parsed.error.message}`));
+  if (!parsed.success) {
+    return err(
+      renderError(`rendered payload violates the outbound schema: ${parsed.error.message}`),
+    );
+  }
+  // The correlation envelope is attached AFTER validation, deliberately. A `RenderError` is
+  // permanent by contract: the outbound feed surfaces it, the consumer's checkpoint holds, and it
+  // fails identically on every retry — so a defect in a purely DIAGNOSTIC field would
+  // head-of-line-block the whole cross-context seam, forever. Telemetry may degrade the trace; it
+  // may never stop the work. `correlationOf` yields only a well-formed block or nothing at all.
+  const metadata = correlationOf(stored);
+  return ok(metadata === undefined ? parsed.data : { ...parsed.data, metadata });
 }
 
 /** The catalog of published event types — additive: future types join here. */

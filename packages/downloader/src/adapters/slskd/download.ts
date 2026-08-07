@@ -94,7 +94,14 @@ export class SlskdDownload implements DownloadPort {
   private readonly watches = new Map<string, Watch>();
 
   constructor(
-    private readonly logger: Logger,
+    /**
+     * The root logger, used ONLY to construct the long-lived collaborators below. The supervisor
+     * itself logs exclusively through `watch.scope.logger`, so its own lines join their story;
+     * the collaborators are built once and outlive any single operation, so their lines carry
+     * `acquisitionId` and are findable by aggregate but not joinable by story. That is a
+     * deliberate boundary, recorded in design.md, not an oversight.
+     */
+    collaboratorLogger: Logger,
     ledger: ResourceLedgerStore,
     config: SlskdDownloadConfig,
     private readonly observer: DownloadObserverPort,
@@ -103,10 +110,10 @@ export class SlskdDownload implements DownloadPort {
   ) {
     this.client = client;
     this.pollIntervalMs = config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-    this.transferLedger = new TransferLedger(logger, ledger);
-    this.teardown = new TransferTeardown(logger, client, timer, this.pollIntervalMs);
+    this.transferLedger = new TransferLedger(collaboratorLogger, ledger);
+    this.teardown = new TransferTeardown(collaboratorLogger, client, timer, this.pollIntervalMs);
     this.staged = new StagedFileResolver(
-      logger,
+      collaboratorLogger,
       client,
       timer,
       config.stagingRoot,
@@ -234,7 +241,7 @@ export class SlskdDownload implements DownloadPort {
         // peer verdict into it. `recogniseRejection` reports a miss distinctly, because
         // `TransferError` is both a real classification and the catch-all — "unrecognised" is what
         // an overloaded slskd looks like, and that is the distinction this field exists to make.
-        this.logger.warn(
+        watch.scope.logger.warn(
           {
             username,
             status: enqueue.status,
@@ -260,7 +267,7 @@ export class SlskdDownload implements DownloadPort {
         // Note the reach of this branch is narrower than it looks: the pinned slskd answers peer
         // refusals with a 500, so those are absorbed by the branch above. See its comment.
         const reason = enqueueRejectionReason(enqueue.body, username);
-        this.logger.warn(
+        watch.scope.logger.warn(
           { username, status: enqueue.status, reason },
           'slskd rejected the enqueue; failing the candidate',
         );

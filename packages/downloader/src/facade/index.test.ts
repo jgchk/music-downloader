@@ -1,4 +1,4 @@
-import { STORY, appendMetadata } from '../application/__fixtures__/correlation.js';
+import { OTHER_STORY, STORY, appendMetadata } from '../application/__fixtures__/correlation.js';
 import { fixedClock } from '../application/__fixtures__/fakes.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
@@ -387,13 +387,15 @@ describe('facade correlation carriage', () => {
   it('threads the caller-minted story into the metadata of the events a command appends', async () => {
     const wiring = testWiring();
 
-    const result = await wiring.facade.submitAcquisition(VALID_SUBMIT, STORY);
+    // OTHER_STORY, deliberately: the wiring's mint source can only produce STORY, so adopting the
+    // caller's story and ignoring it in favour of a fresh mint are distinguishable outcomes here.
+    const result = await wiring.facade.submitAcquisition(VALID_SUBMIT, OTHER_STORY);
 
     expect(result.ok).toBe(true);
     const appended = wiring.store.all();
     expect(appended.length).toBeGreaterThan(0);
     for (const entry of appended) {
-      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.correlationId).toBe(OTHER_STORY);
       expect(entry.metadata.causation).toMatchObject({ kind: 'command' });
     }
   });

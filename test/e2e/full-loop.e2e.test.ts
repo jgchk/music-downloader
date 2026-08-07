@@ -7,6 +7,7 @@ import {
   DOWNLOADER_DB,
   IMPORTER_DB,
   correlationIds,
+  uncorrelatedEventCount,
   IMPORT_VOICE_PHRASE,
   LIBRARY_DIR,
   MBID,
@@ -106,6 +107,10 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     // verbatim onto its own. Every id is well-formed, and neither module invented one of its own.
     const acquisitionStories = correlationIds(DOWNLOADER_DB, acquisitionId);
     expect(acquisitionStories).toHaveLength(1);
+    // Every row, not merely a distinct set of one: `correlationIds` skips uncorrelated rows, so a
+    // regression that stopped writing the pair on SOME events would still leave one distinct id.
+    expect(uncorrelatedEventCount(DOWNLOADER_DB)).toBe(0);
+    expect(uncorrelatedEventCount(IMPORTER_DB)).toBe(0);
     expect(acquisitionStories[0]).toMatch(/^[0-9a-f]{32}$/);
     expect(correlationIds(IMPORTER_DB)).toEqual(acquisitionStories);
 
