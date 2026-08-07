@@ -14,10 +14,19 @@ import type { schema } from '@stryker-mutator/api/core';
  * assume. `readReport` is the one door.
  */
 
+/**
+ * A mutant is a sub-expression, not a line — a `BlockStatement` removal spans a whole function —
+ * so BOTH ends of the span are read. The changed-line verdict intersects that span with the diff's
+ * hunks for *overlap*, and a model carrying only `start` would collapse every block mutant onto one
+ * line and stop overlapping the hunks it encloses.
+ */
 export interface ReportedMutant {
   readonly mutatorName: string;
   readonly status: string;
-  readonly location: { readonly start: { readonly line: number } };
+  readonly location: {
+    readonly start: { readonly line: number };
+    readonly end: { readonly line: number };
+  };
   readonly replacement?: string;
 }
 
@@ -73,6 +82,43 @@ export function isUnclassified(mutant: ReportedMutant): boolean {
   return !isSurviving(mutant) && !(DETECTED as readonly string[]).includes(mutant.status);
 }
 
+/**
+ * What a report actually audited, as counts. This lives in the model rather than in either
+ * presenter because it is the basis of a *decision*, not a rendering: "no surviving mutants",
+ * "the scope produced no mutants at all" and "every mutant here was ignored" are three different
+ * outcomes, and the changed-line verdict fails on the last two while the summary merely words them
+ * differently. Two derivations of that distinction would be two chances to disagree about whether a
+ * scope was audited.
+ */
+export interface Counted {
+  readonly files: number;
+  readonly mutants: number;
+  readonly ignored: number;
+  readonly unclassified: readonly string[];
+}
+
+export function countMutants(report: MutationReport): Counted {
+  const mutants = Object.values(report.files).flatMap((file) => [...file.mutants]);
+  return {
+    files: Object.keys(report.files).length,
+    mutants: mutants.length,
+    ignored: mutants.filter((mutant) => mutant.status === 'Ignored').length,
+    unclassified: [
+      ...new Set(mutants.filter((mutant) => isUnclassified(mutant)).map((m) => m.status)),
+    ].toSorted(byPath),
+  };
+}
+
+/**
+ * Nothing in this scope was actually audited: either the scope produced no mutants at all, or every
+ * mutant it produced was ignored as arid or unmeasurable. Neither is a clean bill, and the verdict
+ * fails on both (design D4, condition 3) rather than reporting "no surviving mutants" over a scope
+ * it never measured.
+ */
+export function hasAuditedNothing(counted: Counted): boolean {
+  return counted.mutants === 0 || counted.mutants === counted.ignored;
+}
+
 /** Code-unit order — the order this repo's boundary guards report paths in. */
 export function byPath(left: string, right: string): number {
   if (left === right) return 0;
@@ -96,8 +142,11 @@ function isMutant(value: unknown): value is ReportedMutant {
   if (typeof value.mutatorName !== 'string' || typeof value.status !== 'string') return false;
   const location = value.location;
   if (!isRecord(location)) return false;
-  const start = location.start;
-  return isRecord(start) && typeof start.line === 'number';
+  return isLine(location.start) && isLine(location.end);
+}
+
+function isLine(value: unknown): boolean {
+  return isRecord(value) && typeof value.line === 'number';
 }
 
 function isReport(value: unknown): value is MutationReport {

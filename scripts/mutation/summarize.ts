@@ -1,7 +1,8 @@
 import {
   byPath,
+  type Counted,
+  countMutants,
   isSurviving,
-  isUnclassified,
   type MutationReport,
   readReport,
   type ReportedMutant,
@@ -86,25 +87,6 @@ export function summarizeReport(raw: string | undefined): string {
   return summarizeSurvivors(report);
 }
 
-interface Counted {
-  readonly files: number;
-  readonly mutants: number;
-  readonly ignored: number;
-  readonly unclassified: readonly string[];
-}
-
-function count(report: MutationReport): Counted {
-  const mutants = Object.values(report.files).flatMap((file) => [...file.mutants]);
-  return {
-    files: Object.keys(report.files).length,
-    mutants: mutants.length,
-    ignored: mutants.filter((mutant) => mutant.status === 'Ignored').length,
-    unclassified: [
-      ...new Set(mutants.filter((mutant) => isUnclassified(mutant)).map((m) => m.status)),
-    ].toSorted(byPath),
-  };
-}
-
 /**
  * A line for statuses this tooling has no rule for. Silence about them is how the weekly channel
  * would go quiet after a Stryker upgrade renamed a status — the run stays green and simply stops
@@ -122,7 +104,7 @@ function unclassifiedNote(counted: Counted): readonly string[] {
 /** Markdown for a job summary: a headline, then one row per surviving line. */
 export function summarizeSurvivors(report: MutationReport): string {
   const rows = findings(report);
-  const counted = count(report);
+  const counted = countMutants(report);
 
   if (rows.length === 0) {
     return [

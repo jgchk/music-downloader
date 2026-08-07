@@ -16,7 +16,7 @@ import {
 const mutant = (status: string): ReportedMutant => ({
   mutatorName: 'ConditionalExpression',
   status,
-  location: { start: { line: 1 } },
+  location: { start: { line: 1 }, end: { line: 1 } },
   replacement: 'true',
 });
 
@@ -78,6 +78,49 @@ describe('reading a report', () => {
     });
 
     expect(readReport(missingLocation)).toBeUndefined();
+  });
+
+  it('reads the end of the mutated span, not only its start', () => {
+    // A mutant is a sub-expression, not a line: a `BlockStatement` removal spans a whole function.
+    // The changed-line verdict tests the span against a diff hunk for OVERLAP, so a model that
+    // reads only `start` collapses every such mutant to one line and stops intersecting the hunks
+    // it encloses — the whole-block family the verdict exists to keep (design D2).
+    const blockMutant = JSON.stringify({
+      files: {
+        'a.ts': {
+          mutants: [
+            {
+              mutatorName: 'BlockStatement',
+              status: 'Survived',
+              location: { start: { line: 10 }, end: { line: 40 } },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(readReport(blockMutant)?.files['a.ts']?.mutants[0]?.location.end.line).toBe(40);
+  });
+
+  it('rejects a mutant carrying no span end rather than reading it as a one-line span', () => {
+    // The silent-narrowing direction: parsed-but-endless would make every block mutant look like a
+    // single line, and the verdict would go quietly green on the family most likely to be a real
+    // finding. Unreadable is the honest answer.
+    const noEnd = JSON.stringify({
+      files: {
+        'a.ts': {
+          mutants: [
+            {
+              mutatorName: 'BlockStatement',
+              status: 'Survived',
+              location: { start: { line: 10 } },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(readReport(noEnd)).toBeUndefined();
   });
 
   it('keeps a file whose mutant list is empty', () => {

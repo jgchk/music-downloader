@@ -25,7 +25,7 @@ describe('mutation summary', () => {
             {
               mutatorName: 'ConditionalExpression',
               status: 'Survived',
-              location: { start: { line: 182 } },
+              location: { start: { line: 182 }, end: { line: 182 } },
               replacement: 'true',
             },
           ],
@@ -47,19 +47,19 @@ describe('mutation summary', () => {
             {
               mutatorName: 'ConditionalExpression',
               status: 'Survived',
-              location: { start: { line: 7 } },
+              location: { start: { line: 7 }, end: { line: 7 } },
               replacement: 'true',
             },
             {
               mutatorName: 'EqualityOperator',
               status: 'Survived',
-              location: { start: { line: 7 } },
+              location: { start: { line: 7 }, end: { line: 7 } },
               replacement: '<=',
             },
             {
               mutatorName: 'BooleanLiteral',
               status: 'Survived',
-              location: { start: { line: 9 } },
+              location: { start: { line: 9 }, end: { line: 9 } },
               replacement: 'false',
             },
           ],
@@ -83,7 +83,7 @@ describe('mutation summary', () => {
             {
               mutatorName: 'BlockStatement',
               status: 'NoCoverage',
-              location: { start: { line: 3 } },
+              location: { start: { line: 3 }, end: { line: 3 } },
               replacement: '{}',
             },
           ],
@@ -103,19 +103,19 @@ describe('mutation summary', () => {
             {
               mutatorName: 'BooleanLiteral',
               status: 'Killed',
-              location: { start: { line: 1 } },
+              location: { start: { line: 1 }, end: { line: 1 } },
               replacement: 'false',
             },
             {
               mutatorName: 'StringLiteral',
               status: 'Ignored',
-              location: { start: { line: 2 } },
+              location: { start: { line: 2 }, end: { line: 2 } },
               replacement: '""',
             },
             {
               mutatorName: 'ArithmeticOperator',
               status: 'Timeout',
-              location: { start: { line: 3 } },
+              location: { start: { line: 3 }, end: { line: 3 } },
               replacement: '-',
             },
           ],
@@ -149,7 +149,7 @@ describe('mutation summary', () => {
             {
               mutatorName: 'ObjectLiteral',
               status: 'Ignored',
-              location: { start: { line: 1 } },
+              location: { start: { line: 1 }, end: { line: 1 } },
               replacement: '{}',
             },
           ],
@@ -169,7 +169,7 @@ describe('mutation summary', () => {
             {
               mutatorName: 'BooleanLiteral',
               status: 'Pending',
-              location: { start: { line: 1 } },
+              location: { start: { line: 1 }, end: { line: 1 } },
               replacement: 'false',
             },
           ],
@@ -191,7 +191,7 @@ describe('mutation summary from a raw report', () => {
             {
               mutatorName: 'BooleanLiteral',
               status: 'Survived',
-              location: { start: { line: 4 } },
+              location: { start: { line: 4 }, end: { line: 4 } },
               replacement: 'false',
             },
           ],
