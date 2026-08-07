@@ -179,7 +179,16 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
         return NOTHING;
       }
       const watermark = state.phase === 'empty' ? undefined : state.seamWatermark;
-      if (watermark !== undefined && incoming !== undefined && incoming <= watermark) {
+      // Stryker disable next-line LogicalOperator: equivalent mutant. Turning this `&&` into `||`
+      // cannot change the outcome, because the only use below guards a comparison against both
+      // values: whenever either is `undefined` that comparison is false regardless, and whenever
+      // both are defined the two operators agree. No test can distinguish them.
+      //
+      // Hoisted onto its own line for exactly that reason — the suppression is line-scoped, and on
+      // the combined condition it also covered the outer `&&`, which IS killable and is now left
+      // audited where it belongs.
+      const hasBothPositions = watermark !== undefined && incoming !== undefined;
+      if (hasBothPositions && incoming <= watermark) {
         return NOTHING;
       }
       return ok([

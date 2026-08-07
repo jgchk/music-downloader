@@ -37,6 +37,9 @@ const GENERATED_DIRECTORY_NAMES = new Set([
   '.svelte-kit',
   '.venv',
   '.e2e-tmp',
+  // Stryker's sandbox: a full copy of the tree, so every source in it would surface here twice —
+  // once as itself and once as an orphan no tsconfig claims.
+  '.stryker-tmp',
   '.git',
   '.jj',
 ]);
@@ -48,6 +51,8 @@ const GENERATED_DIRECTORY_NAMES = new Set([
  */
 const GENERATED_PATHS = new Set([
   'coverage',
+  // Mutation-run output (`pnpm test:mutation`): the JSON report and the incremental cache.
+  'reports',
   'packages/downloader/dist',
   'packages/importer/dist',
   'packages/web/build',

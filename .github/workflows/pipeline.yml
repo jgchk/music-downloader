@@ -63,7 +63,7 @@ jobs:
 
   # Test pyramid — every workspace package in one merged 100% coverage run (node + SSR + Chromium
   # browser-mode projects), plus the frozen-fixture contract tiers (incl. the cross-module seam
-  # fixtures) and the release-tooling unit tests. ffmpeg is a real dependency of the audio-probe
+  # fixtures) and the repo-tooling unit tests. ffmpeg is a real dependency of the audio-probe
   # adapter tests; Chromium is the browser-mode runner for the web client project.
   test:
     runs-on: ubuntu-latest
@@ -87,10 +87,108 @@ jobs:
         run: pnpm run test:cov
       - name: Contract tests (frozen fixtures; no network)
         run: pnpm run test:contract
-      - name: Release-tooling tests
-        run: pnpm run test:release
+      - name: Repo-tooling tests (release + mutation-gate helpers)
+        run: pnpm run test:tooling
       - name: Beets-bridge unit tests @ 100% coverage (Python)
         run: pnpm run test:bridge
+
+  # PR only: mutation testing over the production files this branch changed (change: mutation-gate).
+  #
+  # The `test` job proves every line EXECUTES under test. This proves a test would NOTICE the line
+  # going wrong — the one axis where a suite written by the same process that writes the code would
+  # otherwise grade its own homework. The signal is per-mutant, never a score: the step summary
+  # names each survivor with file, line, and mutation so it converges like a review finding (kill
+  # it, or justify a suppression at the site).
+  #
+  # NOTE: the mutation step is `continue-on-error` and this check is NOT required, because main is
+  # not yet mutant-clean (design D5, task 2.1). Both flip together in task 4.1.
+  #
+  # Scope is the changed FILES rather than the changed lines. Stricter and far simpler: once main is
+  # mutant-clean, a changed file's untouched lines carry no survivors, so the two give the same
+  # verdict — and file scope additionally catches a change that weakens an assertion elsewhere in the
+  # same file. Incremental mode is deliberately NOT used here (stryker.config.mjs, D4a): its report
+  # merges cached whole-repo results, which would fail a branch on debt it never touched.
+  mutation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # projected low-minutes on a 4-core runner; NOT yet observed in CI
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # the merge-base diff needs real history
+      # The audio-probe adapter's tests shell out to a real ffmpeg, and they are the tests that kill
+      # that adapter's mutants — without it those mutants read as survivors.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve the changed production files
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          BASE="$(git merge-base "$BASE_SHA" HEAD)"
+
+          # grep exits 1 on "no match" — a normal, passing outcome here — but 2 on ERROR, and a bare
+          # `|| true` cannot tell them apart. Reading a broken pattern as "nothing changed" would be
+          # a gate that greens on its own breakage, the one failure mode this job must not have.
+          match() { grep "$@" || [ "$?" -eq 1 ]; }
+
+          # The mutate scope as stryker.config.mjs defines it: production TypeScript in the two
+          # context packages. `--diff-filter=ACMR` drops deletions — nothing left to mutate. The
+          # character class is deliberately narrow: a path is about to become a command argument,
+          # and a filename containing shell metacharacters must not be able to redirect the scope.
+          FILES="$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD \
+            | match -E '^packages/(downloader|importer)/src/[A-Za-z0-9._/-]+\.ts$' \
+            | match -vE '(\.test\.ts$|/__fixtures__/)' \
+            | paste -sd, -)"
+
+          # A path that is in scope by package but was dropped by the character class is a case
+          # nobody intended; fail rather than silently mutate less than the diff.
+          REJECTED="$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD \
+            | match -E '^packages/(downloader|importer)/src/' \
+            | match -vE '(\.test\.ts$|/__fixtures__/)' \
+            | match -vE '^packages/(downloader|importer)/src/[A-Za-z0-9._/-]+\.ts$')"
+          if [ -n "$REJECTED" ]; then
+            echo "::error::In-scope paths rejected by the safe-character filter: ${REJECTED}"
+            exit 1
+          fi
+
+          echo "files=${FILES}" >> "$GITHUB_OUTPUT"
+          if [ -z "$FILES" ]; then
+            echo "::notice::No production files changed in the mutated packages — nothing to mutate."
+          else
+            echo "Mutating: ${FILES}"
+          fi
+
+      # continue-on-error, deliberately, until the seeding burn-down closes (tasks 2.1 / design D5).
+      # main currently carries surviving mutants across many files, so a branch that merely TOUCHES
+      # one would go red for debt it did not create. A red check nobody blocks on is the
+      # attested-dead shape quality-gates.md warns about, and an agent loop that learns to ignore
+      # this check learns to ignore it when it is real. So the job reports without failing, and task
+      # 4.1 flips BOTH this flag and the required-check setting together, in one step, once main is
+      # mutant-clean. The step summary below carries the findings either way.
+      - name: Mutation-test the changed production files
+        if: steps.scope.outputs.files != ''
+        continue-on-error: true
+        env:
+          # Never interpolate a PR-controlled value into a `run:` body — `${{ }}` substitution
+          # happens before bash parses the line, so a filename's bytes would become shell syntax.
+          MUTATE: ${{ steps.scope.outputs.files }}
+        run: pnpm exec stryker run --mutate "$MUTATE"
+
+      # always(): the summary's whole job is to explain a FAILING run, so it must survive one. It
+      # reports the missing-report case out loud rather than reading absence as a clean bill.
+      - name: Surface the surviving mutants
+        if: always() && steps.scope.outputs.files != ''
+        run: pnpm tsx scripts/mutation/report.ts >> "$GITHUB_STEP_SUMMARY"
 
   # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
   # tier — browser parity phase included, so Playwright drives the same image that publishes — then,

@@ -27,3 +27,7 @@ packages/web/playwright-report/
 
 # Python hermetic venvs
 **/.venv/
+
+# Mutation-run output (Stryker reports + incremental cache), generated.
+reports/
+.stryker-tmp/

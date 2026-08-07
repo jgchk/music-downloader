@@ -11,6 +11,7 @@
   "compilerOptions": { "noEmit": true, "allowJs": true },
   "files": [
     "vitest.config.ts",
+    "vitest.mutation.config.ts",
     "packages/downloader/vitest.config.ts",
     "packages/importer/vitest.config.ts",
     "packages/web/playwright.config.ts",

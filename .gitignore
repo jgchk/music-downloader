@@ -37,3 +37,7 @@ packages/importer/test/bridge/.venv/
 
 # TypeScript incremental-build state
 *.tsbuildinfo
+
+# Mutation testing (pnpm test:mutation): Stryker's sandbox + its reports/incremental cache
+.stryker-tmp/
+reports/

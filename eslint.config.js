@@ -205,6 +205,10 @@ export default tseslint.config(
       '**/.svelte-kit/**',
       'packages/web/build/**',
       '.e2e-tmp/**',
+      // Stryker's sandbox — a whole copy of the tree, so linting it would double every finding —
+      // and the mutation reports beside it. Both are `pnpm test:mutation` output, never edited.
+      '.stryker-tmp/**',
+      'reports/**',
       // The beets bridge is Python; it has its own native unittest + coverage.py tier.
       'packages/*/test/bridge/**',
       '**/.venv/**',
