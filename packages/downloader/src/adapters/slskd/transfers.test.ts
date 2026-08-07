@@ -309,6 +309,15 @@ describe('enqueueRejectionReason', () => {
     ).toBe('PeerUnavailable');
   });
 
+  it('reads past a peer whose name splices itself into a failure phrase', () => {
+    // The name is removed by REPLACING it, not by deleting it. A one-character name can sit inside
+    // a spelling — slskd echoes the name back wherever the peer put it — and deleting it would
+    // rejoin `ti` and `med out` into `timed out`, handing the peer a verdict of its choosing.
+    expect(enqueueRejectionReason('The wait tiXmed out after 15000 milliseconds', 'X')).toBe(
+      'TransferError',
+    );
+  });
+
   it('never reports a refused enqueue as our own cancellation', () => {
     // An enqueue slskd refused is not something we cancelled, so this path cannot produce
     // `Cancelled` at all — least of all because the peer chose a name containing the word.

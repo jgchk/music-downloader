@@ -33,16 +33,16 @@ type MbArtistCredit = NonNullable<MbRelease['artist-credit']>[number];
 const HIGH_CONFIDENCE = 90; // MusicBrainz search scores run 0–100
 const AMBIGUITY_MARGIN = 10; // a top hit within this of the runner-up is not a confident pick
 
+/**
+ * The credited artist, joined as MusicBrainz spells it. Deliberately NOT trimmed here: both call
+ * sites hand the result straight to `createTarget`, and `domain/target/target.ts` trims `artist`
+ * itself before validating it — so a trim at this edge was code no test could distinguish. Removed
+ * for the same reason `sanitizeSegment` and `buildQuery` dropped theirs.
+ */
 function artistCreditName(credits: readonly MbArtistCredit[] | undefined): string {
-  // Stryker disable next-line ArrayDeclaration,MethodExpression: both equivalent. The injected
-  // default element has neither `name` nor `joinphrase`, so it maps to '' and joins away (the
-  // absent-collection note above); and dropping `.trim()` changes nothing observable, because both
-  // call sites hand this straight to `createTarget`, which trims `artist` itself before validating
-  // it. The trim stays as ACL-local normalization rather than a debt to the domain's constructor.
-  return (credits ?? [])
-    .map((credit) => `${credit.name ?? ''}${credit.joinphrase ?? ''}`)
-    .join('')
-    .trim();
+  // Stryker disable next-line ArrayDeclaration: the injected default element has neither `name` nor
+  // `joinphrase`, so it maps to '' and joins away (the absent-collection note above).
+  return (credits ?? []).map((credit) => `${credit.name ?? ''}${credit.joinphrase ?? ''}`).join('');
 }
 
 function parseYear(date: string | null | undefined): number | undefined {
@@ -278,7 +278,9 @@ export interface ReleaseGroupEdition {
 /**
  * The most common track count among the editions, breaking a tie toward the *lower* count (the more
  * conservative, standard-like edition). Map iteration is insertion order, so the tie rule is applied
- * explicitly rather than relying on it. Assumes a non-empty input.
+ * explicitly rather than relying on it. Total by construction: an empty input yields 0, and both
+ * callers then filter their own empty list against it and present nothing — which is why neither
+ * guards the call.
  */
 function modalTrackCount(counts: readonly number[]): number {
   const frequency = new Map<number, number>();
@@ -288,10 +290,14 @@ function modalTrackCount(counts: readonly number[]): number {
   let modal = 0;
   let modalFrequency = 0;
   for (const [count, freq] of frequency) {
-    // Stryker disable next-line EqualityOperator: `count <= modal` is equivalent. `modal` is only
-    // ever a count already taken from this map, and map keys are distinct, so `count === modal`
-    // cannot hold here — the initial `modal = 0` pairs with `modalFrequency = 0`, which every real
-    // frequency (>= 1) beats on the first arm before this arm is ever consulted.
+    // RECORDED SURVIVOR, waiver withheld: `count <= modal` is equivalent — `modal` is only ever a
+    // count already taken from this map, and map keys are distinct, so `count === modal` cannot
+    // hold here (the initial `modal = 0` pairs with `modalFrequency = 0`, which every real
+    // frequency (>= 1) beats on the first arm before this arm is consulted). A `disable next-line
+    // EqualityOperator` would silence that mutant AND the four killable siblings this line carries
+    // — `>=`/`<=` on the frequency test, `!==` on the tie test, and `count >= modal`, which
+    // inverts the documented lower-count tie-break. Silencing four real findings to hide one
+    // equivalent mutant is the trade the waiver doctrine rejects.
     if (!(freq > modalFrequency || (freq === modalFrequency && count < modal))) {
       continue;
     }
@@ -317,11 +323,10 @@ export function releaseGroupEditionIds(
   editions: readonly ReleaseGroupEdition[],
 ): readonly string[] {
   const official = editions.filter((edition) => edition.status === 'Official');
-  // Stryker disable next-line ConditionalExpression: dropping this guard is equivalent — with no
-  // official edition the modal count of an empty list is 0 and the filter below runs over that same
-  // empty list, so the function still returns []. The guard states the rule and honors
-  // `modalTrackCount`'s documented non-empty precondition rather than leaning on that coincidence.
-  if (official.length === 0) return [];
+  // No early return for an empty `official`: `modalTrackCount` is total (0 for an empty input) and
+  // the filter below then runs over the same empty list, so the function already answers []. The
+  // guard that used to stand here was provably unable to change any answer, which is the signal to
+  // delete it rather than waive it.
   const modal = modalTrackCount(official.map((edition) => edition.trackCount));
   return official
     .filter((edition) => edition.trackCount === modal)
@@ -408,11 +413,9 @@ export function releaseGroupEditionCandidates(
       },
     });
   }
-  // Stryker disable next-line ConditionalExpression: dropping this guard is equivalent — with no
-  // edition collected, the modal count of an empty list is 0 and the sort/map below run over that
-  // same empty list, so the function still presents []. The guard states the rule and honors
-  // `modalTrackCount`'s documented non-empty precondition rather than leaning on that coincidence.
-  if (editions.length === 0) return [];
+  // As in `releaseGroupEditionIds`: no empty-list guard, because `modalTrackCount` is total and the
+  // sort/map below present [] from an empty list anyway. A guard no input can make matter is code
+  // to delete, not code to waive.
   const modal = modalTrackCount(editions.map((edition) => edition.count));
   return editions
     .toSorted((a, b) => {

@@ -115,6 +115,21 @@ export interface SeamWakeups {
 const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * The real `sleep` handed to the reactor and the inbound subscription. A named function, not an
+ * inline arrow at each site, so that the "a delay is unobservable" waiver below can be attached to
+ * the DELAY and to nothing else: written inline, one `disable next-line ArrowFunction` also covers
+ * the `new Promise` executor, and an executor that never calls `resolve` wedges the caller forever
+ * — the opposite of unobservable.
+ */
+// Stryker disable next-line BlockStatement: an emptied body resolves immediately instead of after
+// `ms`, and every caller only `await`s the result — so the mutant changes elapsed wall-clock and
+// nothing else: same attempts, same order, same checkpoint advances. Wall-clock is the one thing a
+// behavioural assertion here may not pin (a faked timer would assert that a timer is used).
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * This module's own readiness shape (design D4) — declared locally, no shared kernel: `up` unless
  * the inbound verdict subscription has halted on a poison event. A synchronous read of in-memory
  * runtime state; never a value that throws, never an event-store scan.
@@ -238,6 +253,15 @@ export async function createDownloaderRuntime(
   // adapters and stop without dispatching anything, because dispatching would mean a real slskd
   // search, a real MusicBrainz request and a real ffmpeg spawn. Each site is suppressed with what
   // its mutant drops; the effect-level behaviour of each adapter is owned by the adapter tier.
+  //
+  // BE HONEST ABOUT WHAT THESE WAIVERS ARE. Everywhere else in this repo a `Stryker disable` argues
+  // the mutant is EQUIVALENT — no observable difference, so no test could ever catch it. These do
+  // not, and cannot: they argue only that the mutant is UNOBSERVABLE FROM AN IN-PROCESS TEST, which
+  // is an assurance gap wearing a waiver's clothes. The sharpest one is the library/staging root
+  // pair handed to `FilesystemLibrary` below — transpose them and finished releases are imported
+  // into the staging root, with nothing in any tier failing. Recorded as named debt in
+  // `openspec/changes/mutation-gate/design.md`, not only here, because a comment inside a waived
+  // block is precisely where nobody looks once the gate is green.
   // Stryker disable next-line BlockStatement: drops the whole production adapter set (see above);
   // with fakes injected this branch never runs, and without them nothing dispatches.
   if (overrides.ports === undefined) {
@@ -304,14 +328,10 @@ export async function createDownloaderRuntime(
         clearInterval(handle);
       };
     },
-    // The re-drive only `await`s this value before dispatching the next stream, so a resolved
-    // `undefined` changes elapsed wall-clock and nothing else: same streams, same order, same
-    // dispatches. The gap is a rate limit on the upstreams, and wall-clock is the one thing a
-    // behavioural assertion may not pin (a faked timer would assert that a timer is used).
-    sleep:
-      // Stryker disable next-line ArrowFunction: equivalent — see the note above; the default arm
-      // only delays, and the delay is unobservable to any assertion about what the reactor does.
-      overrides.reactorTiming?.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    // The re-drive only `await`s this value before dispatching the next stream, so the gap is a
+    // rate limit on the upstreams: same streams, same order, same dispatches. See {@link delay} for
+    // the mutant this shape exists to keep separable.
+    sleep: overrides.reactorTiming?.sleep ?? delay,
     random: overrides.reactorTiming?.random ?? Math.random,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
   });
@@ -358,11 +378,10 @@ export async function createDownloaderRuntime(
         retry: { attempts: 3, baseDelayMs: 250 },
         batchSize: 100,
         pollIntervalMs: 5000,
-        // Stryker disable next-line ArrowFunction: equivalent in every observable respect — the
-        // subscription only `await`s this value (retry backoff, and the yield between batches),
-        // so a resolved `undefined` changes elapsed wall-clock and nothing else: same attempts,
-        // same order, same checkpoint advances, same hold/halt decisions.
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        // The subscription only `await`s this value (retry backoff, and the yield between
+        // batches), so the delay is elapsed wall-clock and nothing else: same attempts, same order,
+        // same checkpoint advances, same hold/halt decisions. {@link delay} carries the waiver.
+        sleep: delay,
         wakeups: verdictWakeups,
       });
       return verdicts;

@@ -1141,15 +1141,18 @@ describe('SlskdDownload', () => {
     expect(result.kind).toBe('completed');
     expect(harness.ledger.created).toEqual([]);
     // Degraded stewardship is invisible in the download's outcome, so each failed write says which
-    // one it was: no write-ahead trail, no id to delete with, no row retired.
-    expect(harness.warnLogs.filter((message) => message.startsWith('ledger:'))).toEqual([
-      'ledger: record transfer failed',
-      'ledger: record transfer failed',
-      'ledger: record transfer id failed',
-      'ledger: record transfer id failed',
-      'ledger: mark transfer removed failed',
-      'ledger: mark transfer removed failed',
-    ]);
+    // one it was: no write-ahead trail, no id to delete with, no row retired. The three writes are
+    // independent and best-effort, so WHICH faults are named — once per file — is the behaviour;
+    // the order they interleave in is not, and neither is this fixture's own file count.
+    const ledgerWarnings = harness.warnLogs.filter((message) => message.startsWith('ledger:'));
+    expect(new Set(ledgerWarnings)).toEqual(
+      new Set([
+        'ledger: record transfer failed',
+        'ledger: record transfer id failed',
+        'ledger: mark transfer removed failed',
+      ]),
+    );
+    expect(ledgerWarnings).toHaveLength(3 * candidate.files.length);
   });
 
   it('still rejects a refused enqueue when the ledger cannot release the write-ahead rows', async () => {

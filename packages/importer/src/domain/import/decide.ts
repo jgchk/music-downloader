@@ -47,8 +47,19 @@ function bestOf(candidates: NonEmptyReadonlyArray<ProposedCandidate>): ProposedC
  * every position the stream ever recorded — or when the stream has no watermark to compare against.
  * Anything else is a redelivery of a position this stream has already run.
  *
- * The one place the rule is written down, because `decide` needs it in both directions: a live
- * cycle refuses a new delivery, and a settled one converges everything that is not new.
+ * The one place the DOMAIN's copy of the rule is written down, because `decide` needs it in both
+ * directions: a live cycle refuses a new delivery, and a settled one converges everything that is
+ * not new. It is NOT the only copy in the repo, and the other one deliberately disagrees:
+ * `interfaces/events/intake-consumer.ts` converges a delivery whose stream has no watermark, where
+ * this treats it as new. That divergence is what protects the pre-watermark legacy population, so
+ * the consumer's converge-first ordering is load-bearing rather than merely defensive — see the
+ * `SubmitImport` arm below. A second seam consumer, a redrive, or a manual resubmission carrying a
+ * `source` would reach this arm without that protection.
+ *
+ * Beware the polarity: `!isNewDelivery(…)` does NOT mean "is a redelivery". It also covers "is not
+ * a delivery at all" (no incoming position), which is why the settled-cycle call site carries its
+ * own `incoming !== undefined` guard and the live-cycle one does not. That guard is load-bearing:
+ * drop it and a manual resubmission would converge to nothing instead of starting a fresh cycle.
  */
 function isNewDelivery(watermark: number | undefined, incoming: number | undefined): boolean {
   if (incoming === undefined) return false;

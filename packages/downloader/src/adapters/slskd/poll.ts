@@ -18,11 +18,13 @@ export async function pollOwnedTransfers(
   const payload = slskdTransfersSchema.parse(await client.getOr(downloadsPath(username), {}));
   return flattenDownloads(payload).filter(
     (transfer): transfer is OwnedTransfer =>
-      // Stryker disable next-line ConditionalExpression: the `!== undefined` operand is a
-      // type-level guard — it is what narrows `filename` to a string so this predicate can claim
-      // `OwnedTransfer` — not a decision. Forcing it true changes no answer: `wanted` is a
-      // `ReadonlySet<string>`, so `has(undefined)` is false for exactly the transfers the guard
-      // already excluded, and the guard cannot be deleted or the predicate stops typechecking.
+      // RECORDED SURVIVOR, waiver withheld: the `!== undefined` operand is a type-level guard — it
+      // is what narrows `filename` to a string so this predicate can claim `OwnedTransfer` — not a
+      // decision. Forcing it true changes no answer: `wanted` is a `ReadonlySet<string>`, so
+      // `has(undefined)` is false for exactly the transfers the guard already excluded, and the
+      // guard cannot be deleted or the predicate stops typechecking. No waiver, because a
+      // `disable next-line` would also silence the whole predicate forced true (every transfer
+      // owned, ownership narrowing gone) and forced false (no transfer owned) — both real.
       transfer.filename !== undefined && wanted.has(transfer.filename),
   );
 }

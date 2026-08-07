@@ -112,10 +112,14 @@ describe('projectStatus', () => {
     expect(manual.acquisitionId).toBeUndefined();
   });
 
-  it('reads the acquisition from the request itself, not from whatever opens the stream', () => {
-    // The projection folds whatever the log holds: `evolve` is documented to degrade an externally
-    // edited or corrupt history rather than throw, and the view follows it. The acquisition is a
-    // fact OF the request, so it is read off the request wherever the request sits.
+  it('tolerates a log whose request row is not the first (externally edited history)', () => {
+    // Not decider-reachable: `decide` on an empty stream accepts only `SubmitImport`, so every
+    // lawful history opens with `ImportRequested` and no caller can produce this order. A
+    // projection reads the log file rather than the decider, though, so a hand-edited or
+    // surgically repaired stream is exactly the input `evolve` is documented to degrade through
+    // rather than throw (state.ts) — and the view degrades with it instead of mis-reporting the
+    // import as sourceless. The acquisition is a fact OF the request, so it is read off the
+    // request wherever the request sits.
     const view = projectStatus(
       toImportId('imp-1'),
       storedAll('imp-1', [MATCH_REVIEW, requested({ source: SOURCE })]),

@@ -27,11 +27,13 @@ export function isRetryable(error: CommandError): boolean {
   // compile-time decision here, not a silent collapse to `false` that would drop a retryable fault.
   switch (error.kind) {
     case 'InfraError':
-    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — removing this
-    // arm's body falls through to `CycleInFlight`, which returns the same `true`. Two adjacent
-    // arms with the same verdict cannot be told apart by any test; the arms stay separate because
-    // they are separate reasons, and reordering them to make the tool see a difference would be
-    // contorting the code for the measurement.
+    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent. This annotates
+    // the `ConcurrencyConflict` arm below (the directive binds to the next line, and `InfraError`
+    // above is a bare fall-through label with no body of its own). Emptying or removing that arm's
+    // body falls through to `CycleInFlight`, which returns the same `true`, so no test can tell the
+    // two apart. The arms stay separate because they are separate reasons, and reordering them to
+    // make the tool see a difference would be contorting the code for the measurement. The `false`
+    // arms below are deliberately NOT waived: the retry-vs-dead-letter boundary stays measured.
     case 'ConcurrencyConflict': {
       // A transient infrastructure fault or an optimistic-concurrency race: retrying can resolve it.
       return true;

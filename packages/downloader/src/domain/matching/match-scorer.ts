@@ -147,8 +147,16 @@ export function scoreMatch(
     weighted += score * signal.weight;
     totalWeight += signal.weight;
   }
-  // No `totalWeight === 0 ? 0 : …` guard: a zero total weight means no signal contributed, so
-  // `weighted` is zero too and the mean is `0/0`, which `clampUnit` is documented to collapse to 0.
-  // The guard could never change the answer — an equivalent condition, removed rather than waived.
+  // No `totalWeight === 0 ? 0 : …` guard. The load-bearing invariant is that `MatchSignal.weight`
+  // is a `Unit`, so it is non-negative by construction: a zero SUM therefore forces every
+  // contributing weight to zero, hence every `score * weight` term to zero, hence `weighted` to
+  // zero. The mean is then `0/0`, which `clampUnit` is documented to collapse to 0 — so the guard
+  // could never change the answer, and it was removed rather than waived.
+  //
+  // Note what that argument rests on, because `signals` is injectable: it is NOT "no signal
+  // contributed" (a signal weighted 0 does contribute, harmlessly). If `weight` were ever widened
+  // from `Unit` to `number`, weights could cancel to a zero sum with `weighted` non-zero, and this
+  // would divide by zero into ±Infinity — which `clampUnit` pins to 1.0, a perfect match score out
+  // of nothing. Widening that type means restoring a guard here.
   return clampUnit(weighted / totalWeight);
 }

@@ -65,6 +65,21 @@ export interface ImporterRuntimeConfig {
 /** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
 const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * The real `sleep` handed to the inbound subscription. A named function, not an inline arrow at the
+ * call site, so that the "a delay is unobservable" waiver can be attached to the DELAY and to
+ * nothing else: written inline, one `disable next-line ArrowFunction` also covers the `new Promise`
+ * executor, and an executor that never calls `resolve` wedges the subscription forever — the
+ * opposite of unobservable.
+ */
+// Stryker disable next-line BlockStatement: an emptied body resolves immediately instead of after
+// `ms`, and the only caller `await`s the result — so the mutant changes elapsed wall-clock and
+// nothing else: same attempts, same order, same checkpoint advances, same hold/halt decisions.
+// Wall-clock is the one thing a behavioural assertion here may not pin.
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export interface ImporterRuntimeOverrides {
   readonly tagger?: TaggerPort;
   readonly intake?: IntakePort;
@@ -283,13 +298,10 @@ export async function createImporterRuntime(
         retry: { attempts: 3, baseDelayMs: 250 },
         batchSize: 100,
         pollIntervalMs: 5000,
-        // Stryker disable next-line ArrowFunction: equivalent in every observable respect — the
-        // subscription only ever `await`s this value (retry backoff, and the yield between
-        // batches), so a resolved `undefined` changes elapsed wall-clock and nothing else: same
-        // attempts, same order, same checkpoint advances, same hold/halt decisions. Wall-clock is
-        // the one thing a behavioural assertion here may not pin, and a test that faked the timer
-        // to observe the delay would be asserting that a timer is used, not what the seam does.
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        // The subscription only ever `await`s this value (retry backoff, and the yield between
+        // batches), so the delay is elapsed wall-clock and nothing else: same attempts, same order,
+        // same checkpoint advances, same hold/halt decisions. {@link delay} carries the waiver.
+        sleep: delay,
         wakeups: acquisitionWakeups,
       });
       return acquisitions;
