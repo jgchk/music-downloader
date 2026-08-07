@@ -32,6 +32,11 @@ import {
 
 const BASE_URL = process.env.SLSKD_BASE_URL;
 const API_KEY = process.env.SLSKD_API_KEY;
+
+if (BASE_URL === undefined || API_KEY === undefined) {
+  throw new Error('SLSKD_BASE_URL and SLSKD_API_KEY must be set');
+}
+
 const SEARCH_TEXT = 'Pink Floyd Dark Side of the Moon';
 // A live search returns hundreds of peers (~MBs). Keep a handful of real, unaltered peer objects —
 // enough to pin the contract shape without bloating the repo. The drop is logged, never silent.
@@ -41,10 +46,6 @@ const EVENTS_LIMIT = 100;
 // How many DownloadFileComplete events to keep in the fixture — a handful pins the decode/re-root
 // contract without bloating the committed file.
 const EVENTS_KEPT = 3;
-
-if (BASE_URL === undefined || API_KEY === undefined) {
-  throw new Error('SLSKD_BASE_URL and SLSKD_API_KEY must be set');
-}
 
 const capturedAt = new Date().toISOString().slice(0, 10);
 const { alias, sanitize, aliases } = createAnonymizer();
@@ -90,6 +91,22 @@ async function expectOk(
 interface Response {
   username?: string;
   files?: { filename?: string; size?: number }[];
+}
+
+/**
+ * Abandon every transfer recorded in one directory of a poll response. Its own function so the walk
+ * over a directory's files is a loop in its own right rather than one nested inside the walk over
+ * directories.
+ */
+async function abandonTransfers(
+  transfers: readonly { id?: string }[],
+  username: string,
+): Promise<void> {
+  for (const t of transfers) {
+    if (t.id === undefined) continue;
+    await call('DELETE', `/api/v0/transfers/downloads/${encodeURIComponent(username)}/${t.id}`);
+    console.log(`abandoned transfer ${t.id}`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -139,10 +156,9 @@ async function main(): Promise<void> {
   );
 
   // Pick a kept peer with a flac file and enqueue one transfer to capture the download payload.
-  const peers = keptPeers.filter((r) =>
+  const peer = keptPeers.find((r) =>
     (r.files ?? []).some((f) => f.filename?.toLowerCase().endsWith('.flac')),
   );
-  const peer = peers[0];
   const file = (peer?.files ?? []).find((f) => f.filename?.toLowerCase().endsWith('.flac'));
   if (peer?.username === undefined || file?.filename === undefined) {
     throw new Error('no enqueueable flac candidate found — re-run for transfer fixtures');
@@ -209,18 +225,15 @@ async function main(): Promise<void> {
   // Clean up: abandon every transfer we just enqueued for this peer.
   const dirs = (poll.body as { directories?: { files?: { id?: string }[] }[] }).directories ?? [];
   for (const dir of dirs) {
-    for (const t of dir.files ?? []) {
-      if (t.id !== undefined) {
-        await call('DELETE', `/api/v0/transfers/downloads/${encodeURIComponent(realUser)}/${t.id}`);
-        console.log(`abandoned transfer ${t.id}`);
-      }
-    }
+    await abandonTransfers(dir.files ?? [], realUser);
   }
   console.log(`\nusername aliases: ${JSON.stringify(aliases())}`);
 }
 
-main().catch((error: unknown) => {
+try {
+  await main();
+} catch (error) {
   console.error('\nrecording failed — the live fixture set may be left half-rewritten');
   console.error(error);
   process.exitCode = 1;
-});
+}

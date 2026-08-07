@@ -103,7 +103,8 @@ export function checkSlskdSpec(spec: Json, operations: readonly SlskdOperation[]
     }
 
     const declaredQuery = paramNames(pathItem, operation, 'query');
-    for (const param of op.queryParams ?? []) {
+    const consumedQuery = op.queryParams ?? [];
+    for (const param of consumedQuery) {
       if (!declaredQuery.has(param)) {
         violations.push({ operation: label, problem: `query parameter "${param}" missing` });
       }

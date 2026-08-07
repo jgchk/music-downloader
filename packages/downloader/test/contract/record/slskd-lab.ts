@@ -48,10 +48,10 @@ const PEER = 'labpeer';
 const LAB_DIR = new URL('../lab/', import.meta.url).pathname;
 const SHARE = String.raw`corpus\Lab Artist\Lab Album`;
 /** Incompressible noise: at the peer's 1 KiB/s ceiling it holds the single upload slot for a whole recording session (see lab/seed-corpus.sh). */
-const HOG_FILE = `${SHARE}\\01 - Slot Hog.flac`;
+const HOG_FILE = String.raw`${SHARE}\01 - Slot Hog.flac`;
 /** Digital silence — a few KiB, so a success-path transfer settles in seconds. */
-const SMALL_FILE = `${SHARE}\\03 - Success Path.flac`;
-const QUEUED_FILE = `${SHARE}\\02 - Queued Behind.flac`;
+const SMALL_FILE = String.raw`${SHARE}\03 - Success Path.flac`;
+const QUEUED_FILE = String.raw`${SHARE}\02 - Queued Behind.flac`;
 
 /**
  * The byte size to enqueue for a shared file, read from the corpus at record time.
@@ -66,7 +66,7 @@ function sizeOf(remoteFilename: string): number {
   return statSync(`${LAB_DIR}corpus/${relative}`).size;
 }
 /** A name the peer demonstrably does not share — the deterministic rejection. */
-const UNSHARED_FILE = `${SHARE}\\99 - Not Shared.flac`;
+const UNSHARED_FILE = String.raw`${SHARE}\99 - Not Shared.flac`;
 const EVENTS_LIMIT = 100;
 const EVENTS_KEPT = 3;
 /** A user the lab has never transferred with, so its downloads collection is genuinely absent. */
@@ -135,10 +135,10 @@ async function pollTransfers(user: string = PEER): Promise<{ raw: Capture; files
   return { raw, files: (dirs ?? []).flatMap((d) => d.files ?? []) };
 }
 
-/** Wait until a transfer matching `filename` reaches a state satisfying `predicate`. */
+/** Wait until a transfer matching `filename` reaches a state satisfying `isMatch`. */
 async function waitFor(
   filename: string,
-  predicate: (state: string) => boolean,
+  isMatch: (state: string) => boolean,
   label: string,
   timeoutMs = 120_000,
 ): Promise<LabTransfer> {
@@ -146,7 +146,7 @@ async function waitFor(
   for (;;) {
     const { files } = await pollTransfers();
     const hit = files.find((f) => f.filename === filename);
-    if (hit !== undefined && predicate(hit.state ?? '')) return hit;
+    if (hit !== undefined && isMatch(hit.state ?? '')) return hit;
     if (Date.now() > deadline) {
       throw new Error(`timed out waiting for ${label} on ${filename} (last: ${hit?.state})`);
     }
@@ -163,29 +163,45 @@ async function resetTransfers(): Promise<void> {
   for (let round = 0; round < 10; round += 1) {
     const { files } = await pollTransfers();
     if (files.length === 0) return;
-    for (const file of files) {
-      if (file.id === undefined) continue;
-      const terminal = (file.state ?? '').toLowerCase().includes('completed');
-      await call('DELETE', `${downloadsPath(PEER)}/${file.id}?remove=${terminal}`);
-    }
+    await tearDown(files);
     await sleep(2000);
   }
   throw new Error('could not clear the lab transfer list');
+}
+
+/**
+ * One teardown pass over the transfers a poll returned, each in the phase its state calls for. Its
+ * own function so the walk over transfers is a loop in its own right rather than one nested inside
+ * the retry rounds above.
+ */
+async function tearDown(files: readonly LabTransfer[]): Promise<void> {
+  for (const file of files) {
+    if (file.id === undefined) continue;
+    const isTerminal = (file.state ?? '').toLowerCase().includes('completed');
+    await call('DELETE', `${downloadsPath(PEER)}/${file.id}?remove=${isTerminal}`);
+  }
 }
 
 async function compose(...args: string[]): Promise<void> {
   await execFileAsync('docker', ['compose', '-f', `${LAB_DIR}compose.yaml`, ...args]);
 }
 
+/** Whether the sut answers its API at all — a refused connection is just "not back yet". */
+async function isSutAnswering(): Promise<boolean> {
+  try {
+    const response = await fetch(`${SUT_URL}/api/v0/server`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Wait until the sut's own API is answering again after a restart. */
 async function waitForSut(): Promise<void> {
   const deadline = Date.now() + 120_000;
   for (;;) {
-    const alive = await fetch(`${SUT_URL}/api/v0/server`).then(
-      (r) => r.ok,
-      () => false,
-    );
-    if (alive) {
+    const isAlive = await isSutAnswering();
+    if (isAlive) {
       // Answering HTTP precedes being logged in; the presence wait that follows covers the rest.
       await sleep(2000);
       return;
@@ -502,9 +518,11 @@ async function errored(): Promise<void> {
   } finally {
     // Restore the peer even if the capture threw: a dead peer left behind fails the NEXT scenario,
     // for reasons that have nothing to do with it.
-    await compose('start', 'peer').catch((error: unknown) =>
-      console.error('failed to restart the lab peer', error),
-    );
+    try {
+      await compose('start', 'peer');
+    } catch (error) {
+      console.error('failed to restart the lab peer', error);
+    }
   }
   await waitForPeerPresence('Online');
   await resetTransfers();
@@ -534,9 +552,11 @@ async function offline(): Promise<void> {
   try {
     await recordOfflineSpellings();
   } finally {
-    await compose('start', 'peer').catch((error: unknown) =>
-      console.error('failed to restart the lab peer', error),
-    );
+    try {
+      await compose('start', 'peer');
+    } catch (error) {
+      console.error('failed to restart the lab peer', error);
+    }
   }
   await waitForPeerPresence('Online');
   await resetTransfers();
@@ -608,9 +628,11 @@ async function stalled(): Promise<void> {
   } finally {
     // Unpause even if the capture threw: a paused peer would silently wreck every later scenario.
     // Its own failure is logged rather than thrown, so it cannot replace the original error.
-    await compose('unpause', 'peer').catch((error: unknown) =>
-      console.error('failed to unpause the lab peer', error),
-    );
+    try {
+      await compose('unpause', 'peer');
+    } catch (error) {
+      console.error('failed to unpause the lab peer', error);
+    }
   }
   await waitForPeerPresence('Online');
   await resetTransfers();
@@ -661,10 +683,12 @@ async function main(): Promise<void> {
   console.log(`\nusername aliases: ${JSON.stringify(aliases())}`);
 }
 
-main().catch((error: unknown) => {
+try {
+  await main();
+} catch (error) {
   console.error(
     '\nrecording failed — the lab may be left dirty and the fixture set half-rewritten',
   );
   console.error(error);
   process.exitCode = 1;
-});
+}

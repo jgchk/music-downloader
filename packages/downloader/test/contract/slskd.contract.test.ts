@@ -125,12 +125,14 @@ async function drive(candidate: Candidate, input: DownloadPolicyInput): Promise<
     new FakeResourceLedger(),
     { stagingRoot: '/tmp/contract-staging' },
     {
-      progress: (_acquisitionId, snapshot) => progress.push(snapshot),
+      progress: (_acquisitionId, snapshot) => {
+        progress.push(snapshot);
+      },
       outcome: (_acquisitionId, _candidate, delivered) => {
         outcomes.push(delivered);
         return okAsync(undefined);
       },
-      finished: () => undefined,
+      finished: () => {},
     },
     client(),
     fakeTimer(),
@@ -175,7 +177,8 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
     })._unsafeUnwrap();
     const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
 
-    const candidates = (await search.search('acq-contract', target, 1))._unsafeUnwrap();
+    const searched = await search.search('acq-contract', target, 1);
+    const candidates = searched._unsafeUnwrap();
 
     expect(candidates.length).toBeGreaterThan(0);
     expect(candidates[0]?.files.length).toBeGreaterThan(0);
@@ -217,7 +220,8 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
     const downloadsPath = `/api/v0/transfers/downloads/${candidate.identity.username}`;
     const enqueue = server.requests.find((r) => r.method === 'POST' && r.path === downloadsPath)!;
     expect(enqueue.headers['x-api-key']).toBe(API_KEY);
-    expect(JSON.parse(enqueue.body)[0]).toMatchObject({ filename: transfer.filename });
+    const enqueued = JSON.parse(enqueue.body) as { filename: string; size: number }[];
+    expect(enqueued[0]).toMatchObject({ filename: transfer.filename });
     expect(server.requests.some((r) => r.method === 'GET' && r.path === downloadsPath)).toBe(true);
     expect(outcomes[0]!.kind).toBe('completed');
   });
@@ -247,7 +251,7 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
     expect(eventsRequest.query).toEqual({ offset: '0', limit: '100' });
   });
 
-  it('records the transfer whose completion event it also captured', async () => {
+  it('records the transfer whose completion event it also captured', () => {
     // The coupling that used to be a warning comment saying the set could not be regenerated: the
     // staged-path resolver matches a completion to a poll by transfer id, so the two fixtures only
     // mean anything together. The scenario records them in one session; this proves it did.
@@ -280,7 +284,8 @@ describe('slskd contract — the live-network cross-check', () => {
     })._unsafeUnwrap();
     const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
 
-    const candidates = (await search.search('acq-contract', target, 1))._unsafeUnwrap();
+    const searched = await search.search('acq-contract', target, 1);
+    const candidates = searched._unsafeUnwrap();
 
     expect(candidates.length).toBeGreaterThan(0);
     const candidate = candidates[0]!;
@@ -523,7 +528,11 @@ describe('slskd contract — a refused enqueue today', () => {
     // read the body, it changes colour instead of a design note going quietly stale.
     await serve('rejection');
     const candidate: Candidate = {
-      identity: { username: 'peer1', path: 'corpus/missing.flac', sizeBytes: 1 },
+      identity: parseCandidateIdentity({
+        username: 'peer1',
+        path: 'corpus/missing.flac',
+        sizeBytes: 1,
+      })._unsafeUnwrap(),
       files: [{ name: 'missing.flac', sizeBytes: 1 }],
       source: { speedBytesPerSec: 0, freeSlots: 0, queueLength: 0 },
     };
@@ -531,15 +540,16 @@ describe('slskd contract — a refused enqueue today', () => {
       silentLogger(),
       new FakeResourceLedger(),
       { stagingRoot: '/tmp/contract-staging' },
-      { progress: () => undefined, outcome: () => okAsync(undefined), finished: () => undefined },
+      { progress: () => {}, outcome: () => okAsync(undefined), finished: () => {} },
       client(),
       fakeTimer(),
     );
 
-    const started = await download.start('acq-contract', candidate, {
-      stallTimeoutMs: 100_000,
-      maxQueueWaitMs: 1,
-    });
+    const started = await download.start(
+      'acq-contract',
+      candidate,
+      createDownloadPolicy({ stallTimeoutMs: 100_000, maxQueueWaitMs: 1 })._unsafeUnwrap(),
+    );
 
     expect(started.isErr()).toBe(true);
     expect(started._unsafeUnwrapErr().message).toContain('500');

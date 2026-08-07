@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadFixtures } from './support/fixture.js';
 import {
@@ -28,13 +28,13 @@ const STUB_ROOT = new URL('../../../../test/e2e/stubs/', import.meta.url).pathna
 // events/ by the events-upcast + events-fold contract tests, ffprobe/ by the ffprobe contract
 // test. Everything else on disk is THIS suite's remit, so a new service directory fails the
 // completeness assertions below instead of escaping wholesale.
-const OWN_TIER_FIXTURE_DIRS = ['events', 'ffprobe'];
+const OWN_TIER_FIXTURE_DIRS = new Set(['events', 'ffprobe']);
 
 describe('recorded fixtures conform to the contract', () => {
   const services = readdirSync(CONTRACT_FIXTURE_ROOT, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !OWN_TIER_FIXTURE_DIRS.includes(entry.name))
+    .filter((entry) => entry.isDirectory() && !OWN_TIER_FIXTURE_DIRS.has(entry.name))
     .map((entry) => entry.name)
-    .sort();
+    .toSorted((a, b) => a.localeCompare(b));
   const fixtures = services.flatMap((service) =>
     loadFixtures(service).map((f) => ({ ...f, service })),
   );
@@ -49,8 +49,12 @@ describe('recorded fixtures conform to the contract', () => {
   // explicitly declared response-unconsumed in the registry. Without this, a fixture whose
   // registration was forgotten would silently escape validation via the skip below.
   it('every fixture is registered or explicitly declared unconsumed', () => {
-    const onDisk = fixtures.map((f) => `${f.service}/${f.name}`).sort();
-    const known = [...Object.keys(fixtureSchemas), ...unconsumedResponseFixtures].sort();
+    const onDisk = fixtures
+      .map((f) => `${f.service}/${f.name}`)
+      .toSorted((a, b) => a.localeCompare(b));
+    const known = [...Object.keys(fixtureSchemas), ...unconsumedResponseFixtures].toSorted((a, b) =>
+      a.localeCompare(b),
+    );
     expect(onDisk).toEqual(known);
   });
 
@@ -94,9 +98,9 @@ describe('E2E stub payloads conform to the contract', () => {
   const stubServices = readdirSync(STUB_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name !== 'plextv')
     .map((entry) => entry.name)
-    .sort();
+    .toSorted((a, b) => a.localeCompare(b));
   const onDisk = stubServices.flatMap((service) =>
-    readdirSync(join(STUB_ROOT, service, 'mappings'))
+    readdirSync(path.join(STUB_ROOT, service, 'mappings'))
       .filter((name) => name.endsWith('.json'))
       .map((name) => `${service}/${name}`),
   );
@@ -105,8 +109,10 @@ describe('E2E stub payloads conform to the contract', () => {
   // explicitly declared response-unconsumed — a body-less DELETE ack is a deliberate
   // declaration, not indistinguishable from a forgotten registration.
   it('every stub mapping is registered or explicitly declared unconsumed', () => {
-    const known = [...Object.keys(stubSchemas), ...unconsumedStubMappings].sort();
-    expect([...onDisk].sort()).toEqual(known);
+    const known = [...Object.keys(stubSchemas), ...unconsumedStubMappings].toSorted((a, b) =>
+      a.localeCompare(b),
+    );
+    expect(onDisk.toSorted((a, b) => a.localeCompare(b))).toEqual(known);
   });
 
   const cases = onDisk.map((rel) => ({ rel }));
@@ -118,7 +124,10 @@ describe('E2E stub payloads conform to the contract', () => {
       return;
     }
     const mapping = JSON.parse(
-      readFileSync(join(STUB_ROOT, `${rel.split('/')[0]}/mappings/${rel.split('/')[1]}`), 'utf8'),
+      readFileSync(
+        path.join(STUB_ROOT, `${rel.split('/', 1)[0]}/mappings/${rel.split('/', 2)[1]}`),
+        'utf8',
+      ),
     ) as {
       response: { jsonBody?: unknown };
     };
@@ -134,7 +143,7 @@ describe('scripted E2E stub payloads conform to the contract', () => {
   const cases = Object.keys(scriptedStubSchemas).map((rel) => ({ rel }));
 
   it.each(cases)('%s validates against its schema', ({ rel }) => {
-    const mapping = JSON.parse(readFileSync(join(STUB_ROOT, rel), 'utf8')) as {
+    const mapping = JSON.parse(readFileSync(path.join(STUB_ROOT, rel), 'utf8')) as {
       response: { jsonBody?: unknown };
     };
     const result = scriptedStubSchemas[rel]!.safeParse(mapping.response.jsonBody);
@@ -144,7 +153,7 @@ describe('scripted E2E stub payloads conform to the contract', () => {
   it('every scripted stub on disk is either contract-mapped or deliberately excluded', () => {
     // The e2e phase registers whatever the directory contains; this sweep stops a future file
     // from being loaded into WireMock while validating against nothing.
-    const onDisk = readdirSync(join(STUB_ROOT, 'slskd/scripted')).map(
+    const onDisk = readdirSync(path.join(STUB_ROOT, 'slskd/scripted')).map(
       (name) => `slskd/scripted/${name}`,
     );
     const accounted = new Set([
@@ -164,7 +173,7 @@ describe('scripted E2E stub payloads conform to the contract', () => {
     // The events schema only asserts `data` is a string; the string-encoded payload is where a
     // shape mistake is easiest to make — decode each one with the adapter's own schema.
     const mapping = JSON.parse(
-      readFileSync(join(STUB_ROOT, 'slskd/scripted/events-both-completes.json'), 'utf8'),
+      readFileSync(path.join(STUB_ROOT, 'slskd/scripted/events-both-completes.json'), 'utf8'),
     ) as { response: { jsonBody: { type: string; data: string }[] } };
     for (const record of mapping.response.jsonBody) {
       const decoded = slskdDownloadFileCompleteSchema.safeParse(JSON.parse(record.data));

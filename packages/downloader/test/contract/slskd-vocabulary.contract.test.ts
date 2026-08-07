@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { slskdTransfersSchema } from '../../src/adapters/slskd/schemas.js';
 import { flattenDownloads } from '../../src/adapters/slskd/transfers.js';
@@ -20,7 +20,7 @@ import { loadFixtures } from './support/fixture.js';
  * describing the old one.
  */
 
-const SPEC_DIR = new URL('./slskd-spec/', import.meta.url).pathname;
+const SPEC_DIR = new URL('slskd-spec/', import.meta.url).pathname;
 const ADAPTER_DIR = new URL('../../src/adapters/slskd/', import.meta.url).pathname;
 
 // The E2E tier's slskd doubles are the other place a transfer state is written by hand — and they
@@ -42,7 +42,7 @@ const EXEMPT_MARKER = 'vocabulary-exempt';
 function transferStubFiles(): string[] {
   return readdirSync(ADAPTER_DIR)
     .filter((name) => name.endsWith('.test.ts'))
-    .sort();
+    .toSorted((a, b) => a.localeCompare(b));
 }
 
 /** Every `state: '…'` literal in a source, minus the ones explicitly exempted on their own line. */
@@ -50,7 +50,12 @@ function statesIn(source: string): string[] {
   return source
     .split('\n')
     .filter((line) => !line.includes(EXEMPT_MARKER))
-    .flatMap((line) => [...line.matchAll(/\bstate:\s*'([^']*)'/g)].map((m) => m[1]!));
+    .flatMap((line) =>
+      line
+        .matchAll(/\bstate:\s*'([^']*)'/g)
+        .map((m) => m[1]!)
+        .toArray(),
+    );
 }
 
 /**
@@ -64,8 +69,11 @@ function e2eInlineStates(): string[] {
   return readdirSync(E2E_ROOT)
     .filter((name) => name.endsWith('.e2e.test.ts'))
     .flatMap((name) => {
-      const source = readFileSync(join(E2E_ROOT, name), 'utf8');
-      return [...source.matchAll(/\bstate:\s*'([^']*)',\s*\n\s*size:/g)].map((m) => m[1]!);
+      const source = readFileSync(path.join(E2E_ROOT, name), 'utf8');
+      return source
+        .matchAll(/\bstate:\s*'([^']*)',\s*\n\s*size:/g)
+        .map((m) => m[1]!)
+        .toArray();
     });
 }
 
@@ -73,13 +81,16 @@ function e2eInlineStates(): string[] {
 function e2eStubStates(): string[] {
   const walk = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) return walk(path);
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(entryPath);
       if (!entry.name.endsWith('.json')) return [];
-      const source = readFileSync(path, 'utf8');
+      const source = readFileSync(entryPath, 'utf8');
       // Only the transfer doubles: a search double's `state` is search vocabulary.
       if (!source.includes('directories')) return [];
-      return [...source.matchAll(/"state":\s*"([^"]*)"/g)].map((m) => m[1]!);
+      return source
+        .matchAll(/"state":\s*"([^"]*)"/g)
+        .map((m) => m[1]!)
+        .toArray();
     });
   return walk(E2E_STUB_ROOT);
 }
