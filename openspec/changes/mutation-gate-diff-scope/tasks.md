@@ -145,18 +145,38 @@ criterion for enforcement. Enforcement itself is deliberately not in this change
       `openspec validate --all --strict` is clean: 27 passed, 0 failed._
 ## 5. Measure — the exit criterion for enforcement (post-merge)
 
-- [ ] 5.1 Collect the shadow verdict from every PR that changes production code in the mutated
+- [x] 5.1 Collect the shadow verdict from every PR that changes production code in the mutated
       packages, for at least six such PRs. For each, record: findings the verdict would have
       blocked on, which of those a competent contributor would call genuine, which were ignored /
       waived without cause / appeased, the Stryker step's duration, and any disagreement between
       reruns of the same commit. Record the tally in this change's `design.md`.
-- [ ] 5.2 Decide against `quality-gates.md`'s bar and record **both** possible outcomes honestly:
+      _Collected as a REPLAY BACKTEST, not live shadow observation — no PR touched `packages/*/src`
+      while the gate was wired, so the verdict step has still never run in CI. Eight PRs replayed at
+      their head commits (#154, #156, #158, #159, #161, #162, #163, #165); #151 and #157 skipped as
+      empty-scope by design. Four of the eight (#154/#156/#158/#159) predate StrykerJS and were
+      replayed with the commit's own code and tests over main's deps and config — declared in
+      design.md, with Stryker's initial test run as the validity guard. No replay excluded.
+      **71 findings, 24 actionable, 47 non-actionable — 66.2%.** Reruns of #162 and #163 gave
+      identical verdicts and identical finding sets; only the named representative mutant varied.
+      Method, per-PR table, the four false-positive families and the three priced sources are all in
+      design.md, "The measurement (task 5.1)"._
+- [x] 5.2 Decide against `quality-gates.md`'s bar and record **both** possible outcomes honestly:
       under ten percent effective false positives → hand off to `mutation-gate` 4.1a/4.1b (flip the
       switch and the required check together, in one step); at or over → say so, leave the verdict
       in shadow, and name what would have to change first. A check can be worth running once
       without earning a seat.
+      _OVER, by more than six times: 66.2% against a bar of under ten. Enforcement stays off,
+      `MUTATION_GATE_ENFORCE` stays absent, and `mutation-gate` 4.1a/4.1b are NOT handed off — the
+      workflow switch and the branch ruleset are untouched and must still move together. The result
+      is robust to every arguable call: dropping the least representative PR (#162) makes it 73.9%.
+      Recorded with what would have to change first, in priority order — extend the arid-logging
+      ignorer to log-only branches and injected sinks; add `--no-renames`; decide the span-overlap
+      trade; close the CompileError audit gap — then re-measure on live PRs._
 
 ## 6. Gate
 
-- [ ] 6.1 `pnpm check` green (12 lanes); `openspec validate --all --strict` clean; version
+- [x] 6.1 `pnpm check` green (12 lanes); `openspec validate --all --strict` clean; version
       decision: `chore` — CI/tooling and artifacts only, no bump, no release.
+      _All 12 lanes green; `openspec validate --all --strict` 27 passed, 0 failed. The measurement
+      commit is `docs` and touches only `openspec/` — no production file, no workflow change (the
+      enforcement switch is deliberately NOT flipped), so no version bump and no release._
