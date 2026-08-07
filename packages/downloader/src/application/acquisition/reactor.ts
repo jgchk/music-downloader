@@ -1,6 +1,8 @@
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { Effect } from '../../domain/acquisition/acquisition.js';
 import type { Logger } from '../logging/logger.js';
+import { CONTEXT_NAME, continueFrom, isCorrelationId } from '../correlation/context.js';
+import type { OperationScope } from '../correlation/context.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type {
   CheckpointStore,
@@ -9,7 +11,7 @@ import type {
   StoredEvent,
 } from '../ports/event-store-port.js';
 import type { ParkedEffect, ParkedEffectStore } from '../ports/parked-effect-port.js';
-import type { Clock } from '../ports/system-ports.js';
+import type { Clock, CorrelationSource } from '../ports/system-ports.js';
 import type { StalledReadModel } from '../projections/read-models.js';
 import type { CommandError } from './command-handler.js';
 import { EffectLander } from './effect-lander.js';
@@ -50,6 +52,8 @@ export interface ReactorDependencies {
   /** The queryable face of dead-lettered effects (reactor-durability D2/D5). */
   readonly stalled: StalledReadModel;
   readonly logger: Logger;
+  /** Mints a story for a stream whose history predates correlation metadata (see `scopeFor`). */
+  readonly correlation: CorrelationSource;
   readonly interpreter: InterpreterDependencies;
   readonly clock: Clock;
   /** The fallback poll timer (composition supplies the real `setInterval`); returns a stopper. */
@@ -248,9 +252,10 @@ export class Reactor {
       { acquisitionId: streamId, phase: acquisition.phase },
       'startup re-drive dispatching the pending effect',
     );
-    const outcome = await this.dispatchEvent(last, events);
+    const scope = this.scopeFor(last);
+    const outcome = await this.dispatchEvent(last, events, scope);
     if (outcome.kind === 'retry') {
-      const isParkedOk = await this.parkStream(last, outcome.effect, outcome.error);
+      const isParkedOk = await this.parkStream(last, outcome.effect, outcome.error, scope);
       if (!isParkedOk) {
         // No checkpoint to hold here: an unparked re-drive failure waits for the next restart.
         this.dependencies.logger.error(
@@ -296,9 +301,14 @@ export class Reactor {
     // fresh exposure must survive this very event — only a PREVIOUSLY stalled stream that now
     // drives successfully is resolved.
     const wasStalled = this.dependencies.stalled.isStalled(stored.streamId);
-    const outcome = await this.dispatchEvent(stored, stream.value);
+    const outcome = await this.dispatchEvent(stored, stream.value, this.scopeFor(stored));
     if (outcome.kind === 'retry') {
-      const isParkedOk = await this.parkStream(stored, outcome.effect, outcome.error);
+      const isParkedOk = await this.parkStream(
+        stored,
+        outcome.effect,
+        outcome.error,
+        this.scopeFor(stored),
+      );
       if (!isParkedOk) return; // fall back to holding the checkpoint — the poll retries in-line
     } else if (wasStalled) {
       // A stalled acquisition's stream was driven successfully again (a cancellation, an operator
@@ -306,6 +316,31 @@ export class Reactor {
       await this.lander.clearStalled(stored.streamId);
     }
     await this.advanceTo(stored.globalSeq);
+  }
+
+  /**
+   * The unit of work one delivered event opens: the story it continues, plus a logger bound to
+   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built once per
+   * dispatch and handed down — nothing below this point re-derives correlation state.
+   */
+  private scopeFor(stored: StoredEvent): OperationScope {
+    const context = continueFrom(stored, this.dependencies.correlation);
+    const logger = this.dependencies.logger.child({
+      correlationId: context.correlationId,
+      streamId: stored.streamId,
+      globalSeq: stored.globalSeq,
+    });
+    const carried = stored.metadata.correlationId;
+    if (carried === undefined || !isCorrelationId(carried)) {
+      // DEBUG, not info: a pre-correlation row can never gain one, so this says nothing an
+      // operator can act on — and a boot re-drive over historical streams would emit it once per
+      // stream. It is a trace-quality note for whoever is already reading debug output.
+      logger.debug(
+        { context: CONTEXT_NAME },
+        'triggering event carries no correlation metadata; synthesized a story for this dispatch',
+      );
+    }
+    return { context, logger };
   }
 
   /**
@@ -319,17 +354,23 @@ export class Reactor {
   private async dispatchEvent(
     stored: StoredEvent,
     stream: readonly StoredEvent[],
+    scope: OperationScope,
   ): Promise<DispatchOutcome> {
     const prefix = stream.filter((entry) => entry.version <= stored.version);
     const acquisition = Acquisition.fromHistory(prefix.map((entry) => entry.event));
     for (const effect of acquisition.reactTo(stored.event)) {
-      const result = await interpretEffect(this.dependencies.interpreter, stored.streamId, effect);
+      const result = await interpretEffect(
+        this.dependencies.interpreter,
+        stored.streamId,
+        effect,
+        scope,
+      );
       if (result.isErr()) {
-        const outcome = await this.handleEffectError(stored, effect, result.error);
+        const outcome = await this.handleEffectError(stored, effect, result.error, scope);
         if (outcome.kind === 'retry') return outcome;
         break; // kind === 'stop': halt dispatch; the stream still advances past the event
       }
-      this.dependencies.logger.debug(
+      scope.logger.debug(
         { acquisitionId: stored.streamId, effect: effect.type },
         'effect dispatched',
       );
@@ -348,10 +389,11 @@ export class Reactor {
     stored: StoredEvent,
     effect: Effect,
     error: CommandError,
+    scope: OperationScope,
   ): Promise<Extract<DispatchOutcome, { kind: 'retry' }> | { readonly kind: 'stop' }> {
     switch (classifyCommandError(error)) {
       case 'permanent': {
-        const isLanded = await this.lander.land(stored, effect, error, 1);
+        const isLanded = await this.lander.land(stored, effect, error, 1, scope);
         return isLanded ? { kind: 'stop' } : { kind: 'retry', effect, error };
       }
       case 'retryable': {
@@ -360,7 +402,7 @@ export class Reactor {
       case 'rejection': {
         // Stale/illegal outcome — the stream has already settled it. Record and advance past it;
         // retrying would only re-fire the same rejection forever.
-        this.dependencies.logger.warn(
+        scope.logger.warn(
           { acquisitionId: stored.streamId, effect: effect.type, err: error },
           'effect follow-on rejected as stale; advancing past it',
         );
@@ -378,11 +420,12 @@ export class Reactor {
     stored: StoredEvent,
     effect: Effect,
     error: CommandError,
+    scope: OperationScope,
   ): Promise<boolean> {
     const now = this.now();
     const schedule = nextRetry(this.policy, 1, now, now, this.dependencies.random());
     if (schedule.kind === 'exhausted') {
-      return this.lander.land(stored, effect, error, 1);
+      return this.lander.land(stored, effect, error, 1, scope);
     }
     const entry: ParkedEffect = {
       streamId: stored.streamId,
@@ -394,13 +437,13 @@ export class Reactor {
     };
     const written = await this.dependencies.parked.park(entry);
     if (written.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: stored.streamId, effect: effect.type, err: written.error },
         'failed to park effect; holding the checkpoint',
       );
       return false;
     }
-    this.dependencies.logger.warn(
+    scope.logger.warn(
       {
         acquisitionId: stored.streamId,
         effect: effect.type,
@@ -446,7 +489,8 @@ export class Reactor {
       return;
     }
 
-    const outcome = await this.dispatchEvent(stored, stream.value);
+    const scope = this.scopeFor(stored);
+    const outcome = await this.dispatchEvent(stored, stream.value, scope);
     if (outcome.kind === 'ok') {
       this.dependencies.logger.info(
         { acquisitionId: entry.streamId, attempt: entry.attempt },
@@ -469,7 +513,13 @@ export class Reactor {
       this.dependencies.random(),
     );
     if (schedule.kind === 'exhausted') {
-      const isLanded = await this.lander.land(stored, outcome.effect, outcome.error, attempt);
+      const isLanded = await this.lander.land(
+        stored,
+        outcome.effect,
+        outcome.error,
+        attempt,
+        scope,
+      );
       if (isLanded) {
         await this.resumeStream(entry, stream.value);
         return;
@@ -534,10 +584,11 @@ export class Reactor {
       (event) => event.globalSeq > entry.globalSeq && event.globalSeq <= this.lastProcessed,
     );
     for (const stored of queued) {
-      const outcome = await this.dispatchEvent(stored, stream);
+      const scope = this.scopeFor(stored);
+      const outcome = await this.dispatchEvent(stored, stream, scope);
       if (outcome.kind === 'retry') {
         // The fresh park replaces the resolved entry (upsert by stream) — nothing to clear.
-        await this.parkStream(stored, outcome.effect, outcome.error);
+        await this.parkStream(stored, outcome.effect, outcome.error, scope);
         return;
       }
     }

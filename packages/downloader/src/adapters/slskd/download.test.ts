@@ -3,6 +3,8 @@ import { asCandidateIdentity } from '../../domain/shared/__fixtures__/candidate-
 import { describe, expect, it } from 'vitest';
 import { errAsync, okAsync } from 'neverthrow';
 import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
+import { testContext } from '../../application/__fixtures__/correlation.js';
+import type { CommandContext, OperationScope } from '../../application/correlation/context.js';
 import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../domain/policy/policies.js';
 import type { DownloadPolicy } from '../../domain/policy/policies.js';
@@ -16,6 +18,8 @@ import type { HttpClient, HttpResponse } from '../support/http.js';
 import { SlskdClient } from './client.js';
 import { ESCALATE_EVERY, SlskdDownload } from './download.js';
 import type { Timer } from './timer.js';
+
+const SILENT_SCOPE: OperationScope = { context: testContext(), logger: silentLogger() };
 
 const STAGING = '/staging';
 const DOWNLOADS_ROOT = '/downloads';
@@ -169,10 +173,12 @@ interface Delivered {
   readonly acquisitionId: string;
   readonly candidate: CandidateIdentity;
   readonly result: DownloadResult;
+  readonly context: CommandContext;
 }
 
 interface Harness {
   adapter: SlskdDownload;
+  scope: OperationScope;
   deletes: string[];
   ledger: FakeResourceLedger;
   counts: { options: number; events: number; posts: number; deliveries: number; polls: number };
@@ -236,14 +242,14 @@ function downloader(options: Options): Harness {
     progress: (_acquisitionId, snapshot) => {
       progress.push(snapshot);
     },
-    outcome: (acquisitionId, delivered, result) => {
+    outcome: (acquisitionId, delivered, result, context) => {
       counts.deliveries += 1;
       if (options.deliverThrows) throw new Error('observer bug: exploded before returning');
       if (deliverFailures > 0) {
         deliverFailures -= 1;
         return errAsync(infraError('outcome.deliver', 'store busy'));
       }
-      outcomes.push({ acquisitionId, candidate: delivered, result });
+      outcomes.push({ acquisitionId, candidate: delivered, result, context });
       return okAsync(undefined);
     },
     finished: (acquisitionId) => {
@@ -269,8 +275,12 @@ function downloader(options: Options): Harness {
     new SlskdClient(http),
     options.timer ?? fakeTimer(),
   );
+  // The scope the shell would hand this effect: its logger IS the harness's recording logger, so
+  // watch-scoped lines stay observable exactly where they were before the scope existed.
+  const scope: OperationScope = { context: testContext(), logger: recordingLogger };
   return {
     adapter,
+    scope,
     deletes,
     ledger,
     counts,
@@ -288,7 +298,7 @@ async function run(
   harness: Harness,
   downloadPolicy: DownloadPolicy = policy(1000, 1000),
 ): Promise<DownloadResult> {
-  const started = await harness.adapter.start(ACQ, candidate, downloadPolicy);
+  const started = await harness.adapter.start(ACQ, candidate, downloadPolicy, harness.scope);
   expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
   await harness.adapter.settled();
   expect(harness.outcomes).toHaveLength(1);
@@ -390,7 +400,7 @@ describe('SlskdDownload', () => {
     const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
 
     await run(harness);
-    const again = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const again = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
     expect(again._unsafeUnwrap()).toEqual({ kind: 'started' });
     await harness.adapter.settled();
 
@@ -682,7 +692,7 @@ describe('SlskdDownload', () => {
       recordingTimer,
     );
 
-    const started = await adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const started = await adapter.start(ACQ, candidate, policy(100_000, 100_000), SILENT_SCOPE);
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     await adapter.settled();
 
@@ -699,7 +709,7 @@ describe('SlskdDownload', () => {
       polls: [],
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     // slskd answered with a 4xx, so the infrastructure is up: the candidate failed, and the retry
     // ladder advances to the next peer instead of retrying this one forever (prod 2026-07-22).
@@ -714,7 +724,7 @@ describe('SlskdDownload', () => {
   it('rejects the candidate as a generic transfer error for other enqueue refusals', async () => {
     const harness = downloader({ enqueue: { status: 400, body: 'boom' }, polls: [] });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
   });
@@ -728,7 +738,7 @@ describe('SlskdDownload', () => {
       polls: [],
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     const infraError = started._unsafeUnwrapErr();
     expect(infraError).toMatchObject({
@@ -754,7 +764,7 @@ describe('SlskdDownload', () => {
       polls: [],
     });
 
-    await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     expect(harness.warnContexts.at(-1)).toMatchObject({
       status: 500,
@@ -768,7 +778,7 @@ describe('SlskdDownload', () => {
       polls: [],
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     // Throttling is slskd's own health, not a peer verdict — classifying its body would invite an
     // operator to read a peer failure into it, so no `wouldBe` is offered at all.
@@ -783,7 +793,7 @@ describe('SlskdDownload', () => {
   it('surfaces a transport fault during enqueue as an InfraError (slskd itself unreachable)', async () => {
     const harness = downloader({ enqueueThrows: true, polls: [] });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
 
     expect(started._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -825,11 +835,21 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
 
-    const first = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const first = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
     // The ensure re-dispatch (a DownloadStarted reaction, or a redelivery): no second enqueue,
     // no second watch — the live watch is the answer.
-    const second = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const second = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(second._unsafeUnwrap()).toEqual({ kind: 'started' });
     expect(harness.counts.posts).toBe(1);
 
@@ -847,11 +867,11 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     await tickUntil(control, () => harness.counts.deliveries > 0, 'the first delivery attempt');
 
-    const aborted = await harness.adapter.abort(ACQ, candidate);
+    const aborted = await harness.adapter.abort(ACQ, candidate, harness.scope);
     expect(aborted._unsafeUnwrap()).toEqual([]);
 
     await tickUntil(control, () => harness.finished.length > 0, 'the aborted watch to exit');
@@ -1087,7 +1107,7 @@ describe('SlskdDownload', () => {
       fakeTimer(),
     );
 
-    const started = await adapter.start(ACQ, candidate, policy(1, 100_000));
+    const started = await adapter.start(ACQ, candidate, policy(1, 100_000), SILENT_SCOPE);
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     await adapter.settled();
 
@@ -1147,8 +1167,18 @@ describe('SlskdDownload', () => {
   it('watches two acquisitions independently and delivers each outcome to its owner', async () => {
     const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
 
-    const first = await harness.adapter.start('acq-1', candidate, policy(1000, 1000));
-    const second = await harness.adapter.start('acq-2', candidate, policy(1000, 1000));
+    const first = await harness.adapter.start(
+      'acq-1',
+      candidate,
+      policy(1000, 1000),
+      harness.scope,
+    );
+    const second = await harness.adapter.start(
+      'acq-2',
+      candidate,
+      policy(1000, 1000),
+      harness.scope,
+    );
     expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
     expect(second._unsafeUnwrap()).toEqual({ kind: 'started' });
     await harness.adapter.settled();
@@ -1174,10 +1204,10 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
 
-    await harness.adapter.start('acq-1', candidate, policy(100_000, 100_000));
-    await harness.adapter.start('acq-2', candidate, policy(100_000, 100_000));
+    await harness.adapter.start('acq-1', candidate, policy(100_000, 100_000), harness.scope);
+    await harness.adapter.start('acq-2', candidate, policy(100_000, 100_000), harness.scope);
 
-    const aborted = await harness.adapter.abort('acq-1', candidate);
+    const aborted = await harness.adapter.abort('acq-1', candidate, harness.scope);
     expect(aborted.isOk()).toBe(true);
     await tickUntil(control, () => harness.finished.includes('acq-1'), 'acq-1 to wind down');
 
@@ -1185,7 +1215,7 @@ describe('SlskdDownload', () => {
     expect(harness.finished).toEqual(['acq-1']);
     expect(harness.outcomes).toEqual([]);
 
-    await harness.adapter.abort('acq-2', candidate);
+    await harness.adapter.abort('acq-2', candidate, harness.scope);
     await tickUntil(control, () => harness.finished.includes('acq-2'), 'acq-2 to wind down');
     await harness.adapter.settled();
   });
@@ -1198,7 +1228,12 @@ describe('SlskdDownload', () => {
     ]);
     const harness = downloader({ polls: [inFlight, bothSucceeded], timer: control.timer });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const started = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
 
     harness.adapter.stop();
@@ -1218,7 +1253,7 @@ describe('SlskdDownload', () => {
       deliverThrows: true,
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     await harness.adapter.settled();
 
@@ -1261,15 +1296,15 @@ describe('SlskdDownload', () => {
     ]);
     const harness = downloader({ polls: [inFlight, inFlight, poll([])], timer: control.timer });
 
-    await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
-    await harness.adapter.start(ACQ, successor, policy(100_000, 100_000));
+    await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000), harness.scope);
+    await harness.adapter.start(ACQ, successor, policy(100_000, 100_000), harness.scope);
 
-    await harness.adapter.abort(ACQ, candidate);
+    await harness.adapter.abort(ACQ, candidate, harness.scope);
     await control.tick();
     await control.tick();
     expect(harness.finished).toEqual([]); // the successor's watch still lives — nothing retired
 
-    await harness.adapter.abort(ACQ, successor);
+    await harness.adapter.abort(ACQ, successor, harness.scope);
     await tickUntil(control, () => harness.finished.length > 0, 'the last watch to wind down');
     await harness.adapter.settled();
     expect(harness.finished).toEqual([ACQ]); // retired exactly once, by the last watch out
@@ -1289,11 +1324,21 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
 
-    const first = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const first = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
-    await harness.adapter.abort(ACQ, candidate); // latch; its listing found nothing to tear down
+    await harness.adapter.abort(ACQ, candidate, harness.scope); // latch; its listing found nothing to tear down
 
-    const again = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const again = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(again._unsafeUnwrap()).toEqual({ kind: 'started' }); // a fresh watch, not the latched one
 
     await tickUntil(control, () => harness.outcomes.length > 0, 'the fresh watch to deliver');
@@ -1308,8 +1353,8 @@ describe('SlskdDownload', () => {
     const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
 
     const [first, second] = await Promise.all([
-      harness.adapter.start(ACQ, candidate, policy(1000, 1000)),
-      harness.adapter.start(ACQ, candidate, policy(1000, 1000)),
+      harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope),
+      harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope),
     ]);
     await harness.adapter.settled();
 
@@ -1340,12 +1385,22 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
     // A enqueues normally (no gate yet), ticks once, parks.
-    const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const started = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
-    await harness.adapter.abort(ACQ, candidate); // latch A; its listing found nothing to tear down
+    await harness.adapter.abort(ACQ, candidate, harness.scope); // latch A; its listing found nothing to tear down
 
     // B reserves, then parks on its gated enqueue.
-    const successorStart = harness.adapter.start(ACQ, successor, policy(100_000, 100_000));
+    const successorStart = harness.adapter.start(
+      ACQ,
+      successor,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     await control.tick(); // A wakes, exits — sees B's reservation, skips retirement
     expect(harness.finished).toEqual([]);
 
@@ -1363,7 +1418,7 @@ describe('SlskdDownload', () => {
       finishedThrows: true,
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000));
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     await harness.adapter.settled(); // resolves — the entry was released despite the throw
 
@@ -1387,12 +1442,17 @@ describe('SlskdDownload', () => {
       timer: control.timer,
     });
 
-    const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+    const started = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
     expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
     // Drive until tick 2's poll is provably parked on the gate (the second transfers GET).
     await tickUntil(control, () => harness.counts.polls >= 2, 'tick 2 to park on the gated poll');
 
-    const aborted = await harness.adapter.abort(ACQ, candidate); // latches mid-tick
+    const aborted = await harness.adapter.abort(ACQ, candidate, harness.scope); // latches mid-tick
     expect(aborted.isOk()).toBe(true);
     pollGate.reject(new Error('socket torn down'));
 
@@ -1418,7 +1478,7 @@ describe('SlskdDownload', () => {
         ],
       });
 
-      const result = await harness.adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate, harness.scope);
 
       expect(result._unsafeUnwrap()).toEqual([]); // nothing had completed into staging
       // In-flight transfers are cancelled (remove=false); the re-poll then finds them gone.
@@ -1441,7 +1501,7 @@ describe('SlskdDownload', () => {
         events: [eventsPage([{ id: '01.flac', local: localOf('01.flac') }])],
       });
 
-      const result = await harness.adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate, harness.scope);
 
       // The completed file's source-reported staged path is returned for the domain to discard.
       expect(result._unsafeUnwrap()).toEqual([{ name: '01.flac', path: stagedPath('01.flac') }]);
@@ -1453,7 +1513,7 @@ describe('SlskdDownload', () => {
       // the desired end state — converge instead of wedging the reactor on a retryable fault.
       const harness = downloader({ polls: [{ status: 404, body: '' }] });
 
-      const result = await harness.adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate, harness.scope);
 
       expect(result._unsafeUnwrap()).toEqual([]);
       expect(harness.deletes).toEqual([]);
@@ -1462,7 +1522,7 @@ describe('SlskdDownload', () => {
     it('is a no-op when the candidate has no transfers left', async () => {
       const harness = downloader({ polls: [poll([])] });
 
-      const result = await harness.adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate, harness.scope);
 
       expect(result._unsafeUnwrap()).toEqual([]);
       expect(harness.deletes).toEqual([]);
@@ -1473,7 +1533,7 @@ describe('SlskdDownload', () => {
         polls: [{ status: 200, body: JSON.stringify({ directories: 'not-an-array' }) }],
       });
 
-      const result = await harness.adapter.abort(ACQ, candidate);
+      const result = await harness.adapter.abort(ACQ, candidate, harness.scope);
 
       expect(result._unsafeUnwrapErr()).toMatchObject({
         kind: 'InfraError',
@@ -1494,10 +1554,15 @@ describe('SlskdDownload', () => {
         timer: control.timer,
       });
 
-      const started = await harness.adapter.start(ACQ, candidate, policy(100_000, 100_000));
+      const started = await harness.adapter.start(
+        ACQ,
+        candidate,
+        policy(100_000, 100_000),
+        harness.scope,
+      );
       expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
 
-      const aborted = await harness.adapter.abort(ACQ, candidate);
+      const aborted = await harness.adapter.abort(ACQ, candidate, harness.scope);
       expect(aborted._unsafeUnwrap()).toEqual([]);
 
       await control.tick(); // wake the parked watch — it sees the abort and exits
@@ -1506,5 +1571,38 @@ describe('SlskdDownload', () => {
       expect(harness.outcomes).toEqual([]); // the abort path owns the settlement, not the watch
       expect(harness.finished).toEqual([ACQ]); // live progress is still retired
     });
+  });
+});
+
+describe('SlskdDownload correlation pinning', () => {
+  it('delivers the settled outcome under the context pinned when the watch was created', async () => {
+    const harness = downloader({ polls: [bothSucceeded], events: [bothCompleted] });
+
+    await run(harness);
+
+    expect(harness.outcomes[0]!.context).toEqual(harness.scope.context);
+  });
+
+  it('logs its watch lines through the scope logger it was handed, not a logger of its own', async () => {
+    // The abandonment path warns from inside the detached watch loop — after the async gap that
+    // the research names as the break point. If the supervisor reached for its constructor logger
+    // there, the line would carry none of the dispatch's bindings.
+    const harness = downloader({
+      polls: [poll([transfer('01.flac', { state: 'Queued, Remotely' })])],
+      timer: fakeTimer(),
+    });
+    const bound: Record<string, unknown>[] = [];
+    const scope: OperationScope = {
+      context: harness.scope.context,
+      logger: {
+        ...silentLogger(),
+        warn: (context: unknown) => void bound.push(context as Record<string, unknown>),
+      } as OperationScope['logger'],
+    };
+
+    await harness.adapter.start(ACQ, candidate, policy(1000, 1), scope);
+    await harness.adapter.settled();
+
+    expect(bound.length).toBeGreaterThan(0);
   });
 });

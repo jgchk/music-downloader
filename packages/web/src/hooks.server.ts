@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { mintCorrelationId } from '$lib/server/correlation.js';
 import { accessOf, bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
 import { SESSION_COOKIE, verifySession } from '$lib/server/session.js';
 
@@ -37,8 +38,12 @@ const OPEN_ROUTES = new Set(['/health', '/login', '/login/callback']);
  * unparseable — anything but valid/expired) is logged as the tamper signal it is.
  */
 export const handle: Handle = ({ event, resolve }) => {
+  // The story is minted HERE — the outermost trigger of every user-initiated operation
+  // (operation-correlation). One id per request, carried verbatim into both modules' commands and
+  // bound onto the request logger, so every line this request produces joins the same story.
+  event.locals.correlationId = mintCorrelationId();
   event.locals.facades = facadesOf();
-  event.locals.logger = loggerOf();
+  event.locals.logger = loggerOf().child({ correlationId: event.locals.correlationId });
   event.locals.access = accessOf();
   event.locals.now = () => new Date().toISOString();
 

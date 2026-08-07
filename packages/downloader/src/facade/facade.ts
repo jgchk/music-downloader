@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import type { CommandError } from '../application/acquisition/command-handler.js';
+import {
+  isCorrelationId,
+  newOperation,
+  toCorrelationId,
+} from '../application/correlation/context.js';
+import type { CommandContext } from '../application/correlation/context.js';
 import { parseMbid } from '../domain/shared/mbid.js';
 import {
   cancelAcquisition as cancelAcquisitionUseCase,
@@ -87,11 +93,20 @@ export type SelectEditionResult = z.infer<typeof selectEditionResultSchema>;
 
 // --- The facade --------------------------------------------------------------------------------
 
+/**
+ * The story a caller has already minted for the operation this command belongs to — 32 lowercase
+ * hex (see `operation-correlation`). Deliberately a plain string, not this module's branded
+ * `CorrelationId`: the facade is wire-shaped, and one caller drives BOTH modules under one story,
+ * so neither module's brand may be the currency at this boundary. A malformed or unknown value
+ * degrades to a freshly minted story — telemetry never refuses work.
+ */
+export type StoryId = string;
+
 export interface DownloaderFacade {
-  submitAcquisition(input: unknown): Promise<FacadeResult<SubmitAcquisitionResult>>;
-  cancelAcquisition(input: unknown): Promise<FacadeResult<CancelAcquisitionResult>>;
+  submitAcquisition(input: unknown, story: StoryId): Promise<FacadeResult<SubmitAcquisitionResult>>;
+  cancelAcquisition(input: unknown, story: StoryId): Promise<FacadeResult<CancelAcquisitionResult>>;
   /** Resume an awaiting-selection acquisition with the chosen edition (manual-edition-selection). */
-  selectEdition(input: unknown): Promise<FacadeResult<SelectEditionResult>>;
+  selectEdition(input: unknown, story: StoryId): Promise<FacadeResult<SelectEditionResult>>;
   getAcquisition(input: unknown): FacadeResult<AcquisitionStatusResponseDto>;
   /** Infallible collection read: returns the DTO directly, no result envelope. */
   listAcquisitions(): AcquisitionListResponseDto;
@@ -99,8 +114,22 @@ export interface DownloaderFacade {
 }
 
 export function createDownloaderFacade(dependencies: UseCaseDependencies): DownloaderFacade {
+  /**
+   * Turn a caller's story into this module's command context. The commandId is minted here, so two
+   * commands of one story get distinct causations — causation is rewritten per hop, correlation is
+   * not. An unusable story is replaced rather than rejected: an operation with a broken trace is
+   * still an operation the user asked for.
+   */
+  const contextFor = (story: StoryId): CommandContext =>
+    isCorrelationId(story)
+      ? {
+          correlationId: toCorrelationId(story),
+          causation: { kind: 'command', commandId: dependencies.correlation.mint() },
+        }
+      : newOperation(dependencies.correlation);
+
   return {
-    async submitAcquisition(input) {
+    async submitAcquisition(input, story) {
       const parsed = submitAcquisitionRequestSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const request = requestToDomain(parsed.data.request);
@@ -112,27 +141,32 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
       }
       const policies = resolvePolicies(parsed.data);
       if (policies.isErr()) return fail({ kind: 'InvalidPolicy' });
-      const result = await submitAcquisitionUseCase(dependencies, {
-        request: request.value,
-        policies: policies.value,
-      });
+      const result = await submitAcquisitionUseCase(
+        dependencies,
+        { request: request.value, policies: policies.value },
+        contextFor(story),
+      );
       return result.match(
         ({ acquisitionId }) => ok({ acquisitionId }),
         (error) => fail(toFacadeError(error)),
       );
     },
 
-    async cancelAcquisition(input) {
+    async cancelAcquisition(input, story) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await cancelAcquisitionUseCase(dependencies, parsed.data.id);
+      const result = await cancelAcquisitionUseCase(
+        dependencies,
+        parsed.data.id,
+        contextFor(story),
+      );
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),
       );
     },
 
-    async selectEdition(input) {
+    async selectEdition(input, story) {
       const parsed = selectEditionInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const releaseMbid = parseMbid(parsed.data.releaseMbid);
@@ -142,7 +176,12 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
           message: 'releaseMbid is not a valid MusicBrainz id',
         });
       }
-      const result = await selectEditionUseCase(dependencies, parsed.data.id, releaseMbid.value);
+      const result = await selectEditionUseCase(
+        dependencies,
+        parsed.data.id,
+        releaseMbid.value,
+        contextFor(story),
+      );
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),

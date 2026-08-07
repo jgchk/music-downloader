@@ -84,7 +84,10 @@ export const load: PageServerLoad = ({ locals, params }) => {
 
 export const actions: Actions = {
   cancel: async ({ locals, params }) => {
-    const result = await locals.facades.downloader.cancelAcquisition({ id: params.id });
+    const result = await locals.facades.downloader.cancelAcquisition(
+      { id: params.id },
+      locals.correlationId,
+    );
     if (!result.ok) {
       return fail(statusOf(result.error), { message: messageOf(result.error) });
     }
@@ -96,10 +99,10 @@ export const actions: Actions = {
   select: async ({ locals, params, request }) => {
     const data = await request.formData();
     const releaseMbid = data.get('releaseMbid');
-    const result = await locals.facades.downloader.selectEdition({
-      id: params.id,
-      releaseMbid: typeof releaseMbid === 'string' ? releaseMbid : '',
-    });
+    const result = await locals.facades.downloader.selectEdition(
+      { id: params.id, releaseMbid: typeof releaseMbid === 'string' ? releaseMbid : '' },
+      locals.correlationId,
+    );
     if (!result.ok) {
       return fail(statusOf(result.error), { message: messageOf(result.error) });
     }

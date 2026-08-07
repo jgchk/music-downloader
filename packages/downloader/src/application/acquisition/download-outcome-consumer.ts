@@ -5,6 +5,7 @@ import { infraError } from '../ports/errors.js';
 import type { InfraError } from '../ports/errors.js';
 import type { DownloadResult } from '../ports/outbound-ports.js';
 import type { Logger } from '../logging/logger.js';
+import type { CommandContext } from '../correlation/context.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDependencies } from './command-handler.js';
 import { classifyCommandError, describeCommandError } from './failure-classification.js';
@@ -23,11 +24,18 @@ export interface DownloadOutcomeDependencies extends CommandDependencies {
   readonly logger: Logger;
 }
 
+/**
+ * `context` is the one the supervisor PINNED when the watch was created, not a fresh mint: the
+ * settled outcome is the same operation as the dispatch that started the download, arriving after
+ * an async gap. Minting here would break the story at exactly the hop the research names as the
+ * classic break point.
+ */
 export function deliverDownloadOutcome(
   dependencies: DownloadOutcomeDependencies,
   acquisitionId: string,
   candidate: CandidateIdentity,
   result: DownloadResult,
+  context: CommandContext,
 ): ResultAsync<void, InfraError> {
   return applyCommand(
     dependencies,
@@ -44,6 +52,7 @@ export function deliverDownloadOutcome(
           reason: result.reason,
           files: result.files,
         },
+    context,
   )
     .map((): void => undefined)
     .orElse((error) => {

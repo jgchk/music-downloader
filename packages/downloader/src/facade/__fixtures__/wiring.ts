@@ -1,4 +1,5 @@
 import { FakeEventStore, fixedClock, sequentialIds } from '../../application/__fixtures__/fakes.js';
+import { fixedCorrelation } from '../../application/__fixtures__/correlation.js';
 import {
   AcquisitionStatusProjection,
   ProgressReadModel,
@@ -30,6 +31,7 @@ export function testWiring(): TestWiring {
     store,
     clock: fixedClock(),
     ids: sequentialIds(),
+    correlation: fixedCorrelation(),
     status,
     progress,
     stalled: new StalledReadModel(),

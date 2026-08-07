@@ -8,7 +8,10 @@ function event(fields: Record<string, string>, facade: Record<string, unknown>) 
   for (const [k, v] of Object.entries(fields)) data.set(k, v);
   return {
     request: { formData: () => Promise.resolve(data) },
-    locals: { facades: { downloader: facade as unknown as DownloaderFacade } },
+    locals: {
+      facades: { downloader: facade as unknown as DownloaderFacade },
+      correlationId: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    },
   } as never;
 }
 
@@ -24,9 +27,13 @@ describe('submit acquisition action', () => {
     ).rejects.toSatisfy(
       (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-9',
     );
-    expect(submitAcquisition).toHaveBeenCalledWith({
-      request: { kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' },
-    });
+    expect(submitAcquisition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: { kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' },
+      }),
+      // The request's story, threaded from `locals` — the hook mints it, the facade adopts it.
+      expect.stringMatching(/^[0-9a-f]{32}$/),
+    );
   });
 
   it('re-renders the modeled failure with the typed values', async () => {

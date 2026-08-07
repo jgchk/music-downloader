@@ -1,3 +1,4 @@
+import { testScope } from '../../src/application/__fixtures__/correlation.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { okAsync } from 'neverthrow';
 import { FakeResourceLedger, silentLogger } from '../../src/application/__fixtures__/fakes.js';
@@ -138,7 +139,7 @@ async function drive(candidate: Candidate, input: DownloadPolicyInput): Promise<
     fakeTimer(),
   );
 
-  const started = await download.start('acq-contract', candidate, policy);
+  const started = await download.start('acq-contract', candidate, policy, testScope());
   if (started.isOk() && started.value.kind === 'started') await download.settled();
   return { outcomes, progress };
 }
@@ -175,9 +176,9 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
       title: 'Lab Album',
       tracks: [{ position: 1, title: 'Success Path', durationMs: 5000 }],
     })._unsafeUnwrap();
-    const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
+    const search = new SlskdSearch(new FakeResourceLedger(), client(), fakeTimer());
 
-    const searched = await search.search('acq-contract', target, 1);
+    const searched = await search.search('acq-contract', target, 1, testScope());
     const candidates = searched._unsafeUnwrap();
 
     expect(candidates.length).toBeGreaterThan(0);
@@ -199,9 +200,9 @@ describe('slskd contract — the lab’s happy path (full-flow)', () => {
       title: 'Lab Album',
       tracks: [{ position: 1, title: 'Success Path', durationMs: 5000 }],
     })._unsafeUnwrap();
-    const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
+    const search = new SlskdSearch(new FakeResourceLedger(), client(), fakeTimer());
 
-    await search.search('acq-contract', target, 1);
+    await search.search('acq-contract', target, 1, testScope());
 
     const released = server.requests.filter(
       (r) => r.method === 'DELETE' && /^\/api\/v0\/searches\/[^/]+$/.test(r.path),
@@ -282,9 +283,9 @@ describe('slskd contract — the live-network cross-check', () => {
       title: 'The Dark Side of the Moon',
       tracks: [{ position: 1, title: 'Time', durationMs: 1000 }],
     })._unsafeUnwrap();
-    const search = new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer());
+    const search = new SlskdSearch(new FakeResourceLedger(), client(), fakeTimer());
 
-    const searched = await search.search('acq-contract', target, 1);
+    const searched = await search.search('acq-contract', target, 1, testScope());
     const candidates = searched._unsafeUnwrap();
 
     expect(candidates.length).toBeGreaterThan(0);
@@ -549,6 +550,7 @@ describe('slskd contract — a refused enqueue today', () => {
       'acq-contract',
       candidate,
       createDownloadPolicy({ stallTimeoutMs: 100_000, maxQueueWaitMs: 1 })._unsafeUnwrap(),
+      testScope(),
     );
 
     expect(started.isErr()).toBe(true);
@@ -573,10 +575,11 @@ describe('slskd contract — the manifest declares everything the adapters send'
         title: 'Lab Album',
         tracks: [{ position: 1, title: 'Success Path', durationMs: 5000 }],
       })._unsafeUnwrap();
-      await new SlskdSearch(silentLogger(), new FakeResourceLedger(), client(), fakeTimer()).search(
+      await new SlskdSearch(new FakeResourceLedger(), client(), fakeTimer()).search(
         'acq-contract',
         target,
         1,
+        testScope(),
       );
       const transfer = transfersIn(scenario)[0]!;
       await drive(candidateFor(scenario, transfer.filename!), {

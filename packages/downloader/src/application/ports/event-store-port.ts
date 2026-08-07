@@ -1,5 +1,6 @@
 import type { ResultAsync } from 'neverthrow';
 import type { AcquisitionEvent, AcquisitionEventType } from '../../domain/acquisition/events.js';
+import type { CausationReference } from '../correlation/context.js';
 import type { InfraError } from './errors.js';
 
 /**
@@ -8,10 +9,28 @@ import type { InfraError } from './errors.js';
  * order that drives projections and the reactor; `UNIQUE(stream_id, version)` is optimistic
  * concurrency, surfaced here as {@link ConcurrencyConflict}.
  */
+/**
+ * Metadata as READ back from the store. The operation-correlation pair is optional here and always
+ * will be: every row written before end-to-end-correlation shipped has neither field, those rows
+ * are never backfilled, and no upcaster may fabricate provenance that never happened. A reader that
+ * required either field would fail to replay real production history.
+ */
 export interface EventMetadata {
   readonly acquisitionId: string;
   readonly occurredAt: string; // ISO-8601
   readonly correlationId?: string;
+  readonly causation?: CausationReference;
+}
+
+/**
+ * Metadata as WRITTEN. The same shape with the correlation pair made mandatory — the asymmetry is
+ * the point: tolerance belongs to the reader, and nothing appended from today on may be
+ * uncorrelated. Because {@link EventStorePort.append} takes this type, a call site that has no
+ * {@link CommandContext} to derive it from is a compile error rather than a silently broken chain.
+ */
+export interface AppendMetadata extends EventMetadata {
+  readonly correlationId: string;
+  readonly causation: CausationReference;
 }
 
 export interface StoredEvent {
@@ -37,7 +56,7 @@ export interface EventStorePort {
     streamId: string,
     expectedVersion: number,
     events: readonly AcquisitionEvent[],
-    metadata: EventMetadata,
+    metadata: AppendMetadata,
   ): ResultAsync<readonly StoredEvent[], AppendError>;
 
   readStream(streamId: string): ResultAsync<readonly StoredEvent[], InfraError>;

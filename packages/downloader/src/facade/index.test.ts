@@ -1,3 +1,5 @@
+import { STORY, appendMetadata } from '../application/__fixtures__/correlation.js';
+import { fixedClock } from '../application/__fixtures__/fakes.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import type { EventStorePort } from '../application/ports/event-store-port.js';
@@ -50,7 +52,7 @@ describe('createDownloaderFacade', () => {
   describe('submitAcquisition', () => {
     it('accepts a valid submission and returns the acquisition id', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.submitAcquisition(VALID_SUBMIT);
+      const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -60,7 +62,7 @@ describe('createDownloaderFacade', () => {
 
     it('returns a modeled validation error for schema-invalid input, without throwing', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.submitAcquisition({ request: { kind: 'nonsense' } });
+      const result = await facade.submitAcquisition({ request: { kind: 'nonsense' } }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -71,9 +73,12 @@ describe('createDownloaderFacade', () => {
 
     it('rejects a schema-valid but non-UUID MusicBrainz id as a validation error', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.submitAcquisition({
-        request: { kind: 'musicbrainz', mbid: 'not-a-uuid', targetType: 'album' },
-      });
+      const result = await facade.submitAcquisition(
+        {
+          request: { kind: 'musicbrainz', mbid: 'not-a-uuid', targetType: 'album' },
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -84,10 +89,13 @@ describe('createDownloaderFacade', () => {
 
     it('returns InvalidPolicy for a schema-valid but domain-inconsistent policy', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.submitAcquisition({
-        ...VALID_SUBMIT,
-        qualityPolicy: { order: ['LOSSLESS'], floor: 'LOSSY_LOW' },
-      });
+      const result = await facade.submitAcquisition(
+        {
+          ...VALID_SUBMIT,
+          qualityPolicy: { order: ['LOSSLESS'], floor: 'LOSSY_LOW' },
+        },
+        STORY,
+      );
 
       expect(result).toEqual({ ok: false, error: { kind: 'InvalidPolicy' } });
     });
@@ -96,7 +104,7 @@ describe('createDownloaderFacade', () => {
       const wiring = testWiring();
       wiring.store.failReads = true;
       const facade = createDownloaderFacade(wiring.deps);
-      const result = await facade.submitAcquisition(VALID_SUBMIT);
+      const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -114,7 +122,7 @@ describe('createDownloaderFacade', () => {
         readAll: () => okAsync([]),
       };
       const facade = createDownloaderFacade({ ...testWiring().deps, store: conflictStore });
-      const result = await facade.submitAcquisition(VALID_SUBMIT);
+      const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -128,11 +136,11 @@ describe('createDownloaderFacade', () => {
     it('maps a cancel-time infrastructure fault to a modeled error value', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
-      const submitted = await facade.submitAcquisition(VALID_SUBMIT);
+      const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
 
       wiring.store.failReads = true;
-      const result = await facade.cancelAcquisition({ id: submitted.value.acquisitionId });
+      const result = await facade.cancelAcquisition({ id: submitted.value.acquisitionId }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -144,10 +152,10 @@ describe('createDownloaderFacade', () => {
     it('cancels a live acquisition', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
-      const submitted = await facade.submitAcquisition(VALID_SUBMIT);
+      const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
 
-      const result = await facade.cancelAcquisition({ id: submitted.value.acquisitionId });
+      const result = await facade.cancelAcquisition({ id: submitted.value.acquisitionId }, STORY);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -159,14 +167,14 @@ describe('createDownloaderFacade', () => {
 
     it('converges as a tolerated no-op for an unknown id (the decider guards)', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.cancelAcquisition({ id: 'acq-unknown' });
+      const result = await facade.cancelAcquisition({ id: 'acq-unknown' }, STORY);
 
       expect(result).toEqual({ ok: true, value: { acquisitionId: 'acq-unknown' } });
     });
 
     it('rejects invalid input as a modeled validation error', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.cancelAcquisition({ id: '' });
+      const result = await facade.cancelAcquisition({ id: '' }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
@@ -190,7 +198,7 @@ describe('createDownloaderFacade', () => {
             candidates: [{ releaseMbid: asMbid(RETAINED_EDITION), trackCount: 12 }],
           },
         ],
-        { acquisitionId: 'acq-1', occurredAt: '2026-01-01T00:00:00Z' },
+        appendMetadata('acq-1', fixedClock()),
       );
       wiring.sync();
       return wiring;
@@ -198,10 +206,13 @@ describe('createDownloaderFacade', () => {
 
     it('accepts a retained candidate and resumes the acquisition', async () => {
       const wiring = await awaitingWiring();
-      const result = await wiring.facade.selectEdition({
-        id: 'acq-1',
-        releaseMbid: RETAINED_EDITION,
-      });
+      const result = await wiring.facade.selectEdition(
+        {
+          id: 'acq-1',
+          releaseMbid: RETAINED_EDITION,
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -214,10 +225,13 @@ describe('createDownloaderFacade', () => {
 
     it('returns the modeled UnknownEdition rejection for an off-menu choice', async () => {
       const wiring = await awaitingWiring();
-      const result = await wiring.facade.selectEdition({
-        id: 'acq-1',
-        releaseMbid: OFF_MENU_EDITION,
-      });
+      const result = await wiring.facade.selectEdition(
+        {
+          id: 'acq-1',
+          releaseMbid: OFF_MENU_EDITION,
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -228,13 +242,16 @@ describe('createDownloaderFacade', () => {
 
     it('returns the modeled IllegalTransition rejection when not awaiting a selection', async () => {
       const wiring = testWiring();
-      const submitted = await wiring.facade.submitAcquisition(VALID_SUBMIT);
+      const submitted = await wiring.facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
 
-      const result = await wiring.facade.selectEdition({
-        id: submitted.value.acquisitionId,
-        releaseMbid: RETAINED_EDITION,
-      });
+      const result = await wiring.facade.selectEdition(
+        {
+          id: submitted.value.acquisitionId,
+          releaseMbid: RETAINED_EDITION,
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -244,7 +261,7 @@ describe('createDownloaderFacade', () => {
 
     it('rejects invalid input as a modeled validation error', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
-      const result = await facade.selectEdition({ id: 'acq-1' });
+      const result = await facade.selectEdition({ id: 'acq-1' }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
@@ -252,7 +269,10 @@ describe('createDownloaderFacade', () => {
 
     it('rejects a non-UUID releaseMbid as a modeled validation error', async () => {
       const wiring = await awaitingWiring();
-      const result = await wiring.facade.selectEdition({ id: 'acq-1', releaseMbid: 'not-a-uuid' });
+      const result = await wiring.facade.selectEdition(
+        { id: 'acq-1', releaseMbid: 'not-a-uuid' },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
@@ -262,10 +282,12 @@ describe('createDownloaderFacade', () => {
   describe('getAcquisition', () => {
     it('exposes the candidate editions while an acquisition awaits manual selection', async () => {
       const wiring = testWiring();
-      await wiring.store.append('acq-1', 0, awaitingSelectionHistory(), {
-        acquisitionId: 'acq-1',
-        occurredAt: '2026-01-01T00:00:00Z',
-      });
+      await wiring.store.append(
+        'acq-1',
+        0,
+        awaitingSelectionHistory(),
+        appendMetadata('acq-1', fixedClock()),
+      );
       wiring.sync();
 
       const result = wiring.facade.getAcquisition({ id: 'acq-1' });
@@ -281,7 +303,7 @@ describe('createDownloaderFacade', () => {
     it('returns the status view for a known acquisition', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
-      const submitted = await facade.submitAcquisition(VALID_SUBMIT);
+      const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
       wiring.sync();
 
@@ -314,7 +336,7 @@ describe('createDownloaderFacade', () => {
     it('lists acquisitions as a wire-shaped collection', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
-      const submitted = await facade.submitAcquisition(VALID_SUBMIT);
+      const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
       wiring.sync();
 
@@ -358,5 +380,51 @@ describe('createDownloaderFacade', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
     });
+  });
+});
+
+describe('facade correlation carriage', () => {
+  it('threads the caller-minted story into the metadata of the events a command appends', async () => {
+    const wiring = testWiring();
+
+    const result = await wiring.facade.submitAcquisition(VALID_SUBMIT, STORY);
+
+    expect(result.ok).toBe(true);
+    const appended = wiring.store.all();
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.causation).toMatchObject({ kind: 'command' });
+    }
+  });
+
+  it('degrades to a fresh story rather than refusing work when the caller supplies a malformed id', async () => {
+    const wiring = testWiring();
+
+    const result = await wiring.facade.submitAcquisition(VALID_SUBMIT, 'not-a-trace-id');
+
+    expect(result.ok).toBe(true);
+    const [first] = wiring.store.all();
+    expect(first!.metadata.correlationId).not.toBe('not-a-trace-id');
+    expect(first!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('gives two commands of one story the same story id and distinct command causations', async () => {
+    const wiring = testWiring();
+
+    const submitted = await wiring.facade.submitAcquisition(VALID_SUBMIT, STORY);
+    const id = submitted.ok ? submitted.value.acquisitionId : '';
+    await wiring.facade.cancelAcquisition({ id }, STORY);
+
+    const stories = new Set(wiring.store.all().map((entry) => entry.metadata.correlationId));
+    const commands = new Set(
+      wiring.store
+        .all()
+        .map((entry) =>
+          entry.metadata.causation?.kind === 'command' ? entry.metadata.causation.commandId : '',
+        ),
+    );
+    expect(stories).toEqual(new Set([STORY]));
+    expect(commands.size).toBe(2); // one story, two commands — causation is rewritten per hop
   });
 });

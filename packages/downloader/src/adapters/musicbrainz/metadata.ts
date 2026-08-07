@@ -4,6 +4,7 @@ import { classifiedFault } from '../support/fault.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { MetadataPort, MetadataResolution } from '../../application/ports/outbound-ports.js';
 import type { Logger } from '../../application/logging/logger.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import type { ZodType } from 'zod';
 import { fetchHttpClient } from '../support/http.js';
 import type { HttpClient } from '../support/http.js';
@@ -62,7 +63,6 @@ export class MusicBrainzMetadata implements MetadataPort {
   private readonly searchLimit: number;
 
   constructor(
-    private readonly logger: Logger,
     private readonly http: HttpClient = fetchHttpClient,
     config: MusicBrainzConfig = {},
   ) {
@@ -71,56 +71,67 @@ export class MusicBrainzMetadata implements MetadataPort {
     this.searchLimit = config.searchLimit ?? 5;
   }
 
-  resolve(request: AcquisitionRequest): ResultAsync<MetadataResolution, InfraError> {
-    return ResultAsync.fromPromise(this.doResolve(request), (cause) =>
+  resolve(
+    request: AcquisitionRequest,
+    scope: OperationScope,
+  ): ResultAsync<MetadataResolution, InfraError> {
+    return ResultAsync.fromPromise(this.doResolve(request, scope.logger), (cause) =>
       classifiedFault('musicbrainz.resolve', cause),
     );
   }
 
-  private async doResolve(request: AcquisitionRequest): Promise<MetadataResolution> {
-    this.logger.debug({ kind: request.kind, targetType: request.targetType }, 'resolving metadata');
+  private async doResolve(
+    request: AcquisitionRequest,
+    logger: Logger,
+  ): Promise<MetadataResolution> {
+    logger.debug({ kind: request.kind, targetType: request.targetType }, 'resolving metadata');
     if (request.kind === 'musicbrainz') {
       return request.targetType === 'album'
-        ? this.resolveReleaseById(request.mbid)
-        : this.resolveRecordingById(request.mbid);
+        ? this.resolveReleaseById(request.mbid, logger)
+        : this.resolveRecordingById(request.mbid, logger);
     }
     if (request.kind === 'release-group') {
-      return this.resolveReleaseByReleaseGroup(request.mbid);
+      return this.resolveReleaseByReleaseGroup(request.mbid, logger);
     }
     return request.targetType === 'album'
-      ? this.resolveReleaseByDescriptor(request.artist, request.title)
-      : this.resolveRecordingByDescriptor(request.artist, request.title);
+      ? this.resolveReleaseByDescriptor(request.artist, request.title, logger)
+      : this.resolveRecordingByDescriptor(request.artist, request.title, logger);
   }
 
-  private async resolveReleaseById(mbid: string): Promise<MetadataResolution> {
+  private async resolveReleaseById(mbid: string, logger: Logger): Promise<MetadataResolution> {
     const json = await this.getJson(
       `${this.baseUrl}/release/${encodeURIComponent(mbid)}?inc=recordings+artist-credits&fmt=json`,
       mbReleaseSchema,
       true, // by-id: a 400 is an invalid mbid — a permanent business "no match"
+      logger,
     );
     if (json === undefined) return UNRESOLVED;
     const target = releaseToTarget(json);
     return target === undefined ? UNRESOLVED : { kind: 'resolved', target };
   }
 
-  private async resolveRecordingById(mbid: string): Promise<MetadataResolution> {
+  private async resolveRecordingById(mbid: string, logger: Logger): Promise<MetadataResolution> {
     const json = await this.getJson(
       `${this.baseUrl}/recording/${encodeURIComponent(mbid)}?inc=artist-credits&fmt=json`,
       mbRecordingSchema,
       true, // by-id: a 400 is an invalid mbid — a permanent business "no match"
+      logger,
     );
     if (json === undefined) return UNRESOLVED;
     const target = recordingToTarget(json);
     return target === undefined ? UNRESOLVED : { kind: 'resolved', target };
   }
 
-  private async resolveReleaseByReleaseGroup(mbid: string): Promise<MetadataResolution> {
+  private async resolveReleaseByReleaseGroup(
+    mbid: string,
+    logger: Logger,
+  ): Promise<MetadataResolution> {
     const url = `${this.baseUrl}/release?release-group=${encodeURIComponent(mbid)}&inc=media&fmt=json&limit=${RELEASE_SEARCH_LIMIT}`;
     // Browsing by release-group mbid: a 400 is an invalid mbid — a permanent business "no match".
-    const json = await this.getJson(url, mbReleaseGroupBrowseSchema, true);
+    const json = await this.getJson(url, mbReleaseGroupBrowseSchema, true, logger);
     const officialIds = releaseGroupCandidateIds(json?.releases);
     for (const id of officialIds) {
-      const resolution = await this.resolveReleaseById(id);
+      const resolution = await this.resolveReleaseById(id, logger);
       if (resolution.kind === 'resolved') return resolution;
     }
     // No official edition to pick — offer the group's editions for a human to choose. When an
@@ -131,7 +142,7 @@ export class MusicBrainzMetadata implements MetadataPort {
       const candidates = releaseGroupEditionCandidates(json?.releases);
       if (candidates.length > 0) return { kind: 'needsSelection', candidates };
     } else {
-      this.logger.warn(
+      logger.warn(
         { releaseGroup: mbid, tried: officialIds },
         'every picked official edition yielded no usable target; unresolved',
       );
@@ -142,15 +153,16 @@ export class MusicBrainzMetadata implements MetadataPort {
   private async resolveReleaseByDescriptor(
     artist: string,
     title: string,
+    logger: Logger,
   ): Promise<MetadataResolution> {
     const query = `release:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
     const url = this.searchUrl('release', query, RELEASE_SEARCH_LIMIT);
     // Search: a 400 means MusicBrainz rejected the Lucene query we built — an adapter defect that
     // must surface as an InfraError, not be swallowed as unresolved.
-    const json = await this.getJson(url, mbReleaseSearchSchema, false);
+    const json = await this.getJson(url, mbReleaseSearchSchema, false, logger);
     const candidateIds = releaseCandidateIds(json?.releases, title);
     for (const id of candidateIds) {
-      const resolution = await this.resolveReleaseById(id);
+      const resolution = await this.resolveReleaseById(id, logger);
       if (resolution.kind === 'resolved') return resolution;
     }
     return UNRESOLVED;
@@ -159,14 +171,15 @@ export class MusicBrainzMetadata implements MetadataPort {
   private async resolveRecordingByDescriptor(
     artist: string,
     title: string,
+    logger: Logger,
   ): Promise<MetadataResolution> {
     const query = `recording:${lucenePhrase(title)} AND artist:${lucenePhrase(artist)}`;
     const url = this.searchUrl('recording', query, this.searchLimit);
     // Search: a 400 means MusicBrainz rejected the Lucene query we built — an adapter defect that
     // must surface as an InfraError, not be swallowed as unresolved.
-    const json = await this.getJson(url, mbRecordingSearchSchema, false);
+    const json = await this.getJson(url, mbRecordingSearchSchema, false, logger);
     const id = bestMatchId(json?.recordings);
-    return id === undefined ? UNRESOLVED : this.resolveRecordingById(id);
+    return id === undefined ? UNRESOLVED : this.resolveRecordingById(id, logger);
   }
 
   private searchUrl(entity: 'release' | 'recording', query: string, limit: number): string {
@@ -190,6 +203,7 @@ export class MusicBrainzMetadata implements MetadataPort {
     url: string,
     schema: ZodType<T>,
     shouldTreat400AsUnresolved: boolean,
+    logger: Logger,
   ): Promise<T | undefined> {
     const response = await this.http.send({
       url,
@@ -197,7 +211,7 @@ export class MusicBrainzMetadata implements MetadataPort {
     });
     if (response.status === 404) return undefined;
     if (shouldTreat400AsUnresolved && response.status === 400) {
-      this.logger.warn({ url }, 'musicbrainz rejected the request (400); treating as unresolved');
+      logger.warn({ url }, 'musicbrainz rejected the request (400); treating as unresolved');
       return undefined;
     }
     if (response.status < 200 || response.status >= 300) {

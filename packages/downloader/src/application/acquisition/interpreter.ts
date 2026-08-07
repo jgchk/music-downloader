@@ -10,6 +10,7 @@ import type {
 } from '../ports/outbound-ports.js';
 import type { MetadataResolution } from '../ports/outbound-ports.js';
 import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
+import type { OperationScope } from '../correlation/context.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDependencies, CommandError } from './command-handler.js';
 import { runValidation } from './validation-service.js';
@@ -51,22 +52,28 @@ export function interpretEffect(
   dependencies: InterpreterDependencies,
   acquisitionId: string,
   effect: Effect,
+  scope: OperationScope,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   const { ports } = dependencies;
   switch (effect.type) {
     case 'ResolveMetadata': {
       return ports.metadata
-        .resolve(effect.request)
+        .resolve(effect.request, scope)
         .andThen((resolution) =>
-          applyCommand(dependencies, acquisitionId, resolutionCommand(resolution)),
+          applyCommand(dependencies, acquisitionId, resolutionCommand(resolution), scope.context),
         );
     }
 
     case 'Search': {
       return ports.search
-        .search(acquisitionId, effect.target, effect.round)
+        .search(acquisitionId, effect.target, effect.round, scope)
         .andThen((candidates) =>
-          applyCommand(dependencies, acquisitionId, { type: 'RecordSearchResults', candidates }),
+          applyCommand(
+            dependencies,
+            acquisitionId,
+            { type: 'RecordSearchResults', candidates },
+            scope.context,
+          ),
         );
     }
 
@@ -77,7 +84,7 @@ export function interpretEffect(
       // through the download-outcome consumer. Idempotent, so live redelivery and the startup
       // re-drive re-dispatch it freely.
       return ports.download
-        .start(acquisitionId, effect.candidate, effect.policy)
+        .start(acquisitionId, effect.candidate, effect.policy, scope)
         .andThen((started) =>
           applyCommand(
             dependencies,
@@ -89,26 +96,33 @@ export function interpretEffect(
                   reason: started.reason,
                   candidate: effect.candidate.identity,
                 },
+            scope.context,
           ),
         );
     }
 
     case 'Validate': {
-      return runValidation(ports.probe, effect.files, effect.target, effect.matchPolicy).andThen(
-        (result) =>
-          applyCommand(
-            dependencies,
-            acquisitionId,
-            result.passed
-              ? { type: 'RecordValidationPassed', verdict: result.verdict }
-              : { type: 'RecordValidationFailed', verdict: result.verdict },
-          ),
+      return runValidation(
+        ports.probe,
+        effect.files,
+        effect.target,
+        effect.matchPolicy,
+        scope,
+      ).andThen((result) =>
+        applyCommand(
+          dependencies,
+          acquisitionId,
+          result.passed
+            ? { type: 'RecordValidationPassed', verdict: result.verdict }
+            : { type: 'RecordValidationFailed', verdict: result.verdict },
+          scope.context,
+        ),
       );
     }
 
     case 'Import': {
       return ports.library
-        .import(effect.files, effect.target)
+        .import(effect.files, effect.target, scope)
         .andThen((result) =>
           applyCommand(
             dependencies,
@@ -116,12 +130,15 @@ export function interpretEffect(
             result.kind === 'imported'
               ? { type: 'RecordImported', location: result.location }
               : { type: 'RecordImportConflict', location: result.location },
+            scope.context,
           ),
         );
     }
 
     case 'Cleanup': {
-      return ports.library.discardStaging(effect.files).map((): readonly StoredEvent[] => []);
+      return ports.library
+        .discardStaging(effect.files, scope)
+        .map((): readonly StoredEvent[] => []);
     }
 
     case 'AbortDownload': {
@@ -129,13 +146,18 @@ export function interpretEffect(
       // turns it into the pending candidate's rejection (staging cleanup follows via `react`); the
       // reported reason is immaterial there, so a plain `Cancelled` stands in. The abort reports the
       // subset the source already completed into staging, so its files are cleaned too (design D2).
-      return ports.download.abort(acquisitionId, effect.candidate).andThen((files) =>
-        applyCommand(dependencies, acquisitionId, {
-          type: 'RecordDownloadFailed',
-          reason: 'Cancelled',
-          files,
-          candidate: effect.candidate.identity,
-        }),
+      return ports.download.abort(acquisitionId, effect.candidate, scope).andThen((files) =>
+        applyCommand(
+          dependencies,
+          acquisitionId,
+          {
+            type: 'RecordDownloadFailed',
+            reason: 'Cancelled',
+            files,
+            candidate: effect.candidate.identity,
+          },
+          scope.context,
+        ),
       );
     }
   }

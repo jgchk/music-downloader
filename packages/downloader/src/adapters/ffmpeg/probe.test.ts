@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { testContext, testScope } from '../../application/__fixtures__/correlation.js';
 import { createLogger } from '../../application/logging/logger.js';
 import { FfmpegAudioProbe } from './probe.js';
 import type { CommandResult, CommandRunner } from './runner.js';
@@ -17,7 +17,7 @@ function ffprobeJson(streams: unknown[], format?: unknown): CommandResult {
 }
 
 function probeWith(runnerImpl: CommandRunner): FfmpegAudioProbe {
-  return new FfmpegAudioProbe(silentLogger(), runnerImpl);
+  return new FfmpegAudioProbe(runnerImpl);
 }
 
 describe('FfmpegAudioProbe', () => {
@@ -37,7 +37,7 @@ describe('FfmpegAudioProbe', () => {
       { duration: '180.5', bit_rate: '900000' },
     );
 
-    const probeResult = await probeWith(runner(meta, OK)).probe('/staging/01.flac');
+    const probeResult = await probeWith(runner(meta, OK)).probe('/staging/01.flac', testScope());
     const result = probeResult._unsafeUnwrap();
 
     expect(result).toEqual({
@@ -55,7 +55,7 @@ describe('FfmpegAudioProbe', () => {
     const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
     const decodeFailed = { code: 1, stdout: '', stderr: 'Invalid data', timedOut: false };
 
-    const probeResult2 = await probeWith(runner(meta, decodeFailed)).probe('/x.flac');
+    const probeResult2 = await probeWith(runner(meta, decodeFailed)).probe('/x.flac', testScope());
     const result = probeResult2._unsafeUnwrap();
 
     expect(result.decodedCleanly).toBe(false);
@@ -80,7 +80,10 @@ describe('FfmpegAudioProbe', () => {
       timedOut: false,
     };
 
-    const result = await new FfmpegAudioProbe(logger, runner(meta, decodeFailed)).probe('/x.flac');
+    const result = await new FfmpegAudioProbe(runner(meta, decodeFailed)).probe('/x.flac', {
+      context: testContext(),
+      logger,
+    });
 
     expect(result._unsafeUnwrap().decodedCleanly).toBe(false);
     const logged = lines.join('');
@@ -96,7 +99,10 @@ describe('FfmpegAudioProbe', () => {
     });
     const probeFailed = { code: 1, stdout: '', stderr: 'moov atom not found', timedOut: false };
 
-    const result = await new FfmpegAudioProbe(logger, runner(probeFailed, OK)).probe('/x.m4a');
+    const result = await new FfmpegAudioProbe(runner(probeFailed, OK)).probe('/x.m4a', {
+      context: testContext(),
+      logger,
+    });
 
     expect(result._unsafeUnwrap().decodedCleanly).toBe(false);
     expect(lines.join('')).toContain('moov atom not found');
@@ -108,7 +114,7 @@ describe('FfmpegAudioProbe', () => {
     // reactor-misclassified-permanent incidents). Timeouts stay infrastructure faults.
     const timedOut = { code: null, stdout: '', stderr: '', timedOut: true };
 
-    const result = await probeWith(runner(timedOut, OK)).probe('/x.flac');
+    const result = await probeWith(runner(timedOut, OK)).probe('/x.flac', testScope());
 
     const error = result._unsafeUnwrapErr();
     expect(error.kind).toBe('InfraError');
@@ -121,7 +127,7 @@ describe('FfmpegAudioProbe', () => {
     const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
     const hungDecode = { code: null, stdout: '', stderr: '', timedOut: true };
 
-    const result = await probeWith(runner(meta, hungDecode)).probe('/x.flac');
+    const result = await probeWith(runner(meta, hungDecode)).probe('/x.flac', testScope());
 
     const error = result._unsafeUnwrapErr();
     expect(error.kind).toBe('InfraError');
@@ -131,7 +137,7 @@ describe('FfmpegAudioProbe', () => {
   it('yields empty metadata when ffprobe itself fails', async () => {
     const probeFailed = { code: 1, stdout: '', stderr: 'not found', timedOut: false };
 
-    const probeResult3 = await probeWith(runner(probeFailed, OK)).probe('/x.flac');
+    const probeResult3 = await probeWith(runner(probeFailed, OK)).probe('/x.flac', testScope());
     const result = probeResult3._unsafeUnwrap();
 
     expect(result).toEqual({
@@ -148,7 +154,7 @@ describe('FfmpegAudioProbe', () => {
   it('treats a file with no audio stream as not cleanly decoded', async () => {
     const meta = ffprobeJson([{ codec_type: 'video', codec_name: 'png' }]);
 
-    const probeResult4 = await probeWith(runner(meta, OK)).probe('/cover.png');
+    const probeResult4 = await probeWith(runner(meta, OK)).probe('/cover.png', testScope());
     const result = probeResult4._unsafeUnwrap();
 
     expect(result.decodedCleanly).toBe(false);
@@ -158,7 +164,7 @@ describe('FfmpegAudioProbe', () => {
   it('handles ffprobe output with no streams at all', async () => {
     const meta = { code: 0, stdout: '{}', stderr: '', timedOut: false };
 
-    const probeResult5 = await probeWith(runner(meta, OK)).probe('/empty');
+    const probeResult5 = await probeWith(runner(meta, OK)).probe('/empty', testScope());
     const result = probeResult5._unsafeUnwrap();
 
     expect(result.decodedCleanly).toBe(false);
@@ -170,7 +176,7 @@ describe('FfmpegAudioProbe', () => {
       { duration: '200' },
     );
 
-    const probeResult6 = await probeWith(runner(meta, OK)).probe('/x.opus');
+    const probeResult6 = await probeWith(runner(meta, OK)).probe('/x.opus', testScope());
     const result = probeResult6._unsafeUnwrap();
 
     expect(result).toEqual({
@@ -187,7 +193,7 @@ describe('FfmpegAudioProbe', () => {
   it('defaults duration to zero when neither the stream nor the format declares one', async () => {
     const meta = ffprobeJson([{ codec_type: 'audio', codec_name: 'mp3' }]); // no format object
 
-    const probeResult7 = await probeWith(runner(meta, OK)).probe('/x.mp3');
+    const probeResult7 = await probeWith(runner(meta, OK)).probe('/x.mp3', testScope());
     const result = probeResult7._unsafeUnwrap();
 
     expect(result.durationMs).toBe(0);
@@ -199,7 +205,7 @@ describe('FfmpegAudioProbe', () => {
       { codec_type: 'audio', codec_name: 'alac', duration: '10', bits_per_sample: 24 },
     ]);
 
-    const probeResult = await probeWith(runner(meta, OK)).probe('/x.m4a');
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.m4a', testScope());
     const result = probeResult._unsafeUnwrap();
 
     expect(result.bitDepth).toBe(24);
@@ -210,7 +216,7 @@ describe('FfmpegAudioProbe', () => {
       { codec_type: 'audio', codec_name: 'mp3', duration: '10', bits_per_sample: 0 },
     ]);
 
-    const probeResult = await probeWith(runner(meta, OK)).probe('/x.mp3');
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.mp3', testScope());
     const result = probeResult._unsafeUnwrap();
 
     expect(result.bitDepth).toBeUndefined();
@@ -221,7 +227,7 @@ describe('FfmpegAudioProbe', () => {
       { codec_type: 'audio', codec_name: 'flac', duration: '10', sample_rate: '' },
     ]);
 
-    const probeResult = await probeWith(runner(meta, OK)).probe('/x.flac');
+    const probeResult = await probeWith(runner(meta, OK)).probe('/x.flac', testScope());
     const result = probeResult._unsafeUnwrap();
 
     expect(result.sampleRate).toBeUndefined();
@@ -232,7 +238,7 @@ describe('FfmpegAudioProbe', () => {
     // run always emits JSON) — a boundary fault to surface, not a bad-file business outcome.
     const garbage = { code: 0, stdout: 'not json at all', stderr: '', timedOut: false };
 
-    const result = await probeWith(runner(garbage, OK)).probe('/x.flac');
+    const result = await probeWith(runner(garbage, OK)).probe('/x.flac', testScope());
 
     const error = result._unsafeUnwrapErr();
     expect(error.kind).toBe('InfraError');
@@ -250,7 +256,7 @@ describe('FfmpegAudioProbe', () => {
       timedOut: false,
     };
 
-    const result = await probeWith(runner(drifted, OK)).probe('/x.flac');
+    const result = await probeWith(runner(drifted, OK)).probe('/x.flac', testScope());
 
     const error = result._unsafeUnwrapErr();
     expect(error.kind).toBe('InfraError');
@@ -263,7 +269,7 @@ describe('FfmpegAudioProbe', () => {
         Promise.reject(Object.assign(new Error('spawn ffprobe ENOENT'), { code: 'ENOENT' })),
     };
 
-    const result = await probeWith(missing).probe('/x.flac');
+    const result = await probeWith(missing).probe('/x.flac', testScope());
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',

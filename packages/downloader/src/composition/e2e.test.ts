@@ -1,3 +1,5 @@
+import type { CommandContext } from '../application/correlation/context.js';
+import { STORY, fixedCorrelation, testContext } from '../application/__fixtures__/correlation.js';
 import { ok, okAsync } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -107,12 +109,18 @@ function wire(options: E2EOptions) {
   // reactor via the store's bus publication — the composed loop under test is the shipped one.
   const downloadObserver = {
     progress: (id: string, progress: DownloadProgress) => progressModel.update(id, progress),
-    outcome: (id: string, candidate: CandidateIdentity, result: DownloadResult) =>
+    outcome: (
+      id: string,
+      candidate: CandidateIdentity,
+      result: DownloadResult,
+      context: CommandContext,
+    ) =>
       deliverDownloadOutcome(
         { store, clock: fixedClock(), logger: silentLogger() },
         id,
         candidate,
         result,
+        context,
       ),
     finished: (id: string) => progressModel.clear(id),
   };
@@ -139,6 +147,7 @@ function wire(options: E2EOptions) {
               acquisitionId,
               candidate.identity,
               result,
+              testContext(),
             );
             if (delivered.isOk()) {
               downloadObserver.finished(acquisitionId);
@@ -165,6 +174,7 @@ function wire(options: E2EOptions) {
     deadLetters: new SqliteDeadLetterStore(database),
     stalled: stalledModel,
     logger: silentLogger(),
+    correlation: fixedCorrelation(),
     interpreter,
     clock: fixedClock(),
     interval: (function_, ms) => {
@@ -180,6 +190,7 @@ function wire(options: E2EOptions) {
     store,
     clock: fixedClock(),
     ids: sequentialIds(),
+    correlation: fixedCorrelation(),
     status,
     progress: progressModel,
     stalled: stalledModel,
@@ -220,7 +231,7 @@ async function startApp(options: E2EOptions) {
 }
 
 async function submit(facade: ReturnType<typeof createDownloaderFacade>): Promise<string> {
-  const result = await facade.submitAcquisition(SUBMIT_BODY);
+  const result = await facade.submitAcquisition(SUBMIT_BODY, STORY);
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error('unreachable');
   return result.value.acquisitionId;
@@ -286,7 +297,7 @@ describe('acquisition E2E', () => {
     // The abandoned candidate's already-completed files are discarded from staging — no residue —
     // via the same cleanup path a rejected candidate uses (D2).
     await vi.waitFor(() => {
-      expect(w.discardStaging).toHaveBeenCalledWith(PARTIAL_FILES);
+      expect(w.discardStaging).toHaveBeenCalledWith(PARTIAL_FILES, expect.anything());
     });
     // The abandonment was still recorded as a failure with its reason, not swallowed.
     expect(w.status.get(id)!.history.some((entry) => entry.kind === 'download-failed')).toBe(true);
@@ -312,7 +323,7 @@ describe('acquisition E2E', () => {
     await settle(w, id, 'Conflicted');
     // The conflicted candidate's staged files must not be left orphaned in staging.
     await vi.waitFor(() => {
-      expect(w.discardStaging).toHaveBeenCalledWith(DOWNLOADED_FILES);
+      expect(w.discardStaging).toHaveBeenCalledWith(DOWNLOADED_FILES, expect.anything());
     });
   });
 

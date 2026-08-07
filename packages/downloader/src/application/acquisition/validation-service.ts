@@ -9,6 +9,7 @@ import {
 import { combineVerdict, isVerdictPassing } from '../../domain/validation/verdict.js';
 import type { ValidationVerdict } from '../../domain/validation/verdict.js';
 import type { InfraError } from '../ports/errors.js';
+import type { OperationScope } from '../correlation/context.js';
 import type { AudioProbePort } from '../ports/outbound-ports.js';
 
 /**
@@ -25,8 +26,9 @@ export function runValidation(
   files: readonly DownloadedFile[],
   target: Target,
   matchPolicy: MatchPolicy,
+  scope: OperationScope,
 ): ResultAsync<ValidationResult, InfraError> {
-  return ResultAsync.combine(files.map((file) => probe.probe(file.path))).map((probes) => {
+  return ResultAsync.combine(files.map((file) => probe.probe(file.path, scope))).map((probes) => {
     const verdict = combineVerdict([
       playabilityValidator(probes),
       structuralIdentityValidator(probes, target),

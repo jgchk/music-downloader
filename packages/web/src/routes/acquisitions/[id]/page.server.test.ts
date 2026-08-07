@@ -15,6 +15,9 @@ const base = {
 const logger = { warn: vi.fn(), error: vi.fn() };
 
 /** The default import read: no import yet for this acquisition (the `NotFound` → `none` path). */
+/** The story the `handle` hook would have minted for this request. */
+const STORY = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
 const noImport = { getImportForAcquisition: () => ({ ok: false, error: { kind: 'NotFound' } }) };
 
 function eventFor(facade: Record<string, unknown>, importer: Record<string, unknown> = noImport) {
@@ -26,6 +29,7 @@ function eventFor(facade: Record<string, unknown>, importer: Record<string, unkn
         importer: importer as unknown as ImporterFacade,
       },
       logger,
+      correlationId: STORY,
       now: () => '2026-08-01T12:00:00Z',
     },
   } as never;
@@ -36,7 +40,10 @@ function selectEventFor(facade: Record<string, unknown>, releaseMbid: string) {
   data.set('releaseMbid', releaseMbid);
   return {
     params: { id: 'acq-1' },
-    locals: { facades: { downloader: facade as unknown as DownloaderFacade } },
+    locals: {
+      facades: { downloader: facade as unknown as DownloaderFacade },
+      correlationId: STORY,
+    },
     request: { formData: () => Promise.resolve(data) },
   } as never;
 }
@@ -209,7 +216,7 @@ describe('cancel action', () => {
     await expect(actions.cancel!(eventFor({ cancelAcquisition }))).rejects.toSatisfy(
       (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-1',
     );
-    expect(cancelAcquisition).toHaveBeenCalledWith({ id: 'acq-1' });
+    expect(cancelAcquisition).toHaveBeenCalledWith({ id: 'acq-1' }, expect.any(String));
   });
 
   it('surfaces a modeled cancel failure', async () => {
@@ -234,7 +241,10 @@ describe('select action', () => {
     await expect(actions.select!(selectEventFor({ selectEdition }, 'boot-1'))).rejects.toSatisfy(
       (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-1',
     );
-    expect(selectEdition).toHaveBeenCalledWith({ id: 'acq-1', releaseMbid: 'boot-1' });
+    expect(selectEdition).toHaveBeenCalledWith(
+      { id: 'acq-1', releaseMbid: 'boot-1' },
+      expect.any(String),
+    );
   });
 
   it('passes a malformed post (no releaseMbid) through as an empty selection for the facade to refuse', async () => {
@@ -244,12 +254,18 @@ describe('select action', () => {
     });
     const event = {
       params: { id: 'acq-1' },
-      locals: { facades: { downloader: { selectEdition } as unknown as DownloaderFacade } },
+      locals: {
+        facades: { downloader: { selectEdition } as unknown as DownloaderFacade },
+        correlationId: STORY,
+      },
       request: { formData: () => Promise.resolve(new FormData()) },
     } as never;
     const result = (await actions.select!(event)) as { status: number };
     expect(result.status).toBe(400);
-    expect(selectEdition).toHaveBeenCalledWith({ id: 'acq-1', releaseMbid: '' });
+    expect(selectEdition).toHaveBeenCalledWith(
+      { id: 'acq-1', releaseMbid: '' },
+      expect.any(String),
+    );
   });
 
   it('surfaces the modeled rejection for an off-menu selection', async () => {

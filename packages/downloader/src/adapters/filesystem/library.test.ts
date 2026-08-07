@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { silentLogger } from '../../application/__fixtures__/fakes.js';
+import { testScope } from '../../application/__fixtures__/correlation.js';
 import type { DownloadedFile } from '../../domain/acquisition/events.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
@@ -48,9 +48,9 @@ describe('FilesystemLibrary.import', () => {
   it('organizes validated files into the policy path and clears staging', async () => {
     const ws = await workspace();
     const files = [await ws.stage('01.flac'), await ws.stage('02.flac')];
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const importResult = await library.import(files, TARGET);
+    const importResult = await library.import(files, TARGET, testScope());
     const result = importResult._unsafeUnwrap();
 
     const expected = path.join(ws.libraryRoot, 'The_Band', 'Great_Album_(2020)');
@@ -65,9 +65,9 @@ describe('FilesystemLibrary.import', () => {
     await mkdir(location, { recursive: true });
     await writeFile(path.join(location, 'existing.flac'), 'original');
     const file = await ws.stage('01.flac');
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const importResult2 = await library.import([file], TARGET);
+    const importResult2 = await library.import([file], TARGET, testScope());
     const result = importResult2._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'conflict', location });
@@ -83,9 +83,9 @@ describe('FilesystemLibrary.import', () => {
       rename: () =>
         Promise.reject(Object.assign(new Error('cross-device link'), { code: 'EXDEV' })),
     };
-    const library = new FilesystemLibrary(ws, silentLogger(), exdevFs);
+    const library = new FilesystemLibrary(ws, exdevFs);
 
-    const importResult3 = await library.import([file], TARGET);
+    const importResult3 = await library.import([file], TARGET, testScope());
     const result = importResult3._unsafeUnwrap();
 
     const expected = path.join(ws.libraryRoot, 'The_Band', 'Great_Album_(2020)');
@@ -100,9 +100,9 @@ describe('FilesystemLibrary.import', () => {
       path: path.join(ws.stagingRoot, 'missing.flac'),
       name: 'missing.flac',
     };
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const result = await library.import([missing], TARGET);
+    const result = await library.import([missing], TARGET, testScope());
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -131,9 +131,9 @@ describe('FilesystemLibrary.discardStaging', () => {
   it('removes exactly the given files and prunes their emptied directory', async () => {
     const ws = await workspace();
     const files = await stageLeaf(ws.stagingRoot, ['01.flac', '02.flac']);
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const discardStagingResult = await library.discardStaging(files);
+    const discardStagingResult = await library.discardStaging(files, testScope());
     discardStagingResult._unsafeUnwrap();
 
     expect(existsSync(files[0]!.path)).toBe(false);
@@ -145,9 +145,9 @@ describe('FilesystemLibrary.discardStaging', () => {
     const [ours] = await stageLeaf(ws.stagingRoot, ['01.flac']);
     const others = path.join(ws.stagingRoot, 'Some Album', 'another.flac');
     await writeFile(others, 'not ours');
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const discardStagingResult2 = await library.discardStaging([ours!]);
+    const discardStagingResult2 = await library.discardStaging([ours!], testScope());
     discardStagingResult2._unsafeUnwrap();
 
     expect(existsSync(ours!.path)).toBe(false);
@@ -159,9 +159,9 @@ describe('FilesystemLibrary.discardStaging', () => {
     const leaf = path.join(ws.stagingRoot, 'Some Album');
     await mkdir(leaf, { recursive: true }); // emptied by import — the files no longer exist
     const files: DownloadedFile[] = [{ path: path.join(leaf, '01.flac'), name: '01.flac' }];
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const discardStagingResult3 = await library.discardStaging(files);
+    const discardStagingResult3 = await library.discardStaging(files, testScope());
     discardStagingResult3._unsafeUnwrap();
 
     expect(existsSync(leaf)).toBe(false);
@@ -172,9 +172,9 @@ describe('FilesystemLibrary.discardStaging', () => {
     const files: DownloadedFile[] = [
       { path: path.join(ws.stagingRoot, 'Gone', '01.flac'), name: '01.flac' },
     ];
-    const library = new FilesystemLibrary(ws, silentLogger());
+    const library = new FilesystemLibrary(ws);
 
-    const discardStagingResult4 = await library.discardStaging(files);
+    const discardStagingResult4 = await library.discardStaging(files, testScope());
     expect(discardStagingResult4.isOk()).toBe(true);
   });
 
@@ -184,11 +184,12 @@ describe('FilesystemLibrary.discardStaging', () => {
       ...nodeLibraryFileSystem,
       rmFile: () => Promise.reject(new Error('permission denied')),
     };
-    const library = new FilesystemLibrary(ws, silentLogger(), failing);
+    const library = new FilesystemLibrary(ws, failing);
 
-    const result = await library.discardStaging([
-      { path: path.join(ws.stagingRoot, 'x', '01.flac'), name: '01.flac' },
-    ]);
+    const result = await library.discardStaging(
+      [{ path: path.join(ws.stagingRoot, 'x', '01.flac'), name: '01.flac' }],
+      testScope(),
+    );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -203,9 +204,9 @@ describe('FilesystemLibrary.discardStaging', () => {
       ...nodeLibraryFileSystem,
       rmdir: () => Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' })),
     };
-    const library = new FilesystemLibrary(ws, silentLogger(), failing);
+    const library = new FilesystemLibrary(ws, failing);
 
-    const result = await library.discardStaging(files);
+    const result = await library.discardStaging(files, testScope());
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',

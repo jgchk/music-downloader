@@ -1,3 +1,4 @@
+import { testScope } from '../../src/application/__fixtures__/correlation.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MusicBrainzMetadata } from '../../src/adapters/musicbrainz/metadata.js';
 import {
@@ -11,7 +12,6 @@ import {
 import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
 import type { Mbid } from '../../src/domain/shared/mbid.js';
 import { parseMbid } from '../../src/domain/shared/mbid.js';
-import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { loadFixtures } from './support/fixture.js';
 import type { ContractFixture } from './support/fixture.js';
 import { startFixtureServer } from './support/server.js';
@@ -46,7 +46,7 @@ const mbidFromPath = (name: string): Mbid =>
 let server: FixtureServer;
 
 function adapter(): MusicBrainzMetadata {
-  return new MusicBrainzMetadata(silentLogger(), undefined, {
+  return new MusicBrainzMetadata(undefined, {
     baseUrl: server.baseUrl,
     userAgent: USER_AGENT,
   });
@@ -64,7 +64,7 @@ describe('MusicBrainz contract (tier 1)', () => {
     const mbid = mbidFromPath('release-lookup.json');
     const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'album' };
 
-    const resolution = await adapter().resolve(request);
+    const resolution = await adapter().resolve(request, testScope());
     const result = resolution._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { type: 'album', mbid } });
@@ -80,7 +80,7 @@ describe('MusicBrainz contract (tier 1)', () => {
     const mbid = mbidFromPath('recording-lookup.json');
     const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'track' };
 
-    const resolution = await adapter().resolve(request);
+    const resolution = await adapter().resolve(request, testScope());
     const result = resolution._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { type: 'track', mbid } });
@@ -103,12 +103,15 @@ describe('MusicBrainz contract (tier 1)', () => {
     const RESOLVED_EDITION = 'be701edc-c9c7-484a-9ed2-aeef051c19be';
     expect(mbidFromPath('release-lookup.json')).toBe(RESOLVED_EDITION);
 
-    const resolution = await adapter().resolve({
-      kind: 'descriptor',
-      targetType: 'album',
-      artist: 'Pink Floyd',
-      title: 'The Dark Side of the Moon',
-    });
+    const resolution = await adapter().resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'Pink Floyd',
+        title: 'The Dark Side of the Moon',
+      },
+      testScope(),
+    );
     const result = resolution._unsafeUnwrap();
 
     const search = server.requests.find((r) => r.path === '/release')!;
@@ -130,12 +133,15 @@ describe('MusicBrainz contract (tier 1)', () => {
     expect(recordings).toHaveLength(5);
     expect(recordings?.every((recording) => recording.score === 100)).toBe(true);
 
-    const resolution = await adapter().resolve({
-      kind: 'descriptor',
-      targetType: 'track',
-      artist: 'Nirvana',
-      title: 'Smells Like Teen Spirit',
-    });
+    const resolution = await adapter().resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'track',
+        artist: 'Nirvana',
+        title: 'Smells Like Teen Spirit',
+      },
+      testScope(),
+    );
     const result = resolution._unsafeUnwrap();
 
     const search = server.requests.find((r) => r.path === '/recording')!;
@@ -160,7 +166,7 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
   });
 
   function rgAdapter(): MusicBrainzMetadata {
-    return new MusicBrainzMetadata(silentLogger(), undefined, {
+    return new MusicBrainzMetadata(undefined, {
       baseUrl: rgServer.baseUrl,
       userAgent: USER_AGENT,
     });
@@ -178,7 +184,7 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
       mbid: releaseGroupMbid,
       targetType: 'album',
     };
-    const resolution = await rgAdapter().resolve(request);
+    const resolution = await rgAdapter().resolve(request, testScope());
     const result = resolution._unsafeUnwrap();
 
     const browse = rgServer.requests.find((r) => r.path === '/release')!;
@@ -210,15 +216,18 @@ describe('MusicBrainz release-group no-official contract (tier 1)', () => {
     const expected = releaseGroupEditionCandidates(releases);
     expect(expected.length).toBeGreaterThan(0);
 
-    const adapter = new MusicBrainzMetadata(silentLogger(), undefined, {
+    const adapter = new MusicBrainzMetadata(undefined, {
       baseUrl: rgServer.baseUrl,
       userAgent: USER_AGENT,
     });
-    const resolution = await adapter.resolve({
-      kind: 'release-group',
-      mbid: releaseGroupMbid,
-      targetType: 'album',
-    });
+    const resolution = await adapter.resolve(
+      {
+        kind: 'release-group',
+        mbid: releaseGroupMbid,
+        targetType: 'album',
+      },
+      testScope(),
+    );
     const result = resolution._unsafeUnwrap();
 
     const browse = rgServer.requests.find((r) => r.path === '/release')!;

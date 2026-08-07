@@ -3,9 +3,10 @@ import type { ResultAsync } from 'neverthrow';
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { DomainError } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
+import type { CommandContext } from '../correlation/context.js';
 import type {
   AppendError,
-  EventMetadata,
+  AppendMetadata,
   EventStorePort,
   StoredEvent,
 } from '../ports/event-store-port.js';
@@ -35,14 +36,16 @@ export function applyCommand(
   dependencies: CommandDependencies,
   acquisitionId: string,
   command: AcquisitionCommand,
+  context: CommandContext,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
-  return attemptCommand(dependencies, acquisitionId, command, OPTIMISTIC_ATTEMPTS);
+  return attemptCommand(dependencies, acquisitionId, command, context, OPTIMISTIC_ATTEMPTS);
 }
 
 function attemptCommand(
   dependencies: CommandDependencies,
   acquisitionId: string,
   command: AcquisitionCommand,
+  context: CommandContext,
   attemptsLeft: number,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   return dependencies.store.readStream(acquisitionId).andThen((stored) => {
@@ -50,15 +53,22 @@ function attemptCommand(
     const decision = acquisition.execute(command);
     if (decision.isErr()) return errAsync(decision.error);
     if (decision.value.length === 0) return okAsync<readonly StoredEvent[], CommandError>([]);
-    const metadata: EventMetadata = {
+    // ONE metadata per decision, so every event of this batch shares ONE causation: the command
+    // that decided them is their common parent. Chaining event-to-event inside a batch would
+    // invent a causal order the decider never expressed.
+    const metadata: AppendMetadata = {
       acquisitionId,
       occurredAt: dependencies.clock.now().toISOString(),
+      correlationId: context.correlationId,
+      causation: context.causation,
     };
     return dependencies.store
       .append(acquisitionId, stored.length, decision.value, metadata)
       .orElse((error) =>
         error.kind === 'ConcurrencyConflict' && attemptsLeft > 1
-          ? attemptCommand(dependencies, acquisitionId, command, attemptsLeft - 1)
+          ? // The re-decide is the SAME unit of work, so it keeps the same context: a lost race
+            // must not fork the story into a second one.
+            attemptCommand(dependencies, acquisitionId, command, context, attemptsLeft - 1)
           : errAsync<readonly StoredEvent[], CommandError>(error),
       );
   });

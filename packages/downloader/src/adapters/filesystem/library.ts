@@ -7,6 +7,7 @@ import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { ImportResult, LibraryPort } from '../../application/ports/outbound-ports.js';
 import type { Logger } from '../../application/logging/logger.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import { renderReleaseDirectory } from './paths.js';
 
 /**
@@ -59,18 +60,24 @@ export interface LibraryConfig {
 export class FilesystemLibrary implements LibraryPort {
   constructor(
     private readonly config: LibraryConfig,
-    private readonly logger: Logger,
     private readonly fs: LibraryFileSystem = nodeLibraryFileSystem,
   ) {}
 
-  import(files: readonly DownloadedFile[], target: Target): ResultAsync<ImportResult, InfraError> {
-    return ResultAsync.fromPromise(this.runImport(files, target), (cause) =>
+  import(
+    files: readonly DownloadedFile[],
+    target: Target,
+    scope: OperationScope,
+  ): ResultAsync<ImportResult, InfraError> {
+    return ResultAsync.fromPromise(this.runImport(files, target, scope.logger), (cause) =>
       infraError('library.import', String(cause), cause),
     );
   }
 
-  discardStaging(files: readonly DownloadedFile[]): ResultAsync<void, InfraError> {
-    this.logger.debug({ fileCount: files.length }, 'discarding staged files');
+  discardStaging(
+    files: readonly DownloadedFile[],
+    scope: OperationScope,
+  ): ResultAsync<void, InfraError> {
+    scope.logger.debug({ fileCount: files.length }, 'discarding staged files');
     return ResultAsync.fromPromise(this.runDiscard(files), (cause) =>
       infraError('library.discardStaging', String(cause), cause),
     );
@@ -96,17 +103,21 @@ export class FilesystemLibrary implements LibraryPort {
     }
   }
 
-  private async runImport(files: readonly DownloadedFile[], target: Target): Promise<ImportResult> {
+  private async runImport(
+    files: readonly DownloadedFile[],
+    target: Target,
+    logger: Logger,
+  ): Promise<ImportResult> {
     const location = path.join(this.config.libraryRoot, renderReleaseDirectory(target));
     if (await this.fs.exists(location)) {
-      this.logger.warn({ location }, 'library import conflict; leaving existing release untouched');
+      logger.warn({ location }, 'library import conflict; leaving existing release untouched');
       return { kind: 'conflict', location };
     }
     await this.fs.mkdir(location);
     for (const file of files) {
       await this.moveInto(file, location);
     }
-    this.logger.debug({ location, fileCount: files.length }, 'imported release');
+    logger.debug({ location, fileCount: files.length }, 'imported release');
     return { kind: 'imported', location };
   }
 

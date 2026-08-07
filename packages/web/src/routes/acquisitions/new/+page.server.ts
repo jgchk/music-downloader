@@ -11,7 +11,10 @@ import type { Actions } from './$types';
 export const actions: Actions = {
   default: async ({ request, locals }) => {
     const data = await request.formData();
-    const result = await locals.facades.downloader.submitAcquisition(submitAcquisitionForm(data));
+    const result = await locals.facades.downloader.submitAcquisition(
+      submitAcquisitionForm(data),
+      locals.correlationId,
+    );
     if (!result.ok) {
       return fail(statusOf(result.error), {
         message: messageOf(result.error),

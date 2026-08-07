@@ -1,3 +1,5 @@
+import { fixedClock } from '../../application/__fixtures__/fakes.js';
+import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
 import {
@@ -28,10 +30,12 @@ function verdictEvent(overrides: { data?: unknown; type?: string } = {}): SeamEv
 
 async function fulfilledWiring(): Promise<TestWiring> {
   const wiring = testWiring();
-  await wiring.store.append('acq-9', 0, fulfilledHistory([a, b]), {
-    acquisitionId: 'acq-9',
-    occurredAt: 't',
-  });
+  await wiring.store.append(
+    'acq-9',
+    0,
+    fulfilledHistory([a, b]),
+    appendMetadata('acq-9', fixedClock()),
+  );
   wiring.sync();
   return wiring;
 }

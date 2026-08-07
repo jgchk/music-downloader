@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { err, ok } from 'neverthrow';
@@ -36,7 +36,7 @@ import { deliverDownloadOutcome } from '../application/acquisition/download-outc
 import type { DownloadObserverPort } from '../application/ports/outbound-ports.js';
 import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
-import type { Clock, IdGenerator } from '../application/ports/system-ports.js';
+import type { Clock, CorrelationSource, IdGenerator } from '../application/ports/system-ports.js';
 import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
@@ -92,6 +92,7 @@ export interface DownloaderRuntimeOverrides {
   readonly ports?: (observer: DownloadObserverPort) => EffectPorts;
   readonly clock?: Clock;
   readonly ids?: IdGenerator;
+  readonly correlation?: CorrelationSource;
   /** Test seam: swap the dead-letter store (e.g. to prove boot survives its faults). */
   readonly deadLetters?: DeadLetterStore;
   /**
@@ -149,6 +150,11 @@ export async function createDownloaderRuntime(
 ): Promise<Result<DownloaderRuntime, DownloaderStartupError>> {
   const clock = overrides.clock ?? { now: () => new Date() };
   const ids = overrides.ids ?? { next: () => randomUUID() };
+  // 32 lowercase hex = a W3C trace id. Chosen so a later OpenTelemetry adoption can carry this
+  // exact value as its trace id instead of minting a parallel one (operation-correlation D1).
+  const correlation: CorrelationSource = overrides.correlation ?? {
+    mint: () => randomBytes(16).toString('hex'),
+  };
 
   mkdirSync(path.dirname(config.databaseFile), { recursive: true });
   const database = openEventDatabase(config.databaseFile);
@@ -203,8 +209,10 @@ export async function createDownloaderRuntime(
     progress: (acquisitionId, progress) => {
       progressModel.update(acquisitionId, progress);
     },
-    outcome: (acquisitionId, candidate, result) =>
-      deliverDownloadOutcome({ store, clock, logger }, acquisitionId, candidate, result),
+    outcome: (acquisitionId, candidate, result, context) =>
+      // `context` is the supervisor's PINNED watch context, so the settled outcome re-enters the
+      // core on the story that started the download rather than opening a new one.
+      deliverDownloadOutcome({ store, clock, logger }, acquisitionId, candidate, result, context),
     finished: (acquisitionId) => {
       progressModel.clear(acquisitionId);
     },
@@ -225,19 +233,19 @@ export async function createDownloaderRuntime(
       realTimer,
     );
     ports = {
-      metadata: new MusicBrainzMetadata(logger, fetchHttpClient, {
+      metadata: new MusicBrainzMetadata(fetchHttpClient, {
         baseUrl: config.musicbrainz.baseUrl,
         userAgent: config.musicbrainz.userAgent,
       }),
-      search: new SlskdSearch(logger, ledger, slskdClient, realTimer),
+      search: new SlskdSearch(ledger, slskdClient, realTimer),
       download: slskdDownload,
-      probe: new FfmpegAudioProbe(logger, nodeCommandRunner, {
+      probe: new FfmpegAudioProbe(nodeCommandRunner, {
         timeoutMs: config.ffmpeg?.timeoutMs,
       }),
-      library: new FilesystemLibrary(
-        { libraryRoot: config.libraryRoot, stagingRoot: config.stagingRoot },
-        logger,
-      ),
+      library: new FilesystemLibrary({
+        libraryRoot: config.libraryRoot,
+        stagingRoot: config.stagingRoot,
+      }),
     };
   } else {
     ports = overrides.ports(downloadObserver);
@@ -259,6 +267,7 @@ export async function createDownloaderRuntime(
     deadLetters,
     stalled: stalledModel,
     logger,
+    correlation,
     interpreter,
     clock,
     // The ambient effects the reactor runs on are chosen here, not in the application layer.
@@ -284,6 +293,7 @@ export async function createDownloaderRuntime(
     store,
     clock,
     ids,
+    correlation,
     status,
     progress: progressModel,
     stalled: stalledModel,

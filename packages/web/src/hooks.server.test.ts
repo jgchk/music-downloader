@@ -5,7 +5,8 @@ import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session
 const bootRuntimes = vi.fn(() => Promise.resolve());
 const facadesOf = vi.fn(() => ({ downloader: {}, importer: {} }));
 const access = { sessionSecret: 'hook-test-secret', plex: {} };
-const logger = { warn: vi.fn(), error: vi.fn() };
+const child = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+const logger = { warn: vi.fn(), error: vi.fn(), child: vi.fn(() => child) };
 vi.mock('$env/dynamic/private', () => ({ env: { LIBRARY_ROOT: '/library' } }));
 vi.mock('$lib/server/runtime.js', () => ({
   bootRuntimes: (...arguments_: unknown[]) => bootRuntimes(...(arguments_ as [])),
@@ -61,7 +62,7 @@ describe('server hooks', () => {
     const result = await handle({ event, resolve });
 
     expect(event.locals.facades).toEqual({ downloader: {}, importer: {} });
-    expect(event.locals.logger).toBe(logger);
+    expect(event.locals.logger).toBe(child);
     expect(event.locals.access).toBe(access);
     // The injected wall clock — the one impure edge loads read time through.
     expect(event.locals.now()).toMatch(/^\d{4}-\d{2}-\d{2}T/);
@@ -88,7 +89,7 @@ describe('server hooks', () => {
     expectLoginRedirect(() =>
       handle({ event: gateEvent('/acquisitions', { cookie: 'forged' }), resolve: vi.fn() }),
     );
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(child.warn).toHaveBeenCalledWith(
       { pathname: '/acquisitions' },
       expect.stringContaining('failed verification'),
     );
@@ -126,7 +127,7 @@ describe('server hooks', () => {
     expect(response.status).toBe(403);
     expect(resolve).not.toHaveBeenCalled();
     // An unauthenticated write attempt is an operator-visible event, not a silent bounce.
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(child.warn).toHaveBeenCalledWith(
       { pathname: '/acquisitions/new', method: 'POST' },
       expect.stringContaining('refused'),
     );
@@ -183,5 +184,43 @@ describe('server hooks', () => {
       },
       expect.stringMatching(/\S/),
     );
+  });
+});
+
+describe('handle — operation correlation', () => {
+  /** A gate event that passes the session check, so `handle` runs to completion. */
+  const openEvent = (): RequestEvent => gateEvent('/health');
+
+  it('mints one story per request and exposes it on locals', async () => {
+    const first = openEvent();
+    const second = openEvent();
+
+    await handle({ event: first, resolve: () => new Response('ok') });
+    await handle({ event: second, resolve: () => new Response('ok') });
+
+    expect(first.locals.correlationId).toMatch(/^[0-9a-f]{32}$/);
+    expect(second.locals.correlationId).toMatch(/^[0-9a-f]{32}$/);
+    expect(first.locals.correlationId).not.toBe(second.locals.correlationId);
+  });
+
+  it('binds the story onto the request logger so every line of one request shares it', async () => {
+    const event = openEvent();
+
+    await handle({ event, resolve: () => new Response('ok') });
+
+    expect(logger.child).toHaveBeenCalledWith({ correlationId: event.locals.correlationId });
+    expect(event.locals.logger).toBe(child);
+  });
+
+  it('does not adopt an inbound traceparent — the story is ours to mint', async () => {
+    // Non-goal by design: trusting a caller's id would let anyone forge or merge our stories.
+    const event = gateEvent('/health');
+    (event.request as unknown as { headers: Headers }).headers = new Headers({
+      traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
+    });
+
+    await handle({ event, resolve: () => new Response('ok') });
+
+    expect(event.locals.correlationId).not.toBe('11111111111111111111111111111111');
   });
 });

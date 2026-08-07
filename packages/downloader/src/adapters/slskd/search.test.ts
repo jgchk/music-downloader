@@ -1,5 +1,6 @@
+import { testScope } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
-import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
+import { FakeResourceLedger } from '../../application/__fixtures__/fakes.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import type { HttpClient, HttpRequest, HttpResponse } from '../support/http.js';
@@ -54,13 +55,10 @@ interface Harness {
 function searcher(routes: Routes, timeoutMs = 15_000): Harness {
   const ledger = new FakeResourceLedger();
   const requests: HttpRequest[] = [];
-  const adapter = new SlskdSearch(
-    silentLogger(),
-    ledger,
-    new SlskdClient(httpFor(routes, requests)),
-    fakeTimer(),
-    { pollIntervalMs: 10, searchTimeoutMs: timeoutMs },
-  );
+  const adapter = new SlskdSearch(ledger, new SlskdClient(httpFor(routes, requests)), fakeTimer(), {
+    pollIntervalMs: 10,
+    searchTimeoutMs: timeoutMs,
+  });
   return { adapter, ledger, requests };
 }
 
@@ -92,7 +90,7 @@ describe('SlskdSearch', () => {
       responses: json(albumResponses),
     });
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toEqual([
       {
@@ -110,7 +108,12 @@ describe('SlskdSearch', () => {
   });
 
   it('returns an empty list when the search finds nothing', async () => {
-    const result = await searcher({ responses: json([]) }).adapter.search(ACQ, albumTarget, 1);
+    const result = await searcher({ responses: json([]) }).adapter.search(
+      ACQ,
+      albumTarget,
+      1,
+      testScope(),
+    );
 
     expect(result._unsafeUnwrap()).toEqual([]);
   });
@@ -123,7 +126,7 @@ describe('SlskdSearch', () => {
         return json({ isComplete: polls >= 2 });
       },
       responses: json(albumResponses),
-    }).adapter.search(ACQ, albumTarget, 2);
+    }).adapter.search(ACQ, albumTarget, 2, testScope());
 
     expect(polls).toBe(2);
     expect(result._unsafeUnwrap()).toHaveLength(1);
@@ -135,7 +138,7 @@ describe('SlskdSearch', () => {
       0,
     );
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     // An unconfirmed search is a truncated read, not an empty result: slskd persists responses
     // only at finalization, so harvesting now would report "nothing exists" for a running search.
@@ -155,6 +158,7 @@ describe('SlskdSearch', () => {
       ACQ,
       albumTarget,
       1,
+      testScope(),
     );
 
     expect(result._unsafeUnwrapErr().message).toContain('state=unknown, responseCount=unknown');
@@ -166,7 +170,7 @@ describe('SlskdSearch', () => {
       responses: json([]),
     });
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     const error = result._unsafeUnwrapErr();
     expect(error).toMatchObject({ kind: 'InfraError', operation: 'slskd.search' });
@@ -181,7 +185,7 @@ describe('SlskdSearch', () => {
       responses: json([]),
     });
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toEqual([]);
     expect(deletedSearchIds(requests)).toEqual(['s1']);
@@ -192,7 +196,7 @@ describe('SlskdSearch', () => {
     const result = await searcher({
       state: () => json({ isComplete: true }),
       responses: json([]),
-    }).adapter.search(ACQ, albumTarget, 1);
+    }).adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toEqual([]);
   });
@@ -202,7 +206,7 @@ describe('SlskdSearch', () => {
     async ({ body }) => {
       const { adapter, ledger, requests } = searcher({ create: json(body) });
 
-      const result = await adapter.search(ACQ, albumTarget, 1);
+      const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
       // An id-less create is an incoherent read — the search could never be polled or swept.
       const error = result._unsafeUnwrapErr();
@@ -218,20 +222,19 @@ describe('SlskdSearch', () => {
     const result = await searcher({
       state: () => json({ isComplete: true, responseCount: 180 }),
       responses: json(albumResponses),
-    }).adapter.search(ACQ, albumTarget, 1);
+    }).adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toHaveLength(1);
   });
 
   it("defaults the deadline to 60s, above slskd's own search duration", async () => {
     const search = new SlskdSearch(
-      silentLogger(),
       new FakeResourceLedger(),
       new SlskdClient(httpFor({ state: () => json({ isComplete: false }) }, [])),
       fakeTimer(),
     );
 
-    const result = await search.search(ACQ, albumTarget, 1);
+    const result = await search.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrapErr().message).toContain('60000ms');
   });
@@ -242,7 +245,7 @@ describe('SlskdSearch', () => {
       del: { status: 500, body: 'boom' },
     });
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toHaveLength(1);
     // The delete was attempted but failed, so the ledger row is left live for the sweep.
@@ -254,7 +257,7 @@ describe('SlskdSearch', () => {
     const { adapter, ledger } = searcher({ responses: json(albumResponses) });
     ledger.fail = true;
 
-    const result = await adapter.search(ACQ, albumTarget, 1);
+    const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toHaveLength(1);
     expect(ledger.created).toEqual([]); // recording was attempted but swallowed
@@ -262,19 +265,23 @@ describe('SlskdSearch', () => {
 
   it('falls back to default poll and timeout config', async () => {
     const search = new SlskdSearch(
-      silentLogger(),
       new FakeResourceLedger(),
       new SlskdClient(httpFor({ responses: json(albumResponses) }, [])),
       fakeTimer(),
     );
 
-    const result = await search.search(ACQ, albumTarget, 1);
+    const result = await search.search(ACQ, albumTarget, 1, testScope());
 
     expect(result._unsafeUnwrap()).toHaveLength(1);
   });
 
   it('surfaces an unexpected HTTP status as an InfraError', async () => {
-    const result = await searcher({ create: json({}, 503) }).adapter.search(ACQ, albumTarget, 1);
+    const result = await searcher({ create: json({}, 503) }).adapter.search(
+      ACQ,
+      albumTarget,
+      1,
+      testScope(),
+    );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -287,6 +294,7 @@ describe('SlskdSearch', () => {
       ACQ,
       albumTarget,
       1,
+      testScope(),
     );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({

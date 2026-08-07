@@ -1,3 +1,5 @@
+import { fixedClock } from '../__fixtures__/fakes.js';
+import { appendMetadata } from '../__fixtures__/correlation.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SourceResourceSweep } from './sweep.js';
@@ -54,7 +56,7 @@ async function seed(acquisitionId: string, isTerminal: boolean): Promise<void> {
   const history = isTerminal
     ? [...selectedHistory([a]), { type: 'AcquisitionCancelled' as const }]
     : selectedHistory([a]);
-  await store.append(acquisitionId, 0, history, { acquisitionId, occurredAt: 't' });
+  await store.append(acquisitionId, 0, history, appendMetadata(acquisitionId, fixedClock()));
   await ledger.recordCreated(resource(acquisitionId));
 }
 
