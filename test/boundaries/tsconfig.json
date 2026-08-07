@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "allowJs": true
+    "allowJs": true,
+    "allowImportingTsExtensions": true
   },
-  "include": [".", "../../eslint.config.js"]
+  "include": [".", "../../eslint.config.js", "../../stryker.config.mjs"]
 }

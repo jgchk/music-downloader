@@ -48,7 +48,7 @@ NAMES=(
   web
   test
   contract
-  release
+  tooling
   bridge
 )
 declare -A COMMANDS=(
@@ -62,7 +62,7 @@ declare -A COMMANDS=(
   ["web"]="pnpm --dir packages/web run check:svelte && pnpm --dir packages/web run build"
   ["test"]="pnpm run test:cov"
   ["contract"]="pnpm run test:contract"
-  ["release"]="pnpm run test:release"
+  ["tooling"]="pnpm run test:tooling"
   ["bridge"]="pnpm run test:bridge"
 )
 

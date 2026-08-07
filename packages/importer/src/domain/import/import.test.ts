@@ -115,6 +115,52 @@ describe('submission', () => {
     expect(landed[0]).toMatchObject({ type: 'ImportRequested', source: { feedPosition: 6 } });
   });
 
+  it('advances the watermark as a cycle carries a later position', () => {
+    // Only a case where the watermark must actually MOVE says it moves. Every scenario above
+    // settles at one position and probes around it, which a fold that simply kept the earlier
+    // value would satisfy exactly as well — and that fold re-imports a delivery this stream has
+    // already run, the duplicate the seam guarantee exists to prevent.
+    const settledAtNine = [
+      requested({ source: { ...SOURCE, feedPosition: 7 } }),
+      REJECTED,
+      requested({ source: { ...SOURCE, feedPosition: 9 } }),
+      REJECTED,
+    ];
+
+    const between = { ...SUBMIT, source: { ...SOURCE, feedPosition: 8 } };
+
+    expect(given(settledAtNine).execute(between)._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('keeps the highest position a cycle carried, not the last one — the fold is a max', () => {
+    // A DESCENDING history is what separates `Math.max(previous, incoming)` from a plain
+    // "latest wins"; an ascending one cannot, because there the two agree. Position 7 arriving
+    // after 9 must not walk the watermark backwards, or everything above 7 becomes importable a
+    // second time.
+    const nineThenSeven = [
+      requested({ source: { ...SOURCE, feedPosition: 9 } }),
+      REJECTED,
+      requested({ source: { ...SOURCE, feedPosition: 7 } }),
+      REJECTED,
+    ];
+
+    const between = { ...SUBMIT, source: { ...SOURCE, feedPosition: 8 } };
+
+    expect(given(nineThenSeven).execute(between)._unsafeUnwrap()).toEqual([]);
+  });
+
+  it('still accepts a manual resubmission onto a settled sourced cycle', () => {
+    // A source-less resubmission is a human asking for the directory again; the watermark guard is
+    // about feed redelivery and must not swallow it. The guard reads `incoming !== undefined`
+    // precisely so a manual resubmit is never compared against a watermark it has no position for.
+    const settled = [requested({ source: { ...SOURCE, feedPosition: 7 } }), REJECTED];
+
+    const events = given(settled).execute(SUBMIT)._unsafeUnwrap();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: 'ImportRequested' });
+  });
+
   it('refuses a NEW delivery while a cycle is in flight — the caller holds, nothing is dropped', () => {
     const live = [requested({ source: { ...SOURCE, feedPosition: 5 } })];
     const newer = { ...SUBMIT, source: { ...SOURCE, feedPosition: 8 } };
@@ -166,6 +212,24 @@ describe('recording a proposal', () => {
       .execute(record([strong, weaker]))
       ._unsafeUnwrap();
     expect(reversed[1]).toMatchObject({ type: 'AutoApplySelected', ref: strong.ref });
+  });
+
+  it('keeps the earliest of two equally-distant candidates — ties do not reorder', () => {
+    // `bestOf` re-derives the winner rather than trusting input order, and on a tie it must keep
+    // the one beets ranked first. A strictly-better comparison says that; an at-least-as-good one
+    // silently promotes the LAST tied candidate, which makes the chosen match depend on the order
+    // a proposal happened to arrive in.
+    const first = candidate({ distance: asDistance(0.05) });
+    const tied = candidate({
+      ref: { dataSource: 'MusicBrainz', albumId: 'album-tied' },
+      distance: asDistance(0.05),
+    });
+
+    const events = given([requested()])
+      .execute(record([first, tied]))
+      ._unsafeUnwrap();
+
+    expect(events[1]).toMatchObject({ type: 'AutoApplySelected', ref: first.ref });
   });
 
   it('auto-applies a candidate exactly at the threshold — the boundary is inclusive', () => {

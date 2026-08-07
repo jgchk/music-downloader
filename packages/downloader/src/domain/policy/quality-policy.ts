@@ -53,7 +53,11 @@ const LOSSY_STANDARD_BPS = 128_000;
 /** Reason about the probed codec, not the file extension (D5). */
 export function resolveQualityBucket(attributes: QualityAttributes): QualityBucket {
   const codec = attributes.codec.trim().toLowerCase();
-  const isLossless = attributes.lossless ?? (codec !== '' && LOSSLESS_CODECS.has(codec));
+  // No `codec !== ''` guard: the empty string is not in LOSSLESS_CODECS, so the check could never
+  // change the answer. It was a genuinely equivalent condition — removed rather than waived, which
+  // is the top of the promotion ladder (the state stops being representable) instead of a
+  // suppression that would have to be re-justified every time someone reads it.
+  const isLossless = attributes.lossless ?? LOSSLESS_CODECS.has(codec);
 
   if (isLossless) {
     const isHires =

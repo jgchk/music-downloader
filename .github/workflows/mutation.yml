@@ -1,0 +1,131 @@
+name: Mutation drift
+
+# The weekly full-repo mutation run over main (change: mutation-gate).
+#
+# The PR job speaks at change time, which is the strongest seat an analyzer can hold — but it only
+# ever sees the diff. Assertion strength in code no PR touches erodes anyway, as the code around it
+# moves and the tests that used to pin it get rewritten. This job is the voice for that code.
+#
+# It blocks nothing, by design: a scheduled job that could redden main would be a gate nobody can
+# land through, and the findings here are real but never urgent. They go to the tracker instead —
+# one issue per file, deduped by title, labelled `mutation-drift` — because an advisory finding with
+# no durable channel is the attested-dead nightly-batch shape the research warns about.
+on:
+  schedule:
+    # Sundays 04:17 UTC. Off the hour on purpose: GitHub's scheduled queue is heavily contended at
+    # :00 and a delayed weekly run is a weekly run that sometimes does not happen.
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write # file and update the drift issues
+
+jobs:
+  full-run:
+    runs-on: ubuntu-latest
+    # A full run is ~6800 mutants, measured at 7m29s-8m52s on 16 local cores (the wall-clock line
+    # under design.md's seeding tally). A 4-core runner is the ceiling this allows for; a wedge must
+    # fail within 90 minutes rather than GitHub's 6h default.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Fresh, never incremental: this run IS the authoritative inventory, and an authoritative
+      # answer built on a cache is not one. `continue-on-error` because the config breaks the run on
+      # any survivor — which is the whole point of the PR gate and exactly the wrong behavior here,
+      # where surviving mutants are the expected output rather than a failure.
+      - name: Full-repo mutation run
+        id: run
+        continue-on-error: true
+        run: pnpm exec stryker run
+
+      - name: Summarize
+        if: always()
+        run: pnpm tsx scripts/mutation/report.ts >> "$GITHUB_STEP_SUMMARY"
+
+      # `continue-on-error` above covers the EXPECTED non-zero exit: the config breaks on any
+      # survivor, which is the point of the PR gate and exactly wrong here, where survivors are this
+      # job's output. It must not also cover a crash, an OOM, a plugin that failed to load, or the
+      # 90-minute timeout — all of which would otherwise leave a green weekly run that filed
+      # nothing, indistinguishable from a clean repo. The inventory's existence is the binary.
+      - name: Assert the run produced an inventory
+        run: |
+          set -euo pipefail
+          if [ ! -s reports/mutation/mutation.json ]; then
+            echo "::error::The mutation run wrote no report (step outcome: ${{ steps.run.outcome }}) — it crashed, was killed, or timed out. No drift was filed."
+            exit 1
+          fi
+
+      - name: File drift issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # The label must exist before the first `--label` use. `gh label create` failing because
+          # it ALREADY exists is the normal case on every run after the first — but a blanket
+          # `|| true` would swallow a 403 from a lost `issues: write`, an expired token, or rate
+          # limiting, and the operator would then debug the downstream `issue create` failure
+          # without the error that explains it.
+          if ! LABEL_ERR="$(gh label create mutation-drift \
+              --description 'Surviving mutants found by the weekly full mutation run' \
+              --color 'B60205' 2>&1)"; then
+            case "$LABEL_ERR" in
+              *'already exists'*) echo "label mutation-drift already exists" ;;
+              *) echo "::error::Could not ensure the mutation-drift label: ${LABEL_ERR}"; exit 1 ;;
+            esac
+          fi
+
+          # `printf '%s'`, never `echo`: this JSON carries `\n` escapes, and some shells' `echo`
+          # interprets them — which would turn the payload into unparseable multi-line text.
+          pnpm --silent tsx scripts/mutation/file-drift.ts > issues.json
+          COUNT="$(jq 'length' issues.json)"
+          echo "drift clusters: ${COUNT}"
+
+          # Dedupe by exact title against OPEN issues carrying the label. One file's drift is one
+          # issue for as long as it persists; a second identical issue every Sunday is how a tracker
+          # channel stops being read.
+          gh issue list --repo "$REPO" --label mutation-drift --state open \
+            --limit 500 --json title --jq '[.[].title]' > open.json
+          # A full page means the window silently lost its tail, and duplicates would start being
+          # filed every week — the exact self-poisoning this dedupe exists to prevent.
+          if [ "$(jq 'length' open.json)" -ge 500 ]; then
+            echo "::error::The dedupe window is full (500 open drift issues) — duplicates would be filed. Burn down the backlog or paginate."
+            exit 1
+          fi
+
+          FILED=0
+          SKIPPED=0
+          while IFS= read -r issue; do
+            TITLE="$(printf '%s' "$issue" | jq -er '.title')"
+            if jq -e --arg t "$TITLE" 'index($t) != null' open.json >/dev/null; then
+              echo "already open, skipping: ${TITLE}"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+            BODY_FILE="$(mktemp)"
+            # `-er`: a missing body would otherwise print the literal string "null" and file an
+            # issue whose entire content is that word.
+            printf '%s' "$issue" | jq -er '.body' > "$BODY_FILE"
+            gh issue create --repo "$REPO" --label mutation-drift \
+              --title "$TITLE" --body-file "$BODY_FILE"
+            FILED=$((FILED + 1))
+          done < <(jq -c '.[]' issues.json)
+
+          # Reported outside the loop so a mid-loop failure (a rate limit on a large first run) says
+          # how far it got rather than naming only the cluster it died on.
+          echo "filed ${FILED}, skipped ${SKIPPED} of ${COUNT} drift clusters"
