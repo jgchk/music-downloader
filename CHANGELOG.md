@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.18.0](https://github.com/jgchk/music-downloader/compare/v3.17.5...v3.18.0) (2026-08-07)
+
+### Features
+
+* **downloader:** thread the correlation/causation pair through the downloader and the BFF ([1e0b445](https://github.com/jgchk/music-downloader/commit/1e0b4458e3aee682f9ce71b05aa5cbfa5b22e7f5))
+* **importer:** thread the correlation/causation pair through the importer ([29892e8](https://github.com/jgchk/music-downloader/commit/29892e80752ecc25958bf68f3fb20bfae0b123e6))
+* **seam:** carry the operation story across the context boundary ([30fa1d3](https://github.com/jgchk/music-downloader/commit/30fa1d32a32e71559471354fb9297dc8452e0947))
+
+### Bug Fixes
+
+* **correlation:** close cycle-2 review, including a regression the cycle-1 fix introduced ([28f1b51](https://github.com/jgchk/music-downloader/commit/28f1b515e35d5ed40d1354d285e29ece5b1178cc))
+* **correlation:** close the gaps ten reviewers found in the first sweep ([6d4c339](https://github.com/jgchk/music-downloader/commit/6d4c33955cd9ad69cc5c6bc97c31251eecbea8cc))
+* **correlation:** pin the seam with producer-rendered fixtures; own the cycle rule; guard the duplication ([72f9bc1](https://github.com/jgchk/music-downloader/commit/72f9bc10f5dcf76143e86bae053e54526d3b1504))
 ## [3.17.5](https://github.com/jgchk/music-downloader/compare/v3.17.4...v3.17.5) (2026-08-07)
 
 ### Bug Fixes
