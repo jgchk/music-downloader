@@ -19,7 +19,16 @@ export interface LineRange {
   readonly end: number;
 }
 
-/** Changed lines per file, keyed exactly as the diff spelled the path. */
+/**
+ * Changed lines per file, keyed exactly as the diff spelled the path.
+ *
+ * A file the diff NAMES is always a key, even when it contributes no range — a branch that only
+ * deleted lines from a file changed that file without writing a line in it. The two facts are
+ * different and the verdict needs both: the key set is what joins against the mutation report (a
+ * scope that joins nothing was never audited), and the ranges are what a mutant's span has to
+ * overlap to become a finding. Collapsing them would make "this branch only deleted code" look
+ * exactly like "the two path spellings no longer match" — a pass and a refusal.
+ */
 export type ChangedLines = ReadonlyMap<string, readonly LineRange[]>;
 
 /**
@@ -75,13 +84,11 @@ export function parseHunkHeader(line: string): LineRange | undefined {
 }
 
 /**
- * Every changed line of every file in a unified diff.
+ * Every file a unified diff names, with the lines it added or modified in each.
  *
  * Files are keyed off the `+++` side rather than `---`, because a file the branch ADDED has
- * `/dev/null` on the old side and would otherwise lose every one of its lines. A file that appears
- * with no contributing hunk — a mode change, or a deletion — is absent from the map entirely rather
- * than present with an empty list, so "this file has no gated line" and "this file is not in the
- * diff" are one answer instead of two.
+ * `/dev/null` on the old side and would otherwise lose every one of its lines. A file whose only
+ * hunks are pure deletions is still a key, with no ranges: see {@link ChangedLines}.
  */
 export function parseChangedLines(diff: string): ChangedLines {
   const changed = new Map<string, LineRange[]>();
@@ -92,6 +99,7 @@ export function parseChangedLines(diff: string): ChangedLines {
     if (newSide !== null) {
       const named = newSide[1]?.trim();
       file = named === DELETED ? undefined : named;
+      if (file !== undefined) changed.set(file, changed.get(file) ?? []);
       continue;
     }
     const hunk = parseHunkHeader(line);
