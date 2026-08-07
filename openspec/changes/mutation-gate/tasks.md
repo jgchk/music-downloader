@@ -26,7 +26,25 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       mutant survive, then kill) or suppress as arid with an inline justification
       (`v8 ignore` doctrine). Composition wiring via per-site suppression, never directory
       exclusion.
-      **NOT COMPLETE — 464 survivors across 62 files; main is not mutant-clean.** Two
+      **464 → 19 on this branch; 64 at the rebased tip. Main is not mutant-clean.** The repo-wide triage was
+      carried out file by file: 6717 mutants, 5712 killed, 77 timed out, 1015 ignored by the D6/D7
+      class rejections, **19 surviving** at a mutation score of **99.67%** (from 92.21%). Every
+      survivor of the 464 was killed with a real assertion, suppressed at the site with a written
+      equivalence proof, deleted as dead code, or is one of the 19 listed in `design.md` with the
+      reason it is left. No live defect was found — production was correct throughout — but a long
+      list of durability and safety invariants had nothing behind them (staged-file cleanup on
+      cancellation, the auto-apply threshold, the fallback poll, the seam's replay guarantee, five
+      budget boundaries, peer redaction), and the dominant cause was not missing tests but tests
+      whose fixtures could not fail. All of that is recorded in `design.md`.
+      This checkbox stays open. Seventeen of the 19 are provably equivalent but deliberately NOT
+      waived — `Stryker disable next-line` keys on (line, mutator), so waiving them would silence a
+      killable twin on the same line, which is how the first draft of this work came to hide 104
+      mutants the suite already killed. The other 2 are a genuine unspecified-behaviour finding in
+      the MusicBrainz album path that no honest test can pin. And the rebase onto v3.18.0 added 45
+      more from someone else's change, taking the tip to 64: main is not mutant-clean, and a one-off
+      sweep cannot make it so while the diff gate stays inert. It therefore still blocks 4.1.
+      _Superseded detail from the seeding pass follows._
+      **464 survivors across 62 files; main was not mutant-clean.** Two
       false-finding classes were retired at the config site (D6 arid logging, D7 static
       mutants), taking the count from run 2's 807 to 472. Fifteen further mutants then left the
       survivor list — fourteen killed
@@ -67,7 +85,7 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 
 - [ ] 4.1 **Jake:** add the mutation PR job to the main-branch ruleset's required checks
       (after 2.x lands and the job is green on a real PR).
-      **BLOCKED on 2.1, and it is now a TWO-part flip.** Review established that a job
+      **STILL BLOCKED on 2.1, and it is a TWO-part flip.** Review established that a job
       which merely fails-without-being-required is the "warning nobody blocks on" shape
       quality-gates.md rejects: with 464 survivors across 62 files, roughly half of all
       production-touching PRs would show a red X for debt they did not create, and a loop
@@ -75,6 +93,15 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       ships `continue-on-error: true`, and task 4.1 removes THAT flag and adds the required
       check together, in one step, once main is mutant-clean. Until then the job runs and
       reports on every PR, and the gate is inert by construction.
+      **After the burn-down (464 → 19), `continue-on-error` was reviewed again and DELIBERATELY
+      LEFT IN PLACE.** The argument is weaker than it was but it still holds, and it now turns on
+      *which* files carry them: a PR touching `importer/domain/import/{state,import,decide}.ts`,
+      `downloader/domain/shared/duration.ts` or `downloader/adapters/musicbrainz/mapping.ts` would
+      show a red X for a survivor it did not create — and the three importer domain files are the
+      decider itself, the most-edited code in the package. Removing the flag while that is
+      true reproduces the rejected shape on a smaller scale. The two things that would clear it are
+      named in `design.md`: split the four narrowing-operand lines so their waivers become precise,
+      and settle the MusicBrainz empty-title question (a real finding, not a mutant to appease).
 - [x] 4.2 Note the web-package deferred item as a `quality-gate` issue (joins mutation
       scope when `.svelte` instrumentation exists or a BFF-only scope is explicitly
       accepted).
