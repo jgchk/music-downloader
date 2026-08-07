@@ -27,6 +27,11 @@ export function isRetryable(error: CommandError): boolean {
   // compile-time decision here, not a silent collapse to `false` that would drop a retryable fault.
   switch (error.kind) {
     case 'InfraError':
+    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — removing this
+    // arm's body falls through to `CycleInFlight`, which returns the same `true`. Two adjacent
+    // arms with the same verdict cannot be told apart by any test; the arms stay separate because
+    // they are separate reasons, and reordering them to make the tool see a difference would be
+    // contorting the code for the measurement.
     case 'ConcurrencyConflict': {
       // A transient infrastructure fault or an optimistic-concurrency race: retrying can resolve it.
       return true;
@@ -119,6 +124,9 @@ export class Reactor {
   private unsubscribe: (() => void) | undefined;
   private stopInterval: (() => void) | undefined;
   private running = false;
+  // Stryker disable next-line BooleanLiteral: equivalent — `drain()` assigns `pending = false` at
+  // the top of its loop before anything reads it, so this initialiser is never observed. The field
+  // needs an initialiser (strict property initialisation), so there is nothing here to delete.
   private pending = false;
   private stopped = false;
 
