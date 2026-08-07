@@ -1,7 +1,8 @@
 import fc from 'fast-check';
+import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
-import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
+import type { AppendMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import { arbEvent } from '../../domain/import/__fixtures__/arbitraries.js';
 import { SqliteEventStore } from './event-store.js';
@@ -21,7 +22,7 @@ import { openEventDatabase } from './schema.js';
  * equals the stream's current length, and fails as `ConcurrencyConflict` otherwise.
  */
 
-const META: EventMetadata = { importId: 'imp', occurredAt: '2026-08-06T00:00:00.000Z' };
+const META: AppendMetadata = appendMetadata('imp', '2026-08-06T00:00:00.000Z');
 
 /** Streams are drawn from a tiny pool so racing writers actually collide. */
 const STREAM_IDS = ['imp-1', 'imp-2'] as const;

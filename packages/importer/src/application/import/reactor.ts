@@ -1,5 +1,5 @@
 import { Import } from '../../domain/import/import.js';
-import { CONTEXT_NAME, continueFrom, isCorrelationId } from '../correlation/context.js';
+import { CONTEXT_NAME, continueFrom, operationScope } from '../correlation/context.js';
 import type { OperationScope } from '../correlation/context.js';
 import type { Logger } from '../logging/logger.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
@@ -209,27 +209,34 @@ export class Reactor {
 
   /**
    * The unit of work one delivered event opens: the story it continues, plus a logger bound to
-   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built once per
-   * dispatch and handed down — nothing below this point re-derives correlation state.
+   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built ONCE per
+   * dispatch and handed down — nothing below this point re-derives correlation state, which
+   * matters because a degraded row mints a fresh story on each call, so a second `scopeFor` would
+   * file the dispatch and its own failure record under two different stories.
    */
   private scopeFor(stored: StoredEvent): OperationScope {
-    const context = continueFrom(stored, this.dependencies.correlation);
-    const logger = this.dependencies.logger.child({
-      correlationId: context.correlationId,
+    const { context, origin } = continueFrom(stored, this.dependencies.correlation);
+    const scope = operationScope(context, this.dependencies.logger, {
       streamId: stored.streamId,
       globalSeq: stored.globalSeq,
     });
-    const carried = stored.metadata.correlationId;
-    if (carried === undefined || !isCorrelationId(carried)) {
-      // DEBUG, not info: a pre-correlation row can never gain one, so this says nothing an
-      // operator can act on — and a boot drain over historical streams would emit it once per
-      // stream. It is a trace-quality note for whoever is already reading debug output.
-      logger.debug(
+    if (origin === 'absent') {
+      // DEBUG: a pre-correlation row can never gain a story, so this says nothing an operator can
+      // act on — and a boot drain over historical streams would emit it once per stream.
+      scope.logger.debug(
         { context: CONTEXT_NAME },
-        'triggering event carries no correlation metadata; synthesized a story for this dispatch',
+        'event predates correlation metadata; synthesized a story for this dispatch',
+      );
+    } else if (origin === 'malformed') {
+      // WARN, not debug: every append since this capability shipped goes through a compiler-checked
+      // write gate, so a stored story that exists but is unusable means a writer is emitting bad
+      // ids RIGHT NOW. That is the opposite of history, and it is actionable.
+      scope.logger.warn(
+        { context: CONTEXT_NAME, carried: stored.metadata.correlationId },
+        'stored correlation id is malformed; synthesized a fresh story — a writer is emitting bad ids',
       );
     }
-    return { context, logger };
+    return scope;
   }
 
   async process(stored: StoredEvent): Promise<void> {
@@ -260,7 +267,7 @@ export class Reactor {
       const result = await this.dependencies.interpret(stored.streamId, effect, scope);
       if (result.isErr()) {
         if (isRetryable(result.error)) {
-          if (!(await this.handleRetryable(stored, effect.type, result.error))) return; // held
+          if (!(await this.handleRetryable(scope, stored, effect.type, result.error))) return; // held
           // Budget spent: this sibling is dead-lettered — a settled outcome, not a verdict on the
           // effects behind it, which still dispatch before the event advances.
           isDeadLettered = true;
@@ -304,13 +311,14 @@ export class Reactor {
    * it forever. Because the tally lives in the store, it survives restarts instead of resetting.
    */
   private async handleRetryable(
+    scope: OperationScope,
     stored: StoredEvent,
     effectType: string,
     error: CommandError,
   ): Promise<boolean> {
     const existing = await this.dependencies.parked.find(stored.globalSeq);
     if (existing.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, effect: effectType, err: existing.error },
         'retry-budget lookup failed; holding checkpoint',
       );
@@ -330,13 +338,13 @@ export class Reactor {
       };
       const written = await this.dependencies.parked.park(entry);
       if (written.isErr()) {
-        this.dependencies.logger.error(
+        scope.logger.error(
           { importId: stored.streamId, effect: effectType, err: written.error },
           'failed to record retry attempt; holding checkpoint',
         );
         return false;
       }
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, effect: effectType, attempt, err: error },
         'effect dispatch failed',
       );
@@ -351,14 +359,14 @@ export class Reactor {
       occurredAt: this.dependencies.clock.now().toISOString(),
     });
     if (recorded.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, effect: effectType, err: recorded.error },
         'dead-letter record failed; holding checkpoint',
       );
       return false;
     }
     this.dependencies.stalled.mark(stored.streamId);
-    this.dependencies.logger.error(
+    scope.logger.error(
       { importId: stored.streamId, effect: effectType, attempts: attempt, err: error },
       'effect dispatch exhausted retry budget; dead-lettered, import stalled, advancing past it',
     );

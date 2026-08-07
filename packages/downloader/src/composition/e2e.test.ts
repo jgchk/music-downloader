@@ -422,7 +422,7 @@ describe('acquisition E2E', () => {
       feed,
       checkpoints: w.checkpoints, // the downloader's OWN store holds this consumer's checkpoint
       deadLetters: new SqliteDeadLetterStore(w.db),
-      handler: verdictEventConsumer(w.deps),
+      handler: verdictEventConsumer(w.deps, { warn: () => {} }),
       policy: 'halt',
       logger: silentLogger(),
       clock: fixedClock(),

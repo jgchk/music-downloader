@@ -4,7 +4,9 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { ImportEvent } from '../../domain/import/events.js';
-import type { EventMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
+import type { AppendMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
+import { STORY, appendMetadata } from '../../application/__fixtures__/correlation.js';
+import { toCorrelationId } from '../../application/correlation/correlation-id.js';
 import {
   candidate,
   MATCH_REVIEW,
@@ -22,7 +24,7 @@ import { legacyRejectResolvedData } from './__fixtures__/legacy-review-resolved.
 import { openEventDatabase, type EventDatabase } from './schema.js';
 import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
-const META: EventMetadata = { importId: 'imp-1', occurredAt: '2026-07-03T12:00:00.000Z' };
+const META: AppendMetadata = appendMetadata('imp-1', '2026-07-03T12:00:00.000Z');
 
 const APPLIED: ImportEvent = { type: 'ImportApplied', location: '/library/album' };
 const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'done', filesDeleted: true };
@@ -325,5 +327,30 @@ describe('SqliteCheckpointStore', () => {
     const result = await checkpoints.save('reactor', 1);
 
     expect(result._unsafeUnwrapErr()).toMatchObject({ operation: 'checkpoint.save' });
+  });
+});
+
+describe('SqliteEventStore — correlation metadata round trip', () => {
+  it('reads a stored causation reference back as the union it was written as', async () => {
+    // The column is JSON and metadata has no upcaster, so the read-edge parse is the only thing
+    // standing between a persisted union and a reader narrowing on a tag nothing ever checked.
+    const store = new SqliteEventStore(freshDatabase());
+    const written = appendMetadata('imp-1', 't', {
+      correlationId: toCorrelationId(STORY),
+      causation: { kind: 'event', context: 'elsewhere', streamId: 'other-1', version: 4 },
+    });
+
+    const appended = await store.append('imp-1', 0, [APPLIED], written);
+    appended._unsafeUnwrap();
+
+    const stream = await store.readStream('imp-1');
+    const read = stream._unsafeUnwrap();
+    expect(read[0]!.metadata.causation).toEqual({
+      kind: 'event',
+      context: 'elsewhere',
+      streamId: 'other-1',
+      version: 4,
+    });
+    expect(read[0]!.metadata.correlationId).toBe(STORY);
   });
 });

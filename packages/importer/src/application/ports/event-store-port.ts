@@ -1,6 +1,7 @@
 import type { ResultAsync } from 'neverthrow';
 import type { ImportEvent, ImportEventType } from '../../domain/import/events.js';
 import type { CausationReference } from '../correlation/context.js';
+import type { CorrelationId } from '../correlation/correlation-id.js';
 import type { InfraError } from './errors.js';
 
 /**
@@ -10,6 +11,8 @@ import type { InfraError } from './errors.js';
  * concurrency, surfaced here as {@link ConcurrencyConflict}.
  */
 /**
+ * @file
+ *
  * Metadata as READ back from the store. The operation-correlation pair is optional here and always
  * will be: every row written before end-to-end-correlation shipped has neither field, those rows
  * are never backfilled, and no upcaster may fabricate provenance that never happened. A reader that
@@ -26,10 +29,10 @@ export interface EventMetadata {
  * Metadata as WRITTEN. The same shape with the correlation pair made mandatory — the asymmetry is
  * the point: tolerance belongs to the reader, and nothing appended from today on may be
  * uncorrelated. Because {@link EventStorePort.append} takes this type, a call site that has no
- * {@link CommandContext} to derive it from is a compile error rather than a silently broken chain.
+ * `CommandContext` (`../correlation/context.js`) to derive it from is a compile error rather than a silently broken chain.
  */
 export interface AppendMetadata extends EventMetadata {
-  readonly correlationId: string;
+  readonly correlationId: CorrelationId;
   readonly causation: CausationReference;
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestEvent, ResolveOptions } from '@sveltejs/kit';
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session.js';
 
@@ -163,6 +163,7 @@ describe('server hooks', () => {
     const event = {
       route: { id: '/acquisitions/[id]' },
       request: { method: 'GET' },
+      locals: {},
     } as unknown as RequestEvent;
 
     const shaped = handleError({ error: boom, event, status: 500, message: 'Internal Error' }) as {
@@ -222,5 +223,49 @@ describe('handle — operation correlation', () => {
     await handle({ event, resolve: () => new Response('ok') });
 
     expect(event.locals.correlationId).not.toBe('11111111111111111111111111111111');
+  });
+});
+
+describe('handleError — joining a crash to its request', () => {
+  // The module-level logger spies are shared across this file's suites, so each case starts clean.
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('logs the fault under the request story, so the crash joins the lines that led to it', () => {
+    // The single most important line to be able to join IS the crash. Logging it on the bare root
+    // would leave an operator with an errorId and no way back to the request that produced it.
+    const event = {
+      route: { id: '/acquisitions/[id]' },
+      request: { method: 'GET' },
+      locals: { correlationId: 'a1b2c3d4e5f60718293a4b5c6d7e8f90' },
+    } as unknown as RequestEvent;
+
+    void handleError({ error: new Error('boom'), event, status: 500, message: 'Internal Error' });
+
+    expect(logger.child).toHaveBeenCalledWith({
+      correlationId: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    });
+    expect(child.error).toHaveBeenCalledOnce();
+  });
+
+  it('still records a fault raised before the hook minted a story', () => {
+    // `handleError` also fires for a throw inside `handle` itself, i.e. before locals exist.
+    // A missing story must never cost us the error record.
+    const event = {
+      route: { id: '/acquisitions/[id]' },
+      request: { method: 'GET' },
+      locals: {},
+    } as unknown as RequestEvent;
+
+    const shaped = handleError({
+      error: new Error('boom'),
+      event,
+      status: 500,
+      message: 'Internal Error',
+    }) as { errorId: string };
+
+    expect(shaped.errorId).toMatch(/\S/);
+    expect(logger.error).toHaveBeenCalledOnce();
   });
 });

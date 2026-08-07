@@ -1,4 +1,5 @@
 import { errAsync, okAsync } from 'neverthrow';
+import { parseCausation } from '../../application/correlation/context.js';
 import type { ResultAsync } from 'neverthrow';
 import type { Statement } from 'better-sqlite3';
 import type { AcquisitionEvent, AcquisitionEventType } from '../../domain/acquisition/events.js';
@@ -6,6 +7,7 @@ import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   AppendError,
+  AppendMetadata,
   CheckpointStore,
   EventBus,
   EventMetadata,
@@ -50,7 +52,7 @@ export class SqliteEventStore implements EventStorePort {
     streamId: string,
     expectedVersion: number,
     events: readonly AcquisitionEvent[],
-    metadata: EventMetadata,
+    metadata: AppendMetadata,
   ) => StoredEvent[];
 
   constructor(
@@ -79,7 +81,7 @@ export class SqliteEventStore implements EventStorePort {
         streamId: string,
         expectedVersion: number,
         events: readonly AcquisitionEvent[],
-        metadata: EventMetadata,
+        metadata: AppendMetadata,
       ): StoredEvent[] => {
         const { c } = this.countStmt.get(streamId) as { c: number };
         if (c !== expectedVersion) throw new ConcurrencyBreak();
@@ -112,7 +114,7 @@ export class SqliteEventStore implements EventStorePort {
     streamId: string,
     expectedVersion: number,
     events: readonly AcquisitionEvent[],
-    metadata: EventMetadata,
+    metadata: AppendMetadata,
   ): ResultAsync<readonly StoredEvent[], AppendError> {
     let stored: StoredEvent[];
     try {
@@ -161,9 +163,24 @@ export class SqliteEventStore implements EventStorePort {
         row.schema_version,
         JSON.parse(row.data) as Record<string, unknown>,
       ),
-      metadata: JSON.parse(row.metadata) as EventMetadata,
+      // Metadata has no upcaster and no schema, so the cast is the only thing standing behind the
+      // whole shape — and `causation` is a discriminated union whose tag nothing has checked.
+      // Re-establish that one invariant here rather than let a future reader narrow on a lie.
+      metadata: parseMetadata(JSON.parse(row.metadata)),
     };
   }
+}
+
+/**
+ * Re-establish the read-side metadata shape. Only `causation` needs real parsing (it is a union);
+ * the rest is carried through as written, and an absent or unreadable pair is normal — every row
+ * written before end-to-end-correlation has none, permanently.
+ */
+function parseMetadata(raw: unknown): EventMetadata {
+  const parsed = raw as EventMetadata;
+  // Unconditional: `parseCausation` already answers `undefined` for absent AND for unreadable, and
+  // `causation` is optional on the read side, so there is nothing to branch on.
+  return { ...parsed, causation: parseCausation((raw as { causation?: unknown }).causation) };
 }
 
 /** The durable reactor checkpoint (D8) on SQLite: one row per consumer, upserted on save. */

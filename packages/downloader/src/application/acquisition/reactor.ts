@@ -1,7 +1,7 @@
 import { Acquisition } from '../../domain/acquisition/acquisition.js';
 import type { Effect } from '../../domain/acquisition/acquisition.js';
 import type { Logger } from '../logging/logger.js';
-import { CONTEXT_NAME, continueFrom, isCorrelationId } from '../correlation/context.js';
+import { CONTEXT_NAME, continueFrom, operationScope } from '../correlation/context.js';
 import type { OperationScope } from '../correlation/context.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type {
@@ -288,9 +288,10 @@ export class Reactor {
       return;
     }
 
+    const scope = this.scopeFor(stored);
     const stream = await this.dependencies.store.readStream(stored.streamId);
     if (stream.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: stored.streamId, err: stream.error },
         'reactor stream read failed',
       );
@@ -301,46 +302,48 @@ export class Reactor {
     // fresh exposure must survive this very event — only a PREVIOUSLY stalled stream that now
     // drives successfully is resolved.
     const wasStalled = this.dependencies.stalled.isStalled(stored.streamId);
-    const outcome = await this.dispatchEvent(stored, stream.value, this.scopeFor(stored));
+    const outcome = await this.dispatchEvent(stored, stream.value, scope);
     if (outcome.kind === 'retry') {
-      const isParkedOk = await this.parkStream(
-        stored,
-        outcome.effect,
-        outcome.error,
-        this.scopeFor(stored),
-      );
+      const isParkedOk = await this.parkStream(stored, outcome.effect, outcome.error, scope);
       if (!isParkedOk) return; // fall back to holding the checkpoint — the poll retries in-line
     } else if (wasStalled) {
       // A stalled acquisition's stream was driven successfully again (a cancellation, an operator
       // resubmission): its dead letters are resolved — clear them and the stalled exposure.
-      await this.lander.clearStalled(stored.streamId);
+      await this.lander.clearStalled(stored.streamId, scope);
     }
     await this.advanceTo(stored.globalSeq);
   }
 
   /**
    * The unit of work one delivered event opens: the story it continues, plus a logger bound to
-   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built once per
-   * dispatch and handed down — nothing below this point re-derives correlation state.
+   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built ONCE per
+   * dispatch and handed down — nothing below this point re-derives correlation state, which
+   * matters because a degraded row mints a fresh story on each call, so a second `scopeFor` would
+   * file the dispatch and its own failure record under two different stories.
    */
   private scopeFor(stored: StoredEvent): OperationScope {
-    const context = continueFrom(stored, this.dependencies.correlation);
-    const logger = this.dependencies.logger.child({
-      correlationId: context.correlationId,
+    const { context, origin } = continueFrom(stored, this.dependencies.correlation);
+    const scope = operationScope(context, this.dependencies.logger, {
       streamId: stored.streamId,
       globalSeq: stored.globalSeq,
     });
-    const carried = stored.metadata.correlationId;
-    if (carried === undefined || !isCorrelationId(carried)) {
-      // DEBUG, not info: a pre-correlation row can never gain one, so this says nothing an
-      // operator can act on — and a boot re-drive over historical streams would emit it once per
-      // stream. It is a trace-quality note for whoever is already reading debug output.
-      logger.debug(
+    if (origin === 'absent') {
+      // DEBUG: a pre-correlation row can never gain a story, so this says nothing an operator can
+      // act on — and a boot drain over historical streams would emit it once per stream.
+      scope.logger.debug(
         { context: CONTEXT_NAME },
-        'triggering event carries no correlation metadata; synthesized a story for this dispatch',
+        'event predates correlation metadata; synthesized a story for this dispatch',
+      );
+    } else if (origin === 'malformed') {
+      // WARN, not debug: every append since this capability shipped goes through a compiler-checked
+      // write gate, so a stored story that exists but is unusable means a writer is emitting bad
+      // ids RIGHT NOW. That is the opposite of history, and it is actionable.
+      scope.logger.warn(
+        { context: CONTEXT_NAME, carried: stored.metadata.correlationId },
+        'stored correlation id is malformed; synthesized a fresh story — a writer is emitting bad ids',
       );
     }
-    return { context, logger };
+    return scope;
   }
 
   /**
@@ -492,7 +495,7 @@ export class Reactor {
     const scope = this.scopeFor(stored);
     const outcome = await this.dispatchEvent(stored, stream.value, scope);
     if (outcome.kind === 'ok') {
-      this.dependencies.logger.info(
+      scope.logger.info(
         { acquisitionId: entry.streamId, attempt: entry.attempt },
         'parked effect resolved; resuming the stream',
       );
@@ -537,13 +540,13 @@ export class Reactor {
         lastError: describeCommandError(outcome.error),
       });
       if (heldOver.isErr()) {
-        this.dependencies.logger.error(
+        scope.logger.error(
           { acquisitionId: entry.streamId, err: heldOver.error },
           'failed landing could not be re-parked; its effect will re-fire next tick',
         );
         return;
       }
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: entry.streamId, effect: outcome.effect.type, attempt, err: outcome.error },
         'exhausted effect could not be landed; parked again at the policy cap',
       );
@@ -556,13 +559,13 @@ export class Reactor {
       lastError: describeCommandError(outcome.error),
     });
     if (rescheduled.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: entry.streamId, err: rescheduled.error },
         'failed to reschedule parked effect',
       );
       return;
     }
-    this.dependencies.logger.warn(
+    scope.logger.warn(
       {
         acquisitionId: entry.streamId,
         effect: outcome.effect.type,

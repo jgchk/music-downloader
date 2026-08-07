@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CORRELATION_ID_PATTERN } from '../../../application/correlation/correlation-id.js';
 
 /**
  * The consumer-owned tolerant reader for music-downloader's outbound seam events (design D1). These
@@ -64,9 +65,12 @@ export type AcquisitionFulfilledDto = z.infer<typeof acquisitionFulfilledSchema>
  * store, and pinning it here would make this reader break the day a third producer appears.
  */
 export const inboundCorrelationSchema = z.object({
-  correlationId: z.string().regex(/^[0-9a-f]{32}$/),
+  correlationId: z.string().regex(CORRELATION_ID_PATTERN),
   causation: z.object({
-    kind: z.literal('event'),
+    // `kind` is read as a free string for the same reason `context` is: this reader never branches
+    // on it, and pinning a tag we discard would break the day a producer's envelope grows a second
+    // shape. Producers pin their own side, which is where a literal belongs.
+    kind: z.string().min(1),
     context: z.string().min(1),
     streamId: z.string().min(1),
     version: z.number().int().nonnegative(),

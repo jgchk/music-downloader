@@ -281,6 +281,24 @@ export function correlationIds(dbFile: string, streamId?: string): string[] {
   }
 }
 
+/**
+ * How many stored events carry NO correlation id. Every append since the capability shipped goes
+ * through a compiler-checked write gate, so on a store created by this build the answer is zero —
+ * which is the assertion {@link correlationIds} alone cannot make, because it skips exactly these
+ * rows and a partial regression would still leave one distinct id behind.
+ */
+export function uncorrelatedEventCount(dbFile: string): number {
+  const db = new Database(dbFile, { readonly: true, fileMustExist: true });
+  try {
+    const rows = db.prepare('SELECT metadata FROM events').all() as { metadata: string }[];
+    return rows.filter(
+      (row) => (JSON.parse(row.metadata) as { correlationId?: string }).correlationId === undefined,
+    ).length;
+  } finally {
+    db.close();
+  }
+}
+
 export async function pollForEvent(
   dbFile: string,
   type: string,

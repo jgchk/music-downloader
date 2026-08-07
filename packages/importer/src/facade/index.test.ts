@@ -1,5 +1,5 @@
 import { testContext } from '../application/__fixtures__/correlation.js';
-import { STORY } from '../application/__fixtures__/correlation.js';
+import { OTHER_STORY, STORY } from '../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { submitImport } from '../application/import/use-cases.js';
 import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
@@ -277,13 +277,15 @@ describe('facade correlation carriage', () => {
   it('threads the caller-minted story into the metadata of the events a command appends', async () => {
     const wiring = testWiring();
 
-    const result = await wiring.facade.submitImport({ path: INTAKE }, STORY);
+    // OTHER_STORY, deliberately: the wiring's mint source can only produce STORY, so adopting the
+    // caller's story and ignoring it in favour of a fresh mint are distinguishable outcomes here.
+    const result = await wiring.facade.submitImport({ path: INTAKE }, OTHER_STORY);
 
     expect(result.ok).toBe(true);
     const appended = wiring.store.all();
     expect(appended.length).toBeGreaterThan(0);
     for (const entry of appended) {
-      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.correlationId).toBe(OTHER_STORY);
       expect(entry.metadata.causation).toMatchObject({ kind: 'command' });
     }
   });

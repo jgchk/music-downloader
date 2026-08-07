@@ -13,7 +13,18 @@ import { externalVerdictDeliverySchema } from '../contracts/verdicts/schemas.js'
  * whose decider makes redelivery and staleness converge to no-ops. Events of other types are
  * acknowledged and ignored (the producer may add types freely).
  */
-export function verdictEventConsumer(dependencies: UseCaseDependencies): ConsumeHandler {
+export interface VerdictConsumerOptions {
+  /**
+   * Announces the one thing this consumer can silently get wrong: a producer whose correlation
+   * envelope it cannot read. Injected — the interface layer owns no logger of its own.
+   */
+  readonly warn: (context: Record<string, unknown>, message: string) => void;
+}
+
+export function verdictEventConsumer(
+  dependencies: UseCaseDependencies,
+  options: VerdictConsumerOptions,
+): ConsumeHandler {
   return async (event: SeamEvent) => {
     if (event.type !== 'release.verdict') return ok(undefined);
 
@@ -28,7 +39,12 @@ export function verdictEventConsumer(dependencies: UseCaseDependencies): Consume
       dependencies,
       acquisitionId,
       { candidate, reasons },
-      contextForDelivery(event.metadata, dependencies.correlation),
+      contextForDelivery(event.metadata, dependencies.correlation, (detail) => {
+        options.warn(
+          { acquisitionId, globalSeq: event.globalSeq, detail },
+          'producer sent a correlation envelope this consumer cannot read; the cross-seam trace is broken until it is fixed',
+        );
+      }),
     );
     return recorded.match(
       () => ok<void, { kind: 'Transient'; reason: string }>(undefined),

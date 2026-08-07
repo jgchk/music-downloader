@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import {
   CONTEXT_NAME,
+  adoptOrMint,
+  parseCausation,
   adoptStory,
   causedBy,
   continueFrom,
@@ -14,7 +16,7 @@ import type { CorrelationSource } from '../ports/system-ports.js';
 const source = (...values: readonly string[]): CorrelationSource => {
   let index = 0;
   return {
-    mint: () => values[Math.min(index++, values.length - 1)]!,
+    mint: () => toCorrelationId(values[Math.min(index++, values.length - 1)]!),
   };
 };
 
@@ -67,7 +69,7 @@ describe('newOperation', () => {
 
 describe('continueFrom', () => {
   it('copies the triggering event story verbatim and points causation at its coordinates', () => {
-    const context = continueFrom(
+    const { context } = continueFrom(
       storedEvent({
         acquisitionId: 'acq-1',
         occurredAt: '2026-08-06T00:00:00.000Z',
@@ -83,7 +85,7 @@ describe('continueFrom', () => {
   });
 
   it('mints a fresh story when the triggering event predates correlation metadata', () => {
-    const context = continueFrom(
+    const { context } = continueFrom(
       storedEvent({ acquisitionId: 'acq-1', occurredAt: '2026-08-06T00:00:00.000Z' }),
       source(OTHER),
     );
@@ -95,7 +97,7 @@ describe('continueFrom', () => {
   });
 
   it('mints a fresh story when the stored id is not a well-formed correlation id', () => {
-    const context = continueFrom(
+    const { context } = continueFrom(
       storedEvent({
         acquisitionId: 'acq-1',
         occurredAt: '2026-08-06T00:00:00.000Z',
@@ -116,5 +118,59 @@ describe('adoptStory', () => {
       correlationId: STORY,
       causation: { kind: 'event', context: 'importer', streamId: 'imp-9', version: 4 },
     });
+  });
+});
+
+describe('parseCausation', () => {
+  it('accepts a stored event reference', () => {
+    expect(parseCausation({ kind: 'event', context: 'x', streamId: 's', version: 3 })).toEqual({
+      kind: 'event',
+      context: 'x',
+      streamId: 's',
+      version: 3,
+    });
+  });
+
+  it('accepts a stored command reference', () => {
+    expect(parseCausation({ kind: 'command', commandId: 'c-1' })).toEqual({
+      kind: 'command',
+      commandId: 'c-1',
+    });
+  });
+
+  it.each([
+    ['a null', null],
+    ['a primitive', 'event'],
+    ['an unknown kind', { kind: 'saga', streamId: 's', version: 1 }],
+    ['a missing kind', { context: 'x', streamId: 's', version: 1 }],
+    ['an empty commandId', { kind: 'command', commandId: '' }],
+    ['a missing streamId', { kind: 'event', context: 'x', version: 1 }],
+    ['an empty context', { kind: 'event', context: '', streamId: 's', version: 1 }],
+    ['a negative version', { kind: 'event', context: 'x', streamId: 's', version: -1 }],
+    ['a fractional version', { kind: 'event', context: 'x', streamId: 's', version: 1.5 }],
+    ['a stringly version', { kind: 'event', context: 'x', streamId: 's', version: '1' }],
+  ])('drops %s rather than handing back a union nothing checked', (_label, value) => {
+    // The column is JSON written by some past version of this process. A reader narrowing on
+    // `kind` would otherwise read `undefined` off a shape TypeScript never verified.
+    expect(parseCausation(value)).toBeUndefined();
+  });
+});
+
+describe('adoptOrMint', () => {
+  it('adopts a well-formed caller story and reports it as carried', () => {
+    // The source can only mint OTHER, so adopting STORY and re-minting are distinguishable.
+    const { context, origin } = adoptOrMint(STORY, source(OTHER));
+
+    expect(origin).toBe('carried');
+    expect(context.correlationId).toBe(STORY);
+    expect(context.causation).toEqual({ kind: 'command', commandId: OTHER });
+  });
+
+  it('mints fresh for an unusable caller story and reports it as malformed', () => {
+    // A live caller got it wrong — unlike a pre-capability row, that IS actionable.
+    const { context, origin } = adoptOrMint('not-a-trace-id', source(OTHER));
+
+    expect(origin).toBe('malformed');
+    expect(context.correlationId).toBe(OTHER);
   });
 });

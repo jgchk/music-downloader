@@ -21,6 +21,7 @@ import {
   fixedCorrelation,
   testContext,
 } from '../__fixtures__/correlation.js';
+import { toCorrelationId } from '../correlation/correlation-id.js';
 import { StalledReadModel } from '../projections/read-models.js';
 import { deliverDownloadOutcome } from './download-outcome-consumer.js';
 import { infraError, permanentInfraError } from '../ports/errors.js';
@@ -107,7 +108,7 @@ async function seed(history: readonly AcquisitionEvent[], streamId = 'acq-1'): P
   await store.append(streamId, current, history, {
     acquisitionId: streamId,
     occurredAt: 't',
-    correlationId: STORY,
+    correlationId: toCorrelationId(STORY),
     causation: { kind: 'command', commandId: 'command-1' },
   });
 }
@@ -1564,9 +1565,36 @@ describe('Reactor correlation propagation', () => {
 
     const minted = lines
       .map((line) => JSON.parse(line) as { level: number; msg: string; correlationId?: string })
-      .find((entry) => entry.msg.includes('no correlation metadata'));
+      .find((entry) => entry.msg.includes('predates correlation metadata'));
     expect(minted).toBeDefined();
     expect(minted!.level).toBe(20); // pino debug
+  });
+
+  it('warns — not debug — when a stored story exists but is unusable', async () => {
+    // A malformed id is not history: every append since this capability shipped goes through the
+    // write gate, so it means a writer is emitting bad ids right now. Reporting it at the same
+    // level as a pre-correlation row is how it stays invisible.
+    store.seedLegacy('acq-1', 0, requestedHistory(), {
+      acquisitionId: 'acq-1',
+      occurredAt: 't',
+      correlationId: 'not-a-trace-id',
+    });
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(stubPorts(), { logger, correlation: fixedCorrelation(OTHER_STORY) }).process(
+      trigger,
+    );
+
+    const entry = lines
+      .map((line) => JSON.parse(line) as { level: number; msg: string })
+      .find((line) => line.msg.includes('malformed'));
+    expect(entry).toBeDefined();
+    expect(entry!.level).toBe(40); // pino warn
   });
 
   it('binds the story, stream and position onto every log line of one dispatch', async () => {

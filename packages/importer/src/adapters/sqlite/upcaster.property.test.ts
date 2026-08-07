@@ -1,7 +1,8 @@
 import fc from 'fast-check';
+import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
-import type { EventMetadata } from '../../application/ports/event-store-port.js';
+import type { AppendMetadata } from '../../application/ports/event-store-port.js';
 import { Import } from '../../domain/import/import.js';
 import { awaitingReviewWithCandidate } from '../../domain/import/__fixtures__/import-fixtures.js';
 import { arbEvent } from '../../domain/import/__fixtures__/arbitraries.js';
@@ -22,7 +23,7 @@ import { buildUpcasterRegistry } from './upcaster.js';
  * on disk, and only they catch a v1 field this file's generator never thought to emit.
  */
 
-const META: EventMetadata = { importId: 'imp', occurredAt: '2026-08-06T00:00:00.000Z' };
+const META: AppendMetadata = appendMetadata('imp', '2026-08-06T00:00:00.000Z');
 
 /**
  * A v1 `ReviewResolved` payload: an earlier version stored the reject-a-bad-delivery verb under the

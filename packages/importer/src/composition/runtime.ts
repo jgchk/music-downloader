@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { toCorrelationId } from '../application/correlation/correlation-id.js';
 import { mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -139,8 +140,11 @@ export async function createImporterRuntime(
   const clock = overrides.clock ?? { now: () => new Date() };
   // 32 lowercase hex = a W3C trace id. Chosen so a later OpenTelemetry adoption can carry this
   // exact value as its trace id instead of minting a parallel one (operation-correlation D1).
+  // 32 lowercase hex = a W3C trace id, so a later OpenTelemetry adoption can carry this exact
+  // value (see application/correlation/correlation-id.ts). This is the ONE place the format is
+  // established; every lift downstream follows from the brand rather than from trust.
   const correlation: CorrelationSource = overrides.correlation ?? {
-    mint: () => randomBytes(16).toString('hex'),
+    mint: () => toCorrelationId(randomBytes(16).toString('hex')),
   };
 
   // The configured auto-apply threshold crosses the edge here: parse it into a branded Distance so

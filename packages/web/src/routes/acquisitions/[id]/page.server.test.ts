@@ -216,7 +216,7 @@ describe('cancel action', () => {
     await expect(actions.cancel!(eventFor({ cancelAcquisition }))).rejects.toSatisfy(
       (thrown: unknown) => isRedirect(thrown) && thrown.location === '/acquisitions/acq-1',
     );
-    expect(cancelAcquisition).toHaveBeenCalledWith({ id: 'acq-1' }, expect.any(String));
+    expect(cancelAcquisition).toHaveBeenCalledWith({ id: 'acq-1' }, STORY);
   });
 
   it('surfaces a modeled cancel failure', async () => {

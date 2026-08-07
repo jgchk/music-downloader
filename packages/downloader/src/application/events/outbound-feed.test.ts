@@ -1,4 +1,4 @@
-import { appendMetadata } from '../__fixtures__/correlation.js';
+import { STORY, appendMetadata } from '../__fixtures__/correlation.js';
 import { err, ok } from 'neverthrow';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
@@ -160,5 +160,27 @@ describe('OutboundFeed', () => {
 
     expect(batch.isErr()).toBe(true);
     expect(batch._unsafeUnwrapErr()).toMatchObject({ kind: 'RenderError' });
+  });
+});
+
+describe('OutboundFeed — the correlation envelope', () => {
+  it('serves the rendered envelope beside the payload, so the story reaches the consumer', async () => {
+    // Without this the renderer can be perfect and the seam still carries no story: the feed is
+    // the only hop between them, and dropping the field there fails no other test.
+    await seed('acq-1');
+    // A mapping that renders an envelope, so the subject is the feed's carriage of it — not the
+    // producer's rendering, which has its own suite.
+    const withEnvelope: PublishedEventMapping = {
+      ...mapping,
+      render: (stored, prefix) =>
+        mapping
+          .render(stored, prefix)
+          .map((rendered) => ({ ...rendered, metadata: { correlationId: STORY } })),
+    };
+    const feed = new OutboundFeed(store, withEnvelope);
+
+    const batch = await feed.read(0, 10);
+
+    expect(batch._unsafeUnwrap().events[0]?.metadata).toEqual({ correlationId: STORY });
   });
 });
