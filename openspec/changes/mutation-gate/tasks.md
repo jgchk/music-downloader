@@ -22,10 +22,27 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 
 ## 2. Seeding triage (goal RETIRED: main cannot become mutant-clean — see 2.1)
 
-- [ ] 2.1 Triage every survivor: kill with a strengthened/new test (red-first: watch the
+- [x] 2.1 Triage every survivor: kill with a strengthened/new test (red-first: watch the
       mutant survive, then kill) or suppress as arid with an inline justification
       (`v8 ignore` doctrine). Composition wiring via per-site suppression, never directory
       exclusion.
+      **CLOSED on the triage being complete with its residue recorded** — not on "main becomes
+      mutant-clean", which `docs/research/blocking-mutation-gate-scope.md` §5.1 establishes is
+      unreachable in principle rather than merely unreached: the equivalent fraction among
+      *survivors* RISES as a suite improves (Schuler & Zeller), under 5% of mutants carry unique
+      information at all, and Google calls mutation adequacy *"neither practical nor desirable"*.
+      Twenty-seven unkillable survivors after a 464 → 19 → 27 burn-down is the literature's
+      predicted outcome, not a residue of incomplete work; the exit criterion was the wrong one,
+      and a task whose premise cannot exist cannot close by doing more of the same work.
+      The residue is recorded in `design.md`: **7100 mutants, 929 ignored, 6083 killed, 61 timed
+      out, 27 surviving — 99.56%**, all 27 provably equivalent and none of them waivable without
+      silencing a killable twin (measured, not argued — see the v3.18.0 burn-down section).
+      `mutation-gate-diff-scope` is what makes the residue harmless: under changed-LINE failure
+      scope a mutant on a line no PR touched cannot fail that PR, so nothing has to be done to
+      the 27 before a flip. When a PR does edit one of those lines, being asked to re-audit the
+      equivalence claim is correct behaviour rather than friction.
+      _Detail from the passes that got here follows, left in place so the record shows what
+      changed._
       **464 → 19 on this branch; 64 at the rebased tip. Main is not mutant-clean.** The repo-wide triage was
       carried out file by file: 6717 mutants, 5712 killed, 77 timed out, 1015 ignored by the D6/D7
       class rejections, **19 surviving** at a mutation score of **99.67%** (from 92.21%). Every
@@ -104,8 +121,31 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 
 ## 4. Handoff
 
-- [ ] 4.1 **Jake:** add the mutation PR job to the main-branch ruleset's required checks
-      (after 2.x lands and the job is green on a real PR).
+The flip is TWO tasks rather than one, and its criterion is a measurement rather than a state of
+main. The old criterion — *"split the four narrowing-operand lines so their waivers become
+precise"* — is **deleted, not weakened**: it is unreachable twice over, and it is recorded as
+deleted here rather than silently dropped. There are twenty-seven, not four; and splitting cannot
+work for this mutator family at all, because `ConditionalExpression` emits `true` *and* `false`
+from one node and `EqualityOperator` emits both substitutions from one operator token, so the
+equivalent and its killable twin are co-located whatever the formatting (`design.md` D10, measured
+against Stryker 9.6.1). Contorting production code to make a tool's waiver fit is the appeasement
+the admission contract exists to prevent.
+
+`mutation-gate-diff-scope` replaces it with a criterion that is reachable: the failure scope
+becomes the changed LINES, so the twenty-seven stop blocking without being suppressed, and the
+verdict ships in shadow so its effective false-positive rate can be measured *here* before it
+blocks anything. 4.1a and 4.1b then happen together, in one step, so the gate never spends time in
+the "fails but is not required" shape `quality-gates.md` rejects.
+
+- [ ] 4.1a Enable enforcement: set `MUTATION_GATE_ENFORCE=true` on the `mutation` job, once
+      `mutation-gate-diff-scope` task 5.1's shadow measurement clears `quality-gates.md`'s
+      ten-percent effective-false-positive bar on real PRs in this repository. If it does not
+      clear, the honest outcome is to say so and leave the verdict in shadow — a check can be
+      worth running once without earning a seat, and both halves get recorded either way.
+- [ ] 4.1b **Jake:** add the mutation PR check to the main-branch ruleset's required checks, in
+      the same step as 4.1a. Repo settings are outside agent permissions.
+      _Historical record of how this task got here follows; the reasoning it contains is
+      superseded above wherever the two disagree._
       **STILL BLOCKED on 2.1, and it is a TWO-part flip.** Review established that a job
       which merely fails-without-being-required is the "warning nobody blocks on" shape
       quality-gates.md rejects: with 464 survivors across 62 files, roughly half of all
@@ -137,7 +177,7 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       **Superseded by `openspec/changes/mutation-gate-diff-scope/`**, which moves the failure scope
       from changed files to changed lines and ships it in shadow mode behind `MUTATION_GATE_ENFORCE`.
       Under it the equivalents stop blocking — a mutant on a line no PR touched cannot fail that PR —
-      so this checkbox is superseded by that change's 4.1a/4.1b rather than completed here. Two
+      so this checkbox is superseded by 4.1a/4.1b above rather than completed as written. Two
       corrections it must carry, both wrong above and left in place so the record shows what changed:
       "split the four narrowing-operand lines" is unreachable (there are seventeen, and splitting
       cannot work for this mutator family), and "task 4.1 removes THAT flag" is reversed — diff-scope

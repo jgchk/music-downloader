@@ -3,6 +3,27 @@
 **Research date:** 2026-08-07. All URLs accessed 2026-08-07 unless noted. Findings are input to a
 decision, **not normative until adopted** through an OpenSpec change and a PR.
 
+> **Erratum, recorded when this research was adopted as `mutation-gate-diff-scope`.** The house
+> figures in §1 are a snapshot of `main` taken before the v3.18.0 burn-down landed. They are left
+> as written, because the argument they support does not depend on the exact count and rewriting a
+> dated measurement would falsify the record — but two of them are superseded, and this doc is not
+> the place to read the current state from:
+>
+> - **64 survivors at 98.96%** is now **27 at 99.56%** (7100 mutants, 929 ignored, 6083 killed, 61
+>   timed out). The v3.18.0 correlation change's 45 were burned down to 9.
+> - **The 2 MusicBrainz album-title survivors are FIXED**, in v3.18.1, not open. They were a real
+>   domain bug and were fixed rather than waived, which retired them by removing the sentinel they
+>   lived on. §9's *"a different animal … must not be swept up with the 17"* was right and has been
+>   acted on; nothing there remains to do.
+> - The **17** provably-equivalent narrowing operands are **27** on the same reading, and §9's
+>   recommendation to retire them with an `ignore-unions` plugin has since been measured and argues
+>   the other way: an ignorer is consulted per AST *node*, and 38 of the 64 sat on a node that also
+>   carries a killed mutant, so running one took a file from 96.67% to a false 100.00%.
+>
+> The current numbers live in `openspec/changes/mutation-gate/design.md`, which is re-measured
+> against the shipped tree. Everything else here — the literature, the tool facts, the option
+> analysis, the pitfall checklist — is unaffected.
+
 **Question.** A StrykerJS mutation gate runs per-PR in `.github/workflows/pipeline.yml`, scoped to
 the production **files** a branch changed, with `continue-on-error: true` and no required-check
 flag. The owner wants it to genuinely block. `main` is not mutant-clean and — as the shipped design

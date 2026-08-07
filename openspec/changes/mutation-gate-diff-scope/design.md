@@ -23,9 +23,14 @@ What exists today, and constrains the approach:
   refuses to report zero drift from an unreadable report.
 - `test/boundaries/mutation-scope.test.ts` pins the job's command shape, the scope alternation,
   the report path, the waiver doctrine and the suppression ceiling.
-- Main is not mutant-clean: 64 survivors at 98.96% at the tip — 45 of them arrived with one
-  unrelated feature (v3.18.0) inside a week, 17 are provably-equivalent narrowing operands
-  deliberately left unwaived, 2 are a real unspecified-behaviour finding.
+- Main is not mutant-clean: **7100 mutants, 929 ignored, 6083 killed, 61 timed out, 27 surviving
+  — 99.56%** at the tip. All 27 are provably equivalent and deliberately left unwaived, because no
+  mechanism Stryker 9.6.1 offers is (node AND mutator), so every available waiver for this family
+  silences a killable twin. (An earlier reading of this same tip said 64 at 98.96%, of which 45
+  arrived with one unrelated feature inside a week and 2 were a real unspecified-behaviour finding
+  in the MusicBrainz album path. The 45 were burned down to 9 and the MusicBrainz finding was FIXED
+  in v3.18.1 — it was a domain bug, not a mutant to appease. Mutation debt is a flow, not a stock:
+  that is the point, not a caveat.)
 
 ## Goals / Non-Goals
 
@@ -42,8 +47,10 @@ What exists today, and constrains the approach:
 
 - **Enabling enforcement.** The switch ships off. Flipping it is a separate decision on separate
   evidence.
-- **The `ignore-unions` ignorer plugin**, and **fixing the two MusicBrainz survivors.** Both are
-  named in `proposal.md` as out of scope with their reasons.
+- **The `ignore-unions` ignorer plugin.** Named in `proposal.md` as out of scope with its reason —
+  and with the measurement that now argues against building it at all. (The two MusicBrainz
+  survivors were also listed here as out of scope; they were **fixed in v3.18.1**, so there is
+  nothing left to be out of scope about.)
 - **Any change to what Stryker mutates or how.** No mutator changes, no new suppressions, no
   threshold change. `thresholds.break: 100` stays exactly as it is (§6: keep it while it means
   "zero survivors"; never introduce a sub-100 number).
@@ -77,8 +84,8 @@ feedback.** A wide report under a narrow gate also preserves the one genuine pro
 had: an assertion weakened elsewhere in a file the branch touched still shows up, as a report
 rather than as a block.
 
-**Consequence, stated rather than discovered:** the seventeen recorded equivalents and the two
-MusicBrainz survivors stop blocking the moment the failure scope stops including untouched lines
+**Consequence, stated rather than discovered:** the twenty-seven recorded equivalents stop
+blocking the moment the failure scope stops including untouched lines
 — without being suppressed, and without silencing the killable twins that share their lines. When
 a PR *does* edit one of those lines, being asked to re-audit the equivalence claim is correct
 behaviour, not friction. That is exactly what Sonar sells: *"You own the quality and security of
@@ -321,7 +328,7 @@ relitigates it:
    survivors to 6 (99.89%)"*, *"the 6 sit in…"*, and *"Four are provably equivalent narrowing
    operands"*. `design.md` explicitly retracts that: run 6's 99.89% was false (it was hiding 104
    killable mutants behind two block directives that never closed), corrected to 19 at 99.67%, and
-   the tip of main is **64 at 98.96%**. The comment is rewritten around D5's actual reason.
+   the tip of main is **27 at 99.56%**. The comment is rewritten around D5's actual reason.
 2. **The stale timeout comment** (D6).
 3. **`design.md`'s task 3.3 / Open Questions** records 2m31s on a 2-file diff and asks for a
    re-measurement on the first PR that changes production code. Two such PRs have since run;
@@ -349,7 +356,7 @@ without being suppressed, so nothing has to be done to them before a flip.
 
 **Task 4.1 — the required-check flip.** Its stated exit criterion is *"split the four
 narrowing-operand lines so their waivers become precise"*. That is doubly superseded by
-`mutation-gate`'s own `design.md`: there are **seventeen**, not four, and **splitting cannot work**
+`mutation-gate`'s own `design.md`: there are **twenty-seven**, not four, and **splitting cannot work**
 for this mutator family (D10, second bullet). The task can never close as written. Restated as the
 two-step it now is, with the criterion this change makes reachable:
 
