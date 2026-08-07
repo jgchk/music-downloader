@@ -418,6 +418,44 @@ Enforcement is *not* migrated here. Task 5.1 collects the measurement; `mutation
 flip enforcement and the required check together, in one step, so the gate never spends time in
 the "fails but is not required" shape `quality-gates.md` rejects.
 
+## The verdict watched deciding, on real data
+
+Written before the first CI run, because a gate nobody has watched decide anything is written rather
+than implemented — and because the one hazard that matters most here (D4's path-spelling join) is
+invisible in unit tests built from our own fixtures: they would agree with each other whatever
+Stryker does.
+
+Two real Stryker runs on the shipped tree, and three real `git diff -U0 --no-prefix` outputs.
+
+**The join, verified against a real report rather than a fixture.** Stryker 9.6.1 keys its report
+`packages/downloader/src/domain/ranking/ranking.ts` — repo-relative, POSIX, byte-identical to what
+`git diff --no-prefix` prints. This matches its source (`normalizeReportFileName` is
+`normalizeFileName(path.relative(process.cwd(), fileName))`), now confirmed by observation. The
+report also carries genuine multi-line spans: 31 of `facade/mapping.ts`'s mutants span more than
+five lines, which is the family the overlap test exists for.
+
+**The decision, both directions.** `packages/importer/src/facade/mapping.ts` has one real surviving
+mutant — `ConditionalExpression` → `false` at line 51, the equivalent already recorded in
+`mutation-gate`'s survivor table. Stryker exited **1** on that run, as `thresholds.break: 100`
+demands.
+
+| the branch's diff                    | verdict                    | shadow exit | enforcing exit |
+| ------------------------------------ | -------------------------- | ----------- | -------------- |
+| edits line **51** (the survivor's)    | `findings` — 1, named      | 0           | 1              |
+| edits line **200**, 149 lines away    | `clean`                    | 0           | 0              |
+| line 200, diff cut **without** `--no-prefix` | `unaudited: no-file-joined` | 0    | 1              |
+| line 51, report absent (crashed run)  | `no-report`                | 0           | 1              |
+
+The second row is the whole thesis in one line: **Stryker exited 1 and the verdict is clean.** Under
+the shipped file scope that exit code was the gate, so a branch editing an unrelated line of that
+file went red for a survivor it did not create. Under changed-line scope the survivor is still
+*reported* — the summary says "1 surviving mutant elsewhere in the changed files … did not block this
+branch" — and blocks nothing.
+
+The third row is the silent-green hazard, produced on purpose by dropping one flag. It fails as
+*unaudited* and the summary names the cause (path spellings drifted) rather than reporting a clean
+scope, which is the outcome that would otherwise have looked exactly like success forever.
+
 ## Open Questions
 
 - **How many shadow PRs are enough?** Task 5.1 sets a floor of six PRs that change production
