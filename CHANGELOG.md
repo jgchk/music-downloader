@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.18.1](https://github.com/jgchk/music-downloader/compare/v3.18.0...v3.18.1) (2026-08-07)
+
+### Bug Fixes
+
+* **musicbrainz:** stop an uncomparable album title from bypassing the ambiguity guard ([a02bd2b](https://github.com/jgchk/music-downloader/commit/a02bd2b903a55b01fa285d9d54fdf3230ebdd2ac))
 ## [3.18.0](https://github.com/jgchk/music-downloader/compare/v3.17.5...v3.18.0) (2026-08-07)
 
 ### Features
