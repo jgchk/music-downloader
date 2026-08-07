@@ -72,10 +72,18 @@ title match so the queue stays deduplicated.
 
 ### D5 — The check becomes required only after the seeding run
 
-Order inside the change: land config + scripts + CI job non-required → run the initial
+**SUPERSEDED in its second half** — the sequencing below is retired, and
+`docs/research/blocking-mutation-gate-scope.md` is the authority on why: "until main is
+mutant-clean" names a state no suite reaches, because the equivalent fraction among survivors
+rises as the suite improves. `openspec/changes/mutation-gate-diff-scope/` replaces it with
+line-scoped failure shipped in shadow mode. The first half still holds and still explains why:
+flipping first would block every PR on pre-existing debt that no diff owns. Kept unedited below
+because the reasoning that produced it is the reasoning the research doc corrects.
+
+~~Order inside the change: land config + scripts + CI job non-required → run the initial
 full-repo pass → triage into kills/suppressions until main is mutant-clean → *then* Jake
 flips the job to required in the ruleset. Flipping first would block every PR on
-pre-existing debt that no diff owns.
+pre-existing debt that no diff owns.~~
 
 ## Risks / Trade-offs
 
@@ -394,7 +402,13 @@ a durability or safety rule that had nothing behind it:
   broken binary and a schema-drifted one; the filesystem library's EXDEV guard could be forced open,
   papering a permissions fault over as a successful import.
 
-### The 19 that remain, and why each is left
+### The 19 that remained at the pre-rebase tip, and why each was left
+
+**Superseded as an inventory** — the authoritative survivor list is the table under "The v3.18.0
+burn-down" below, which reflects HEAD. This section is kept for its reasoning, which still holds and
+has since been confirmed by measurement rather than argument. Three of its rows are gone: the two
+MusicBrainz `''` mutants (the album-title open question, now fixed) and
+`domain/acquisition/acquisition.ts:103` (respelled).
 
 One survivor is missing from this table on purpose, because it is the clearest illustration of why
 reading a mutant off the printed line is dangerous.
@@ -409,7 +423,7 @@ test that parks a stream, lets a later event land undrained, and asserts the res
 fires exactly once. Unpinned behaviour, not a live defect — but it was one triage step away from
 being waived as equivalent.
 
-Regenerate with `pnpm exec stryker run`; this list is current at HEAD.
+The list as it stood then (regenerate the current one with `pnpm exec stryker run`):
 
 | Site | Mutated span | Verdict |
 | --- | --- | --- |
@@ -466,7 +480,8 @@ guard as a property-presence test would cost the domain reader more than the sco
 
 **Cost, stated plainly:** a future PR touching one of these files will see the mutation job report a
 survivor it did not create. That is the friction these rows buy, and it is why the job must stay
-non-blocking until either the `ignore-unions` rule below lands (the right fix — a config rule
+non-blocking until either the `ignore-unions` rule below lands (**RETRACTED — measured impossible;
+see "Measured: no Stryker mechanism can suppress one mutant of a node"**; a config rule
 inspects the AST node and *can* be precise where a line-scoped comment cannot) or the ACL question
 below is settled.
 
@@ -480,6 +495,7 @@ the event stores). Re-measuring at the rebased tip:
 | --- | --- | --- | --- | --- |
 | this branch, before the rebase | 6701 | 893 | 19 | 99.67% |
 | the same branch, rebased onto v3.18.0 | 7088 | 929 | **64** | 98.96% |
+| after the v3.18.0 burn-down below | 7100 | 929 | **27** | **99.56%** |
 
 The burn-down did not regress. **v3.18.0 arrived carrying 45 surviving mutants of its own**, in the
 production code it added — clustered in `importer/domain/import/events.ts` (10), the two
@@ -502,12 +518,15 @@ number it spoils:
   per-mutant-on-changed-files design was chosen for.
 
 **This does NOT change the recommendation to leave `continue-on-error` in place in this PR** — the
-ordering in D5 still holds, and flipping the flag while 64 survivors sit on main would block the
-next unrelated PR on debt it did not create. It sharpens what has to happen next: the flip is worth
-more than it looked, and the thing standing between here and it is now mostly *someone else's* 45,
+ordering in D5 still holds *for the flag*, and flipping it while 64 survivors sit on main would
+block the next unrelated PR on debt it did not create. (Read no further than that: the paragraph
+below frames the burn-down as the road to the flip, which is exactly the premise retired under "Why
+the gate still stays inert" — the road is line-scoping, not a shorter list.) It sharpens what has to
+happen next: the flip is worth more than it looked, and what stands between here and it is *someone
+else's* 45,
 not this change's 19.
 
-### Open question: an album title that normalizes to nothing
+### Open question, now CLOSED: an album title that normalizes to nothing
 
 The two MusicBrainz survivors are `release.title ?? ''` and `group.title ?? ''`. They are **not**
 equivalent, and pinning today's behaviour would be fiction, because today's behaviour is unspecified.
@@ -522,8 +541,51 @@ otherwise have refused to choose. Two punctuation-titled albums are indistinguis
 This narrows the memory-held claim that the album path is "fully fixed": it is, for titles that
 survive normalization. The principled fix is to carry an absent-or-empty identity title as
 `undefined` rather than `''` and require a *present* title for the exact-title preference — the
-"make the illegal state unrepresentable" rung, not a guard. That is a real change to a recently
-hardened path and is deliberately **not** attempted inside a burn-down. Recorded as a deferred item.
+"make the illegal state unrepresentable" rung, not a guard.
+
+**Done, in `fix(musicbrainz)` — but not quite as sketched, and the difference matters.**
+
+Red first: two scenarios were written and watched failing — a request for `÷` answered with `+`, and
+a request for `÷` answered with a release MusicBrainz sent no title for — both bypassing an ambiguity
+guard that should have refused.
+
+The sketched fix (absent-or-empty → `undefined`, require a *present* title) makes those two refuse,
+and shipped that way first. Review then caught what it also does: **it removes a right answer along
+with the wrong one.** A request for `÷` against the genuine `÷` album and a within-margin rival used
+to resolve correctly, by the exact-title preference. Under the sketch, `wanted` is `undefined`, no
+group is titled, and the ambiguity guard refuses — so *every* punctuation-titled album becomes
+permanently unresolvable whenever anything scores near it. Nothing pinned that loss either way, and
+three reviewers converged on it independently.
+
+The error in the sketch is a conflation it inherited from the bug: `÷` is not incomparable, it is
+only incomparable **under this normalizer**. Treating "MusicBrainz sent no title" and "the normalizer
+cannot represent this title" as the same fact is the same collapse the fix set out to remove, one
+level up. So `comparableTitle` now falls back to the literal text when normalization empties a
+*present* title, and returns `undefined` only for genuine absence. `÷` still refuses to match `+`;
+`÷` matches `÷`; absence matches nothing, including another absence. The two value spaces cannot
+collide — a fallback value contains no letter or digit by construction, and a normalized one always
+contains at least one.
+
+The fallback is deliberately **not** casefolded, and the code says so at the site: nothing reaching
+that line contains a letter or a digit, so for every title it can actually receive there is no case
+to fold. The exception is real but empty in practice — a few cased symbols exist (`Ⓐ`/`ⓐ`) and now
+compare case-sensitively. Accepted rather than papered over, because a casefold there is a line no
+honest test could pin.
+
+Rung of the ladder, stated honestly because the first draft of this section overclaimed: this is
+**not** rung 4. `undefined` is exactly as much a comparable value as `''` was as far as `===` is
+concerned, and `isSameTitle`'s `wanted !== undefined` **is** still a guard someone could forget. What
+changed is that the guard is written once, in one function, instead of implicitly at two call sites —
+centralisation plus a test that kills its removal, which is a real win and rung 1-to-2 work, not
+unrepresentability.
+
+It does retire the two `''` survivors by **removing the sentinel they lived on** rather than by
+asserting the unspecified behaviour they exposed — which is why the fix was worth doing and pinning
+the old behaviour would have been fiction. Five tests now pin the area: the two refusals, the
+punctuation-titled album that must still be *findable*, a separators-only title that must not be,
+and a request spelled differently from MusicBrainz's own title (which is what "exact after
+normalization" means, and was unpinned at this level — a surviving mutant found it). The file went
+from 3 survivors to 1, and the new code is fully measured: every mutant in it killed.
 
 ### A `disable next-line` keys on (line, mutator) — not on the operand its reason argues
 
@@ -584,7 +646,7 @@ Read by mutator (mutants silenced, not directives): `StringLiteral` 27, `ArrayDe
    returns `undefined`, because these switches have no `default` and control falls out to the
    function's implicit tail return. The labels are the *compile-time* exhaustiveness pin, so rung 3
    (delete) does not apply and no runtime test can distinguish them.
-2. **Type-narrowing operands on discriminated unions** (now ~2 waived, 17 recorded as survivors
+2. **Type-narrowing operands on discriminated unions** (now ~2 waived, 16 recorded as survivors
    instead). `state.phase === 'applied' && state.remediation?.status === s`, where `remediation` is
    declared on `AppliedState` alone: the second operand reads `undefined` on every other member, so
    the conjunction is false either way. The operand exists to satisfy the type checker, not to
@@ -604,14 +666,17 @@ will not stop being true. The doctrine's own remedy for that is a **configured r
 reason**, not a comment at each of N sites, and this repo already has the machinery
 (`scripts/mutation/ignore-logging.mjs` is a local ignore-plugin with its own test).
 
-**Recommended, deferred, and deliberately not done inside a burn-down:** an `ignore-unions` plugin
+**RETRACTED — this recommendation is false, and was disproved by experiment; see "Measured: no
+Stryker mechanism can suppress one mutant of a node" below. An ignore-plugin is consulted per AST
+NODE before mutants exist, so it cannot leave a killable sibling on the same node measured. The
+paragraph is kept, struck, because the reasoning that produced it is instructive.** ~~an `ignore-unions` plugin
 retiring families 1 and 2 at the config site under the D6/D7 argument, which would take the inline
 waiver count back to roughly 25 *and* clear seventeen of the recorded survivors — an ignore plugin
 is handed the babel path, so it can ignore the narrowing operand alone and leave the killable
 sibling on the same line measured, which is precisely what a line-scoped comment cannot do. That is
 a rule-pack decision with its own false-negative cost (it
 would also hide a genuinely wrong `case` grouping), so it deserves its own change and its own
-grilling rather than being smuggled in here. Until then the 58 stand, individually justified — each
+grilling rather than being smuggled in here.~~ Until then the 58 stand, individually justified — each
 verified to silence only mutants that genuinely survive.
 
 - **`decider-properties` did what it claimed.** Even before this burn-down the deciders and their
@@ -640,18 +705,336 @@ outright when every mutant in scope was ignored. Recorded as a deferred item alo
 blind spot; the fix is upstream (per-mutant module reloading in the vitest runner), not a config
 we can write today.
 
+## The v3.18.0 burn-down: 64 → 27, and the measured limit of precise suppression
+
+**7100 mutants, 929 ignored, 6083 killed, 61 timed out, 27 surviving — 99.56%.**
+
+Re-measured after the rebase onto the current main and after two changes this pass had drafted were
+dropped on review (see "What the review sweep found"), so this is the figure for the tree that
+actually ships, not the one the burn-down ended on. It supersedes an earlier draft of this section
+that said **25 / 99.59%**: that number predated the two mutants deliberately *re-admitted* below when
+a score-driven assertion was reverted, and the survivor table underneath has listed 27 rows since.
+The headline was simply never updated to match its own inventory — the exact drift
+`docs/research/blocking-mutation-gate-scope.md` §10 catalogues, committed here and corrected here.
+Timeout counts move a little run to run (71 in one earlier run, 61 in this one); survivors did not.
+
+The 45 that arrived
+with v3.18.0 are down to 9; the album-title open question is closed; and one of the seventeen
+recorded equivalents was retired by respelling. The remaining **27 are all provably equivalent, and
+every one carries a written argument** at its site.
+
+The part worth carrying forward is not the number. It is that this pass **measured** the thing the
+previous pass reasoned about — whether any Stryker mechanism can waive one mutant of a node without
+silencing its killable siblings. It cannot, and the recommendation this document previously made was
+wrong.
+
+### The 45 that came with v3.18.0: 36 killed, 9 equivalent
+
+Not one was a missing feature. Every one was a fact the suite *executed* but could not have noticed
+going wrong — the same shape as the pre-rebase burn-down, reproduced on a feature written **after**
+the gate existed. That is the argument for task 4.1 restated with fresh evidence: the debt arrives
+with the work, so only a diff-time gate meets it at the rate it arrives.
+
+The ones worth naming, because each is a real assertion gap rather than a mutation artefact:
+
+- **`isCycleStart` could decline to answer.** It is declared `: boolean`, but every mutant of its
+  exhaustive `switch` — emptying a `case` label, dropping a consequent — makes control fall out and
+  return `undefined`. `undefined` is falsy, so no loose assertion could see it, and the outbound
+  renderer slices a cycle's story on this answer. Ten mutants, one gap.
+- **Both event stores were only ever given `null` as degraded metadata.** `typeof raw !== 'object'
+  || raw === null` left four SURVIVORS on one line (it carries about twice that many mutants), and `null` is the single input on which all
+  four agree with the original (`typeof null === 'object'`) — which is precisely *why* four sat
+  there. A JSON scalar in that column routes down the spread path under three of them and
+  manufactures `{0:'g',1:'o',…}`: provenance nobody wrote.
+- **A composition root's correlation minter could return `undefined` for every operation.** Every
+  existing runtime test either overrode the source or supplied a good story, so the id format
+  `runtime.ts` calls the one place to establish was unspecified. Note for anyone re-testing that
+  line: reading the story off the outbound feed is a FALSE kill, because the fake supervisor injects
+  its own context — only the raw stored row of the submitting hop observes the composed mint.
+- **`{ warn: logger.warn.bind(logger) }` emptied to `{}` is not arid.** The verdict consumer calls
+  `warn` unconditionally on the unreadable-envelope path, so `{}` throws out through
+  `consume`/`drain`/`poll` and **the verdict is never applied**. Reading that object as "just
+  logging" would have hidden a real failure path — a caution for D6's blast radius.
+- **A verdict could be published under a story opened after it.** The bound keeping the correlation
+  envelope "as of the event" could be forced true and no fixture noticed, because none held a
+  second cycle.
+- **Both renderers could ship `metadata: undefined` instead of omitting the key** — which `toEqual`
+  reads as identical — against a serialization convention both files state out loud.
+
+**Six of the 11 that remain are one family with one proof** (the other five carry their own arguments in the table below): the block `correlationOf` builds is immediately
+re-validated by `publishedCorrelationSchema`, whose `correlationId` applies the *same*
+`CORRELATION_ID_PATTERN` the guard applies, plus a `z.string()` that rejects `undefined`. So
+`metadata !== undefined` ⟺ the story is a string matching the pattern, independently of the guard;
+every mutation of it changes behaviour only on branches the schema then drops. A side-finding worth
+recording: this proves the `!isCorrelationId(story)` half of the guard is **fully subsumed** by the
+downstream schema check. It was left in place deliberately — the file's own comment argues the block
+should be checked before validation, and deleting it would make the schema solely load-bearing for
+that invariant — but it is redundant, and that is a design question for its owner.
+
+### Measured: no Stryker mechanism can suppress one mutant of a node
+
+This document previously recommended an **ignore-plugin** as the right fix for the equivalent
+family, on the grounds that a plugin "is handed the babel path, so it can ignore the narrowing
+operand alone and leave the killable sibling on the same line measured, which is precisely what a
+line-scoped comment cannot do."
+
+**That is false.** Read `@stryker-mutator/instrumenter@9.6.1`
+(`transformers/babel-transformer.js`, `transformers/ignorer-bookkeeper.js`): the ignorer is consulted
+in `enterNode`, once per AST node, *before any mutant exists*, and the single message it returns is
+stamped on **every** mutant **every** mutator generates for that node and its subtree. Its
+granularity is the node. A comment directive's is (line, mutator). Neither is (node ∧ mutator), and
+nothing composes them — they are `??`-chained alternatives, not filters.
+
+Verified by experiment, not by reading. A throwaway ignore-plugin matched exactly one node — the
+`state.phase === 'AwaitingManualSelection'` test in `domain/acquisition/acquisition.ts`, whose
+`ConditionalExpression → true` mutant was a recorded equivalent survivor. From the run's own JSON:
+
+| mutant on that node | before | with the node-precise plugin |
+| --- | --- | --- |
+| `ConditionalExpression → true` | Survived (equivalent) | Ignored — *intended* |
+| `ConditionalExpression → false` | **Killed** | Ignored |
+| `EqualityOperator → !==` | **Killed** | Ignored |
+| `StringLiteral → ""` | **Killed** | Ignored |
+
+The file's score went 96.67% → **100.00%** by hiding three findings the suite was catching. That is
+the same false-100% the first draft of this document shipped, reproduced under the mechanism
+recommended to prevent it.
+
+Generalised across the whole list rather than assumed: **38 of the 64 survivors sat on an AST node
+that also carries a killed mutant** — including **17 of 17** of the equivalent-narrowing family. For
+those, a node-precise waiver is strictly worse than no waiver. The `ignore-unions` plugin this
+document recommended should **not** be built.
+
+### One was retired by spelling, and that is the test for whether a rewrite is honest
+
+`acquisition.ts`'s snapshot menu guard now asks `'candidates' in state` — the way the three
+properties directly above it already ask. `in` is not an operator either mutator rewrites, so the
+equivalent mutant does not exist, while the mutant that carries the behaviour (emptying the property
+name so the menu is never carried) remains and is killed.
+
+Measured: **30 mutants with 1 unkillable survivor → 27 mutants with none.**
+
+Worth stating as a rule, because the same move done badly is indistinguishable from gaming — and the
+first draft of this paragraph stated the rule in a form its own example fails, which review caught:
+
+> **A rewrite that removes an equivalent mutant must not leave any behaviour at the site unmeasured
+> that was measured before.**
+
+*Not* "must not reduce the count of killed mutants", which is what this said first. The count at this
+site did fall, 3 killed → 1: the `===` spelling produced `ConditionalExpression → false`,
+`EqualityOperator → !==` and `StringLiteral → ""`, and the `in` spelling produces only the
+`StringLiteral`. The rewrite is still sound, but it takes the finding-level argument to show it: all
+three of those mutants were killed by the *same single assertion* — `exposes the retained candidate
+editions while awaiting a choice` (read-models.test.ts) — because each of them blanks the menu, and
+the surviving `StringLiteral` mutant blanks it too. One behaviour, one assertion, still measured.
+A count-based rule would have waved that through on the wrong evidence and, worse, would license a
+future rewrite that hides a *distinct* finding as long as the arithmetic came out.
+
+The respelling also moved an invariant from the compiler's keeping into the fold's, which review
+flagged and which is now closed: `'candidates' in state` equals the phase test only because every
+exit from `AwaitingManualSelection` drops the key, and six other arms of `evolve` use the
+`{ ...state }` form that would not. That is asserted over every reachable history by `carries
+'candidates' on no state but AwaitingManualSelection` (state.property.test.ts) — written red-first
+against a hand-introduced `{ ...state }` cancel arm, which it catches and **no other test in the
+suite does.**
+
+The other sixteen were left alone, on purpose:
+
+- The **decider and state-fold phase guards** (`decide.ts` ×2, `state.ts`) could take the same
+  treatment and should not. Rewriting a decider's phase guard as a property-presence test costs the
+  domain reader more than the score is worth — the phase name *is* the ubiquitous language there.
+  This repeats the previous pass's judgement rather than overturning it inside a burn-down.
+- The **brand-lift ternaries** (`facade/mapping.ts`, `bridge-adapter.ts`) would need
+  `toPositiveInt`/`branded` widened to accept `undefined`. Declining was right, but review corrected
+  the reason, and the corrected one is worth having: the dependency-rule argument first recorded here
+  is the *weakest* of the three, because widening a signature teaches the domain nothing about the
+  adapter. The real arguments are (a) **contract fidelity** — `toPositiveInt`'s docstring says "call
+  it only where the wire schema has already proven the value a positive integer", and an
+  `undefined`-tolerant mode dilutes it from guardian-of-an-invariant to guardian-plus-optionality-
+  passthrough; and (b) decisively, `bridge-adapter.ts` does not call a purpose-built mint at all — it
+  calls `branded<T>` directly, which `brand.ts` declares **the single sanctioned cast** in the
+  system. Widening *that* hands every brand in both packages a nullable lifting mode nobody asked
+  for, and weakens the one function whose narrowness is the entire guarantee that a branded value can
+  only originate from a proven invariant. Two equivalent mutants are nowhere near that price.
+  Note also that both mutants are equivalent *precisely because* the brand is runtime-erased: the
+  ternaries exist for the type checker alone. Reshaping a domain contract to delete a type-level-only
+  ternary would be letting the measurement tool author the domain.
+- The rest have no spelling that removes the equivalent mutant without either inventing a helper
+  whose only motive is the tool, or deleting a guard the type checker requires.
+
+### The authoritative survivor list (25, current at HEAD)
+
+Regenerate with `pnpm exec stryker run`. Every row is provably equivalent with its argument written
+at the site; none is an unexamined leftover.
+
+| Site | Mutated span → | Family |
+| --- | --- | --- |
+| `downloader/interfaces/contracts/events/mapping.ts:23` ×3 | `story === undefined` → false; whole guard → false; `\|\|` → `&&` | subsumed by the schema re-validation |
+| `downloader/interfaces/contracts/events/mapping.ts:109` | `block === undefined` → false | `safeParse(undefined)` fails either way |
+| `downloader/interfaces/contracts/events/mapping.ts:111` | `metadata === undefined` → false | `{…, metadata: undefined}` is byte-identical on the wire |
+| `importer/interfaces/contracts/events/mapping.ts:46` ×3 | as above | subsumed by the schema re-validation |
+| `importer/interfaces/contracts/events/mapping.ts:111` | `block === undefined` → false | `safeParse(undefined)` fails either way |
+| `importer/interfaces/contracts/events/mapping.ts:113` | `metadata === undefined` → false | `{…, metadata: undefined}` is byte-identical on the wire |
+| `importer/interfaces/contracts/events/mapping.ts:43` | `<=` → `<` | versions are unique; the equal case is `stored`, never a cycle start |
+| `downloader/adapters/musicbrainz/mapping.ts:334` | `count < modal` → `<=` | map keys are distinct, so `count === modal` cannot hold |
+| `downloader/adapters/slskd/client.ts:141` | `body !== undefined` → true | `JSON.stringify(undefined)` is `undefined`; fetch sends no body |
+| `downloader/adapters/slskd/poll.ts:28` | `filename !== undefined` → true | `Set<string>.has(undefined)` is false |
+| `downloader/application/projections/read-models.ts:329` | `streamId !== undefined` → true | `undefined` in a `Set<string>` no `isStalled(string)` can query |
+| `importer/application/projections/read-models.ts:280` | `streamId !== undefined` → true | as above |
+| `importer/application/projections/read-models.ts:182` | `type === 'ImportRequested'` → true | `source` is declared on that member alone |
+| `importer/application/projections/read-models.ts:215` | `directory === undefined` → false | no open review can reach it without a directory |
+| `downloader/domain/acquisition/decide.ts:333` | `phase !== 'Fulfilled'` → false | `resume` is declared on `FulfilledState` alone |
+| `downloader/domain/acquisition/state.ts:339` | `phase !== 'Fulfilled'` → false | as above |
+| `importer/domain/import/decide.ts:250` | `phase !== 'awaiting-review'` → false | `settled` is declared on that phase alone |
+| `downloader/domain/policy/policies.ts:69` | `timeBudgetMs !== undefined` → true | `undefined <= 0` is false |
+| `downloader/domain/ranking/ranking.ts:48` | `>` → `>=` | equal ranks give the same answer to every consumer |
+| `downloader/domain/shared/duration.ts:25` | `actualMs !== undefined` → true | the tolerance check answers false for `undefined` |
+| `importer/facade/mapping.ts:51` | ternary test → false | the brand lift is the identity at runtime |
+| `importer/adapters/beets/bridge-adapter.ts:97` | ternary test → false | as above |
+| `importer/application/import/use-cases.ts:118` | ternary test → false | the missing id would miss in the projection anyway |
+
+### What the review sweep found, including a live defect
+
+Eleven reviewers ran over this pass. Three findings are worth carrying, because each is a way a
+mutation burn-down specifically goes wrong.
+
+**A live, reachable crash — found by reviewing the burn-down's own new test.** Both event stores'
+`parseMetadata` returned a non-object metadata column "exactly as found", and one of the tests added
+here pinned that for a JSON *scalar*, where it genuinely degrades (`'gone'.correlationId` is
+`undefined`). `null` is the one value for which it does not: `continueFrom` opens with
+`stored.metadata.correlationId`, so a metadata column holding JSON `null` throws a `TypeError` out of
+an unawaited `drain()` as an unhandled rejection and takes the runtime down — the exact wedge that
+guard exists to prevent, arriving by the other door. Reachable: DB surgery on the event store is a
+documented ops procedure here, and the pre-existing test wrote that value and asserted only
+`isOk()`. Every non-object now reads as a row carrying **no** provenance. The lesson is the sharper
+half: a *strengthened* assertion and a rewritten comment made the untouched hole look covered.
+
+**A test written for the score, caught and reverted.** The burn-down killed a mutant with
+`expect('metadata' in rendered).toBe(false)`, justified as the serialization convention "on the
+wire". Two reviewers independently showed the justification is false — `JSON.stringify` drops an
+`undefined` property, so the two shapes are byte-identical; `OutboundFeed` re-adds the key
+unconditionally one layer out; and no consumer reads a published event with `in` or `Object.keys`.
+It pinned a distinction nothing can observe. Reverted to `toBeUndefined()`, and the two mutants are
+recorded as equivalent survivors instead. This is the rule working as intended: the honest answer
+cost two points of score, and the reviewer that found it is the one this document predicted would
+(`design.md` Risks: "test-quality-reviewer already hunts refactoring-brittle tests").
+
+**A fix that removed a right answer with the wrong one.** Recorded above under the album-title
+question. Three reviewers converged on it; the shipped fix now keeps punctuation-titled albums
+findable, and a test pins that they are.
+
+Also worth noting for the next pass: the `--tempDirName` glob was widened in `stryker.config.mjs`
+but not in `.gitignore`, `.prettierignore`, or `eslint.config.js` — and **jj snapshots the working
+copy against `.gitignore`**, so an un-ignored sandbox (a full copy of the tree) would have been
+auto-added to the working-copy commit. Fixing a hazard in one of four places is its own failure mode.
+
+### Why the gate still stays inert — and why waiting for a clean main is not the plan
+
+Main is **not** mutant-clean, so `continue-on-error` stays on the PR job's Stryker step and task 4.1
+stays open. Flipping it while these survivors sit on main would block the next unrelated PR on debt
+it did not create, which is exactly what D5's ordering exists to prevent.
+
+**But D5's ordering rests on a premise that is now retired.** D5 sequences the flip *after* "main
+becomes mutant-clean", and `docs/research/blocking-mutation-gate-scope.md` establishes — from the
+literature, not from this repo's experience — that such a state is unreachable in principle: the
+equivalent fraction among survivors **rises** as the suite improves. Read that doc rather than this
+paragraph; it is the authority, and §5.1 and §9 carry the argument and its sources. The consequence
+for this change is blunt and belongs here: **task 2.1's exit criterion can never be met, so any plan
+whose next step is "finish the burn-down" is planning against a state that does not exist.** Three
+passes have now driven the list down by hand (464 → 19, then 64 → 27) and the gate has blocked
+exactly nothing.
+
+**The adopted direction is `openspec/changes/mutation-gate-diff-scope/`** — move the failure scope
+from changed *files* to changed *lines*, shipped in shadow mode behind `MUTATION_GATE_ENFORCE`, with
+a measured false-positive rate as the gate to enforcement. That change owns the pipeline job from
+here on: the survivor forgiveness, the timeout, the verdict, and the comments that argue them. This
+document deliberately makes no further edit to `.github/workflows/pipeline.yml`, so that the two
+changes cannot contradict each other in the same file. Under that design `continue-on-error` **moves
+rather than disappears** (diff-scope D5), which is why it is still on the Stryker step here.
+
+**One hazard found in this pass and deliberately left for that change to fix.** `continue-on-error:
+true` covers the whole step, so it forgives Stryker *crashing* exactly as readily as it forgives
+survivors — a config error, an OOM, a plugin that failed to load, or a corrupted sandbox all leave a
+green job indistinguishable from a clean run. That is the one failure mode a gate must not have, and
+it is not hypothetical here: the sandbox-nesting bug recorded below produced a **confidently wrong
+score** rather than an error. Two notes for whoever implements it:
+
+- **The weekly workflow already solved this and nobody cited it.** `.github/workflows/mutation.yml`
+  carries an "Assert the run produced an inventory" step whose comment states the rule exactly —
+  `continue-on-error` must cover the expected non-zero exit and nothing else. The PR job has no
+  equivalent. The asymmetry, not the mechanism, is the finding.
+- **Exit code alone is not enough**, measured here: a Stryker `ConfigError` propagates as an
+  unhandled rejection and node also exits 1, so a crash and a missed threshold are the same code.
+  The reporters run before the threshold is evaluated, so the presence of `reports/mutation/
+  mutation.json` is what separates them. Diff-scope D4 already requires the verdict to fail on a
+  missing or unreadable report; that condition is the same test, and it is the one to reuse.
+
+Worth stating plainly, because shadow mode hides it: until diff-scope's verdict step is *enforcing*,
+this hazard remains open. The gate can still green on its own breakage.
+
+### D8 — RECOMMENDED, NOT IMPLEMENTED: a justified survivor baseline, checked by the job
+
+**Partly superseded.** Line-scoped failure (`mutation-gate-diff-scope`) is the adopted answer to the
+question this decision was reaching for, and it retires the *blocking* motive: a mutant on a line no
+PR touched cannot fail that PR, so the equivalents below stop being a gate to arm rather than a debt
+to clear. The inventory idea survives only as a way to keep the equivalence *claims* audited, which
+is a smaller job than the one described here. Read the rest as the reasoning that ruled out the
+alternatives, not as a live recommendation.
+
+The only mechanism that can arm this gate honestly is one Stryker does not offer and does not need
+to: **a checked-in inventory of the known-equivalent survivors, compared against the run's JSON
+report by the job itself.** The job fails on any surviving mutant *not* in the inventory and passes
+the ones that are. The report parser it needs already exists (`scripts/mutation/report-model.ts`).
+
+Why this is the right rung, in the doctrine's own terms:
+
+- It is **precise to (file, line, mutator, replacement)** — finer than anything Stryker offers — so
+  it is structurally incapable of the collateral damage measured above. It cannot silence a killable
+  twin, because it names the exact replacement.
+- Each entry carries **a written justification**, the shape the waiver doctrine asks for, and the
+  entries are **countable** — so `mutation-scope.test.ts` can hold a ceiling on them exactly as it
+  does for `// Stryker disable` directives today: a number to drive down, never a budget to spend.
+- It is the standard adoption pattern for a strict analyser over an existing codebase (PHPStan's and
+  Psalm's baselines, ESLint's suppressions file). That is a point in its favour and also its danger:
+  **a baseline allowed to grow is exactly the attested-dead shape it exists to escape.** The ceiling
+  test is what makes it a ratchet rather than a dumping ground.
+
+It is deliberately **not implemented here.** It is a rule-pack decision with a real false-negative
+cost — a wrongly-justified entry stops being audited until someone re-reads it — and this document
+has now twice recorded a mechanism adopted on an argument rather than a measurement. It deserves its
+own change and its own grilling. What this pass contributes is the measurement that rules out the
+alternatives, so that grilling can start from evidence.
+
+### Two operational findings, both of which produced confidently wrong readings
+
+- **Custom sandbox directories nest.** A Stryker run ignores whatever `tempDirName` is set to —
+  **its own**, and only its own. So two concurrent runs given different `--tempDirName` values (the
+  way concurrent scoped triage avoids cross-corruption) each copy the *other's* sandbox into theirs,
+  recursively:
+  `.stryker-tmp-a/sandbox-x/.stryker-tmp-b/sandbox-y/…`. It does not fail loudly — it reports a
+  plausible wrong score (73 survivors in a file that has none) and then dies on `ENOENT` inside a
+  path it had just built. Fixed by an `ignorePatterns` glob covering every spelling.
+- **The config file is a positional argument**, not `-c`/`--configFile`. `stryker run -c other.mjs`
+  silently runs the DEFAULT config, which is how the first attempt at the experiment above produced
+  a confident "the plugin does not fire" that was purely an artefact of the flag being ignored.
+
 ## Open Questions
 
 - **Task 3.3 is now measured in CI, not just locally.** This change's own PR (#161) exercised the
   job on a real 2-file production diff (`quality-policy.ts`, `import/decide.ts`): the whole job took
   **2m31s** on a 4-core runner, of which the Stryker pass was **~1m43s** — 372 mutants, 359 killed,
   13 surviving, at 5.08 tests per mutant. Comfortably inside the 20-minute timeout, so no tuning
-  lever was needed. Levers if a larger diff ever needs them remain `--concurrency` (D4) first, then
-  narrowing `mutate` to changed line ranges rather than changed files.
+  lever was needed — but that run is the **smallest** of three now observed, and reading it as
+  representative is a mistake `docs/research/blocking-mutation-gate-scope.md` §10 catalogues by name.
+  The other two are recorded there. The ceiling is left at 20 by this change and raised by
+  `mutation-gate-diff-scope` (its task 3.4), which owns the job. Levers if a larger diff ever needs
+  them remain `--concurrency` (D4) first, then narrowing `mutate` to changed line ranges rather than
+  changed files — which is now the adopted direction rather than a lever.
 
   Two things that run confirmed beyond the timing. The scope resolution picked out exactly the two
   changed production files and nothing else. And the job **passed while Stryker exited 1** — the
   `continue-on-error` arrangement behaves as designed: the findings are reported in the step summary
-  and the check stays green until task 4.1 flips both together. `decide.ts`'s 13 survivors in CI
+  and the check stays green. (That observation stands; "until task 4.1 flips both together" no longer
+  does — see "Why the gate still stays inert".) `decide.ts`'s 13 survivors in CI
   match the 13 measured locally, which is a second confirmation that scoped and full runs agree. Re-measure on the first PR
   that actually changes production code.
