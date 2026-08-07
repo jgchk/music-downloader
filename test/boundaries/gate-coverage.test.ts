@@ -37,12 +37,23 @@ const GENERATED_DIRECTORY_NAMES = new Set([
   '.svelte-kit',
   '.venv',
   '.e2e-tmp',
-  // Stryker's sandbox: a full copy of the tree, so every source in it would surface here twice —
-  // once as itself and once as an orphan no tsconfig claims.
-  '.stryker-tmp',
   '.git',
   '.jj',
 ]);
+
+/**
+ * Tool-owned names matched by *prefix* rather than exactly, held to the same dot-directory rule as
+ * the set above (the scenario checks both).
+ *
+ * Stryker's sandbox needs one: `.stryker-tmp` is only the DEFAULT name, and a run given
+ * `--tempDirName` — which is how two concurrent scoped runs avoid corrupting each other's sandbox —
+ * writes `.stryker-tmp-<name>/` instead. Every spelling is a full copy of the tree, so an unskipped
+ * one surfaces every source inside it twice: once as itself and once as an orphan no tsconfig
+ * claims. Exact-matching the default name meant this gate failed on the presence of its own
+ * tooling's output. Same reason `.gitignore`, `.prettierignore`, `eslint.config.js` and
+ * `stryker.config.mjs` all carry the wildcarded glob rather than the bare name.
+ */
+const GENERATED_DIRECTORY_PREFIXES = ['.stryker-tmp'];
 
 /**
  * Generated output whose directory name is ours rather than a tool's, matched by *anchored path*
@@ -79,8 +90,13 @@ function repoRelative(absolute: string): string {
 function isGeneratedPath(file: string): boolean {
   const relative = repoRelative(file);
   return (
-    relative.split('/').some((segment) => GENERATED_DIRECTORY_NAMES.has(segment)) ||
-    [...GENERATED_PATHS].some((tree) => relative === tree || relative.startsWith(`${tree}/`))
+    relative
+      .split('/')
+      .some(
+        (segment) =>
+          GENERATED_DIRECTORY_NAMES.has(segment) ||
+          GENERATED_DIRECTORY_PREFIXES.some((prefix) => segment.startsWith(prefix)),
+      ) || [...GENERATED_PATHS].some((tree) => relative === tree || relative.startsWith(`${tree}/`))
   );
 }
 
@@ -441,12 +457,23 @@ describe('gate coverage: the guard itself', () => {
 
   it('skips by basename only where a tool owns the name — every other skip is anchored', () => {
     // Dot-directories and the two names a package manager / language runtime reserve. Anything else
-    // is a name we chose, and a name we chose can collide with first-party source.
-    const chosenByUs = [...GENERATED_DIRECTORY_NAMES].filter(
+    // is a name we chose, and a name we chose can collide with first-party source. The prefix list
+    // is held to the same rule and matters more, not less: it prunes on a *leading* match, so a
+    // non-dot entry there would take every sibling name that merely starts the same way.
+    const chosenByUs = [...GENERATED_DIRECTORY_NAMES, ...GENERATED_DIRECTORY_PREFIXES].filter(
       (name) => !name.startsWith('.') && name !== 'node_modules' && name !== '__pycache__',
     );
 
     expect(chosenByUs).toEqual([]);
+  });
+
+  it('prunes a Stryker sandbox however `--tempDirName` spelled it, not just the default', () => {
+    // A scoped run's renamed sandbox is a full copy of the tree. Left unpruned it fails this gate
+    // on files that are not source at all — the gate breaking on its own tooling's output.
+    const root = temporaryDirectory();
+    mkdirSync(path.join(root, '.stryker-tmp-scoped', 'sandbox-x', 'packages'), { recursive: true });
+
+    expect(walkedDirectories(root)).not.toContain(path.join(root, '.stryker-tmp-scoped'));
   });
 
   it('reaches every tier, so the coverage scenarios cannot pass over an empty set', () => {

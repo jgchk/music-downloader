@@ -28,6 +28,7 @@ packages/web/playwright-report/
 # Python hermetic venvs
 **/.venv/
 
-# Mutation-run output (Stryker reports + incremental cache), generated.
+# Mutation-run output (Stryker reports + incremental cache), generated. The sandbox glob is
+# wildcarded because `--tempDirName` renames it (`.stryker-tmp-<name>/`) — see .gitignore.
 reports/
-.stryker-tmp/
+.stryker-tmp*/

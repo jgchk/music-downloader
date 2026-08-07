@@ -38,6 +38,10 @@ packages/importer/test/bridge/.venv/
 # TypeScript incremental-build state
 *.tsbuildinfo
 
-# Mutation testing (pnpm test:mutation): Stryker's sandbox + its reports/incremental cache
-.stryker-tmp/
+# Mutation testing (pnpm test:mutation): Stryker's sandbox + its reports/incremental cache.
+# Wildcarded, because `.stryker-tmp` is only the DEFAULT sandbox name: a run given `--tempDirName`
+# (how concurrent scoped runs avoid corrupting each other's sandbox) writes `.stryker-tmp-<name>/`.
+# This is the load-bearing copy of the glob — jj snapshots the working copy against .gitignore, so
+# an un-ignored sandbox (a full copy of the tree) is auto-added to the working-copy commit.
+.stryker-tmp*/
 reports/

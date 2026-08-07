@@ -207,7 +207,9 @@ export default tseslint.config(
       '.e2e-tmp/**',
       // Stryker's sandbox — a whole copy of the tree, so linting it would double every finding —
       // and the mutation reports beside it. Both are `pnpm test:mutation` output, never edited.
-      '.stryker-tmp/**',
+      // Wildcarded because `--tempDirName` renames the sandbox (`.stryker-tmp-<name>/`) — see
+      // .gitignore, which carries the same glob for the same reason.
+      '.stryker-tmp*/**',
       'reports/**',
       // The beets bridge is Python; it has its own native unittest + coverage.py tier.
       'packages/*/test/bridge/**',
