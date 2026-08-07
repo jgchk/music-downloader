@@ -2,7 +2,9 @@ import { globSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import mutationSuiteConfig from '../../vitest.mutation.config.ts';
+import { DIFF_FLAGS } from '../../scripts/mutation/changed-lines.ts';
 import { REPORT_PATH } from '../../scripts/mutation/report-model.ts';
+import { ENFORCE_SWITCH } from '../../scripts/mutation/verdict.ts';
 import strykerConfig from '../../stryker.config.mjs';
 
 /**
@@ -104,6 +106,49 @@ const PRODUCTION_SET = new Set(PRODUCTION);
  */
 function commitGateText(): string {
   return readFileSync(path.join(REPO_ROOT, 'scripts/check.sh'), 'utf8');
+}
+
+function pipelineText(): string {
+  return readFileSync(path.join(REPO_ROOT, '.github/workflows/pipeline.yml'), 'utf8');
+}
+
+/**
+ * The `mutation` job's own text, sliced from the workflow so a scenario about this job cannot be
+ * satisfied by an unrelated one hundreds of lines away — the exact failure the scope-alternation
+ * scenario below was rewritten to avoid when `toContain('downloader')` was answered by a docker tag.
+ */
+function mutationJob(): string {
+  const text = pipelineText();
+  const start = text.indexOf('\n  mutation:\n');
+  const after = /^ {2}[a-z][\w-]*:$/m.exec(text.slice(start + 1 + '  mutation:\n'.length));
+  return after === null
+    ? text.slice(start)
+    : text.slice(start, start + 1 + '  mutation:\n'.length + after.index);
+}
+
+/**
+ * The job's steps, one string each. A claim like "this step does NOT carry `continue-on-error`" is
+ * only worth anything against the step's own block: asserted against the whole job it would be
+ * answered by the flag sitting on a *different* step, which is precisely the arrangement this
+ * change ships.
+ */
+function mutationSteps(): string[] {
+  return mutationJob()
+    .split(/\n {6}- (?=name:|uses:|run:)/)
+    .slice(1);
+}
+
+/**
+ * Fails loudly when no step matches, rather than returning an empty string. Half the scenarios
+ * below are `not.toContain` claims, and every one of them would pass over a step that no longer
+ * exists — the vacuous-green shape this whole file is written against.
+ */
+function stepNamed(fragment: string): string {
+  const step = mutationSteps().find((candidate) => candidate.includes(fragment));
+  if (step === undefined) {
+    throw new Error(`No step of the \`mutation\` job contains ${JSON.stringify(fragment)}.`);
+  }
+  return step;
 }
 
 function rootScripts(): Record<string, string | undefined> {
@@ -268,7 +313,7 @@ describe('mutation gate placement', () => {
     // was satisfied by the word appearing in an unrelated step name, so deleting the whole job
     // left this green.
     expect(pipeline).toMatch(/^ {2}mutation:$/m);
-    expect(pipeline).toMatch(/run: pnpm exec stryker run --mutate/);
+    expect(pipeline).toMatch(/pnpm exec stryker run --mutate/);
 
     expect(weekly).toMatch(/^ {2}schedule:$/m);
     expect(weekly).toMatch(/^ {4}- cron: '[^']+'$/m);
@@ -293,6 +338,74 @@ describe('mutation gate placement', () => {
     // Both negations the config declares are re-stated by the workflow's exclusion grep.
     expect(pipeline).toMatch(/\\\.test\\\.ts\$/);
     expect(pipeline).toContain('__fixtures__');
+  });
+
+  it('carries the changed-line verdict in a step of its own', () => {
+    // Without this, deleting the whole gate — the step that decides — leaves the boundary tier
+    // green. The existing scenarios pin the mutation RUN; the run is now advisory by construction
+    // (`continue-on-error`), so the run alone proves nothing about whether anything is gated.
+    const verdict = stepNamed('pr-verdict.ts');
+
+    expect(verdict).toMatch(/pnpm tsx scripts\/mutation\/pr-verdict\.ts/);
+    expect(verdict).toContain('$GITHUB_STEP_SUMMARY');
+  });
+
+  it('runs the verdict even when the mutation run failed', () => {
+    // always(): a crashed run is exactly when the verdict matters most, and it fails on a missing
+    // or unreadable report. A verdict step that skipped on a failed Stryker step would skip the
+    // step whose whole job is to fail on a crash.
+    expect(stepNamed('pr-verdict.ts')).toMatch(/if: always\(\)/);
+  });
+
+  it('keeps `continue-on-error` on the mutation run and off the verdict', () => {
+    // The flag MOVES, it does not disappear (design D5). It stays on the Stryker step precisely
+    // because that step's exit code stops being the verdict: `thresholds.break: 100` fails on any
+    // survivor anywhere in the file-wide reporting scope, which is the verdict line scope rejects.
+    // A flag that crept onto the verdict step would make the whole gate inert again, silently.
+    expect(stepNamed('stryker run --mutate')).toContain('continue-on-error: true');
+    expect(stepNamed('pr-verdict.ts')).not.toContain('continue-on-error');
+  });
+
+  it('ships the verdict in shadow — the enforcement switch is absent', () => {
+    // Shadow is the shipped first state, and the flip is a decision on a measurement taken here
+    // (quality-gates.md's ten-percent bar), not a side effect of landing this job.
+    expect(mutationJob()).not.toContain(`${ENFORCE_SWITCH}:`);
+  });
+
+  it('feeds the verdict a diff cut with the flags the parser was written against', () => {
+    // The silent-green hazard. If the job's git spelling and `changed-lines.ts`'s expectations ever
+    // part company — a dropped `--no-prefix`, most likely — every intersection test returns false
+    // and the gate reads clean forever. One declaration, asserted against the job.
+    const scope = stepNamed('Resolve the changed production files');
+
+    expect(scope).toContain('git diff -U0');
+    for (const flag of DIFF_FLAGS) {
+      expect(scope).toContain(flag);
+    }
+  });
+
+  it('resolves exactly one merge-base for the whole job', () => {
+    // The mutate scope and the changed hunks must be the same comparison. Two `git merge-base`
+    // calls is two chances to answer differently — and a hunk set computed against a different base
+    // gates lines the branch did not write.
+    expect(mutationJob().match(/git merge-base/g)).toHaveLength(1);
+  });
+
+  it('budgets the job for the runs actually observed, not for a projection', () => {
+    // Once this check blocks, a timeout is a red required check on a correct branch: unattributable
+    // and non-deterministically reproducible, which is what teaches a loop that a check is flaky.
+    // The largest observed run was 13m58s.
+    expect(mutationJob()).toMatch(/timeout-minutes: 30/);
+    expect(mutationJob()).not.toMatch(/NOT yet observed in CI/);
+  });
+
+  it('argues its configuration from no number its own design retracts', () => {
+    // The job's comment used to justify `continue-on-error` from "464 survivors to 6 (99.89%)".
+    // `mutation-gate`'s design.md explicitly retracts that score — it was hiding 104 killable
+    // mutants behind two block directives that never closed. A retracted figure left arguing for a
+    // live decision is how the next reader relitigates it.
+    expect(mutationJob()).not.toContain('99.89');
+    expect(mutationJob()).not.toContain('464');
   });
 
   it('reads its report from the path the config writes it to', () => {

@@ -92,26 +92,43 @@ jobs:
       - name: Beets-bridge unit tests @ 100% coverage (Python)
         run: pnpm run test:bridge
 
-  # PR only: mutation testing over the production files this branch changed (change: mutation-gate).
+  # PR only: mutation testing over the production files this branch changed (change: mutation-gate),
+  # with the FAILURE scope narrowed to the changed LINES (change: mutation-gate-diff-scope).
   #
   # The `test` job proves every line EXECUTES under test. This proves a test would NOTICE the line
   # going wrong — the one axis where a suite written by the same process that writes the code would
-  # otherwise grade its own homework. The signal is per-mutant, never a score: the step summary
-  # names each survivor with file, line, and mutation so it converges like a review finding (kill
-  # it, or justify a suppression at the site).
+  # otherwise grade its own homework. The signal is per-mutant, never a score: the summary names each
+  # survivor with file, line, and mutation so it converges like a review finding (kill it, or justify
+  # a suppression at the site).
   #
-  # NOTE: the mutation step is `continue-on-error` and this check is NOT required, because main is
-  # not yet mutant-clean (design D5, task 2.1). Both flip together in task 4.1.
+  # TWO SCOPES, deliberately different:
   #
-  # Scope is the changed FILES rather than the changed lines. Stricter and far simpler: once main is
-  # mutant-clean, a changed file's untouched lines carry no survivors, so the two give the same
-  # verdict — and file scope additionally catches a change that weakens an assertion elsewhere in the
-  # same file. Incremental mode is deliberately NOT used here (stryker.config.mjs, D4a): its report
-  # merges cached whole-repo results, which would fail a branch on debt it never touched.
+  #   * REPORTING scope is the changed FILES. The step summary keeps the whole file-scoped inventory,
+  #     so an assertion weakened elsewhere in a file this branch touched is still visible. Android
+  #     lint's rule: suppress the gate, never the feedback.
+  #   * FAILURE scope is the changed LINES. A branch fails only for a surviving mutant whose span
+  #     OVERLAPS a line it added or modified — overlap rather than containment, so a whole-block
+  #     mutant covering a function the branch edited one line of still counts.
+  #
+  # File-scoped FAILURE was justified by an identity: "once main is mutant-clean, a changed file's
+  # untouched lines carry no survivors, so the two give the same verdict". Main is not mutant-clean
+  # and cannot become so — the equivalent fraction among survivors RISES as a suite improves, and the
+  # tip sits at 27 survivors / 99.56%, every one of them provably equivalent and unwaivable without
+  # silencing a killable twin. With the precondition unavailable, file scope reduces to failing
+  # branches for debt they did not create. See docs/research/blocking-mutation-gate-scope.md.
+  #
+  # Incremental mode is deliberately NOT used here (stryker.config.mjs, D4a): its report merges
+  # cached whole-repo results, which would fail a branch on debt it never touched.
   mutation:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # projected low-minutes on a 4-core runner; NOT yet observed in CI
+    # Measured in CI, three times, not projected: 2m32s on a 2-file diff, 9m37s on 53 changed files,
+    # 13m58s on 36. Cost is mutants x tests per mutant rather than file count, which is why the
+    # smaller diff was the slower run. The largest was 66% of the old 20-minute budget. Once this
+    # check blocks, a timeout is a red required check on a CORRECT branch — unattributable and
+    # non-deterministically reproducible, which is exactly what teaches an agent loop that the
+    # mutation check is the flaky one to ignore.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
@@ -166,37 +183,72 @@ jobs:
             echo "::notice::No production files changed in the mutated packages — nothing to mutate."
           else
             echo "Mutating: ${FILES}"
+
+            # The changed LINES, for the verdict step, cut against the SAME merge-base resolved
+            # above — the job resolves a base exactly once, so the mutate scope and the changed
+            # hunks cannot drift onto different comparisons.
+            #
+            # The flags are `scripts/mutation/changed-lines.ts`'s DIFF_FLAGS and the boundary tier
+            # asserts they match. `--no-prefix` is the load-bearing one: these paths are joined
+            # against Stryker's report keys, which are relative to the run's working directory, and
+            # a surviving `b/` would make every intersection false and the gate vacuously green.
+            IFS=',' read -r -a SCOPED <<< "$FILES"
+            git diff -U0 --no-prefix --diff-filter=ACMR "$BASE" HEAD -- "${SCOPED[@]}" \
+              > "${RUNNER_TEMP}/changed.diff"
+            echo "Changed hunks: $(grep -c '^@@' "${RUNNER_TEMP}/changed.diff" || true)"
           fi
 
-      # continue-on-error, deliberately, until the burn-down closes (tasks 2.1 / design D5).
-      # A branch that merely TOUCHES a file carrying a pre-existing survivor would go red for debt it
-      # did not create. A red check nobody blocks on is the attested-dead shape quality-gates.md
-      # warns about, and an agent loop that learns to ignore this check learns to ignore it when it
-      # is real. So the job reports without failing, and task 4.1 flips BOTH this flag and the
-      # required-check setting together, in one step, once main is mutant-clean. The step summary
-      # below carries the findings either way.
+      # `continue-on-error` stays here, and it MOVES rather than disappears. The reason is not
+      # caution — it is that THIS STEP'S EXIT CODE STOPS BEING THE VERDICT (design D5).
+      # `thresholds.break: 100` makes Stryker exit non-zero for any survivor anywhere in the
+      # file-wide REPORTING scope, which is precisely the verdict changed-line scope rejects: it
+      # fails a branch for debt it did not create, and a red check nobody can act on is one an agent
+      # loop learns to ignore when it is real. The job's decision now lives in the verdict step
+      # below, which carries no such flag.
       #
-      # The task-2.1 burn-down took main from 464 survivors to 6 (99.89%), which weakens this
-      # argument without retiring it: the 6 sit in `importer/domain/import/{state,import,decide}.ts`,
-      # `downloader/domain/shared/duration.ts` and `downloader/adapters/musicbrainz/mapping.ts` —
-      # the importer decider being the most-edited code in that package, not a backwater. Four are
-      # provably equivalent narrowing operands left unwaived on purpose (a line-scoped waiver would
-      # silence a killable twin); two are an unspecified-behaviour finding in the album path that no
-      # honest test can pin. design.md names what has to happen before this flag comes off.
+      # Note what this flag also forgives: Stryker CRASHING, exactly as readily as it forgives
+      # survivors. That hole is closed downstream rather than here — the verdict fails on a missing
+      # or unreadable report instead of reading absence as a clean bill.
       - name: Mutation-test the changed production files
+        id: stryker
         if: steps.scope.outputs.files != ''
         continue-on-error: true
         env:
           # Never interpolate a PR-controlled value into a `run:` body — `${{ }}` substitution
           # happens before bash parses the line, so a filename's bytes would become shell syntax.
           MUTATE: ${{ steps.scope.outputs.files }}
-        run: pnpm exec stryker run --mutate "$MUTATE"
+        run: |
+          set -euo pipefail
+          START="$SECONDS"
+          STATUS=0
+          pnpm exec stryker run --mutate "$MUTATE" || STATUS="$?"
+          # Surfaced with the verdict so design D2's tuning lever — range-scoping the run itself —
+          # is pulled on a number rather than on somebody's patience.
+          echo "seconds=$((SECONDS - START))" >> "$GITHUB_OUTPUT"
+          exit "$STATUS"
 
       # always(): the summary's whole job is to explain a FAILING run, so it must survive one. It
       # reports the missing-report case out loud rather than reading absence as a clean bill.
       - name: Surface the surviving mutants
         if: always() && steps.scope.outputs.files != ''
         run: pnpm tsx scripts/mutation/report.ts >> "$GITHUB_STEP_SUMMARY"
+
+      # The job's decision, and the only step that carries it. always() for the same reason as the
+      # summary and a sharper one: a run that CRASHED is when this step matters most, so skipping it
+      # on a failed Stryker step would skip the very step meant to fail on a crash. No
+      # `continue-on-error` here, deliberately — that flag is what made the gate inert.
+      #
+      # Shipped in SHADOW: `MUTATION_GATE_ENFORCE` is absent, so the verdict is computed, published
+      # to the step summary, and does not fail the job. `mutation-gate` 4.1a/4.1b flip that switch
+      # and the main-branch required check together, in one step, once the shadow measurement clears
+      # quality-gates.md's ten-percent effective-false-positive bar on real PRs here.
+      - name: Verdict — surviving mutants on the changed lines
+        if: always() && steps.scope.outputs.files != ''
+        env:
+          MUTATION_STRYKER_SECONDS: ${{ steps.stryker.outputs.seconds }}
+        run: |
+          pnpm tsx scripts/mutation/pr-verdict.ts "${RUNNER_TEMP}/changed.diff" \
+            >> "$GITHUB_STEP_SUMMARY"
 
   # main only, after the gate is green: build the image once, gate it through the out-of-process E2E
   # tier — browser parity phase included, so Playwright drives the same image that publishes — then,
