@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.5](https://github.com/jgchk/music-downloader/compare/v3.17.4...v3.17.5) (2026-08-07)
+
+### Bug Fixes
+
+* **web:** stop an unknown login error code from resolving to a prototype member ([893d37a](https://github.com/jgchk/music-downloader/commit/893d37abb17fe402c2f64dd5760a499ce2f22a63))
 ## [3.17.4](https://github.com/jgchk/music-downloader/compare/v3.17.3...v3.17.4) (2026-08-07)
 
 ### Bug Fixes
