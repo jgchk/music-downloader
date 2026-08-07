@@ -108,11 +108,18 @@ describe('changed lines, from real git output', () => {
   it('gates nothing for a pure deletion — the branch added no line there', () => {
     // The trap. `@@ -2,2 +1,0 @@` says two lines left and none arrived; turning it into `1-1`
     // would fail the branch for a survivor on a line it never wrote.
-    expect(parseChangedLines(diff).get('deleted-from.ts')).toBeUndefined();
+    expect(parseChangedLines(diff).get('deleted-from.ts')).toEqual([]);
+  });
+
+  it('still names a file it gates no line in, so a deletion is not an unread file', () => {
+    // A deletion-only file is CHANGED (it joins the mutation report, and a scope that joins nothing
+    // is a scope nobody audited) while gating no line. One answer for both would make a branch that
+    // only deletes code indistinguishable from a broken path join.
+    expect(parseChangedLines(diff).has('deleted-from.ts')).toBe(true);
   });
 
   it('says nothing about a file the branch did not change', () => {
-    expect(parseChangedLines(diff).get('untouched.ts')).toBeUndefined();
+    expect(parseChangedLines(diff).has('untouched.ts')).toBe(false);
   });
 
   it('keys every changed file in one diff, in the spelling git printed', () => {
@@ -120,6 +127,7 @@ describe('changed lines, from real git output', () => {
     // the key is the repo-relative path and not `b/`-prefixed; a prefix here would make every
     // intersection false and the gate vacuously green.
     expect(parseChangedLines(diff).keys().toArray().toSorted(byPath)).toEqual([
+      'deleted-from.ts',
       'edited.ts',
       'inserted.ts',
     ]);
