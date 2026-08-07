@@ -20,7 +20,7 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 - [x] 1.3 Initial full-repo run; capture the survivor inventory grouped by file/layer.
       _Recorded in `design.md` — the seeding tally and the per-layer inventory._
 
-## 2. Seeding triage (main becomes mutant-clean)
+## 2. Seeding triage (goal RETIRED: main cannot become mutant-clean — see 2.1)
 
 - [ ] 2.1 Triage every survivor: kill with a strengthened/new test (red-first: watch the
       mutant survive, then kill) or suppress as arid with an inline justification
@@ -43,6 +43,24 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       the MusicBrainz album path that no honest test can pin. And the rebase onto v3.18.0 added 45
       more from someone else's change, taking the tip to 64: main is not mutant-clean, and a one-off
       sweep cannot make it so while the diff gate stays inert. It therefore still blocks 4.1.
+      **64 → 27 (99.56%, re-measured on the shipped tree), and this checkbox can no longer be closed by triage at all.** v3.18.0's 45
+      were burned down to 9 — 36 killed by real tests, none of which needed a production change —
+      and the MusicBrainz album-title finding was FIXED rather than pinned (`comparableTitle` /
+      `isSameTitle`: absence is now `undefined`, and absence matches nothing, including another
+      absence), which retired those 2 survivors by removing the sentinel they lived on. One of the
+      seventeen equivalents was retired by respelling a guard as `'candidates' in state`, the way its
+      three neighbours already ask.
+      The remaining **27 are all provably equivalent**, and the reason they cannot be waived is now
+      MEASURED rather than argued. A `// Stryker disable` keys on (line, mutator); an ignore-plugin
+      is consulted per AST **node**, before mutants exist, so its message lands on every mutant of
+      that node. Neither is (node AND mutator). Across the 64, **38 sat on a node that also carries a
+      killed mutant — including 17 of 17 of this family** — so a node-precise waiver silences real
+      findings: running one proved it, taking a file from 96.67% to a false 100.00% by hiding three
+      kills. The `ignore-unions` plugin `design.md` used to recommend should NOT be built.
+      So triage is finished and the goal it served is unreachable by triage. Closing this needs a
+      decision — `design.md` **D8**, a justified survivor baseline the JOB checks, which is precise
+      to (file, line, mutator, replacement) and so cannot silence a twin. Deliberately not built
+      here: it is a rule-pack decision that deserves its own change and its own grilling.
       _Superseded detail from the seeding pass follows._
       **464 survivors across 62 files; main was not mutant-clean.** Two
       false-finding classes were retired at the config site (D6 arid logging, D7 static
@@ -79,7 +97,10 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       lever chosen (if any) in `design.md` D4.
       _Measured in CI on this change's own PR (#161): 2m31s for the job, ~1m43s for the Stryker
       pass, over a real 2-file production diff — 372 mutants, 359 killed, 13 surviving. Well
-      inside the 20-minute timeout, so no tuning lever was needed; recorded in `design.md`._
+      inside the 20-minute timeout; no tuning lever was needed. Recorded in `design.md`. Note it is
+      the SMALLEST of three runs now observed — the others are in
+      `docs/research/blocking-mutation-gate-scope.md` §1, and §10 catalogues reading this one as
+      representative. Raising the ceiling belongs to `mutation-gate-diff-scope` task 3.4._
 
 ## 4. Handoff
 
@@ -102,6 +123,33 @@ flip is last (D5) — the gate must not block on pre-existing debt.
       true reproduces the rejected shape on a smaller scale. The two things that would clear it are
       named in `design.md`: split the four narrowing-operand lines so their waivers become precise,
       and settle the MusicBrainz empty-title question (a real finding, not a mutant to appease).
+      **Both of those have now been attempted, and only one of them was possible.** The MusicBrainz
+      question is settled — fixed, not appeased. Making the waivers precise is NOT possible: measured
+      against Stryker 9.6.1, no mechanism it offers is (node AND mutator), so every available waiver
+      for this family silences a killable twin. `continue-on-error` therefore stays, and 4.1 stays
+      open.
+      **This task's premise is retired, and 4.1 will not close in the form it is written.** It is
+      blocked on 2.1, whose exit criterion is "main becomes mutant-clean" — and
+      `docs/research/blocking-mutation-gate-scope.md` establishes from the literature that no suite
+      reaches that state: the equivalent fraction among survivors rises as the suite improves. Read
+      §5.1 and §9 there. Three hand burn-downs have now run and the gate has blocked nothing, so
+      "wait for the burn-down to close" was never going to become a flip.
+      **Superseded by `openspec/changes/mutation-gate-diff-scope/`**, which moves the failure scope
+      from changed files to changed lines and ships it in shadow mode behind `MUTATION_GATE_ENFORCE`.
+      Under it the equivalents stop blocking — a mutant on a line no PR touched cannot fail that PR —
+      so this checkbox is superseded by that change's 4.1a/4.1b rather than completed here. Two
+      corrections it must carry, both wrong above and left in place so the record shows what changed:
+      "split the four narrowing-operand lines" is unreachable (there are seventeen, and splitting
+      cannot work for this mutator family), and "task 4.1 removes THAT flag" is reversed — diff-scope
+      D5 keeps `continue-on-error` on the Stryker step and moves the verdict to a new step that does
+      not carry it.
+      **Not fixed here, deliberately:** `continue-on-error: true` covers the whole step, so it
+      forgives Stryker CRASHING exactly as readily as it forgives survivors — a gate that greens on
+      its own breakage, and shadow mode does not close it either. The finding, the `mutation.yml`
+      precedent that already solved it, and why the exit code alone cannot tell the two apart are
+      recorded in `design.md` under "Why the gate still stays inert". `mutation-gate-diff-scope` owns
+      the job; this change makes no edit to `.github/workflows/pipeline.yml` so the two cannot
+      contradict each other in the same file.
 - [x] 4.2 Note the web-package deferred item as a `quality-gate` issue (joins mutation
       scope when `.svelte` instrumentation exists or a BFF-only scope is explicitly
       accepted).
@@ -112,3 +160,6 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 ## 5. Gate
 
 - [x] 5.1 `pnpm check` green; version decision: `chore`, no bump.
+      _Amended for the v3.18.0 burn-down pass: it carries a real `fix` — the MusicBrainz
+      album-title identity bug — so that pass ships as **3.18.1**. The mutation-gate work
+      itself is still `test`/`chore` and demands no bump of its own._
