@@ -663,6 +663,138 @@ describe('releaseCandidateIds', () => {
     expect(ids).toEqual(['lead']);
   });
 
+  it('matches a request spelled differently from the title MusicBrainz returned', () => {
+    // The exact-title preference is exact *after normalization*, and this is the level that claim
+    // has to hold at — nobody types an album's punctuation the way MusicBrainz spells it. Without
+    // it, "exact-title" would quietly mean "byte-identical", and the preference would fire only for
+    // requests copied out of MusicBrainz itself.
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'deluxe',
+          score: 100,
+          title: 'Midnights (3am Edition)',
+          'release-group': { id: 'rg-deluxe', title: 'Midnights (3am Edition)' },
+        }),
+        hit({
+          id: 'base',
+          score: 95,
+          title: 'Midnights',
+          'release-group': { id: 'rg-base', title: 'Midnights' },
+        }),
+      ],
+      'midnights  3AM edition!',
+    );
+
+    // The two groups are inside the ambiguity margin, so only the exact-title preference can pick
+    // one — and it can only pick this one if the request and the title normalized to the same text.
+    expect(ids).toEqual(['deluxe']);
+  });
+
+  it('answers a punctuation-only request with the album that bears that exact title', () => {
+    // The counterweight to the two refusals below, and the behaviour they must not cost. `÷` names
+    // exactly one album; it is `normalizeTitle` that cannot represent it, not the request that is
+    // meaningless. So a punctuation-only title still wins the exact-title preference against a
+    // within-margin rival — the same way any other title would.
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'divide-sym',
+          score: 100,
+          title: '÷',
+          'release-group': { id: 'rg-divide-sym', title: '÷' },
+        }),
+        hit({
+          id: 'rival',
+          score: 95,
+          title: 'Divide',
+          'release-group': { id: 'rg-rival', title: 'Divide' },
+        }),
+      ],
+      '÷',
+    );
+
+    // Without the exact-title preference these two sit inside the ambiguity margin and neither
+    // wins, so this asserting anything but `[]` is the preference doing its job.
+    expect(ids).toEqual(['divide-sym']);
+  });
+
+  it('treats a title that is nothing but separators as no title at all', () => {
+    // The fallback exists so `÷` stays comparable, not so that *anything* does. Whitespace carries
+    // no identity to fall back to, so it must land where an absent title lands — matching nothing —
+    // rather than becoming a value two blank titles could agree on.
+    const blank = ' '.repeat(3);
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'blank',
+          score: 100,
+          title: blank,
+          'release-group': { id: 'rg-blank', title: blank },
+        }),
+        hit({
+          id: 'rival',
+          score: 95,
+          title: 'Divide',
+          'release-group': { id: 'rg-rival', title: 'Divide' },
+        }),
+      ],
+      blank,
+    );
+
+    expect(ids).toEqual([]);
+  });
+
+  it('refuses a punctuation-only request rather than letting a differently-punctuated album answer it', () => {
+    // Real albums are titled in pure punctuation — `÷` and `+` (Ed Sheeran), `?` (XXXTentacion) —
+    // and `normalizeTitle` collapses every one of them to the same empty string. Comparing them in
+    // that form makes `÷` and `+` the same album, so the exact-title preference would bypass the
+    // ambiguity guard on text that distinguishes nothing and answer a request for `÷` with `+`.
+    const ids = releaseCandidateIds(
+      [
+        hit({ id: 'plus', score: 100, title: '+', 'release-group': { id: 'rg-plus', title: '+' } }),
+        hit({
+          id: 'divide',
+          score: 95,
+          title: 'Divide',
+          'release-group': { id: 'rg-divide', title: 'Divide' },
+        }),
+      ],
+      '÷',
+    );
+
+    // Two groups within the ambiguity margin and no group bearing the requested title: the guard
+    // decides, and it refuses.
+    expect(ids).toEqual([]);
+  });
+
+  it('refuses a punctuation-only request rather than letting an untitled group answer it', () => {
+    // The other half of the same rule, reached by a different route: an absent upstream title is
+    // not evidence of anything, so it may not match a request either — least of all a request whose
+    // own text normalizes away. Two absences are not an agreement.
+    const ids = releaseCandidateIds(
+      [
+        {
+          id: 'untitled',
+          score: 100,
+          title: null,
+          status: 'Official',
+          date: '2017',
+          'release-group': { id: 'rg-untitled', title: null },
+        },
+        hit({
+          id: 'divide',
+          score: 95,
+          title: 'Divide',
+          'release-group': { id: 'rg-divide', title: 'Divide' },
+        }),
+      ],
+      '÷',
+    );
+
+    expect(ids).toEqual([]);
+  });
+
   it('orders the winning group the same way whatever order the search returned its editions in', () => {
     const editions = [
       hit({ id: 'named', title: 'Album (Deluxe)', status: 'Official', date: '2020' }),
@@ -867,6 +999,20 @@ describe('releaseCandidateIds — null tolerance', () => {
       'Album',
     );
 
+    expect(ids).toEqual(['hit']);
+  });
+
+  it('tolerates search hits that omit the title fields entirely', () => {
+    // The schema declares every title `.nullable().optional()`, so an omitted field is as real a
+    // shape as an explicit null and reaches the mapping as `undefined`. The sibling above pins the
+    // null spelling; this pins the absent one, which takes a different branch on the way in.
+    const ids = releaseCandidateIds(
+      [{ id: 'hit', score: 100, status: 'Official', date: '2020', 'release-group': { id: 'rg' } }],
+      'Album',
+    );
+
+    // An untitled hit still identifies an album — by its release group — it simply cannot win the
+    // exact-title preference, so the confidence guard resolves it.
     expect(ids).toEqual(['hit']);
   });
 });

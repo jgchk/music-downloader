@@ -120,9 +120,11 @@ export function bestMatchId(entries: readonly MbScoredEntry[] | undefined): stri
  * collapse every run of non-alphanumeric characters (punctuation, parentheses, brackets, whitespace)
  * to a single space, trimmed. So `"Midnights (3am Edition)"`, `"midnights  3AM edition"`, and
  * `"MIDNIGHTS (3am Edition)"` all normalize identically, while `"Midnights"` does not equal
- * `"Midnights (3am Edition)"`. Equality after this transform is the *only* edition-match relation —
- * there is deliberately no fuzzy or partial matching, because a wrong edition becomes the download
- * validation contract.
+ * `"Midnights (3am Edition)"`. Equality after this transform is the edition-match relation for any
+ * title that survives it; a title every character of which is stripped is compared as its literal
+ * text instead — see {@link comparableTitle}, which owns that second relation. There is deliberately
+ * no fuzzy or partial matching under either, because a wrong edition becomes the download validation
+ * contract.
  */
 export function normalizeTitle(title: string): string {
   return title
@@ -132,19 +134,78 @@ export function normalizeTitle(title: string): string {
     .trim();
 }
 
+/**
+ * A title reduced to the form titles are compared in, or `undefined` when there is no title to
+ * compare at all — MusicBrainz sent none, or it is nothing but separators.
+ *
+ * The bug this exists to prevent: {@link normalizeTitle} collapses a title of pure punctuation to
+ * `''`, and an absent title used to become `''` too, so the two compared **equal**. A request for
+ * `÷` then satisfied the exact-title preference against `+` (both Ed Sheeran; `?` is XXXTentacion),
+ * or against a release MusicBrainz sent no title for, and won on text that distinguishes nothing —
+ * bypassing the ambiguity guard that would otherwise have refused to choose.
+ *
+ * The fix is NOT to disqualify punctuation titles: `÷` names exactly one album, and it is the
+ * normalizer that cannot represent it, not the request that is meaningless. Disqualifying it would
+ * trade a wrong answer for no answer, permanently, for every album titled that way. So a title that
+ * normalizes away falls back to its literal text, which still tells `÷` from `+`. The two value
+ * spaces cannot collide: a fallback value contains no letter or number (`\p{L}`/`\p{N}`) by
+ * construction, and a normalized value always contains at least one. Verified exhaustively over
+ * every code point rather than argued: no `\p{L}`/`\p{N}` character is erased by
+ * NFC → casefold → strip.
+ *
+ * `undefined` is therefore left meaning exactly one thing — *there is no title here* — which is what
+ * makes it safe for {@link isSameTitle} to treat as matching nothing.
+ */
+function comparableTitle(title: string | null | undefined): string | undefined {
+  if (title === null || title === undefined) return undefined;
+  const normalized = normalizeTitle(title);
+  if (normalized !== '') return normalized;
+  // No casefold here, deliberately. Nothing reaching this line contains a letter or number
+  // (`\p{L}`/`\p{N}`) — if it did, `normalizeTitle` would have kept it and returned above, and that
+  // holds across the casefold it applies first — so for every title this can
+  // actually receive there is no case to fold. Not a universal: a few cased SYMBOLS exist (`Ⓐ`
+  // lowercases to `ⓐ`) and those now compare case-sensitively. Accepted rather than papered over —
+  // no album is titled that way, and casefolding here would be a line no honest test could pin.
+  const literal = title.normalize('NFC').trim();
+  return literal === '' ? undefined : literal;
+}
+
+/**
+ * Whether a candidate title is the requested one.
+ *
+ * Two titles match when they are equal AND present. Absence matches nothing — not another absence,
+ * and not anything else. Two releases we have no title for are not evidence of the same album; they
+ * are two things we cannot tell apart, which is the ambiguity guard's business, not this
+ * preference's.
+ *
+ * Guarding `wanted` alone is sufficient because `===` already forces the other side: the only pair
+ * it would wrongly accept is absent-against-absent, and excluding `wanted` excludes exactly that.
+ * Note what that leaves — `a === b && a !== undefined` — which is **symmetric**. The parameter names
+ * read as roles, but no call site can observe an argument swap, so there is no ordering here to
+ * audit. If a directional rule ever arrives (a prefix match, casefolding one side only), take an
+ * object parameter so the sides are named where they are passed.
+ */
+function isSameTitle(candidate: string | undefined, wanted: string | undefined): boolean {
+  return wanted !== undefined && candidate === wanted;
+}
+
 interface GroupedRelease {
   readonly id: string;
   readonly score: number;
-  readonly title: string;
+  /**
+   * This release's own title, as {@link comparableTitle} — used to order editions within a group,
+   * and standing in as {@link GroupedRelease.groupTitle} for the singleton fallback below.
+   */
+  readonly title: string | undefined;
   readonly status: string | undefined;
   readonly date: string | undefined;
   /**
    * The identity title of the group this release belongs to: the release-group title, or — for the
    * singleton fallback of a hit without a release-group id — the release's own title. Compared
-   * against the request title (via {@link normalizeTitle}) by the exact-title preference in
+   * against the request title (both via {@link comparableTitle}) by the exact-title preference in
    * {@link releaseCandidateIds}.
    */
-  readonly groupTitle: string;
+  readonly groupTitle: string | undefined;
 }
 
 // Order MusicBrainz dates chronologically by (year, month, day) components rather than lexically:
@@ -185,11 +246,10 @@ function compareDates(a: string | null | undefined, b: string | null | undefined
  * then the canonical rule — `Official` status before any other, then earliest release date.
  * Same-rank ties keep the incoming (search-relevance) order via the stable sort.
  */
-function compareReleases(wantedTitle: string) {
+function compareReleases(wantedTitle: string | undefined) {
   return (a: GroupedRelease, b: GroupedRelease): number => {
     const titleRank =
-      Number(normalizeTitle(a.title) !== wantedTitle) -
-      Number(normalizeTitle(b.title) !== wantedTitle);
+      Number(!isSameTitle(a.title, wantedTitle)) - Number(!isSameTitle(b.title, wantedTitle));
     if (titleRank !== 0) return titleRank;
     const statusRank = Number(a.status !== 'Official') - Number(b.status !== 'Official');
     if (statusRank !== 0) return statusRank;
@@ -202,10 +262,14 @@ function compareReleases(wantedTitle: string) {
  * empty, weak, or ambiguous. Hits are grouped by release group (the album identity), and identity
  * is resolved across groups in two steps. First, the exact-title preference: when exactly one
  * high-confidence group (score ≥ {@link HIGH_CONFIDENCE}; a group's score is its top hit's) has an
- * identity title equal to the request title under {@link normalizeTitle}, the request text itself
+ * identity title equal to the request title under {@link comparableTitle}, the request text itself
  * disambiguates and that group wins regardless of how closely derivative-named siblings score
  * (e.g. "Discovery" over a within-margin "Discovery Remixed" — and symmetrically, requesting
- * "Discovery Remixed" wins the remix group). Otherwise — no titled group (typos, partial titles)
+ * "Discovery Remixed" wins the remix group). A title with no comparable text at all — absent
+ * upstream, or nothing but separators — never satisfies that preference ({@link isSameTitle}), so it
+ * cannot bypass the guard on text that identifies no album; a punctuation title like `÷` still does,
+ * against an identically-spelled one. Otherwise — no titled group (typos, partial titles, untitled
+ * hits)
  * or several (distinct albums genuinely sharing a title) — the confidence/ambiguity guard decides
  * over the full ranking: the best group must score at least {@link HIGH_CONFIDENCE} and beat the
  * runner-up group by at least {@link AMBIGUITY_MARGIN}, so ties fail safe as before. Many
@@ -228,14 +292,14 @@ export function releaseCandidateIds(
     // group keyed by its release id — conservative, since it can only widen apparent ambiguity.
     const group = release['release-group'];
     const key = group?.id ?? `release:${release.id}`;
-    const title = release.title ?? '';
+    const title = comparableTitle(release.title);
     const member: GroupedRelease = {
       id: release.id,
       score: release.score ?? 0,
       title,
       status: release.status ?? undefined,
       date: release.date ?? undefined,
-      groupTitle: group?.id === undefined ? title : (group.title ?? ''),
+      groupTitle: group?.id === undefined ? title : comparableTitle(group.title),
     };
     const existing = groups.get(key);
     if (existing === undefined) groups.set(key, [member]);
@@ -248,11 +312,11 @@ export function releaseCandidateIds(
     .toArray()
     .toSorted((a, b) => b.score - a.score);
 
-  const wanted = normalizeTitle(requestTitle);
+  const wanted = comparableTitle(requestTitle);
   const titled = ranked.filter(
     (group) =>
       group.score >= HIGH_CONFIDENCE &&
-      group.members.some((m) => normalizeTitle(m.groupTitle) === wanted),
+      group.members.some((m) => isSameTitle(m.groupTitle, wanted)),
   );
 
   let winner = titled.length === 1 ? titled[0] : undefined;
