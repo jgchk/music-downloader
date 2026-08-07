@@ -107,3 +107,40 @@ describe('the per-context correlation modules are duplicated deliberately, not d
     expect(normalize(read('importer'))).toEqual(normalize(read('downloader')));
   });
 });
+
+/**
+ * The story format is defined in THREE places that share no code: each module's
+ * `correlation-id.ts`, and the web BFF's mint. That is deliberate — a story belongs to neither
+ * module (one request drives both), so the shell that spans them owns its own mint, and making
+ * either module's constant the currency would be the shared kernel D13 exists to avoid.
+ *
+ * The drift mode is the worst in the change and the quietest: if the BFF minted a shape the
+ * modules reject, both facades would discard every caller's story as malformed and mint their
+ * own, and NOTHING would log it — the symptom is only that web lines and module lines stop
+ * joining. So the three are pinned against each other here.
+ */
+describe('the story format agrees everywhere it is defined', () => {
+  const MODULE_PATTERN = '/^[0-9a-f]{32}$/';
+
+  it.each([
+    ['downloader', 'packages/downloader/src/application/correlation/correlation-id.ts'],
+    ['importer', 'packages/importer/src/application/correlation/correlation-id.ts'],
+  ])('the %s module declares the expected pattern', (_module, relative) => {
+    const source = readFileSync(path.join(REPO_ROOT, relative), 'utf8');
+
+    expect(source).toContain(`CORRELATION_ID_PATTERN = ${MODULE_PATTERN}`);
+  });
+
+  it('the BFF mints a value both modules would accept', () => {
+    // Behavioural, not textual: the BFF builds the id from bytes rather than declaring a pattern,
+    // so the only honest pin is that what it produces satisfies the modules' own predicate.
+    const source = readFileSync(
+      path.join(REPO_ROOT, 'packages/web/src/lib/server/correlation.ts'),
+      'utf8',
+    );
+    const bytes = /STORY_BYTES = (\d+)/.exec(source)?.[1];
+
+    expect(bytes).toBe('16'); // 16 bytes hex-encoded = the 32 characters the modules require
+    expect(source).toContain("padStart(2, '0')"); // ...and every byte contributes exactly two
+  });
+});

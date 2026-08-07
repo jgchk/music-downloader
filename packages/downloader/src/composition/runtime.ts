@@ -151,11 +151,9 @@ export async function createDownloaderRuntime(
 ): Promise<Result<DownloaderRuntime, DownloaderStartupError>> {
   const clock = overrides.clock ?? { now: () => new Date() };
   const ids = overrides.ids ?? { next: () => randomUUID() };
-  // 32 lowercase hex = a W3C trace id. Chosen so a later OpenTelemetry adoption can carry this
-  // exact value as its trace id instead of minting a parallel one (operation-correlation D1).
   // 32 lowercase hex = a W3C trace id, so a later OpenTelemetry adoption can carry this exact
-  // value (see application/correlation/correlation-id.ts). This is the ONE place the format is
-  // established; every lift downstream follows from the brand rather than from trust.
+  // value (see application/correlation/correlation-id.ts). This is the ONE place this module's
+  // format is established; every lift downstream follows from the brand rather than from trust.
   const correlation: CorrelationSource = overrides.correlation ?? {
     mint: () => toCorrelationId(randomBytes(16).toString('hex')),
   };

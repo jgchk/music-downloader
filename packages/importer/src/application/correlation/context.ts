@@ -178,9 +178,22 @@ export function operationScope(
  * reader to write the obvious `if (m.causation?.kind === 'event') use(m.causation.streamId)` would
  * narrow on a tag TypeScript never checked and read `undefined` at runtime.
  *
- * Anything unrecognised becomes `undefined` — the same degradation an unusable story gets, for the
- * same reason: provenance we cannot read is absent provenance, and inventing one is worse.
+ * Anything unrecognised becomes `undefined`, because a reference we cannot read is no reference —
+ * and inventing one is worse. Note this is NOT the same case as an absent story: `causation` is
+ * mandatory on the write path, so a stored one that fails to parse means a first-party invariant
+ * has been violated, exactly as a malformed `correlationId` does. Nothing reads causation yet, so
+ * that distinction has no consumer to report it to; the first reader to resolve a reference should
+ * take it as an origin the way {@link continueFrom} does, rather than inherit a channel that has
+ * already discarded the signal (recorded as a follow-up in design.md).
  */
+/**
+ * A store version: a non-negative safe integer. `Number.isSafeInteger` already rejects every
+ * non-number, so a `typeof` guard beside it would be dead code that no test could ever kill.
+ */
+function isStreamVersion(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
 export function parseCausation(value: unknown): CausationReference | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const candidate = value as Record<string, unknown>;
@@ -193,8 +206,7 @@ export function parseCausation(value: unknown): CausationReference | undefined {
   const { context, streamId, version } = candidate;
   if (typeof context !== 'string' || context === '') return undefined;
   if (typeof streamId !== 'string' || streamId === '') return undefined;
-  if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 0)
-    return undefined;
+  if (!isStreamVersion(version)) return undefined;
   return causedBy(context, streamId, version);
 }
 

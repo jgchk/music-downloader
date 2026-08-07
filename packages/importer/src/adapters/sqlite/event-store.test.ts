@@ -331,6 +331,21 @@ describe('SqliteCheckpointStore', () => {
 });
 
 describe('SqliteEventStore — correlation metadata round trip', () => {
+  it('degrades a row whose metadata is not an object at all, rather than wedging the stream', async () => {
+    // DB surgery on the event store is a documented ops procedure here. A throw would become an
+    // InfraError for the WHOLE read, so one hand-edited row would hold the reactor's checkpoint
+    // forever — the opposite of how every other unreadable-provenance path behaves.
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    const seeded = await store.append('imp-1', 0, [APPLIED], META);
+    seeded._unsafeUnwrap();
+    database.prepare('UPDATE events SET metadata = ?').run('null');
+
+    const read = await store.readStream('imp-1');
+
+    expect(read.isOk()).toBe(true);
+  });
+
   it('reads a stored causation reference back as the union it was written as', async () => {
     // The column is JSON and metadata has no upcaster, so the read-edge parse is the only thing
     // standing between a persisted union and a reader narrowing on a tag nothing ever checked.

@@ -131,6 +131,15 @@ describe('parseCausation', () => {
     });
   });
 
+  it('accepts version zero — the first event of a stream is a legitimate parent', () => {
+    expect(parseCausation({ kind: 'event', context: 'x', streamId: 's', version: 0 })).toEqual({
+      kind: 'event',
+      context: 'x',
+      streamId: 's',
+      version: 0,
+    });
+  });
+
   it('accepts a stored command reference', () => {
     expect(parseCausation({ kind: 'command', commandId: 'c-1' })).toEqual({
       kind: 'command',
@@ -146,6 +155,10 @@ describe('parseCausation', () => {
     ['an empty commandId', { kind: 'command', commandId: '' }],
     ['a missing streamId', { kind: 'event', context: 'x', version: 1 }],
     ['an empty context', { kind: 'event', context: '', streamId: 's', version: 1 }],
+    ['an empty streamId', { kind: 'event', context: 'x', streamId: '', version: 1 }],
+    ['a non-string streamId', { kind: 'event', context: 'x', streamId: 7, version: 1 }],
+    ['a non-string context', { kind: 'event', context: 7, streamId: 's', version: 1 }],
+    ['a non-string commandId', { kind: 'command', commandId: 7 }],
     ['a negative version', { kind: 'event', context: 'x', streamId: 's', version: -1 }],
     ['a fractional version', { kind: 'event', context: 'x', streamId: 's', version: 1.5 }],
     ['a stringly version', { kind: 'event', context: 'x', streamId: 's', version: '1' }],

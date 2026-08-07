@@ -177,6 +177,13 @@ export class SqliteEventStore implements EventStorePort {
  * written before end-to-end-correlation has none, permanently.
  */
 function parseMetadata(raw: unknown): EventMetadata {
+  // A row whose metadata is not an object at all (DB surgery is a documented ops procedure here)
+  // must degrade like every other unreadable provenance — NOT throw, which `readStream` would turn
+  // into an InfraError for the whole stream and wedge the reactor's checkpoint on one bad row.
+  // A row whose metadata is not an object at all (DB surgery is a documented ops procedure here)
+  // must degrade like every other unreadable provenance — NOT throw, which `readStream` would turn
+  // into an InfraError for the whole stream and wedge the reactor's checkpoint on one bad row.
+  if (typeof raw !== 'object' || raw === null) return raw as EventMetadata;
   const parsed = raw as EventMetadata;
   // Unconditional: `parseCausation` already answers `undefined` for absent AND for unreadable, and
   // `causation` is optional on the read side, so there is nothing to branch on.

@@ -7,7 +7,11 @@ import type {
   RenderError,
 } from '../../../application/ports/published-events-port.js';
 import { CONTEXT_NAME, isCorrelationId } from '../../../application/correlation/context.js';
-import { ACQUISITION_FULFILLED_TYPE, acquisitionFulfilledEventSchema } from './schemas.js';
+import {
+  ACQUISITION_FULFILLED_TYPE,
+  acquisitionFulfilledEventSchema,
+  publishedCorrelationSchema,
+} from './schemas.js';
 
 /**
  * The correlation envelope for a stored event, or `undefined` when the row predates the
@@ -96,7 +100,14 @@ function renderFulfilled(
   // fails identically on every retry — so a defect in a purely DIAGNOSTIC field would
   // head-of-line-block the whole cross-context seam, forever. Telemetry may degrade the trace; it
   // may never stop the work. `correlationOf` yields only a well-formed block or nothing at all.
-  const metadata = correlationOf(stored);
+  // Validated, but never fatal. Moving the block out of the envelope's own parse (so a diagnostic
+  // defect could not head-of-line-block the seam) would otherwise leave `publishedCorrelationSchema`
+  // enforcing nothing at all — a rename in `correlationOf` would compile, pass every gate, and
+  // silently detach every cross-context trace. So it is checked here and DROPPED on failure:
+  // telemetry still cannot stop the work, and what ships is again what the contract declares.
+  const block = correlationOf(stored);
+  const checked = block === undefined ? undefined : publishedCorrelationSchema.safeParse(block);
+  const metadata = checked?.success === true ? checked.data : undefined;
   return ok(metadata === undefined ? parsed.data : { ...parsed.data, metadata });
 }
 
