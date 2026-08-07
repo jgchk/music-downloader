@@ -1,3 +1,4 @@
+import type { OperationScope } from '../../application/correlation/context.js';
 import { rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
 import { ResultAsync } from 'neverthrow';
@@ -35,25 +36,24 @@ export class FilesystemIntake implements IntakePort {
 
   constructor(
     config: IntakeConfig,
-    private readonly logger: Logger,
     private readonly fs: IntakeFileSystem = nodeIntakeFileSystem,
   ) {
     this.root = path.resolve(config.intakeRoot);
   }
 
-  deleteRelease(directory: string): ResultAsync<void, InfraError> {
-    return ResultAsync.fromPromise(this.runDelete(directory), (cause) =>
+  deleteRelease(directory: string, scope: OperationScope): ResultAsync<void, InfraError> {
+    return ResultAsync.fromPromise(this.runDelete(directory, scope.logger), (cause) =>
       infraError('intake.deleteRelease', String(cause), cause),
     );
   }
 
-  private async runDelete(directory: string): Promise<void> {
+  private async runDelete(directory: string, logger: Logger): Promise<void> {
     const target = path.resolve(directory);
     if (!this.isInsideRoot(target)) {
       throw new Error(`refusing to delete outside the intake root: ${target}`);
     }
     await this.fs.removeTree(target);
-    this.logger.info({ directory: target }, 'deleted rejected release from intake');
+    logger.info({ directory: target }, 'deleted rejected release from intake');
     await this.pruneEmptyParents(path.dirname(target));
   }
 

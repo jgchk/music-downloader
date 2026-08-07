@@ -70,10 +70,10 @@ export const actions: Actions = {
     if (destructive !== undefined && text(data, 'confirmed') === undefined) {
       return { confirm: confirmStateOf(destructive, data) };
     }
-    const result = await locals.facades.importer.resolveReview({
-      id: params.id,
-      resolution: resolveReviewForm(data),
-    });
+    const result = await locals.facades.importer.resolveReview(
+      { id: params.id, resolution: resolveReviewForm(data) },
+      locals.correlationId,
+    );
     if (!result.ok) {
       return fail(statusOf(result.error), { message: messageOf(result.error) });
     }

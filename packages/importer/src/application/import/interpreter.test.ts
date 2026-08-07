@@ -1,3 +1,8 @@
+import { testScope } from '../__fixtures__/correlation.js';
+
+/** One scope instance: the port assertions below pin that the SAME scope reaches the adapter. */
+const SCOPE = testScope();
+import { appendMetadata } from '../__fixtures__/correlation.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -44,9 +49,9 @@ function ports(overrides: Partial<EffectPorts> = {}): EffectPorts {
 
 async function run(history: readonly ImportEvent[], effect: Effect, effectPorts: EffectPorts) {
   const store = new FakeEventStore();
-  await store.append('imp-1', 0, history, { importId: 'imp-1', occurredAt: 't' });
+  await store.append('imp-1', 0, history, appendMetadata('imp-1', fixedClock()));
   const dependencies = { store, clock: fixedClock(), ports: effectPorts };
-  const result = await interpretEffect(dependencies, 'imp-1', effect);
+  const result = await interpretEffect(dependencies, 'imp-1', effect, SCOPE);
   return { result, store };
 }
 
@@ -54,11 +59,15 @@ describe('Propose', () => {
   it('feeds a proposal back as RecordProposal carrying the pinned id', async () => {
     const p = ports();
     const { result, store } = await run([requested()], PROPOSE, p);
-    expect(p.tagger.propose).toHaveBeenCalledWith(DIRECTORY, {
-      searchId: 'mb-1',
-      searchArtist: undefined,
-      searchAlbum: undefined,
-    });
+    expect(p.tagger.propose).toHaveBeenCalledWith(
+      DIRECTORY,
+      {
+        searchId: 'mb-1',
+        searchArtist: undefined,
+        searchAlbum: undefined,
+      },
+      SCOPE,
+    );
     expect(result._unsafeUnwrap().map((entry) => entry.type)).toEqual([
       'CandidatesProposed',
       'AutoApplySelected',
@@ -99,10 +108,14 @@ describe('Apply', () => {
   it('records a clean apply', async () => {
     const p = ports();
     const { result } = await run(applyingHistory, APPLY, p);
-    expect(p.tagger.apply).toHaveBeenCalledWith(DIRECTORY, {
-      kind: 'candidate',
-      ref: candidate().ref,
-    });
+    expect(p.tagger.apply).toHaveBeenCalledWith(
+      DIRECTORY,
+      {
+        kind: 'candidate',
+        ref: candidate().ref,
+      },
+      SCOPE,
+    );
     expect(result._unsafeUnwrap().map((entry) => entry.event)).toEqual([
       { type: 'ImportApplied', location: '/library/x' },
     ]);
@@ -174,7 +187,7 @@ describe('DeleteIntake', () => {
   it('records the rejection with the deletion marker after cleaning intake', async () => {
     const p = ports();
     const { result } = await run(rejectHistory, DELETE, p);
-    expect(p.intake.deleteRelease).toHaveBeenCalledWith(DIRECTORY);
+    expect(p.intake.deleteRelease).toHaveBeenCalledWith(DIRECTORY, SCOPE);
     expect(result._unsafeUnwrap().map((entry) => entry.event)).toEqual([
       { type: 'ImportRejected', reason: 'bad rip', filesDeleted: true },
     ]);

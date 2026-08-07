@@ -2,6 +2,7 @@ import type { ResultAsync } from 'neverthrow';
 import type { Effect } from '../../domain/import/import.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { IntakePort, TaggerPort } from '../ports/outbound-ports.js';
+import type { OperationScope } from '../correlation/context.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDependencies, CommandError } from './command-handler.js';
 
@@ -26,16 +27,21 @@ export function interpretEffect(
   dependencies: InterpreterDependencies,
   importId: string,
   effect: Effect,
+  scope: OperationScope,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   const { ports } = dependencies;
   switch (effect.type) {
     case 'Propose': {
       return ports.tagger
-        .propose(effect.directory, {
-          searchId: effect.searchId,
-          searchArtist: effect.searchArtist,
-          searchAlbum: effect.searchAlbum,
-        })
+        .propose(
+          effect.directory,
+          {
+            searchId: effect.searchId,
+            searchArtist: effect.searchArtist,
+            searchAlbum: effect.searchAlbum,
+          },
+          scope,
+        )
         .andThen((outcome) =>
           applyCommand(
             dependencies,
@@ -48,31 +54,47 @@ export function interpretEffect(
                   pinnedId: effect.searchId,
                 }
               : { type: 'RecordDoomed', reason: outcome.reason },
+            scope.context,
           ),
         );
     }
 
     case 'Apply': {
-      return ports.tagger.apply(effect.directory, effect.mode).andThen((outcome) => {
+      return ports.tagger.apply(effect.directory, effect.mode, scope).andThen((outcome) => {
         switch (outcome.kind) {
           case 'applied': {
-            return applyCommand(dependencies, importId, {
-              type: 'RecordApplied',
-              location: outcome.location,
-              failures: outcome.failures,
-            });
+            return applyCommand(
+              dependencies,
+              importId,
+              {
+                type: 'RecordApplied',
+                location: outcome.location,
+                failures: outcome.failures,
+              },
+              scope.context,
+            );
           }
           case 'skipped-duplicate': {
-            return applyCommand(dependencies, importId, {
-              type: 'RecordApplySkippedDuplicate',
-              incumbents: outcome.incumbents,
-            });
+            return applyCommand(
+              dependencies,
+              importId,
+              {
+                type: 'RecordApplySkippedDuplicate',
+                incumbents: outcome.incumbents,
+              },
+              scope.context,
+            );
           }
           case 'doomed': {
-            return applyCommand(dependencies, importId, {
-              type: 'RecordDoomed',
-              reason: outcome.reason,
-            });
+            return applyCommand(
+              dependencies,
+              importId,
+              {
+                type: 'RecordDoomed',
+                reason: outcome.reason,
+              },
+              scope.context,
+            );
           }
         }
       });
@@ -80,8 +102,10 @@ export function interpretEffect(
 
     case 'DeleteIntake': {
       return ports.intake
-        .deleteRelease(effect.directory)
-        .andThen(() => applyCommand(dependencies, importId, { type: 'RecordIntakeDeleted' }));
+        .deleteRelease(effect.directory, scope)
+        .andThen(() =>
+          applyCommand(dependencies, importId, { type: 'RecordIntakeDeleted' }, scope.context),
+        );
     }
   }
 }

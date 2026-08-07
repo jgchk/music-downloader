@@ -1,8 +1,8 @@
+import { testScope } from '../../application/__fixtures__/correlation.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import { FilesystemIntake } from './intake.js';
 import type { IntakeFileSystem } from './intake.js';
 
@@ -26,8 +26,8 @@ describe('FilesystemIntake', () => {
     mkdirSync(release, { recursive: true });
     writeFileSync(path.join(release, '01.mp3'), 'x');
 
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const releaseDeletionResult = await intake.deleteRelease(release);
+    const intake = new FilesystemIntake({ intakeRoot: root });
+    const releaseDeletionResult = await intake.deleteRelease(release, testScope());
     releaseDeletionResult._unsafeUnwrap();
 
     expect(existsSync(release)).toBe(false);
@@ -42,8 +42,8 @@ describe('FilesystemIntake', () => {
     mkdirSync(release, { recursive: true });
     mkdirSync(sibling, { recursive: true });
 
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const releaseDeletionResult2 = await intake.deleteRelease(release);
+    const intake = new FilesystemIntake({ intakeRoot: root });
+    const releaseDeletionResult2 = await intake.deleteRelease(release, testScope());
     releaseDeletionResult2._unsafeUnwrap();
 
     expect(existsSync(release)).toBe(false);
@@ -52,33 +52,33 @@ describe('FilesystemIntake', () => {
 
   it('tolerates an already-gone directory (idempotent under redelivery)', async () => {
     const root = freshRoot();
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const result = await intake.deleteRelease(path.join(root, 'never-existed'));
+    const intake = new FilesystemIntake({ intakeRoot: root });
+    const result = await intake.deleteRelease(path.join(root, 'never-existed'), testScope());
     expect(result.isOk()).toBe(true);
   });
 
   it('refuses to delete outside the intake root', async () => {
     const root = freshRoot();
     const outside = freshRoot();
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
+    const intake = new FilesystemIntake({ intakeRoot: root });
 
-    const result = await intake.deleteRelease(path.join(outside, 'album'));
+    const result = await intake.deleteRelease(path.join(outside, 'album'), testScope());
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
     expect(result._unsafeUnwrapErr().message).toContain('refusing to delete');
   });
 
   it('refuses to delete the intake root itself', async () => {
     const root = freshRoot();
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const result = await intake.deleteRelease(root);
+    const intake = new FilesystemIntake({ intakeRoot: root });
+    const result = await intake.deleteRelease(root, testScope());
     expect(result.isErr()).toBe(true);
     expect(existsSync(root)).toBe(true);
   });
 
   it('refuses a sneaky traversal that resolves outside the root', async () => {
     const root = freshRoot();
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger());
-    const result = await intake.deleteRelease(path.join(root, '..', 'sibling'));
+    const intake = new FilesystemIntake({ intakeRoot: root });
+    const result = await intake.deleteRelease(path.join(root, '..', 'sibling'), testScope());
     expect(result.isErr()).toBe(true);
   });
 
@@ -89,8 +89,8 @@ describe('FilesystemIntake', () => {
       removeTree: () => Promise.resolve(),
       removeEmptyDir: () => Promise.reject(Object.assign(new Error('EACCES'), { code: 'EACCES' })),
     };
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger(), failing);
-    const result = await intake.deleteRelease(release);
+    const intake = new FilesystemIntake({ intakeRoot: root }, failing);
+    const result = await intake.deleteRelease(release, testScope());
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });
 
@@ -101,8 +101,8 @@ describe('FilesystemIntake', () => {
       removeTree: () => Promise.resolve(),
       removeEmptyDir: () => Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
     };
-    const intake = new FilesystemIntake({ intakeRoot: root }, silentLogger(), gone);
-    const result = await intake.deleteRelease(release);
+    const intake = new FilesystemIntake({ intakeRoot: root }, gone);
+    const result = await intake.deleteRelease(release, testScope());
     expect(result.isOk()).toBe(true);
   });
 });

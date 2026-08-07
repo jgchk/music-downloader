@@ -1,3 +1,11 @@
+import {
+  OTHER_STORY,
+  STORY,
+  appendMetadata,
+  fixedCorrelation,
+  legacyMetadata,
+  testContext,
+} from '../__fixtures__/correlation.js';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isRetryable } from './reactor.js';
@@ -29,6 +37,7 @@ import type { CommandError } from './command-handler.js';
 import type { EffectPorts } from './interpreter.js';
 import { interpretEffect } from './interpreter.js';
 import { REACTOR_CONSUMER, Reactor } from './reactor.js';
+import type { ReactorDependencies } from './reactor.js';
 import type { EffectInterpreter } from './reactor.js';
 
 let store: FakeEventStore;
@@ -53,7 +62,7 @@ beforeEach(() => {
 
 function realInterpret(ports: EffectPorts): EffectInterpreter {
   const dependencies = { store, clock: fixedClock(), ports };
-  return (importId, effect) => interpretEffect(dependencies, importId, effect);
+  return (importId, effect, scope) => interpretEffect(dependencies, importId, effect, scope);
 }
 
 function reactor(
@@ -62,6 +71,7 @@ function reactor(
     interval?: (function_: () => void, ms: number) => () => void;
     retryBudget?: number;
     logger?: Logger;
+    correlation?: ReactorDependencies['correlation'];
   } = {},
 ): Reactor {
   return new Reactor({
@@ -73,6 +83,7 @@ function reactor(
     stalled,
     clock: fixedClock(),
     logger: overrides.logger ?? silentLogger(),
+    correlation: overrides.correlation ?? fixedCorrelation(),
     interpret,
     // Tests drive drains explicitly; the default real interval is covered by its own test below.
     interval: overrides.interval ?? (() => () => {}),
@@ -80,10 +91,22 @@ function reactor(
   });
 }
 
+/** Seed rows exactly as a build BEFORE end-to-end-correlation wrote them: no pair at all. */
+function seedLegacy(history: readonly ImportEvent[]): void {
+  store.bus = undefined;
+  store.seedLegacy('imp-1', 0, history, legacyMetadata('imp-1', fixedClock()));
+  store.bus = bus;
+}
+
 /** Seed history without publishing: detach the bus for the append, as a pre-start backlog. */
 async function seed(history: readonly ImportEvent[]): Promise<void> {
   store.bus = undefined;
-  await store.append('imp-1', 0, history, { importId: 'imp-1', occurredAt: 't' });
+  await store.append('imp-1', 0, history, {
+    importId: 'imp-1',
+    occurredAt: 't',
+    correlationId: STORY,
+    causation: { kind: 'command', commandId: 'command-1' },
+  });
   store.bus = bus;
 }
 
@@ -93,7 +116,11 @@ describe('Reactor', () => {
     const interpret = vi.fn(() => okAsync([]));
     await reactor(interpret).start();
 
-    expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
+    expect(interpret).toHaveBeenCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'Propose' }),
+      expect.anything(),
+    );
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
 
@@ -126,11 +153,16 @@ describe('Reactor', () => {
     const r = reactor(realInterpret(ports));
     await r.start();
 
-    await applyCommand({ store, clock: fixedClock() }, 'imp-1', {
-      type: 'SubmitImport',
-      directory: DIRECTORY,
-      policy: POLICY,
-    });
+    await applyCommand(
+      { store, clock: fixedClock() },
+      'imp-1',
+      {
+        type: 'SubmitImport',
+        directory: DIRECTORY,
+        policy: POLICY,
+      },
+      testContext(),
+    );
     await vi.waitFor(() => {
       expect(store.all().map((entry) => entry.type)).toEqual([
         'ImportRequested',
@@ -139,10 +171,11 @@ describe('Reactor', () => {
         'ImportApplied',
       ]);
     });
-    expect(ports.tagger.apply).toHaveBeenCalledWith(DIRECTORY, {
-      kind: 'candidate',
-      ref: candidate().ref,
-    });
+    expect(ports.tagger.apply).toHaveBeenCalledWith(
+      DIRECTORY,
+      { kind: 'candidate', ref: candidate().ref },
+      expect.anything(),
+    );
     r.stop();
   });
 
@@ -241,6 +274,7 @@ describe('Reactor', () => {
       stalled,
       clock: fixedClock(),
       logger,
+      correlation: fixedCorrelation(),
       interpret,
       interval: () => () => {},
     });
@@ -248,7 +282,11 @@ describe('Reactor', () => {
     await r.start();
 
     // Fell back to 0 and drained the backlog rather than silently skipping it — and said so loudly.
-    expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
+    expect(interpret).toHaveBeenCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'Propose' }),
+      expect.anything(),
+    );
     expect(errorSpy).toHaveBeenCalledWith(
       { err: infraError('checkpoint.load', 'boom') },
       'checkpoint load failed; replaying from the log start',
@@ -261,8 +299,8 @@ describe('Reactor', () => {
     // the drain is mid-pass — the exact restart shape: the appended events must not fall into the
     // gap between the one-shot backlog snapshot and the live subscription.
     await seed([requested()]);
-    const apply = vi.fn((_importId: string, _effect: unknown) => okAsync([]));
-    const interpret: EffectInterpreter = (importId, effect) => {
+    const apply = vi.fn((_importId: string, _effect: unknown, _scope: unknown) => okAsync([]));
+    const interpret: EffectInterpreter = (importId, effect, scope) => {
       if (effect.type === 'Propose') {
         return store
           .append(
@@ -276,17 +314,21 @@ describe('Reactor', () => {
               },
               { type: 'AutoApplySelected', ref: candidate().ref, distance: asDistance(0.01) },
             ],
-            { importId, occurredAt: 't' },
+            appendMetadata(importId, fixedClock()),
           )
           .map(() => []);
       }
-      return apply(importId, effect);
+      return apply(importId, effect, scope);
     };
     const r = reactor(interpret);
     await r.start();
 
     await vi.waitFor(() => {
-      expect(apply).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Apply' }));
+      expect(apply).toHaveBeenCalledWith(
+        'imp-1',
+        expect.objectContaining({ type: 'Apply' }),
+        expect.anything(),
+      );
       expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(3);
     });
     r.stop();
@@ -326,6 +368,7 @@ describe('Reactor', () => {
         deadLetters,
         parked,
         stalled,
+        correlation: fixedCorrelation(),
         clock: fixedClock(),
         logger: silentLogger(),
         interpret,
@@ -334,7 +377,11 @@ describe('Reactor', () => {
 
       await seed([requested()]); // appended with the bus detached: only the poll can find it
       await vi.advanceTimersByTimeAsync(5000);
-      expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Propose' }));
+      expect(interpret).toHaveBeenCalledWith(
+        'imp-1',
+        expect.objectContaining({ type: 'Propose' }),
+        expect.anything(),
+      );
 
       r.stop();
       await seed([requested()]);
@@ -466,7 +513,11 @@ describe('Reactor', () => {
     // fires exactly once; a whole-stream fold would see the trailing ImportApplied (`applied`) and
     // never react. The checkpoint advances precisely to that event.
     expect(interpret).toHaveBeenCalledTimes(1);
-    expect(interpret).toHaveBeenCalledWith('imp-1', expect.objectContaining({ type: 'Apply' }));
+    expect(interpret).toHaveBeenCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'Apply' }),
+      expect.anything(),
+    );
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(autoApply.globalSeq);
   });
 });
@@ -594,7 +645,7 @@ describe('Reactor — defect containment', () => {
     await r.start(); // empty log: the startup drain is clean
 
     // A live append publishes on the bus, so this wakeup alone fires the throwing drain.
-    await store.append('imp-1', 0, [requested()], { importId: 'imp-1', occurredAt: 't' });
+    await store.append('imp-1', 0, [requested()], appendMetadata('imp-1', fixedClock()));
     await vi.waitFor(() => {
       expect(lines.join('')).toContain('reactor pass failed unexpectedly');
     });
@@ -625,6 +676,7 @@ describe('Reactor — defect containment', () => {
       stalled,
       clock: fixedClock(),
       logger: silentLogger(),
+      correlation: fixedCorrelation(),
       interpret,
       interval: (function_) => {
         intervals.push(function_);
@@ -677,6 +729,7 @@ describe('Reactor — sibling effects of one event', () => {
     expect(interpret).toHaveBeenLastCalledWith(
       'imp-1',
       expect.objectContaining({ type: 'DeleteIntake' }),
+      expect.anything(),
     );
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
@@ -695,6 +748,7 @@ describe('Reactor — sibling effects of one event', () => {
     expect(interpret).toHaveBeenLastCalledWith(
       'imp-1',
       expect.objectContaining({ type: 'DeleteIntake' }),
+      expect.anything(),
     );
     expect(deadLetters.letters).toHaveLength(1);
     expect(stalled.isStalled('imp-1')).toBe(true);
@@ -707,5 +761,85 @@ describe('isRetryable', () => {
     // Unreachable from effect dispatch today (the reactor never submits imports), but the
     // command-error union must stay fully classified; this pins the arm's direction.
     expect(isRetryable({ kind: 'CycleInFlight' })).toBe(true);
+  });
+});
+
+describe('Reactor correlation propagation', () => {
+  /** Ports whose effects always succeed — the subject here is the identity, not the outcome. */
+  const stubPorts = (): EffectPorts => ({
+    tagger: {
+      propose: vi.fn(() =>
+        okAsync({ kind: 'proposal' as const, candidates: [candidate()], duplicates: [] }),
+      ),
+      apply: vi.fn(() =>
+        okAsync({ kind: 'applied' as const, location: '/library/Artist/Album', failures: [] }),
+      ),
+      validate: vi.fn(),
+    },
+    intake: { deleteRelease: vi.fn(() => okAsync(undefined)) },
+  });
+
+  it('continues the triggering event story in the events its follow-up command appends', async () => {
+    await seed([requested()]);
+    const trigger = store.all().at(-1)!;
+    const before = store.all().length;
+
+    await reactor(realInterpret(stubPorts())).process(trigger);
+
+    const appended = store.all().filter((entry) => entry.globalSeq > before);
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.causation).toEqual({
+        kind: 'event',
+        context: 'importer',
+        streamId: trigger.streamId,
+        version: trigger.version,
+      });
+    }
+  });
+
+  it('mints a fresh story for a stream written before correlation existed', async () => {
+    seedLegacy([requested()]);
+    const trigger = store.all().at(-1)!;
+    const before = store.all().length;
+
+    await reactor(realInterpret(stubPorts()), {
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
+
+    const appended = store.all().filter((entry) => entry.globalSeq > before);
+    expect(appended.length).toBeGreaterThan(0);
+    expect(appended[0]!.metadata.correlationId).toBe(OTHER_STORY);
+  });
+
+  it('binds the story, stream and position onto every log line of one dispatch', async () => {
+    await seed([requested()]);
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(realInterpret(stubPorts()), { logger }).process(trigger);
+
+    const dispatched = lines
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            msg: string;
+            correlationId?: string;
+            streamId?: string;
+            globalSeq?: number;
+          },
+      )
+      .filter((entry) => entry.msg === 'effect dispatched');
+    expect(dispatched.length).toBeGreaterThan(0);
+    for (const entry of dispatched) {
+      expect(entry.correlationId).toBe(STORY);
+      expect(entry.streamId).toBe(trigger.streamId);
+      expect(entry.globalSeq).toBe(trigger.globalSeq);
+    }
   });
 });

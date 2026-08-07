@@ -1,4 +1,6 @@
 import { Import } from '../../domain/import/import.js';
+import { CONTEXT_NAME, continueFrom, isCorrelationId } from '../correlation/context.js';
+import type { OperationScope } from '../correlation/context.js';
 import type { Logger } from '../logging/logger.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type {
@@ -9,7 +11,7 @@ import type {
 } from '../ports/event-store-port.js';
 import type { ParkedEffect, ParkedEffectStore } from '../ports/parked-effect-port.js';
 import type { StalledReadModel } from '../projections/read-models.js';
-import type { Clock } from '../ports/system-ports.js';
+import type { Clock, CorrelationSource } from '../ports/system-ports.js';
 import type { ResultAsync } from 'neverthrow';
 import type { Effect } from '../../domain/import/import.js';
 import type { CommandError } from './command-handler.js';
@@ -77,6 +79,7 @@ export const REACTOR_CONSUMER = 'import-reactor';
 export type EffectInterpreter = (
   importId: string,
   effect: Effect,
+  scope: OperationScope,
 ) => ResultAsync<readonly StoredEvent[], CommandError>;
 
 export interface ReactorDependencies {
@@ -90,6 +93,8 @@ export interface ReactorDependencies {
   readonly stalled: StalledReadModel;
   readonly clock: Clock;
   readonly logger: Logger;
+  /** Mints a story for a stream whose history predates correlation metadata (see `scopeFor`). */
+  readonly correlation: CorrelationSource;
   readonly interpret: EffectInterpreter;
   /** Injectable fallback timer (defaults to `setInterval`); returns a stop function. */
   readonly interval?: (function_: () => void, ms: number) => () => void;
@@ -202,12 +207,38 @@ export class Reactor {
     }
   }
 
+  /**
+   * The unit of work one delivered event opens: the story it continues, plus a logger bound to
+   * `{correlationId, streamId, globalSeq}` for every line the dispatch emits. Built once per
+   * dispatch and handed down — nothing below this point re-derives correlation state.
+   */
+  private scopeFor(stored: StoredEvent): OperationScope {
+    const context = continueFrom(stored, this.dependencies.correlation);
+    const logger = this.dependencies.logger.child({
+      correlationId: context.correlationId,
+      streamId: stored.streamId,
+      globalSeq: stored.globalSeq,
+    });
+    const carried = stored.metadata.correlationId;
+    if (carried === undefined || !isCorrelationId(carried)) {
+      // DEBUG, not info: a pre-correlation row can never gain one, so this says nothing an
+      // operator can act on — and a boot drain over historical streams would emit it once per
+      // stream. It is a trace-quality note for whoever is already reading debug output.
+      logger.debug(
+        { context: CONTEXT_NAME },
+        'triggering event carries no correlation metadata; synthesized a story for this dispatch',
+      );
+    }
+    return { context, logger };
+  }
+
   async process(stored: StoredEvent): Promise<void> {
     if (stored.globalSeq <= this.lastProcessed) return; // already handled (at-least-once dedupe)
 
+    const scope = this.scopeFor(stored);
     const stream = await this.dependencies.store.readStream(stored.streamId);
     if (stream.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, err: stream.error },
         'reactor stream read failed',
       );
@@ -226,7 +257,7 @@ export class Reactor {
     const aggregate = Import.fromHistory(prefix.map((entry) => entry.event));
     let isDeadLettered = false;
     for (const effect of aggregate.reactTo(stored.event)) {
-      const result = await this.dependencies.interpret(stored.streamId, effect);
+      const result = await this.dependencies.interpret(stored.streamId, effect, scope);
       if (result.isErr()) {
         if (isRetryable(result.error)) {
           if (!(await this.handleRetryable(stored, effect.type, result.error))) return; // held
@@ -238,16 +269,13 @@ export class Reactor {
         // Stale/illegal outcome — the stream has already settled this sibling; retrying would only
         // re-fire the same rejection forever. Record it and carry on: dropping the effects behind
         // it would silently lose work the event still owes.
-        this.dependencies.logger.warn(
+        scope.logger.warn(
           { importId: stored.streamId, effect: effect.type, err: result.error },
           'effect follow-on rejected as stale; continuing past it',
         );
         continue;
       }
-      this.dependencies.logger.debug(
-        { importId: stored.streamId, effect: effect.type },
-        'effect dispatched',
-      );
+      scope.logger.debug({ importId: stored.streamId, effect: effect.type }, 'effect dispatched');
     }
 
     const saved = await this.dependencies.checkpoints.save(REACTOR_CONSUMER, stored.globalSeq);
@@ -256,7 +284,7 @@ export class Reactor {
       // `lastProcessed`) so the event redelivers on the next wakeup/poll, mirroring the
       // subscription's `advance()`. At-least-once tolerates the re-dispatch; the domain's stale
       // guards converge the redelivery.
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, globalSeq: stored.globalSeq, err: saved.error },
         'checkpoint save failed; holding for redelivery',
       );

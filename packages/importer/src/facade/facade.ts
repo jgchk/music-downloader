@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { CommandError } from '../application/import/command-handler.js';
 import {
+  isCorrelationId,
+  newOperation,
+  toCorrelationId,
+} from '../application/correlation/context.js';
+import type { CommandContext } from '../application/correlation/context.js';
+import {
   getImport as getImportUseCase,
   getImportForAcquisition as getImportForAcquisitionUseCase,
   listImports as listImportsUseCase,
@@ -97,9 +103,18 @@ export type ResolveReviewResult = z.infer<typeof resolveReviewResultSchema>;
 
 // --- The facade --------------------------------------------------------------------------------
 
+/**
+ * The story a caller has already minted for the operation this command belongs to — 32 lowercase
+ * hex (see `operation-correlation`). Deliberately a plain string, not this module's branded
+ * `CorrelationId`: the facade is wire-shaped, and one caller drives BOTH modules under one story,
+ * so neither module's brand may be the currency at this boundary. A malformed or unknown value
+ * degrades to a freshly minted story — telemetry never refuses work.
+ */
+export type StoryId = string;
+
 export interface ImporterFacade {
-  submitImport(input: unknown): Promise<FacadeResult<SubmitImportResult>>;
-  resolveReview(input: unknown): Promise<FacadeResult<ResolveReviewResult>>;
+  submitImport(input: unknown, story: StoryId): Promise<FacadeResult<SubmitImportResult>>;
+  resolveReview(input: unknown, story: StoryId): Promise<FacadeResult<ResolveReviewResult>>;
   getImport(input: unknown): FacadeResult<ImportStatusResponseDto>;
   /** The import an acquisition was submitted as — the web timeline's correlation read. */
   getImportForAcquisition(input: unknown): FacadeResult<ImportStatusResponseDto>;
@@ -109,21 +124,36 @@ export interface ImporterFacade {
 }
 
 export function createImporterFacade(dependencies: UseCaseDependencies): ImporterFacade {
+  /**
+   * Turn a caller's story into this module's command context. The commandId is minted here, so two
+   * commands of one story get distinct causations — causation is rewritten per hop, correlation is
+   * not. An unusable story is replaced rather than rejected: an operation with a broken trace is
+   * still an operation the user asked for.
+   */
+  const contextFor = (story: StoryId): CommandContext =>
+    isCorrelationId(story)
+      ? {
+          correlationId: toCorrelationId(story),
+          causation: { kind: 'command', commandId: dependencies.correlation.mint() },
+        }
+      : newOperation(dependencies.correlation);
+
   return {
-    async submitImport(input) {
+    async submitImport(input, story) {
       const parsed = submitImportRequestSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await submitImportUseCase(dependencies, {
-        directory: parsed.data.path,
-        hints: hintsToDomain(parsed.data),
-      });
+      const result = await submitImportUseCase(
+        dependencies,
+        { directory: parsed.data.path, hints: hintsToDomain(parsed.data) },
+        contextFor(story),
+      );
       return result.match(
         ({ importId }) => ok({ importId }),
         (error) => fail(toFacadeError(error)),
       );
     },
 
-    async resolveReview(input) {
+    async resolveReview(input, story) {
       const parsed = resolveReviewInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
       const result = await resolveReviewUseCase(
@@ -131,6 +161,7 @@ export function createImporterFacade(dependencies: UseCaseDependencies): Importe
         // Schema-proven non-empty above; lift the addressed id into its brand for the use-case.
         toImportId(parsed.data.id),
         resolutionToDomain(parsed.data.resolution),
+        contextFor(story),
       );
       return result.match(
         () => ok({ importId: parsed.data.id }),

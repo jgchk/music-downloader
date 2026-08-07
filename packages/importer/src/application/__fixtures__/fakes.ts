@@ -11,6 +11,7 @@ import type {
   AppendError,
   CheckpointStore,
   EventBus,
+  AppendMetadata,
   EventMetadata,
   EventStorePort,
   StoredEvent,
@@ -30,7 +31,7 @@ export class FakeEventStore implements EventStorePort {
     streamId: string,
     expectedVersion: number,
     events: readonly ImportEvent[],
-    metadata: EventMetadata,
+    metadata: AppendMetadata,
   ): ResultAsync<readonly StoredEvent[], AppendError> {
     if (this.failAppends) return errAsync(infraError('append', 'boom'));
     if (this.conflictOnAppend) {
@@ -51,6 +52,30 @@ export class FakeEventStore implements EventStorePort {
     this.events.push(...stored);
     this.bus?.publish(stored);
     return okAsync(stored);
+  }
+
+  /**
+   * Write rows the way a build BEFORE end-to-end-correlation wrote them — no correlation, no
+   * causation. Deliberately bypasses {@link append}'s write contract, because that is exactly what
+   * an older binary did: the rows exist, they are permanent, and every degradation path has to be
+   * tested against them rather than against a hand-nulled field.
+   */
+  seedLegacy(
+    streamId: string,
+    expectedVersion: number,
+    events: readonly ImportEvent[],
+    metadata: EventMetadata,
+  ): readonly StoredEvent[] {
+    const stored = events.map((event, index) => ({
+      globalSeq: this.events.length + index + 1,
+      streamId,
+      version: expectedVersion + index,
+      type: event.type,
+      event,
+      metadata,
+    }));
+    this.events.push(...stored);
+    return stored;
   }
 
   readStream(streamId: string): ResultAsync<readonly StoredEvent[], InfraError> {

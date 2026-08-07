@@ -1,3 +1,6 @@
+/** The story the `handle` hook would have minted for this request. */
+const STORY = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
 import { describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { Logger } from 'pino';
@@ -41,6 +44,7 @@ function eventFor(
         downloader: downloader as unknown as DownloaderFacade,
       },
       logger: { warn: vi.fn() } as unknown as Logger,
+      correlationId: STORY,
     },
   } as never;
 }
@@ -80,10 +84,13 @@ describe('resolve action', () => {
     await expect(
       actions.resolve!(eventFor({ resolveReview }, { verb: 'supply-id', mbReleaseId: 'mb-2' })),
     ).rejects.toSatisfy((thrown: unknown) => isRedirect(thrown) && thrown.location === '/reviews');
-    expect(resolveReview).toHaveBeenCalledWith({
-      id: 'imp-1',
-      resolution: { verb: 'supply-id', mbReleaseId: 'mb-2' },
-    });
+    expect(resolveReview).toHaveBeenCalledWith(
+      {
+        id: 'imp-1',
+        resolution: { verb: 'supply-id', mbReleaseId: 'mb-2' },
+      },
+      STORY,
+    );
   });
 
   it.each(DESTRUCTIVE_VERBS)(
@@ -132,10 +139,13 @@ describe('resolve action', () => {
   it('passes an unknown verb straight to the facade to refuse — the gate holds nothing', async () => {
     const resolveReview = vi.fn().mockResolvedValue({ ok: false, error: { kind: 'Validation' } });
     await actions.resolve!(eventFor({ resolveReview }, { verb: 'brand-new-verb' }));
-    expect(resolveReview).toHaveBeenCalledWith({
-      id: 'imp-1',
-      resolution: { verb: 'brand-new-verb' },
-    });
+    expect(resolveReview).toHaveBeenCalledWith(
+      {
+        id: 'imp-1',
+        resolution: { verb: 'brand-new-verb' },
+      },
+      STORY,
+    );
   });
 
   it('refuses a __proto__ verb as a modeled 400, never a thrown 500', async () => {
@@ -145,7 +155,10 @@ describe('resolve action', () => {
       .fn()
       .mockResolvedValue({ ok: false, error: { kind: 'ValidationFailed', detail: 'bad verb' } });
     const result = await actions.resolve!(eventFor({ resolveReview }, { verb: '__proto__' }));
-    expect(resolveReview).toHaveBeenCalledWith({ id: 'imp-1', resolution: { verb: '__proto__' } });
+    expect(resolveReview).toHaveBeenCalledWith(
+      { id: 'imp-1', resolution: { verb: '__proto__' } },
+      STORY,
+    );
     expect(result).toMatchObject({ status: 400 });
   });
 
@@ -162,10 +175,13 @@ describe('resolve action', () => {
         eventFor({ resolveReview }, { verb: 'reject', reason: 'bad rip', confirmed: 'true' }),
       ),
     ).rejects.toSatisfy((thrown: unknown) => isRedirect(thrown) && thrown.location === '/reviews');
-    expect(resolveReview).toHaveBeenCalledWith({
-      id: 'imp-1',
-      resolution: { verb: 'reject', reason: 'bad rip' },
-    });
+    expect(resolveReview).toHaveBeenCalledWith(
+      {
+        id: 'imp-1',
+        resolution: { verb: 'reject', reason: 'bad rip' },
+      },
+      STORY,
+    );
   });
 
   it('surfaces the stale-resolution conflict as the modeled error (web-ui spec)', async () => {

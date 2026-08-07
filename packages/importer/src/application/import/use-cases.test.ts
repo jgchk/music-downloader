@@ -1,3 +1,4 @@
+import { appendMetadata, fixedCorrelation, testContext } from '../__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import {
   DIRECTORY,
@@ -35,6 +36,7 @@ function dependencies(): UseCaseDependencies & {
     status: new ImportStatusProjection(),
     stalled: new StalledReadModel(),
     policy: POLICY,
+    correlation: fixedCorrelation(),
   };
 }
 
@@ -43,7 +45,7 @@ async function seed(
   history: readonly ImportEvent[],
 ): Promise<ImportId> {
   const importId = importIdFor(DIRECTORY);
-  await d.store.append(importId, 0, history, { importId, occurredAt: 't' });
+  await d.store.append(importId, 0, history, appendMetadata(importId, fixedClock()));
   d.status.rebuild(d.store.all());
   return importId;
 }
@@ -64,7 +66,11 @@ describe('importIdFor', () => {
 describe('submitImport', () => {
   it('keys the import by its directory and stamps hints and policy', async () => {
     const d = dependencies();
-    const result = await submitImport(d, { directory: `${DIRECTORY}/`, hints: HINTS });
+    const result = await submitImport(
+      d,
+      { directory: `${DIRECTORY}/`, hints: HINTS },
+      testContext(),
+    );
     const { importId } = result._unsafeUnwrap();
     expect(importId).toBe(importIdFor(DIRECTORY));
     expect(d.store.all()[0]!.event).toEqual({
@@ -77,18 +83,22 @@ describe('submitImport', () => {
 
   it('converges a resubmission of a live directory on the same import', async () => {
     const d = dependencies();
-    await submitImport(d, { directory: DIRECTORY });
-    const again = await submitImport(d, { directory: DIRECTORY });
+    await submitImport(d, { directory: DIRECTORY }, testContext());
+    const again = await submitImport(d, { directory: DIRECTORY }, testContext());
     expect(again._unsafeUnwrap().importId).toBe(importIdFor(DIRECTORY));
     expect(d.store.all()).toHaveLength(1);
   });
 
   it('records the acquisition source so the linkage is queryable from the log', async () => {
     const d = dependencies();
-    await submitImport(d, {
-      directory: DIRECTORY,
-      source: { acquisitionId: toAcquisitionId('acq-1') },
-    });
+    await submitImport(
+      d,
+      {
+        directory: DIRECTORY,
+        source: { acquisitionId: toAcquisitionId('acq-1') },
+      },
+      testContext(),
+    );
     expect(d.store.all()[0]!.event).toMatchObject({
       type: 'ImportRequested',
       source: { acquisitionId: 'acq-1' },
@@ -103,14 +113,19 @@ describe('resolveReview', () => {
   it('records a resolution against the open review', async () => {
     const d = dependencies();
     const importId = await seed(d, awaitingMatchReview());
-    const result = await resolveReview(d, importId, { kind: 'import-as-is' });
+    const result = await resolveReview(d, importId, { kind: 'import-as-is' }, testContext());
     expect(result.isOk()).toBe(true);
     expect(d.store.all().at(-1)!.type).toBe('ReviewResolved');
   });
 
   it('surfaces the domain refusal for an unknown import', async () => {
     const d = dependencies();
-    const result = await resolveReview(d, toImportId('imp-missing'), { kind: 'import-as-is' });
+    const result = await resolveReview(
+      d,
+      toImportId('imp-missing'),
+      { kind: 'import-as-is' },
+      testContext(),
+    );
     expect(result._unsafeUnwrapErr()).toEqual({ kind: 'UnknownImport' });
   });
 });

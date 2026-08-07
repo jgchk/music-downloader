@@ -1,3 +1,4 @@
+import { appendMetadata, testContext } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
 import { importIdFor, submitImport } from '../../application/import/use-cases.js';
@@ -118,7 +119,7 @@ describe('the intake event consumer', () => {
       importId,
       1,
       [{ type: 'ImportRejected', reason: 'unusable delivery', filesDeleted: true }],
-      { importId, occurredAt: 'T1' },
+      appendMetadata(importId, 'T1'),
     );
     appended._unsafeUnwrap();
     wiring.sync();
@@ -220,12 +221,16 @@ describe('the intake event consumer', () => {
     // An operator manually resubmits the same directory (no seam source), and that cycle is
     // later rejected too.
     const importId = importIdFor(`${INTAKE_ROOT}/Radiohead - Kid A`);
-    await submitImport(wiring.deps, { directory: `${INTAKE_ROOT}/Radiohead - Kid A` });
+    await submitImport(
+      wiring.deps,
+      { directory: `${INTAKE_ROOT}/Radiohead - Kid A` },
+      testContext(),
+    );
     const rerejected = await wiring.store.append(
       importId,
       3,
       [{ type: 'ImportRejected', reason: 'still wrong', filesDeleted: true }],
-      { importId, occurredAt: 'T2' },
+      appendMetadata(importId, 'T2'),
     );
     rerejected._unsafeUnwrap();
     wiring.sync();
@@ -259,10 +264,14 @@ describe('the intake event consumer', () => {
 
   it('an import without a watermark converges every redelivery — the pre-watermark behavior', async () => {
     const wiring = testWiring();
-    await submitImport(wiring.deps, {
-      directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
-      source: { acquisitionId: toAcquisitionId('acq-1') },
-    });
+    await submitImport(
+      wiring.deps,
+      {
+        directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
+        source: { acquisitionId: toAcquisitionId('acq-1') },
+      },
+      testContext(),
+    );
     wiring.sync();
     const before = wiring.store.all().length;
 
@@ -274,10 +283,14 @@ describe('the intake event consumer', () => {
 
   it('the pre-watermark convergence announces itself — the one deliberate drop is never silent', async () => {
     const wiring = testWiring();
-    await submitImport(wiring.deps, {
-      directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
-      source: { acquisitionId: toAcquisitionId('acq-1') },
-    });
+    await submitImport(
+      wiring.deps,
+      {
+        directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
+        source: { acquisitionId: toAcquisitionId('acq-1') },
+      },
+      testContext(),
+    );
     wiring.sync();
     const warnings: { context: Record<string, unknown>; message: string }[] = [];
     const consume = consumer(wiring, {
