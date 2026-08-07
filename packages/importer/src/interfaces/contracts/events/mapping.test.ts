@@ -137,6 +137,35 @@ describe('published correlation metadata', () => {
     expect(rendered.metadata).toMatchObject({ correlationId: SECOND_DELIVERY_STORY });
   });
 
+  it('publishes a verdict under the story of the cycle it belongs to, not of one opened after it', () => {
+    // The bound on the walk-back is the renderer's own, deliberately redundant with the feed's
+    // truncation: `render` is a public port method and callers do hand it whole streams (the
+    // full-circle test does). A revived acquisition's stream carries a LATER cycle, and an
+    // unbounded walk-back would refile the FIRST delivery's verdict under the replacement's story
+    // every time that verdict is re-rendered.
+    const firstCycle = verdictHistory();
+    const events = [...firstCycle, ...verdictHistory()];
+    let seenRequests = 0;
+    const stream = stored(events, 'imp-1', (event) => {
+      if (event.type !== 'ImportRequested') return;
+      seenRequests += 1;
+      return seenRequests === 1 ? STORY : SECOND_DELIVERY_STORY;
+    });
+    const firstVerdict = stream[firstCycle.length - 1]!;
+
+    const rendered = publishedEventMapping.render(firstVerdict, stream)._unsafeUnwrap();
+
+    expect(rendered.metadata).toEqual({
+      correlationId: STORY,
+      causation: {
+        kind: 'event',
+        context: 'importer',
+        streamId: 'imp-1',
+        version: firstVerdict.version,
+      },
+    });
+  });
+
   it('omits the block when the prefix carries no cycle start to take a story from', () => {
     // Defensive, not decorative: the story is a property of the CYCLE, so with no cycle in the
     // prefix there is no story to publish — and inventing one is exactly what is forbidden.
@@ -165,6 +194,14 @@ describe('published correlation metadata', () => {
 
     const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
 
+    // No correlation block for a cycle whose rows predate the capability: nothing is fabricated.
+    //
+    // Asserted as "no value", not as "no key". `expect('metadata' in rendered).toBe(false)` would
+    // also pass and would kill one more mutant, but it would pin a distinction nothing can observe:
+    // `JSON.stringify` drops an `undefined` property, so the two shapes are byte-identical on the
+    // wire; `OutboundFeed` re-adds the key unconditionally one layer out; and no consumer reads a
+    // published event with `in` or `Object.keys`. That assertion would exist for the mutation score
+    // rather than for a reader, so the mutant is recorded as an equivalent survivor instead.
     expect(rendered.metadata).toBeUndefined();
     expect(rendered.data).toBeDefined(); // the payload is unaffected by the envelope's absence
   });

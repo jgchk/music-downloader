@@ -182,6 +182,14 @@ describe('published correlation metadata', () => {
 
     const rendered = publishedEventMapping.render(stream.at(-1)!, stream)._unsafeUnwrap();
 
+    // No correlation block at all: nothing is fabricated for a row that predates the capability.
+    //
+    // Asserted as "no value", not as "no key". `expect('metadata' in rendered).toBe(false)` would
+    // also pass and would kill one more mutant, but it would pin a distinction nothing can observe:
+    // `JSON.stringify` drops an `undefined` property, so the two shapes are byte-identical on the
+    // wire; `OutboundFeed` re-adds the key unconditionally one layer out; and no consumer reads a
+    // published event with `in` or `Object.keys`. That assertion would exist for the mutation score
+    // rather than for a reader, so the mutant is recorded as an equivalent survivor instead.
     expect(rendered.metadata).toBeUndefined();
     expect(rendered.data).toBeDefined(); // the payload is unaffected by the envelope's absence
   });
