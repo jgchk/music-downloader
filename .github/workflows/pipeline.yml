@@ -168,13 +168,21 @@ jobs:
             echo "Mutating: ${FILES}"
           fi
 
-      # continue-on-error, deliberately, until the seeding burn-down closes (tasks 2.1 / design D5).
-      # main currently carries surviving mutants across many files, so a branch that merely TOUCHES
-      # one would go red for debt it did not create. A red check nobody blocks on is the
-      # attested-dead shape quality-gates.md warns about, and an agent loop that learns to ignore
-      # this check learns to ignore it when it is real. So the job reports without failing, and task
-      # 4.1 flips BOTH this flag and the required-check setting together, in one step, once main is
-      # mutant-clean. The step summary below carries the findings either way.
+      # continue-on-error, deliberately, until the burn-down closes (tasks 2.1 / design D5).
+      # A branch that merely TOUCHES a file carrying a pre-existing survivor would go red for debt it
+      # did not create. A red check nobody blocks on is the attested-dead shape quality-gates.md
+      # warns about, and an agent loop that learns to ignore this check learns to ignore it when it
+      # is real. So the job reports without failing, and task 4.1 flips BOTH this flag and the
+      # required-check setting together, in one step, once main is mutant-clean. The step summary
+      # below carries the findings either way.
+      #
+      # The task-2.1 burn-down took main from 464 survivors to 6 (99.89%), which weakens this
+      # argument without retiring it: the 6 sit in `importer/domain/import/{state,import,decide}.ts`,
+      # `downloader/domain/shared/duration.ts` and `downloader/adapters/musicbrainz/mapping.ts` —
+      # the importer decider being the most-edited code in that package, not a backwater. Four are
+      # provably equivalent narrowing operands left unwaived on purpose (a line-scoped waiver would
+      # silence a killable twin); two are an unspecified-behaviour finding in the album path that no
+      # honest test can pin. design.md names what has to happen before this flag comes off.
       - name: Mutation-test the changed production files
         if: steps.scope.outputs.files != ''
         continue-on-error: true
