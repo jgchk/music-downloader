@@ -461,6 +461,12 @@ neighbour, and it used to be told the same story: a diff the job never wrote onc
 path-drift paragraph, sending a reader to debug a normalisation bug that does not exist. It now has
 its own refusal and its own sentence.
 
+**What this does NOT verify.** The workflow wiring. This change alters no production file in the
+mutated packages, so its own PR resolved an empty scope and skipped the verdict step entirely —
+correctly, and confirmed in the job's step list. Everything above exercised the modules directly.
+The first PR to touch `packages/*/src` is where `RUNNER_TEMP`, the step outputs and the env are
+exercised for the first time, and it is the run to read carefully.
+
 ## Known false-positive sources, for the shadow measurement to price
 
 Review found three ways this verdict can block a branch that did nothing wrong. None is fixed here,

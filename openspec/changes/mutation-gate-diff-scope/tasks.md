@@ -85,7 +85,13 @@ criterion for enforcement. Enforcement itself is deliberately not in this change
       the enforce switch absent (shadow). Done when a PR run shows the verdict in the summary and
       the job's conclusion is unchanged from today.
       _`if: always() && steps.scope.outputs.files != ''`, no `continue-on-error`, appended to
-      `$GITHUB_STEP_SUMMARY`, enforce switch absent._
+      `$GITHUB_STEP_SUMMARY`, enforce switch absent. **The step has not yet run in CI**, and could
+      not: this change touches no production file in the mutated packages, so its own PR (#166)
+      resolved an empty scope and skipped the Stryker, summary and verdict steps alike — the
+      designed behaviour, verified in the job's step list. The verdict logic is verified locally
+      against real Stryker output and real `git diff` (design.md, "The verdict watched deciding"),
+      but the WIRING — `RUNNER_TEMP`, the step outputs, the env — first executes on the next PR that
+      changes production code. That run is task 5.1's first data point and its first smoke test._
 - [x] 3.3 Rewrite the `continue-on-error` comment block on the Stryker step: state that the flag
       **moves rather than disappears** and why — that step's exit code stops being the verdict
       (design D5) — and delete the argument built on the retracted "464 → 6 (99.89%)" figure and
