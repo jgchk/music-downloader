@@ -72,6 +72,17 @@ export default {
   // `pnpm test:mutation` breaks for anyone who has run `pnpm check` even once — the venv is created
   // by the `bridge` lane. Everything listed here is generated output that no mutant can live in.
   ignorePatterns: [
+    // A Stryker run ignores only the sandbox of the run in flight — its own CONFIGURED
+    // `tempDirName`, which defaults to `.stryker-tmp` (measured against 9.6.1: the prune list is
+    // built from `tempDirName`, not from the default name). So the default is NOT automatically
+    // safe: a run given `--tempDirName` (which is how two scoped runs avoid corrupting each other's
+    // sandbox, e.g. when triaging several files at once) copies every OTHER spelling into its own,
+    // the default included, and they nest:
+    // `.stryker-tmp-a/sandbox-x/.stryker-tmp-b/sandbox-y/…`. It does not fail loudly — it reports a
+    // plausible WRONG score (73 survivors in a file that has none) and only then dies on `ENOENT`
+    // for files inside a path it had just built. The glob covers every spelling, so the rule holds
+    // however the directory is named.
+    '**/.stryker-tmp*/',
     '**/.venv/',
     'coverage',
     '.e2e-tmp',
