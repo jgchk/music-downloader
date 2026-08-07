@@ -55,18 +55,42 @@ function candidate(overrides: {
 }
 
 describe('candidateQualityBucket', () => {
-  it('resolves to the worst bucket among audio files', () => {
-    const mixed = candidate({
-      files: [
-        { name: '01.flac', sizeBytes: 1, durationMs: 251_000, codec: 'flac' },
-        { name: '02.mp3', sizeBytes: 1, durationMs: 264_000, codec: 'mp3', bitrate: 192_000 },
-      ],
-    });
-    expect(candidateQualityBucket(mixed, DEFAULT_QUALITY_POLICY)).toBe('LOSSY_STANDARD');
+  const flacTrack: CandidateFile = {
+    name: '01.flac',
+    sizeBytes: 1,
+    durationMs: 251_000,
+    codec: 'flac',
+  };
+  const mp3Track: CandidateFile = {
+    name: '02.mp3',
+    sizeBytes: 1,
+    durationMs: 264_000,
+    codec: 'mp3',
+    bitrate: 192_000,
+  };
+
+  // A release is only as good as its worst track, whichever order the source lists them in — so the
+  // verdict is asserted from both directions rather than only the one where the worst track is last.
+  it.each([
+    { listing: 'worst last', files: [flacTrack, mp3Track] },
+    { listing: 'worst first', files: [mp3Track, flacTrack] },
+  ])('resolves to the worst bucket among audio files ($listing)', ({ files }) => {
+    expect(candidateQualityBucket(candidate({ files }), DEFAULT_QUALITY_POLICY)).toBe(
+      'LOSSY_STANDARD',
+    );
   });
 
   it('is UNKNOWN when there are no audio files', () => {
     const c = candidate({ files: [{ name: 'cover.jpg', sizeBytes: 1 }] });
+    expect(candidateQualityBucket(c, DEFAULT_QUALITY_POLICY)).toBe('UNKNOWN');
+  });
+
+  it('is UNKNOWN for a file the source never named a codec for, bitrate or not', () => {
+    // A bitrate alone does not name a quality tier: without a codec we cannot tell 320kbps of MP3
+    // from a lossless stream, so the release stays UNKNOWN rather than being credited as lossy-high.
+    const c = candidate({
+      files: [{ name: '01.flac', sizeBytes: 1, durationMs: 251_000, bitrate: 320_000 }],
+    });
     expect(candidateQualityBucket(c, DEFAULT_QUALITY_POLICY)).toBe('UNKNOWN');
   });
 });
@@ -100,43 +124,54 @@ describe('rankCandidates', () => {
     expect(rankCandidates([c], target, DEFAULT_QUALITY_POLICY, justAbove)).toHaveLength(0);
   });
 
+  // Every ordering test below names its candidates so that the LAST tie-break — the alphabetical
+  // identity key — would put them in the OPPOSITE order. Otherwise the assertion passes whether or
+  // not the tier under test decides anything, which is how all four of these tiers came to be
+  // unpinned: each expected order happened to be the alphabetical one.
   it('ranks quality above a better match (spec scenario)', () => {
-    const lossless = candidate({ username: 'a', codec: 'flac' });
+    const lossless = candidate({ username: 'zeta-lossless', codec: 'flac' });
     // A slightly weaker (fewer aligned) but still gate-passing lossy candidate.
-    const lossy = candidate({ username: 'b', codec: 'mp3', bitrate: 320_000 });
+    const lossy = candidate({ username: 'alpha-lossy', codec: 'mp3', bitrate: 320_000 });
     const ranked = rankCandidates(
       [lossy, lossless],
       target,
       DEFAULT_QUALITY_POLICY,
       DEFAULT_MATCH_POLICY,
     );
-    expect(ranked[0]!.candidate.identity.username).toBe('a');
+    expect(ranked[0]!.candidate.identity.username).toBe('zeta-lossless');
   });
 
   it('orders by match confidence within the same quality bucket', () => {
-    const strong = candidate({ username: 'strong', codec: 'flac' });
+    const strong = candidate({ username: 'zeta-strong', codec: 'flac' });
     // Same lossless bucket and same aligned files, but its folder omits the year → the low-weight
     // year signal misses, giving a slightly lower (still gate-passing) match confidence.
-    const weaker = candidate({ username: 'weaker', codec: 'flac', path: 'Radiohead - Kid A' });
+    const weaker = candidate({
+      username: 'alpha-weaker',
+      codec: 'flac',
+      path: 'Radiohead - Kid A',
+    });
     const ranked = rankCandidates(
       [weaker, strong],
       target,
       DEFAULT_QUALITY_POLICY,
       DEFAULT_MATCH_POLICY,
     );
-    expect(ranked.map((r) => r.candidate.identity.username)).toEqual(['strong', 'weaker']);
+    expect(ranked.map((r) => r.candidate.identity.username)).toEqual([
+      'zeta-strong',
+      'alpha-weaker',
+    ]);
   });
 
   it('breaks ties by source reliability then identity', () => {
-    const fast = candidate({ username: 'fast', codec: 'flac', speed: 900 });
-    const slow = candidate({ username: 'slow', codec: 'flac', speed: 100 });
+    const fast = candidate({ username: 'zeta-fast', codec: 'flac', speed: 900 });
+    const slow = candidate({ username: 'alpha-slow', codec: 'flac', speed: 100 });
     const ranked = rankCandidates(
       [slow, fast],
       target,
       DEFAULT_QUALITY_POLICY,
       DEFAULT_MATCH_POLICY,
     );
-    expect(ranked[0]!.candidate.identity.username).toBe('fast');
+    expect(ranked[0]!.candidate.identity.username).toBe('zeta-fast');
   });
 
   it('breaks a full tie deterministically by identity key', () => {
@@ -147,10 +182,10 @@ describe('rankCandidates', () => {
   });
 
   it('uses free slots and queue length as finer source tie-breaks', () => {
-    const roomy = candidate({ username: 'roomy', codec: 'flac', speed: 100, freeSlots: 5 });
-    const busy = candidate({ username: 'busy', codec: 'flac', speed: 100, freeSlots: 0 });
+    const roomy = candidate({ username: 'zeta-roomy', codec: 'flac', speed: 100, freeSlots: 5 });
+    const busy = candidate({ username: 'alpha-busy', codec: 'flac', speed: 100, freeSlots: 0 });
     const short = candidate({
-      username: 'short',
+      username: 'mid-short-queue',
       codec: 'flac',
       speed: 100,
       freeSlots: 5,
@@ -162,6 +197,10 @@ describe('rankCandidates', () => {
       DEFAULT_QUALITY_POLICY,
       DEFAULT_MATCH_POLICY,
     );
-    expect(ranked.map((r) => r.candidate.identity.username)).toEqual(['roomy', 'short', 'busy']);
+    expect(ranked.map((r) => r.candidate.identity.username)).toEqual([
+      'zeta-roomy',
+      'mid-short-queue',
+      'alpha-busy',
+    ]);
   });
 });

@@ -179,6 +179,12 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     // Every other event contributes no history entry. Enumerated exhaustively (no `default`) so a
     // newly-added event variant is a compile error here — forcing a decision on whether it surfaces
     // in the timeline — rather than silently defaulting to invisible.
+    // Stryker disable StringLiteral,ConditionalExpression,BlockStatement: equivalent — every mutant
+    // of this arm still yields `undefined`. There is no `default`, so an event whose label was
+    // emptied matches nothing and falls out of the switch to the function's implicit tail return,
+    // which is the same `undefined` the shared body returns; dropping the body falls out the same
+    // way. No caller can tell the two apart. The labels exist as the compile-time exhaustiveness
+    // pin described above, not as a runtime branch, so there is nothing here to delete either.
     case 'EditionSelected':
     case 'ManualSelectionRequested':
     case 'SearchCompleted':
@@ -188,6 +194,7 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     case 'ValidationPassed': {
       return undefined;
     }
+    // Stryker restore all
   }
 }
 
@@ -301,6 +308,11 @@ export async function seedStalledReadModel(
     return;
   }
   for (const letter of letters.value) {
+    // Stryker disable next-line ConditionalExpression: equivalent — this guard is the type
+    // narrowing `mark(acquisitionId: string)` needs for an optional `streamId` (a subscription
+    // letter carries none), not a decision. Forcing it true adds `undefined` to a `Set<string>`
+    // that is only ever queried by `isStalled(id: string)`, so no query any caller can make
+    // changes its answer. The guard cannot be deleted: without it the call does not typecheck.
     if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }

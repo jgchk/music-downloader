@@ -73,6 +73,9 @@ describe('createDownloadPolicy', () => {
       createDownloadPolicy({ stallTimeoutMs: 0, maxQueueWaitMs: 5000 })._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NonPositiveStallTimeout' });
     expect(
+      createDownloadPolicy({ stallTimeoutMs: 1000, maxQueueWaitMs: 0 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'NonPositiveQueueWait' });
+    expect(
       createDownloadPolicy({ stallTimeoutMs: 1000, maxQueueWaitMs: -1 })._unsafeUnwrapErr(),
     ).toEqual({ kind: 'NonPositiveQueueWait' });
   });

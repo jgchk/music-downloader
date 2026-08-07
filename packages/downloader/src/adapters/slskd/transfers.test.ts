@@ -189,11 +189,14 @@ describe('aggregate', () => {
     expect(status.failureReason).toBe('TransferError');
   });
 
-  it('flags an all-queued set and surfaces the earliest queue position', () => {
+  it('flags an all-queued set and surfaces the first position slskd actually reported', () => {
+    // slskd reports `placeInQueue` per file and not always for the first one, so the candidate's
+    // position is the first one present — a file without it is passed over, not reported as "no
+    // position known".
     const status = aggregate(
       [
-        { state: 'Queued, Remotely', size: 100, placeInQueue: 5 },
         { state: 'Queued, Remotely', size: 100 },
+        { state: 'Queued, Remotely', size: 100, placeInQueue: 5 },
       ],
       'peer1',
     );
@@ -201,6 +204,21 @@ describe('aggregate', () => {
     expect(status.allQueued).toBe(true);
     expect(status.progress.queuePosition).toBe(5);
     expect(status.progress.percent).toBe(0);
+  });
+
+  it('does not flag a partly-started set as all-queued', () => {
+    // `allQueued` gates the "still waiting behind the peer's queue" report, so one file that has
+    // started downloading takes the whole candidate out of it.
+    const status = aggregate(
+      [
+        { state: 'Queued, Remotely', size: 100 },
+        { state: 'InProgress', size: 100, bytesTransferred: 10 },
+      ],
+      'peer1',
+    );
+
+    expect(status.allQueued).toBe(false);
+    expect(status.hasFailure).toBe(false);
   });
 
   it('classifies in-progress and stateless transfers as not all-queued', () => {
@@ -274,6 +292,19 @@ describe('enqueueRejectionReason', () => {
       enqueueRejectionReason(
         'User transfer rejected: lol appears to be offline',
         'transfer rejected: lol',
+      ),
+    ).toBe('PeerUnavailable');
+  });
+
+  it('reads past a peer whose name also carries regular-expression syntax', () => {
+    // A username is arbitrary text, so it can carry regex metacharacters. They are escaped before
+    // the name is removed; stripping them instead would build a pattern that no longer matches the
+    // name slskd echoed back, leaving the peer's own "transfer rejected:" in the sentence to be
+    // read as the verdict.
+    expect(
+      enqueueRejectionReason(
+        'User transfer rejected: (lol) appears to be offline',
+        'transfer rejected: (lol)',
       ),
     ).toBe('PeerUnavailable');
   });

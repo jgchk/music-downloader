@@ -30,11 +30,19 @@ describe('playabilityValidator', () => {
 
   it('fails a truncated (undecodable) file', () => {
     const probes = [probe(), probe({ decodedCleanly: false, durationMs: 298_000 })];
-    expect(playabilityValidator(probes).reason).toBe('Unplayable');
+    expect(playabilityValidator(probes)).toEqual({
+      name: 'playability',
+      score: 0,
+      reason: 'Unplayable',
+    });
   });
 
   it('fails an empty probe set', () => {
-    expect(playabilityValidator([]).reason).toBe('Unplayable');
+    expect(playabilityValidator([])).toEqual({
+      name: 'playability',
+      score: 0,
+      reason: 'Unplayable',
+    });
   });
 });
 
@@ -48,14 +56,20 @@ describe('structuralIdentityValidator', () => {
   });
 
   it('fails a wrong track count', () => {
-    expect(structuralIdentityValidator([probe()], target).reason).toBe('WrongTrackCount');
+    expect(structuralIdentityValidator([probe()], target)).toEqual({
+      name: 'structuralIdentity',
+      score: 0,
+      reason: 'WrongTrackCount',
+    });
   });
 
   it('fails on a duration mismatch and reports the partial score', () => {
     const probes = [probe({ durationMs: 380_000 }), probe({ durationMs: 120_000 })];
-    const outcome = structuralIdentityValidator(probes, target);
-    expect(outcome.reason).toBe('DurationMismatch');
-    expect(outcome.score).toBe(0.5);
+    expect(structuralIdentityValidator(probes, target)).toEqual({
+      name: 'structuralIdentity',
+      score: 0.5,
+      reason: 'DurationMismatch',
+    });
   });
 });
 

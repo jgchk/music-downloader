@@ -45,10 +45,23 @@ function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
       // The abort's settlement: reject the pending candidate as the interpreter would have.
       return {
         type: 'RecordDownloadFailed',
+        // Stryker disable next-line StringLiteral: equivalent — an unread argument. This effect is
+        // emitted only by the `AcquisitionCancelled` reaction, so the stream is in the terminal
+        // `Cancelled` phase whenever the degrade lands (redelivery included), and that arm of
+        // `decide` settles the pending candidate with a `CandidateRejected` alone — no
+        // `DownloadFailed` carrying a reason is ever emitted. The field is required by the command
+        // type, so it cannot be dropped; it is stated truthfully rather than left blank. The
+        // `Download` arm above is the opposite case: there the reason IS recorded, and pinned.
         reason: 'Cancelled',
         candidate: effect.candidate.identity,
       };
     }
+    // Stryker disable StringLiteral,ConditionalExpression,BlockStatement: equivalent — every mutant
+    // of this arm still yields `undefined`. There is no `default`, so an effect whose label was
+    // emptied matches nothing and falls out of the switch to the function's implicit tail return,
+    // which is the same `undefined` the shared body returns; dropping the body falls out the same
+    // way. Callers branch on `command !== undefined` alone, so none can tell the two apart. The
+    // labels are the compile-time exhaustiveness pin described above, not a runtime branch.
     case 'Search':
     case 'Validate':
     case 'Import':
@@ -56,6 +69,7 @@ function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
       // No modeled failure to degrade to — dead-letter and expose the acquisition as stalled.
       return undefined;
     }
+    // Stryker restore all
   }
 }
 

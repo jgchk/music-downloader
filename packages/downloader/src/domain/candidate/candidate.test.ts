@@ -21,12 +21,18 @@ describe('parseCandidateIdentity', () => {
     ).toEqual({ username: 'peer1', path: '/a', sizeBytes: 0 });
   });
 
-  it('rejects an empty username or path', () => {
+  it('rejects a blank username or path, whether empty or only whitespace', () => {
+    expect(
+      parseCandidateIdentity({ username: '', path: '/a', sizeBytes: 1 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'EmptyUsername' });
     expect(
       parseCandidateIdentity({ username: '  ', path: '/a', sizeBytes: 1 })._unsafeUnwrapErr(),
     ).toEqual({ kind: 'EmptyUsername' });
     expect(
       parseCandidateIdentity({ username: 'peer1', path: '', sizeBytes: 1 })._unsafeUnwrapErr(),
+    ).toEqual({ kind: 'EmptyPath' });
+    expect(
+      parseCandidateIdentity({ username: 'peer1', path: ' \t ', sizeBytes: 1 })._unsafeUnwrapErr(),
     ).toEqual({ kind: 'EmptyPath' });
   });
 

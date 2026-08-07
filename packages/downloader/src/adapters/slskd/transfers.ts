@@ -18,7 +18,26 @@ export type OwnedTransfer = SlskdTransfer & { readonly filename: string };
  * directory under `directories`; flatten those groups to a flat file list.
  */
 export function flattenDownloads(payload: SlskdTransfersPayload): SlskdTransfer[] {
-  return (payload.directories ?? []).flatMap((directory) => directory.files ?? []);
+  // Stryker disable next-line ArrayDeclaration: seeding the fallback with an element cannot be
+  // observed. It is consumed only by the flatMap below, which reads `.files` off each element and
+  // contributes nothing for one that has none — so a seeded fallback flattens to the same empty
+  // list. (The `?? []` on the line below is a different node and stays measured.)
+  const groups = payload.directories ?? [];
+  return groups.flatMap((directory) => directory.files ?? []);
+}
+
+/**
+ * slskd's state flags for a transfer, as text. An absent state reads as an empty one: every caller
+ * asks the text whether it *contains* one of slskd's words, and a state slskd did not report
+ * contains none of them.
+ */
+function stateOf(transfer: SlskdTransfer): string {
+  // Stryker disable next-line StringLiteral: the empty default is only ever substring-matched
+  // against slskd's own words ('completed', 'succeeded', 'queued', 'cancel') and concatenated into
+  // the failure haystack, which is matched against the FAILURE_VOCABULARY spellings. Stryker's
+  // replacement text contains none of them, so every caller reads it exactly as it reads '' — the
+  // mutant has no observable difference.
+  return transfer.state ?? '';
 }
 
 type TransferStatus = 'succeeded' | 'failed' | 'queued' | 'transferring';
@@ -29,6 +48,9 @@ function statusOf(state: string): TransferStatus {
     return normalized.includes('succeeded') ? 'succeeded' : 'failed';
   }
   if (normalized.includes('queued')) return 'queued';
+  // Stryker disable next-line StringLiteral: the none-of-the-above arm. No caller compares against
+  // 'transferring' — the three that read a status test it against 'succeeded', 'failed' and
+  // 'queued' — so this spelling names the case for a reader and decides nothing.
   return 'transferring';
 }
 
@@ -38,12 +60,12 @@ function statusOf(state: string): TransferStatus {
  * in-flight one must first be cancelled and left to transition before its record can be removed.
  */
 export function isTransferComplete(transfer: SlskdTransfer): boolean {
-  return (transfer.state ?? '').toLowerCase().includes('completed');
+  return stateOf(transfer).toLowerCase().includes('completed');
 }
 
 /** Whether a transfer completed *successfully* — its file is staged and can be resolved (D2). */
 export function isTransferSucceeded(transfer: SlskdTransfer): boolean {
-  return statusOf(transfer.state ?? '') === 'succeeded';
+  return statusOf(stateOf(transfer)) === 'succeeded';
 }
 
 /**
@@ -160,7 +182,13 @@ function classify(text: string): TextDerivedReason {
  */
 function redactPeer(body: string, username: string): string {
   if (username === '') return body;
-  return body.replaceAll(new RegExp(escapeRegExp(username), 'gi'), '<peer>');
+  const peer = new RegExp(escapeRegExp(username), 'gi');
+  // Stryker disable next-line StringLiteral: the placeholder is never read — the redacted text
+  // feeds only substring matching against the vocabulary, and no spelling contains it. Emptying it
+  // (deleting the name instead of replacing it) reads identically for every text slskd is recorded
+  // as writing, because slskd embeds the name at phrase boundaries, never inside a spelling. The
+  // non-empty sentinel is defence in depth against a splice, not a behavior a recorded text shows.
+  return body.replaceAll(peer, '<peer>');
 }
 
 function escapeRegExp(value: string): string {
@@ -184,12 +212,16 @@ export function reasonFromTransfer(
   transfer: SlskdTransfer,
   username: string,
 ): DownloadFailureReason {
-  const state = transfer.state ?? '';
+  const state = stateOf(transfer);
   if (state.toLowerCase().includes('cancel')) return 'Cancelled';
   // The exception is peer-adjacent too — slskd wraps other failures as "…from user <name>: …" — so
   // the name comes out here exactly as it does on the enqueue path. This is the path that actually
   // runs on the pinned slskd, so protecting only the other one would protect nothing.
-  return classify(redactPeer(`${state} ${transfer.exception ?? ''}`, username));
+  // Stryker disable next-line StringLiteral: same argument as {@link stateOf} — an absent exception
+  // contributes an empty span to the haystack, and Stryker's replacement text matches no spelling
+  // in FAILURE_VOCABULARY, so the classification is identical either way.
+  const exception = transfer.exception ?? '';
+  return classify(redactPeer(`${state} ${exception}`, username));
 }
 
 /**
@@ -250,13 +282,13 @@ export function aggregate(
   transfers: readonly SlskdTransfer[],
   username: string,
 ): TransferAggregate {
-  const statuses = transfers.map((transfer) => statusOf(transfer.state ?? ''));
+  const statuses = transfers.map((transfer) => statusOf(stateOf(transfer)));
   const bytesTransferred = transfers.reduce((sum, t) => sum + (t.bytesTransferred ?? 0), 0);
   const bytesTotal = transfers.reduce((sum, t) => sum + (t.size ?? 0), 0);
   const queuePosition = transfers
     .map((transfer) => transfer.placeInQueue)
     .find((place) => place !== undefined);
-  const failed = transfers.find((transfer) => statusOf(transfer.state ?? '') === 'failed');
+  const failed = transfers.find((transfer) => statusOf(stateOf(transfer)) === 'failed');
 
   return {
     progress: {

@@ -42,6 +42,11 @@ function manualTagsToDomain(
     title: track.title,
     artist: track.artist,
     trackNumber: toPositiveInt(track.trackNumber),
+    // Stryker disable next-line ConditionalExpression: the guard is type-level only, so forcing
+    // either arm is behaviorally identical. `toPositiveInt` is a runtime-erased brand lift
+    // (`branded` returns its argument unchanged), so `toPositiveInt(undefined)` would also yield
+    // `undefined` — the ternary exists solely because its parameter is typed `number`, not
+    // `number | undefined`. No input can make the two arms disagree.
     discNumber: track.discNumber === undefined ? undefined : toPositiveInt(track.discNumber),
   }));
   return {

@@ -1,7 +1,10 @@
+import { errAsync } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from './command-handler.js';
 import { FakeEventStore, fixedClock } from '../__fixtures__/fakes.js';
 import { OTHER_STORY, STORY, appendMetadata, testContext } from '../__fixtures__/correlation.js';
+import { infraError } from '../ports/errors.js';
+import type { EventStorePort } from '../ports/event-store-port.js';
 import {
   defaultPolicies,
   matchingCandidate,
@@ -182,6 +185,62 @@ describe('applyCommand', () => {
     );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'ConcurrencyConflict' });
+  });
+
+  it('hands an infrastructure append fault straight back instead of re-deciding it', async () => {
+    // Only a lost optimistic-concurrency race earns a re-decide — the loser's stale guards absorb
+    // it. An infra fault is nobody's race: retrying it here would hide a broken store behind a
+    // silent success and take the decision away from the caller that owns the retry cadence.
+    const d = dependencies();
+    await d.store.append('acq-1', 0, resolvedHistory(), appendMetadata('acq-1', clock));
+    let faultsLeft = 1; // a store that faults once and then accepts — an in-place retry would land
+    const flakyStore: EventStorePort = {
+      readStream: (id) => d.store.readStream(id),
+      readAll: (from, limit) => d.store.readAll(from, limit),
+      append: (id, version, events, metadata) => {
+        if (faultsLeft > 0) {
+          faultsLeft -= 1;
+          return errAsync(infraError('event-store.append', 'boom'));
+        }
+        return d.store.append(id, version, events, metadata);
+      },
+    };
+
+    const result = await applyCommand(
+      { store: flakyStore, clock },
+      'acq-1',
+      { type: 'RecordSearchResults', candidates: [] },
+      testContext(),
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+  });
+
+  it('absorbs a stale command without entering the write path at all', async () => {
+    // `decide` answered with no events, so there is nothing to write. The command resolves without
+    // an append — not with an append of nothing — which is why a store whose write path is faulted
+    // still reports success here: a stale outcome must never look like an infrastructure failure.
+    const d = dependencies();
+    await d.store.append(
+      'acq-1',
+      0,
+      [...resolvedHistory(), { type: 'AcquisitionCancelled' }],
+      appendMetadata('acq-1', clock),
+    );
+    d.store.failAppends = true;
+
+    const result = await applyCommand(
+      d,
+      'acq-1',
+      {
+        type: 'RecordDownloadCompleted',
+        files: [],
+        candidate: matchingCandidate('a').identity,
+      },
+      testContext(),
+    );
+
+    expect(result._unsafeUnwrap()).toEqual([]);
   });
 
   it('propagates an infrastructure read failure', async () => {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { asCandidateIdentity } from '../domain/shared/__fixtures__/candidate-identity.js';
-import { DEFAULT_MATCH_POLICY } from '../domain/policy/policies.js';
+import { asMbid } from '../domain/shared/__fixtures__/mbid.js';
+import {
+  DEFAULT_DOWNLOAD_POLICY,
+  DEFAULT_MATCH_POLICY,
+  DEFAULT_RETRY_POLICY,
+} from '../domain/policy/policies.js';
+import { DEFAULT_QUALITY_POLICY } from '../domain/policy/quality-policy.js';
 import type { AcquisitionStatusView } from '../application/projections/read-models.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 
@@ -46,10 +52,12 @@ describe('resolvePolicies', () => {
       request: { kind: 'musicbrainz', mbid: 'rel-1', targetType: 'album' },
     })._unsafeUnwrap();
 
-    expect(policies.match).toEqual(DEFAULT_MATCH_POLICY);
-    expect(policies.retry.maxSearchRounds).toBe(3);
-    expect(policies.download.stallTimeoutMs).toBeGreaterThan(0);
-    expect(policies.quality.floor).toBe('LOSSY_LOW');
+    expect(policies).toEqual({
+      quality: DEFAULT_QUALITY_POLICY,
+      match: DEFAULT_MATCH_POLICY,
+      retry: DEFAULT_RETRY_POLICY,
+      download: DEFAULT_DOWNLOAD_POLICY,
+    });
   });
 
   it('applies supplied policy overrides', () => {
@@ -61,9 +69,12 @@ describe('resolvePolicies', () => {
       downloadPolicy: { stallTimeoutMs: 5, maxQueueWaitMs: 10 },
     })._unsafeUnwrap();
 
-    expect(policies.match.threshold).toBe(0.9);
-    expect(policies.quality.floor).toBe('LOSSY_HIGH');
-    expect(policies.retry.timeBudgetMs).toBe(1000);
+    expect(policies).toEqual({
+      quality: { order: ['LOSSLESS', 'LOSSY_HIGH'], floor: 'LOSSY_HIGH' },
+      match: { threshold: 0.9 },
+      retry: { maxSearchRounds: 5, maxTotalAttempts: 20, timeBudgetMs: 1000 },
+      download: { stallTimeoutMs: 5, maxQueueWaitMs: 10 },
+    });
   });
 
   it('rejects a floor that is not part of a custom order', () => {
@@ -78,6 +89,21 @@ describe('resolvePolicies', () => {
 
 describe('statusViewToDto', () => {
   const candidate = asCandidateIdentity({ username: 'u1', path: 'p', sizeBytes: 100 });
+  const MBID = '11111111-1111-4111-8111-111111111111';
+
+  /** A view of an acquisition whose metadata never resolved, so only the request describes it. */
+  const unresolvedView = (requestedTarget: AcquisitionStatusView['requestedTarget']) =>
+    ({
+      acquisitionId: 'acq-1',
+      status: 'MetadataFailed',
+      transferStarted: false,
+      requestedTarget,
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+      cancellable: false,
+      awaitingSelection: false,
+    }) satisfies AcquisitionStatusView;
 
   it('maps every history-entry kind and the current candidate', () => {
     const request = {
@@ -117,68 +143,74 @@ describe('statusViewToDto', () => {
     const dto = statusViewToDto(view);
 
     expect(dto.currentCandidate).toEqual(candidate);
-    expect(dto.history.map((entry) => entry.kind)).toEqual([
-      'requested',
-      'resolved',
-      'search-started',
-      'selected',
-      'download-started',
-      'download-failed',
-      'validation-failed',
-      'imported',
-      'fulfillment-rejected',
-      'fulfilled',
-      'exhausted',
-      'conflicted',
-      'metadata-failed',
-      'cancelled',
+    // The whole projected timeline, in order and field for field: every kind keeps its own payload
+    // (the candidate it concerns, the reasons it was rejected for, where it landed).
+    expect(dto.history).toEqual([
+      { kind: 'requested', at: 'r0', request },
+      { kind: 'resolved', at: 'r1', artist: 'A', title: 'T', year: 1975 },
+      { kind: 'search-started', at: 'r2', round: 1 },
+      { kind: 'selected', at: 't0', candidate },
+      { kind: 'download-started', at: 't0b', candidate },
+      { kind: 'download-failed', at: 't1', candidate, reason: 'Stalled' },
+      { kind: 'validation-failed', at: 't2', candidate, reasons: ['Unplayable'] },
+      { kind: 'imported', at: 't3', candidate, location: '/lib/a' },
+      { kind: 'fulfillment-rejected', at: 't4', candidate, reasons: ['corrupt stub'] },
+      { kind: 'fulfilled', at: 'z0', location: '/lib/a' },
+      { kind: 'exhausted', at: 'z1' },
+      { kind: 'conflicted', at: 'z2', location: '/lib/occupied' },
+      { kind: 'metadata-failed', at: 'z3' },
+      { kind: 'cancelled', at: 'z4' },
     ]);
-    expect(dto.history.map((entry) => entry.at)).toEqual([
-      'r0',
-      'r1',
-      'r2',
-      't0',
-      't0b',
-      't1',
-      't2',
-      't3',
-      't4',
-      'z0',
-      'z1',
-      'z2',
-      'z3',
-      'z4',
-    ]);
-    expect(dto.history[0]).toEqual({ kind: 'requested', at: 'r0', request });
-    expect(dto.history[1]).toEqual({
-      kind: 'resolved',
-      at: 'r1',
-      artist: 'A',
-      title: 'T',
-      year: 1975,
-    });
-    expect(dto.history[11]).toEqual({ kind: 'conflicted', at: 'z2', location: '/lib/occupied' });
   });
 
-  it('echoes the requested target onto the wire when present', () => {
-    const request = {
-      kind: 'descriptor' as const,
-      targetType: 'album' as const,
-      artist: 'A',
-      title: 'T',
-    };
-    const view: AcquisitionStatusView = {
+  it('echoes the requested target onto the wire under the kind that was asked for', () => {
+    // A release, a release group and a free-text descriptor are three different asks, and a
+    // consumer describes them differently — the echoed kind must survive the crossing intact.
+    expect(
+      statusViewToDto(
+        unresolvedView({ kind: 'musicbrainz', mbid: asMbid(MBID), targetType: 'album' }),
+      ).requestedTarget,
+    ).toEqual({ kind: 'musicbrainz', mbid: MBID, targetType: 'album' });
+
+    expect(
+      statusViewToDto(
+        unresolvedView({ kind: 'release-group', mbid: asMbid(MBID), targetType: 'album' }),
+      ).requestedTarget,
+    ).toEqual({ kind: 'release-group', mbid: MBID, targetType: 'album' });
+
+    expect(
+      statusViewToDto(
+        unresolvedView({
+          kind: 'descriptor',
+          targetType: 'album',
+          artist: 'A',
+          title: 'T',
+          album: 'Al',
+        }),
+      ).requestedTarget,
+    ).toEqual({ kind: 'descriptor', targetType: 'album', artist: 'A', title: 'T', album: 'Al' });
+  });
+
+  it('leaves the resolved target absent until metadata resolves, then carries it', () => {
+    expect(
+      statusViewToDto(
+        unresolvedView({ kind: 'musicbrainz', mbid: asMbid(MBID), targetType: 'album' }),
+      ).target,
+    ).toBeUndefined();
+
+    const resolved: AcquisitionStatusView = {
       acquisitionId: 'acq-1',
-      status: 'MetadataFailed',
-      transferStarted: false,
-      requestedTarget: request,
-      attempts: 0,
+      status: 'Downloading',
+      transferStarted: true,
+      target: { artist: 'Pink Floyd', title: 'Animals' },
+      attempts: 1,
       rejectedCount: 0,
       history: [],
-      cancellable: false,
+      cancellable: true,
       awaitingSelection: false,
     };
-    expect(statusViewToDto(view).requestedTarget).toEqual(request);
+
+    expect(statusViewToDto(resolved).target).toEqual({ artist: 'Pink Floyd', title: 'Animals' });
   });
 
   it('omits an absent current candidate', () => {

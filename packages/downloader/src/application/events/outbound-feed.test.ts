@@ -74,6 +74,33 @@ describe('OutboundFeed', () => {
     expect(prefixLength).toBe(fulfilled().length);
   });
 
+  it('renders from the prefix as of the event even after its stream has moved on', async () => {
+    // The redelivery case that makes "as of the event" load-bearing: by the time a consumer is
+    // redelivered a position, its stream has usually grown past it. Rendering from the stream as
+    // it stands NOW would make the same position render differently on every read — so a payload
+    // would depend on when it was fetched, and replaying the feed would not reproduce it.
+    const history = fulfilled();
+    await seed('acq-1');
+    const feed = new OutboundFeed(store, mapping);
+    const firstRead = await feed.read(0, 100);
+    const asDelivered = firstRead._unsafeUnwrap();
+
+    const candidate = matchingCandidate('peer');
+    await store.append(
+      'acq-1',
+      history.length,
+      [{ type: 'FulfillmentRejected', candidate: candidate.identity, reasons: ['corrupt stub'] }],
+      appendMetadata('acq-1', 'T1'),
+    );
+    const redelivery = await feed.read(0, 100);
+
+    // The scan boundary has moved (there is a new row to scan); the rendered event has not.
+    expect(redelivery._unsafeUnwrap().events).toStrictEqual(asDelivered.events);
+    expect((asDelivered.events[0]!.data as { prefixLength: number }).prefixLength).toBe(
+      history.length,
+    );
+  });
+
   it('renders each event from its OWN stream prefix, never the interleaved global log', async () => {
     // Two streams interleaved so each fulfilment has the OTHER stream's rows before it in the
     // global log: a feed that folded the log instead of the event's stream prefix would

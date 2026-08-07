@@ -62,7 +62,7 @@ export function driveCommands(steps: readonly CommandStep[]): DriveResult {
 
 /** The stream's seam convergence watermark, read uniformly across phases (`empty` carries none). */
 export function watermarkOf(state: ImportState): number | undefined {
-  return state.phase === 'empty' ? undefined : state.seamWatermark;
+  return state.seamWatermark;
 }
 
 // --- History registers ---------------------------------------------------------------------------

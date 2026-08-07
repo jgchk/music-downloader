@@ -6,6 +6,7 @@ import {
   reviewResolvedV1ToV2,
   UpcasterRegistry,
 } from './upcaster.js';
+import type { Upcaster } from './upcaster.js';
 
 describe('reviewResolvedV1ToV2', () => {
   it('lifts the legacy verb to reject-unusable-delivery, preserving reasons', () => {
@@ -13,6 +14,16 @@ describe('reviewResolvedV1ToV2', () => {
       type: 'ReviewResolved',
       resolution: { kind: 'reject-unusable-delivery', reasons: ['corrupt rip'] },
     });
+  });
+
+  it('passes a stored payload carrying no resolution at all through untouched', () => {
+    // An upcaster reads raw on-disk JSON, not a typed event, so it is a tolerant reader: a row
+    // whose `resolution` is absent is not this rename's concern and flows on. Reaching into the
+    // missing field instead would throw, and a throw here poisons the whole stream read — one
+    // unreadable row would make the entire import unloadable rather than just unrenamed.
+    const v1 = { type: 'ReviewResolved' };
+
+    expect(reviewResolvedV1ToV2(v1)).toBe(v1);
   });
 
   it('passes a ReviewResolved carrying any other resolution kind through untouched', () => {
@@ -102,17 +113,19 @@ describe('UpcasterRegistry', () => {
     // it skips the versions it did not participate in, and the absence of a step at a version IS
     // the declaration that the type's shape did not change there. Steps {1→2, 3→4, 5→6} with a
     // v1 row therefore apply ALL THREE, in ascending order (registration order must not matter).
+    // Each step records that it ran, so the payload itself carries the order they ran in: a chain
+    // applied out of order would feed a later shape to an earlier step and corrupt the event.
+    const step =
+      (label: string): Upcaster =>
+      (data) => ({ ...data, applied: [...(data.applied as readonly string[]), label] });
     const registry = new UpcasterRegistry()
-      .register('Widened', 1, (data) => ({ ...data, two: true }))
-      .register('Widened', 5, (data) => ({ ...data, six: true }))
-      .register('Widened', 3, (data) => ({ ...data, four: true }));
+      .register('Widened', 1, step('1→2'))
+      .register('Widened', 5, step('5→6'))
+      .register('Widened', 3, step('3→4'));
 
-    expect(registry.upcast('Widened', 1, { type: 'Widened', one: true })).toEqual({
+    expect(registry.upcast('Widened', 1, { type: 'Widened', applied: [] })).toEqual({
       type: 'Widened',
-      one: true,
-      two: true,
-      four: true,
-      six: true,
+      applied: ['1→2', '3→4', '5→6'],
     });
   });
 

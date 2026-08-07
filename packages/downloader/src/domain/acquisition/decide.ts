@@ -323,6 +323,11 @@ export function decide(command: AcquisitionCommand, state: AcquisitionState): De
       // other phase converges silently: absorbing terminals stay absorbed, a legacy fulfilment has
       // no retained candidate to judge, a mismatched reference is stale, and a redelivery after
       // the revival finds the acquisition already back in flight.
+      // Stryker disable next-line ConditionalExpression: forcing this guard false is equivalent.
+      // `resume` is declared on `FulfilledState` alone and no fold path carries it onto another
+      // phase, so every other phase reads `undefined` on the very next line and converges on the
+      // same `ok([])` two lines later. The guard is the narrowing that lets `state.resume`
+      // type-check, and the place to say out loud that Fulfilled is the one revivable phase.
       if (state.phase !== 'Fulfilled') return ok([]);
       const resume = state.resume;
       if (resume === undefined || !isReferringTo(command.candidate, resume.candidate.identity)) {

@@ -11,6 +11,12 @@ describe('isWithinDurationTolerance', () => {
     expect(isWithinDurationTolerance(2_400_000, 2_460_000)).toBe(true);
   });
 
+  it('accepts a difference of exactly the tolerance', () => {
+    // 100s track: 4% is 4s, so the 5s absolute bound governs — and a difference of exactly 5s
+    // still aligns (the tolerance is inclusive).
+    expect(isWithinDurationTolerance(100_000, 105_000)).toBe(true);
+  });
+
   it('rejects a large difference', () => {
     expect(isWithinDurationTolerance(180_000, 200_000)).toBe(false);
   });
@@ -23,6 +29,15 @@ describe('alignmentScore', () => {
 
   it('scores the aligned fraction on partial matches', () => {
     expect(alignmentScore([100_000, 200_000], [100_000, 999_999])).toBe(0.5);
+  });
+
+  it('scores the aligned fraction when the release has fewer tracks than expected', () => {
+    // Two of the three expected durations have a counterpart; the third has none and cannot align.
+    expect(alignmentScore([100_000, 200_000, 300_000], [100_000, 200_000])).toBeCloseTo(2 / 3);
+  });
+
+  it('ignores surplus tracks beyond the expectation', () => {
+    expect(alignmentScore([100_000, 200_000], [100_000, 200_000, 300_000])).toBe(1);
   });
 
   it('scores 0 for an empty expectation', () => {

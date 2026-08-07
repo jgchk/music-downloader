@@ -77,6 +77,7 @@ interface ReactorOverrides {
   readonly sleep?: (ms: number) => Promise<void>;
   readonly redriveGapMs?: number;
   readonly correlation?: ReactorDependencies['correlation'];
+  readonly pollIntervalMs?: number;
 }
 
 function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor {
@@ -99,6 +100,7 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     // Instant re-drive jitter by default; the jitter values are pinned by their own test below.
     sleep: overrides.sleep ?? (() => Promise.resolve()),
     redriveGapMs: overrides.redriveGapMs,
+    pollIntervalMs: overrides.pollIntervalMs,
   };
   return new Reactor(dependencies);
 }
@@ -231,10 +233,25 @@ describe('Reactor.start', () => {
     expect(streamEventTypes('acq-1').filter((type) => type === 'DownloadStarted')).toHaveLength(1);
   });
 
-  it('subscribes even when the catch-up read fails', async () => {
+  it('subscribes even when the catch-up read fails, reporting it as a handled fault', async () => {
     store.failReadAll = true;
-    await reactor(stubPorts()).start();
-    expect(bus.subscriberCount()).toBe(1);
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const r = reactor(stubPorts(), { logger });
+    await r.start();
+
+    expect(bus.subscriberCount()).toBe(1); // still follows live events
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: infraError('readAll', 'boom') },
+      'reactor catch-up failed',
+    );
+    // A store fault is a value the pass handles and names, never a defect escaping into the
+    // containment catch — an operator triaging "reactor pass failed unexpectedly" hunts our bug.
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'reactor pass failed unexpectedly',
+    );
+    r.stop();
   });
 
   it('logs a failed checkpoint load and replays from the log start', async () => {
@@ -371,6 +388,31 @@ describe('Reactor.process', () => {
     r.stop();
   });
 
+  it('coalesces the wakeups that arrive during a pass into exactly one further pass', async () => {
+    // Every bus wakeup calls drain(). Without the coalescing flag, a published batch would queue
+    // one whole catch-up pass per event on the dispatch mutex — a stampede over the store that
+    // grows with the batch. The wakeups that land while a pass is running fold into one more pass.
+    await seed(requestedHistory());
+    const readAll = vi.spyOn(store, 'readAll');
+    const wakeups: Promise<void>[] = [];
+    const holder: { r?: Reactor } = {};
+    const resolve = vi.fn(() => {
+      if (resolve.mock.calls.length === 1) {
+        // Three wakeups land while this very effect is in flight, as a published batch would.
+        wakeups.push(holder.r!.drain(), holder.r!.drain(), holder.r!.drain());
+      }
+      return okAsync({ kind: 'unresolved' as const });
+    });
+    const r = reactor(stubPorts({ metadata: { resolve } }));
+    holder.r = r;
+
+    await r.drain();
+    await Promise.all(wakeups);
+
+    expect(readAll).toHaveBeenCalledTimes(2); // the pass that was running, plus exactly one more
+    r.stop();
+  });
+
   it('polls on the supplied interval timer, and stop() clears it', async () => {
     vi.useFakeTimers();
     try {
@@ -396,6 +438,26 @@ describe('Reactor.process', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('arms the fallback poll at the configured cadence, five seconds when none is given', async () => {
+    // The poll is the delivery guarantee — wakeups are only a lossy latency hint — so the cadence
+    // the reactor asks composition for is a behavior, not an implementation detail.
+    const gaps: number[] = [];
+    const interval = (_tick: () => void, ms: number): (() => void) => {
+      gaps.push(ms);
+      return () => {};
+    };
+
+    const unconfigured = reactor(stubPorts(), { interval });
+    await unconfigured.start();
+    expect(gaps).toEqual([5000]);
+    unconfigured.stop();
+
+    const configured = reactor(stubPorts(), { interval, pollIntervalMs: 250 });
+    await configured.start();
+    expect(gaps).toEqual([5000, 250]);
+    configured.stop();
   });
 });
 
@@ -522,6 +584,41 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
     r.stop();
   });
 
+  it('leaves an event the drain has not reached to the drain, dispatching it exactly once', async () => {
+    // The resume dispatches the events the drain already advanced PAST while the stream was
+    // parked — its queue is bounded above by the checkpoint, not open-ended. The retry scheduler
+    // runs at the head of a drain pass, before the catch-up read, so an event appended since the
+    // last pass is still ahead of the checkpoint when the park comes due: a resume that reached
+    // past it would dispatch its effect, and the catch-up moments later would dispatch it again.
+    const a = matchingCandidate('a');
+    await seed(selectedHistory([a])); // ends CandidateSelected (seq 5) → Download effect
+    const start = vi
+      .fn()
+      .mockReturnValueOnce(errAsync(infraError('slskd', 'down')))
+      .mockReturnValue(okAsync({ kind: 'started' as const }));
+    const discardStaging = vi.fn(() => okAsync(undefined));
+    const r = reactor(
+      stubPorts({
+        download: { start, abort: vi.fn(() => okAsync([])) },
+        library: { import: vi.fn(), discardStaging },
+      }),
+    );
+
+    await r.start(); // parks acq-1 at the CandidateSelected download
+    await seed([{ type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' }]); // seq 6
+    await r.drain(); // queued behind the park
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(6);
+
+    // Seq 7 lands after that pass: the drain has not reached it when the park falls due below.
+    await seed([{ type: 'CandidateRejected', candidate: a.identity, files: sampleFiles }]);
+    clock.advance(5000);
+    await r.drain();
+
+    expect(discardStaging).toHaveBeenCalledOnce(); // its cleanup fired once, from the catch-up
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeGreaterThanOrEqual(7);
+    r.stop();
+  });
+
   it('re-parks the stream when a queued event fails during catch-up', async () => {
     const a = matchingCandidate('a');
     await seed(selectedHistory([a]));
@@ -546,8 +643,11 @@ describe('Reactor — ordering under park (no-leapfrog invariant)', () => {
 describe('Reactor — retry scheduler (reactor-durability D2)', () => {
   it('re-dispatches a due parked effect with backoff, incrementing the attempt', async () => {
     await seed(requestedHistory());
+    const logger = silentLogger();
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
     expect(resolve).toHaveBeenCalledTimes(1);
 
@@ -561,6 +661,18 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
       attempt: 2,
       nextRetryAt: '2026-07-22T12:00:15.000Z', // 5s + doubled 10s step
     });
+    // The reschedule is the operator's record of a stream still backing off, and it must not
+    // masquerade as a failed write: the durable entry above was written.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        acquisitionId: 'acq-1',
+        effect: 'ResolveMetadata',
+        attempt: 2,
+        nextRetryAt: '2026-07-22T12:00:15.000Z',
+      }),
+      'parked effect retry failed; rescheduled',
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     clock.advance(5000); // 12:00:10 — second step not due yet
     await r.drain();
@@ -582,6 +694,33 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
 
     expect(parked.count()).toBe(0);
     expect(streamEventTypes('acq-1')).toContain('MetadataResolutionFailed');
+    // Once: the first dispatch. Twice: the retry. The resume that follows dispatches only the
+    // events the drain queued BEHIND the park — there are none here — never the parked event
+    // itself a second time in the same tick.
+    expect(resolve).toHaveBeenCalledTimes(2);
+    r.stop();
+  });
+
+  it('stays silent at error level through a park that resolves cleanly', async () => {
+    // Error-level noise on the happy path is how an operator learns to scroll past the log that
+    // finally matters: a checkpoint that loaded reports no replay, a checkpoint that saved reports
+    // no fault, and a park that cleared reports no lingering entry. Parking itself is a warn — a
+    // notable-but-handled condition — so a whole park-and-resume cycle raises no alarm.
+    await seed(requestedHistory());
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const resolve = vi
+      .fn()
+      .mockReturnValueOnce(errAsync(infraError('mb', 'down')))
+      .mockReturnValue(okAsync({ kind: 'unresolved' as const }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
+    await r.start();
+
+    clock.advance(5000);
+    await r.drain();
+
+    expect(parked.count()).toBe(0); // the whole cycle ran: parked, retried, resumed, cleared
+    expect(errorSpy).not.toHaveBeenCalled();
     r.stop();
   });
 
@@ -675,27 +814,50 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
 
   it('keeps the park scheduled when the retry cannot read the stream', async () => {
     await seed(requestedHistory());
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
 
     clock.advance(5000);
     store.failReads = true;
     await r.drain();
     expect(parked.peek('acq-1')).toMatchObject({ attempt: 1 }); // untouched — retried next tick
+    // Named against the stream it belongs to, and handled as a value: a park that quietly stops
+    // retrying, or one whose fault surfaces as an unexplained defect, are different triages.
+    expect(errorSpy).toHaveBeenCalledWith(
+      { acquisitionId: 'acq-1', err: infraError('readStream', 'boom') },
+      'parked-effect retry could not read the stream',
+    );
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'reactor pass failed unexpectedly',
+    );
     r.stop();
   });
 
   it('tolerates a due-listing failure and retries on a later tick', async () => {
     await seed(requestedHistory());
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
 
     clock.advance(5000);
     parked.failDue = true;
     await r.drain();
     expect(resolve).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: infraError('parked-effects.due', 'boom') },
+      'parked-effect due listing failed',
+    );
+    // A store fault the pass handles, not a defect escaping into the containment catch.
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'reactor pass failed unexpectedly',
+    );
 
     parked.failDue = false;
     await r.drain();
@@ -778,14 +940,27 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
       lastError: 'fs: denied',
     });
     deadLetters.failRecord = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const discardStaging = vi.fn(() => errAsync(infraError('fs', 'denied')));
     const r = reactor(stubPorts({ library: { import: vi.fn(), discardStaging } }), {
       retryPolicy: TIGHT_BUDGET,
+      logger,
     });
     await r.start();
 
     const entry = parked.peek('acq-1');
     expect(entry).toBeDefined();
+    // The entry IS parked again — the operator is told the effect is held at the cap, not that
+    // the hold-over write failed (its sibling spec below covers that far worse situation).
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ acquisitionId: 'acq-1', attempt: 4 }),
+      'exhausted effect could not be landed; parked again at the policy cap',
+    );
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'failed landing could not be re-parked; its effect will re-fire next tick',
+    );
     // Exactly the policy cap from the fixed clock — "backed off" means at the cap, not merely
     // any future instant (a 1ms reschedule would also read as later-than-now).
     expect(entry!.nextRetryAt).toBe(
@@ -1036,14 +1211,22 @@ describe('Reactor — budget exhaustion lands somewhere modeled (reactor-durabil
 
   it('keeps the previous schedule when a retry reschedule cannot be written', async () => {
     await seed(requestedHistory());
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
 
     clock.advance(5000);
     parked.failPark = true;
     await r.drain();
     expect(parked.peek('acq-1')).toMatchObject({ attempt: 1 }); // unchanged; a later tick retries
+    // The stream's backoff silently stopped advancing: it will re-fire on the next tick with no
+    // step, so the failed write is reported rather than passed off as a normal reschedule.
+    expect(errorSpy).toHaveBeenCalledWith(
+      { acquisitionId: 'acq-1', err: infraError('parked-effects.park', 'boom') },
+      'failed to reschedule parked effect',
+    );
     r.stop();
   });
 
@@ -1208,10 +1391,16 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
     await seed(importedThenFulfilled([matchingCandidate('b')]), 'acq-done'); // terminal → nothing
     await seed(awaitingSelectionHistory(), 'acq-paused'); // the pause IS the state → nothing
     await checkpointToHead(); // the drain has nothing to do; only the re-drive acts
+    const sleeps: number[] = [];
     const ports = stubPorts({
       metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
     });
-    const r = reactor(ports);
+    const r = reactor(ports, {
+      sleep: (ms) => {
+        sleeps.push(ms);
+        return Promise.resolve();
+      },
+    });
     await r.start();
 
     expect(ports.metadata.resolve).toHaveBeenCalledOnce(); // acq-pending resumed
@@ -1220,6 +1409,24 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
       streamEventTypes('acq-downloading').filter((type) => type === 'DownloadStarted'),
     ).toHaveLength(1); // the ensure re-dispatch absorbed, never double-recorded
     expect(ports.search.search).not.toHaveBeenCalled(); // terminal and paused derive nothing
+    // One rate-limit gap per stream the pass actually dispatches: the terminal and the paused
+    // stream are passed over before the gap, not slept through and dispatched into a no-op.
+    expect(sleeps).toHaveLength(2);
+    r.stop();
+  });
+
+  it('passes over a terminal stream even when its last event still derives an effect', async () => {
+    // Cancelled is terminal, yet reacting to its AcquisitionCancelled derives an AbortDownload for
+    // the transfer that was in flight. Terminal means settled: re-driving it would re-issue an
+    // abort for every long-cancelled acquisition on every boot. Reclaiming a source resource
+    // orphaned by a crash is the resource sweep's job, not the re-drive's.
+    await seed([...selectedHistory([matchingCandidate('a')]), { type: 'AcquisitionCancelled' }]);
+    await checkpointToHead();
+    const abort = vi.fn(() => okAsync([]));
+    const r = reactor(stubPorts({ download: { start: vi.fn(), abort } }));
+    await r.start();
+
+    expect(abort).not.toHaveBeenCalled();
     r.stop();
   });
 
@@ -1308,10 +1515,19 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
 
   it('survives an unexpected throw inside a pass without poisoning the mutex', async () => {
     await seed(requestedHistory());
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => okAsync({ kind: 'unresolved' as const }));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     store.throwOnReadAll = true; // a bug, not a modeled failure — must not silence the reactor
     await r.drain(); // resolves; the throw is caught and logged
+
+    // A swallowed defect is the "pending forever, nothing in the logs" class: the containment
+    // catch exists to keep the loop alive, and saying so is the other half of its job.
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: new Error('boom') },
+      'reactor pass failed unexpectedly',
+    );
 
     store.throwOnReadAll = false;
     await r.drain(); // the mutex still runs passes
@@ -1340,11 +1556,19 @@ describe('Reactor — startup re-drive (reactor-durability D3)', () => {
   it('parks a stream whose re-driven effect fails retryably', async () => {
     await seed(requestedHistory(), 'acq-1');
     await checkpointToHead();
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const resolve = vi.fn(() => errAsync(infraError('mb', 'down')));
-    const r = reactor(stubPorts({ metadata: { resolve } }));
+    const r = reactor(stubPorts({ metadata: { resolve } }), { logger });
     await r.start();
 
     expect(parked.peek('acq-1')).toMatchObject({ globalSeq: 1, attempt: 1 });
+    // The park is durable, so the deferral warning would be a lie: the retry scheduler owns this
+    // stream from here, and no operator should be told to wait for the next restart.
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      're-driven effect failed and could not be parked; deferred to the next restart',
+    );
     r.stop();
   });
 

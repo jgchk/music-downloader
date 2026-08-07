@@ -1,5 +1,6 @@
 import { testScope } from '../../application/__fixtures__/correlation.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
@@ -118,6 +119,16 @@ describe('MusicBrainzMetadata', () => {
       testScope(),
     );
     const result = resolveResult5._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('treats a 404 from the album search as no results at all', async () => {
+    const resolveResult25 = await resolver([]).resolve(
+      { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+      testScope(),
+    );
+    const result = resolveResult25._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
   });
@@ -327,21 +338,37 @@ describe('MusicBrainzMetadata', () => {
     });
   });
 
+  // The bootleg here is a *selectable* edition (a well-formed mbid): manual selection is scoped to
+  // groups with no official edition, so the existence of an official one keeps this unresolved even
+  // though a candidate could have been offered.
   it('reports unresolved (not manual selection) when an official edition exists but yields no target', async () => {
-    const sparse = ok({ id: 'off', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
-    const resolveResult13 = await resolver([
+    const sparse = ok({ id: uuid('off'), title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
+    const logger = silentLogger();
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const routes: [string, HttpResponse][] = [
       [
         '/release?release-group=rg-5',
         browse([
-          { id: 'off', status: 'Official', date: '2010', media: [{ 'track-count': 10 }] },
-          { id: 'boot', status: 'Bootleg', date: '2011', media: [{ 'track-count': 10 }] },
+          { id: uuid('off'), status: 'Official', date: '2010', media: [{ 'track-count': 10 }] },
+          { id: uuid('boot'), status: 'Bootleg', date: '2011', media: [{ 'track-count': 10 }] },
         ]),
       ],
-      ['/release/off', sparse], // official edition resolves to no valid target
-    ]).resolve(byReleaseGroup('rg-5'), testScope());
+      [`/release/${uuid('off')}`, sparse], // official edition resolves to no valid target
+    ];
+    // The adapter logs through the scope's logger, so the spied logger is handed in on the scope.
+    const resolveResult13 = await new MusicBrainzMetadata(http(routes)).resolve(
+      byReleaseGroup('rg-5'),
+      { ...testScope(), logger },
+    );
     const result = resolveResult13._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
+    // the dropped editions leave no other trace, so the warning naming what was tried is the
+    // operator's only record of why a group with editions resolved to nothing
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ releaseGroup: 'rg-5', tried: [uuid('off')] }),
+      expect.stringContaining('no usable target'),
+    );
   });
 
   it('tolerates a null-status edition among the browsed releases (prod: Red Headed Stranger)', async () => {
@@ -455,6 +482,35 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
+  it('treats a 404 from the recording search as no results at all', async () => {
+    const resolveResult26 = await resolver([]).resolve(
+      { kind: 'descriptor', targetType: 'track', artist: 'Artist', title: 'Song' },
+      testScope(),
+    );
+    const result = resolveResult26._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('sends no lookup when the track search yields no confident match', async () => {
+    const urls: string[] = [];
+    const capturing: HttpClient = {
+      send: ({ url }) => {
+        urls.push(url);
+        return Promise.resolve(ok({ recordings: [{ id: 'rec-9', score: 50 }] }));
+      },
+    };
+
+    const result = await new MusicBrainzMetadata(capturing).resolve(
+      { kind: 'descriptor', targetType: 'track', artist: 'Artist', title: 'Song' },
+      testScope(),
+    );
+
+    expect(result._unsafeUnwrap()).toEqual({ kind: 'unresolved' });
+    // MusicBrainz is rate-limited: an unmatched search must cost one request, not two
+    expect(urls).toHaveLength(1);
+  });
+
   it('escapes quotes in the descriptor search so a quoted title stays a valid Lucene phrase', async () => {
     const urls: string[] = [];
     const capturing: HttpClient = {
@@ -478,17 +534,24 @@ describe('MusicBrainzMetadata', () => {
     expect(query).toBe(String.raw`release:"\"Heroes\"" AND artist:"David Bowie"`);
   });
 
-  it('surfaces an unexpected HTTP status as an InfraError', async () => {
-    const result = await resolver([['/release/rel-1', { status: 503, body: '' }]]).resolve(
-      albumById,
-      testScope(),
-    );
+  // Every status outside 2xx that is not one of the two modelled business answers (404 not found,
+  // 400 invalid mbid on a lookup) is an infrastructure fault naming the status — the body is never
+  // parsed on the strength of a non-success status, so each case carries a *well-formed* body and
+  // the status alone is what makes it fail.
+  it.each([199, 300, 503])(
+    'surfaces HTTP %i as an InfraError naming the status instead of mapping the body',
+    async (status) => {
+      const body = releaseFixture(uuid('rel-1')).body;
+      const result = await resolver([['/release/rel-1', { status, body }]]).resolve(
+        albumById,
+        testScope(),
+      );
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      kind: 'InfraError',
-      operation: 'musicbrainz.resolve',
-    });
-  });
+      const fault = result._unsafeUnwrapErr();
+      expect(fault).toMatchObject({ kind: 'InfraError', operation: 'musicbrainz.resolve' });
+      expect(fault.message).toContain(`MusicBrainz responded ${status}`);
+    },
+  );
 
   it('surfaces a contract-violating 200 response as an InfraError without mapping it', async () => {
     const malformed = ok({ id: 'rel-1', media: 'not-an-array' });
@@ -509,6 +572,15 @@ describe('MusicBrainzMetadata', () => {
       ['/release/rel-1', { status: 400, body: '{"error":"Invalid mbid."}' }],
     ]).resolve(albumById, testScope());
     const result = resolveResult22._unsafeUnwrap();
+
+    expect(result).toEqual({ kind: 'unresolved' });
+  });
+
+  it('treats a 400 (invalid mbid) on a recording lookup as unresolved, not a retryable fault', async () => {
+    const resolveResult24 = await resolver([
+      ['/recording/rec-1', { status: 400, body: '{"error":"Invalid mbid."}' }],
+    ]).resolve(trackById, testScope());
+    const result = resolveResult24._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
   });

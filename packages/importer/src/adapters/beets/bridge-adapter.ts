@@ -88,6 +88,11 @@ function candidateToDomain(candidate: BridgeCandidate): ProposedCandidate {
     // only the album fields need a key rename (`albumdisambig`).
     tracks: candidate.tracks.map((track) => ({
       ...track,
+      // Stryker disable next-line ConditionalExpression: equivalent mutant. This guard is a
+      // TYPE-level narrowing, not a runtime one — `branded` is the identity at runtime (the brand
+      // is a phantom tag, erased), so the false arm applied to an absent distance yields exactly
+      // the `undefined` the true arm returns. The ternary exists only so `branded<Distance>` is
+      // handed a `number`; no observable value differs either way.
       distance: track.distance === undefined ? undefined : branded<Distance>(track.distance),
     })),
     extraItems: candidate.extra_items,

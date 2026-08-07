@@ -1,9 +1,10 @@
-import { ResultAsync, err, ok } from 'neverthrow';
+import { ResultAsync, err, errAsync, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import type { DestinationStream } from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
+import { infraError } from '../ports/errors.js';
 
 /** A pino destination that collects each emitted NDJSON line for assertions. */
 function collectingDestination(): { stream: DestinationStream; lines: string[] } {
@@ -339,18 +340,69 @@ describe('CatchUpSubscription', () => {
   });
 
   it('a checkpoint save failure holds delivery rather than losing it', async () => {
-    feed.events = [seamEvent(1)];
+    feed.events = [seamEvent(1), seamEvent(2)];
     checkpoints.failSaves = true;
     const sub = subscription();
 
     await sub.start();
 
+    // The cycle stops at the event whose position could not be recorded. Carrying on would put
+    // event 2 on the far side of an unrecorded position: a crash there loses 1 but not 2, and the
+    // consumer's "everything before the checkpoint has been seen" claim stops being true.
+    expect(handled).toEqual([1]);
     expect(await checkpointOf()).toBe(0);
 
     checkpoints.failSaves = false;
     await sub.poll();
-    // Redelivered (at-least-once); the handler ran twice and the checkpoint caught up.
-    expect(handled).toEqual([1, 1]);
+    // Redelivered (at-least-once); 1 is handled a second time and the checkpoint catches up.
+    expect(handled).toEqual([1, 1, 2]);
+    expect(await checkpointOf()).toBe(2);
+  });
+
+  it('keeps draining past a run of positions the producer never published', async () => {
+    // A feed read can scan a whole batch of the producer's internal events and report only how far
+    // it got. Catching up must carry on into the next batch rather than treating the skip as the
+    // end of the backlog — otherwise a long unpublished run is walked one batch per poll interval.
+    feed.events = [seamEvent(8)];
+    const sub = subscription({
+      feed: {
+        read: (fromGlobalSeq: number, limit: number) =>
+          fromGlobalSeq < 7
+            ? Promise.resolve(ok({ events: [], scannedTo: 7 }))
+            : feed.read(fromGlobalSeq, limit),
+      },
+    });
+
+    await sub.start();
+
+    expect(handled).toEqual([8]);
+    expect(await checkpointOf()).toBe(8);
+  });
+
+  it('stops the cycle when the scanned-past position itself cannot be checkpointed', async () => {
+    // The scan boundary is a checkpoint like any other. Reading on past a position the store
+    // refused to record would deliver the next batch from behind a boundary this cycle never
+    // saved, so a restart would resume before it and redeliver a wider window than intended.
+    feed.events = [seamEvent(1), seamEvent(6)];
+    const sub = subscription({
+      checkpoints: {
+        load: (name: string) => checkpoints.load(name),
+        save: (name: string, globalSeq: number) =>
+          globalSeq === 5
+            ? errAsync(infraError('checkpoint.save', 'boom'))
+            : checkpoints.save(name, globalSeq),
+      },
+      feed: {
+        read: (fromGlobalSeq: number, limit: number) =>
+          fromGlobalSeq === 0
+            ? Promise.resolve(ok({ events: [seamEvent(1)], scannedTo: 5 }))
+            : feed.read(fromGlobalSeq, limit),
+      },
+    });
+
+    await sub.start();
+
+    expect(handled).toEqual([1]);
     expect(await checkpointOf()).toBe(1);
   });
 
@@ -389,6 +441,31 @@ describe('CatchUpSubscription', () => {
     expect(await checkpointOf()).toBe(7);
   });
 
+  it('a wakeup landing mid-cycle earns another pass instead of waiting for the fallback poll', async () => {
+    // The wakeup cannot interleave with the running cycle, so it is remembered and honoured when
+    // that cycle ends. Forgetting it would leave the event sitting until the fallback interval
+    // came round — the interval is the delivery guarantee, but it is not the delivery latency.
+    const stuck: ConsumeFailure = { kind: 'Transient', reason: 'IntakeDirectoryMissing' };
+    const sub = subscription({
+      sleep: (ms) => {
+        sleeps.push(ms);
+        if (ms === 100) {
+          for (const listener of wakeListeners) listener(); // the producer wakes us mid-backoff
+        }
+        return Promise.resolve();
+      },
+    });
+    await sub.start(); // nothing to deliver yet; this is what registers the wakeup listener
+    feed.events = [seamEvent(1)];
+    failures.set(1, [stuck, stuck, stuck]); // the first pass spends its attempts and holds
+
+    await sub.poll();
+
+    // The second pass ran inside the same poll, by which time the transient fault had cleared.
+    expect(handled).toEqual([1]);
+    expect(await checkpointOf()).toBe(1);
+  });
+
   it('concurrent polls coalesce instead of interleaving', async () => {
     feed.events = [seamEvent(1)];
     const sub = subscription();
@@ -420,7 +497,9 @@ describe('CatchUpSubscription', () => {
 
     const outcome = await sub.reset();
 
-    expect(outcome.isErr()).toBe(true);
+    // The store's own modeled failure travels out unwrapped — the operator is told the save is
+    // what refused, not that something unexpected happened inside the reset.
+    expect(outcome._unsafeUnwrapErr()).toMatchObject({ operation: 'checkpoint.save' });
     expect(await checkpointOf()).toBe(2);
   });
 
@@ -584,7 +663,12 @@ describe('CatchUpSubscription', () => {
 
     const outcome = await sub.reset(0);
 
-    expect(outcome._unsafeUnwrapErr()).toMatchObject({ operation: 'checkpoint.reset' });
+    // Distinct from the modeled save failure above: a rejecting adapter is a defect nobody
+    // modeled, so the reset says so in its own words rather than borrowing the store's.
+    expect(outcome._unsafeUnwrapErr()).toMatchObject({
+      operation: 'checkpoint.reset',
+      message: 'checkpoint reset failed unexpectedly',
+    });
   });
 
   it('stop detaches the wakeup listener and the fallback interval', async () => {

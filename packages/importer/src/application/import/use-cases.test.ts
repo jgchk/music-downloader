@@ -81,6 +81,16 @@ describe('submitImport', () => {
     });
   });
 
+  it('records the filesystem root as itself when every slash in it is trailing', async () => {
+    const d = dependencies();
+
+    await submitImport(d, { directory: '///' }, testContext());
+
+    // Collapsing the cosmetic slashes must not collapse the path away: the recorded directory is
+    // what beets is later pointed at, and the empty string names nothing at all.
+    expect(d.store.all()[0]!.event).toMatchObject({ type: 'ImportRequested', directory: '/' });
+  });
+
   it('converges a resubmission of a live directory on the same import', async () => {
     const d = dependencies();
     await submitImport(d, { directory: DIRECTORY }, testContext());

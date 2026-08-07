@@ -11,9 +11,14 @@ import type { Target } from '../../domain/target/target.js';
 // Path-hostile characters, whitespace, and control characters, each collapsed to an underscore.
 const UNSAFE = /[\\/:*?"<>|\s\u{0}-\u{1F}]/gu;
 
-/** Reduce an arbitrary string to a single safe path segment; never empty. */
+/**
+ * Reduce an arbitrary string to a single safe path segment; never empty. No trimming: `UNSAFE`
+ * already covers every character `String#trim` would strip (its `\s` class is exactly trim's
+ * whitespace set), so leading and trailing whitespace has become underscores by this point —
+ * deliberately, since a segment is not allowed to silently lose characters either.
+ */
 export function sanitizeSegment(raw: string): string {
-  const cleaned = raw.replaceAll(UNSAFE, '_').trim();
+  const cleaned = raw.replaceAll(UNSAFE, '_');
   return cleaned === '' ? '_' : cleaned;
 }
 

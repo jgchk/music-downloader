@@ -53,6 +53,36 @@ describe('ffprobe contract (tier 1)', () => {
     });
   });
 
+  it('asks ffprobe for the same output the fixtures were recorded from', async () => {
+    // A replayed fixture only proves anything if production asks the binary the question the
+    // recorder asked: `-show_streams -show_format -print_format json` is what makes this stdout
+    // exist at all — drop `-show_format` and the format-level duration/bitrate fallbacks the tests
+    // above rely on are simply not in the payload — and `-v error` keeps ffprobe's banner out of
+    // the stderr the adapter logs as the operator's diagnosis. The recorder's own argument list is
+    // in test/contract/record/ffprobe.ts and must stay identical to this one.
+    const invocations: { readonly command: string; readonly arguments_: readonly string[] }[] = [];
+    const fixture = loadFixture('lossless-flac.json');
+    const replay = replayRunner(JSON.stringify(fixture.stdout));
+    const recording: CommandRunner = {
+      run: (command, arguments_, timeoutMs) => {
+        invocations.push({ command, arguments_ });
+        return replay.run(command, arguments_, timeoutMs);
+      },
+    };
+
+    await new FfmpegAudioProbe(recording).probe('/staging/01.flac', testScope());
+
+    expect(invocations.find((call) => call.command === 'ffprobe')?.arguments_).toEqual([
+      '-v',
+      'error',
+      '-show_streams',
+      '-show_format',
+      '-print_format',
+      'json',
+      '/staging/01.flac',
+    ]);
+  });
+
   it('recovers bitDepth from a numeric bits_per_sample on recorded lossless-PCM stdout', async () => {
     // WAV pcm_s16le has no `bits_per_raw_sample`; real ffprobe reports depth as a numeric
     // `bits_per_sample`. This pins the adapter's numeric-fallback branch against real output —

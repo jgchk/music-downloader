@@ -152,6 +152,12 @@ export function interpretEffect(
           acquisitionId,
           {
             type: 'RecordDownloadFailed',
+            // Stryker disable next-line StringLiteral: equivalent — an unread argument. This effect
+            // is emitted only by the `AcquisitionCancelled` reaction, so the stream is in the
+            // terminal `Cancelled` phase whenever the command lands (redelivery included), and that
+            // arm of `decide` settles the pending candidate with a `CandidateRejected` alone — no
+            // `DownloadFailed` carrying a reason is ever emitted. The field is required by the
+            // command type, so it cannot be dropped; it is stated truthfully rather than left blank.
             reason: 'Cancelled',
             files,
             candidate: effect.candidate.identity,

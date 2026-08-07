@@ -20,12 +20,25 @@ import type {
  * adapter validates against those before mapping, so these functions receive already-typed data.
  */
 
+// Absent-collection defaults (`x ?? []`) and the mutation gate: Stryker's ArrayDeclaration mutator
+// rewrites every `[]` default below as `['Stryker was here']`. At each of those sites the injected
+// string is then walked by a pipeline that reads a property a string does not have (`tracks`, `id`,
+// `status`, `format`, `track-count`, `score`), so it contributes exactly what an empty array
+// contributes: nothing. Those mutants are equivalent, and each is suppressed at its own site naming
+// the property that neutralizes it — one line at a time rather than file-wide, so a genuine array
+// literal here stays measured.
+
 type MbArtistCredit = NonNullable<MbRelease['artist-credit']>[number];
 
 const HIGH_CONFIDENCE = 90; // MusicBrainz search scores run 0–100
 const AMBIGUITY_MARGIN = 10; // a top hit within this of the runner-up is not a confident pick
 
 function artistCreditName(credits: readonly MbArtistCredit[] | undefined): string {
+  // Stryker disable next-line ArrayDeclaration,MethodExpression: both equivalent. The injected
+  // default element has neither `name` nor `joinphrase`, so it maps to '' and joins away (the
+  // absent-collection note above); and dropping `.trim()` changes nothing observable, because both
+  // call sites hand this straight to `createTarget`, which trims `artist` itself before validating
+  // it. The trim stays as ACL-local normalization rather than a debt to the domain's constructor.
   return (credits ?? [])
     .map((credit) => `${credit.name ?? ''}${credit.joinphrase ?? ''}`)
     .join('')
@@ -50,6 +63,8 @@ function optionalMbid(id: string | undefined): Mbid | undefined {
 }
 
 export function releaseToTarget(release: MbRelease): Target | undefined {
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `tracks`, so
+  // the flatMap body yields nothing and the track list stays empty (absent-collection note above).
   const tracks = (release.media ?? []).flatMap((medium) =>
     (medium.tracks ?? []).map((track, index) => ({
       position: track.position ?? index + 1,
@@ -73,6 +88,9 @@ export function recordingToTarget(recording: MbRecording): Target | undefined {
     type: 'track',
     artist: artistCreditName(recording['artist-credit']),
     title: recording.title ?? '',
+    // Stryker disable next-line StringLiteral: the track title's default is unobservable. It only
+    // differs from '' when the recording has no title — and then the *target* title above is '' too,
+    // which `createTarget` rejects as EmptyTitle before it ever looks at a track.
     tracks: [{ position: 1, title: recording.title ?? '', durationMs: recording.length ?? 0 }],
     mbid: optionalMbid(recording.id),
   });
@@ -86,6 +104,8 @@ export function recordingToTarget(recording: MbRecording): Target | undefined {
  * for the album path, which judges ambiguity across release groups instead).
  */
 export function bestMatchId(entries: readonly MbScoredEntry[] | undefined): string | undefined {
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `score`, so
+  // it scores 0, falls below the confidence floor, and yields `undefined` exactly as no entry does.
   const scored = (entries ?? []).map((entry) => ({ id: entry.id, score: entry.score ?? 0 }));
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
@@ -134,6 +154,9 @@ interface GroupedRelease {
 // non-year-leading value maps to +Infinity and sorts after every dated release.
 const DATE_COMPONENT_SENTINEL = 99;
 function dateKey(date: string | null | undefined): number {
+  // Stryker disable next-line StringLiteral: the `??` default is unobservable. The pattern is
+  // anchored, so every string that does not start with four digits — '' and any sentinel alike —
+  // fails to match and takes the `Infinity` branch below.
   const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/.exec(date ?? '');
   if (match === null) return Infinity;
   const year = Number(match[1]);
@@ -146,7 +169,14 @@ function dateKey(date: string | null | undefined): number {
 function compareDates(a: string | null | undefined, b: string | null | undefined): number {
   const aKey = dateKey(a);
   const bKey = dateKey(b);
-  return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  if (aKey < bKey) return -1;
+  // Stryker disable next-line ConditionalExpression,EqualityOperator: equivalent under the only
+  // consumer this result has. It is read exclusively by `Array#toSorted`, and V8's sort asks a
+  // comparator only whether it answered "negative" — it never distinguishes 0 from a positive
+  // number. So no assertion on any sorted output can tell the `1` arm from the `0` arm, whichever
+  // of them a mutant chooses. Both arms are kept because the comparator *contract* is
+  // negative/zero/positive; the `< 0`-only shortcut is V8's implementation, not something to encode.
+  return aKey > bKey ? 1 : 0;
 }
 
 /**
@@ -189,6 +219,8 @@ export function releaseCandidateIds(
   requestTitle: string,
 ): readonly string[] {
   const groups = new Map<string, GroupedRelease[]>();
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `id`, so the
+  // loop's first guard skips it and no group is formed (absent-collection note above).
   const releaseList = releases ?? [];
   for (const release of releaseList) {
     if (release.id === undefined) continue;
@@ -256,6 +288,10 @@ function modalTrackCount(counts: readonly number[]): number {
   let modal = 0;
   let modalFrequency = 0;
   for (const [count, freq] of frequency) {
+    // Stryker disable next-line EqualityOperator: `count <= modal` is equivalent. `modal` is only
+    // ever a count already taken from this map, and map keys are distinct, so `count === modal`
+    // cannot hold here — the initial `modal = 0` pairs with `modalFrequency = 0`, which every real
+    // frequency (>= 1) beats on the first arm before this arm is ever consulted.
     if (!(freq > modalFrequency || (freq === modalFrequency && count < modal))) {
       continue;
     }
@@ -281,6 +317,10 @@ export function releaseGroupEditionIds(
   editions: readonly ReleaseGroupEdition[],
 ): readonly string[] {
   const official = editions.filter((edition) => edition.status === 'Official');
+  // Stryker disable next-line ConditionalExpression: dropping this guard is equivalent — with no
+  // official edition the modal count of an empty list is 0 and the filter below runs over that same
+  // empty list, so the function still returns []. The guard states the rule and honors
+  // `modalTrackCount`'s documented non-empty precondition rather than leaning on that coincidence.
   if (official.length === 0) return [];
   const modal = modalTrackCount(official.map((edition) => edition.trackCount));
   return official
@@ -300,7 +340,11 @@ export function releaseGroupEditionIds(
 export function releaseGroupCandidateIds(
   releases: readonly MbBrowseRelease[] | undefined,
 ): readonly string[] {
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected seed element has no
+  // `status`, so `releaseGroupEditionIds` filters it out as non-official before anything reads it.
   const editions: ReleaseGroupEdition[] = [];
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `id`, so the
+  // loop's first guard skips it and no edition is collected (absent-collection note above).
   const releaseList = releases ?? [];
   for (const release of releaseList) {
     if (release.id === undefined) continue;
@@ -316,6 +360,8 @@ export function releaseGroupCandidateIds(
 
 /** An edition's total track count: the sum of its media's `track-count`s (unknown contributes 0). */
 function totalTrackCount(release: MbBrowseRelease): number {
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no
+  // `track-count`, so it adds 0 and the sum is the same as over no media at all.
   return (release.media ?? []).reduce((sum, medium) => sum + (medium['track-count'] ?? 0), 0);
 }
 
@@ -334,12 +380,16 @@ export function releaseGroupEditionCandidates(
   // The numeric count (0 = unknown) rides alongside each candidate purely for the picker's modal
   // ranking; it never reaches the event, where an unknown count is absent (never the sentinel 0).
   const editions: { readonly candidate: EditionCandidate; readonly count: number }[] = [];
+  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `id`, so
+  // `optionalMbid` reads it as absent and the loop's guard skips it, presenting no candidate.
   const releaseList = releases ?? [];
   for (const release of releaseList) {
     const releaseMbid = optionalMbid(release.id);
     if (releaseMbid === undefined) continue;
     const formats = [
       ...new Set(
+        // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no
+        // `format`, so the type guard below drops it and the format list stays empty.
         (release.media ?? [])
           .map((medium) => medium.format)
           .filter((format): format is string => typeof format === 'string'),
@@ -358,6 +408,10 @@ export function releaseGroupEditionCandidates(
       },
     });
   }
+  // Stryker disable next-line ConditionalExpression: dropping this guard is equivalent — with no
+  // edition collected, the modal count of an empty list is 0 and the sort/map below run over that
+  // same empty list, so the function still presents []. The guard states the rule and honors
+  // `modalTrackCount`'s documented non-empty precondition rather than leaning on that coincidence.
   if (editions.length === 0) return [];
   const modal = modalTrackCount(editions.map((edition) => edition.count));
   return editions

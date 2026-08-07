@@ -54,10 +54,12 @@ function parseNumber(value: string | undefined): number | undefined {
 /**
  * Bit depth from `bits_per_raw_sample` (a string) when present, else `bits_per_sample` (a number).
  * ffprobe reports `0` for "not applicable", which reads as unknown rather than a real 0-bit depth.
+ * An absent depth needs no arm of its own — `undefined === 0` is false, so it falls through the
+ * ternary and is returned as the `undefined` it already is.
  */
 function parseBitDepth(stream: FfprobeStream): number | undefined {
   const depth = parseNumber(stream.bits_per_raw_sample) ?? stream.bits_per_sample;
-  return depth === undefined || depth === 0 ? undefined : depth;
+  return depth === 0 ? undefined : depth;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { ResultAsync, err, ok } from 'neverthrow';
+import { ResultAsync, err, errAsync, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeCheckpointStore, FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
@@ -189,6 +189,44 @@ describe('CatchUpSubscription', () => {
     expect(await checkpointOf()).toBe(2);
   });
 
+  it('spends the whole retry budget: a fault that clears on the last attempt still delivers', async () => {
+    // The budget is `attempts` deliveries, not `attempts` waits. Stopping one short would hold a
+    // delivery whose fault had already cleared, costing it a whole fallback interval for nothing.
+    feed.events = [seamEvent(1)];
+    const stuck: ConsumeFailure = { kind: 'Transient', reason: 'IntakeDirectoryMissing' };
+    failures.set(1, [stuck, stuck]); // heals on the third and last attempt of the budget
+    const sub = subscription({ retry: { attempts: 3, baseDelayMs: 100 } });
+
+    await sub.start();
+
+    expect(handled).toEqual([1]);
+    expect(sleeps.filter((ms) => ms > 0)).toEqual([100, 200]); // no backoff after the last attempt
+    expect(await checkpointOf()).toBe(1);
+  });
+
+  it('a wakeup landing mid-cycle is not lost: the held cycle is followed by one more pass', async () => {
+    // Coalescing is what keeps a wakeup that arrives DURING a cycle from waiting out the whole
+    // fallback interval: the in-flight drain remembers it and runs one more pass before settling.
+    const stuck: ConsumeFailure = { kind: 'Transient', reason: 'IntakeDirectoryMissing' };
+    const sub = subscription({
+      sleep: (ms) => {
+        sleeps.push(ms);
+        // The producer's wakeup lands while the cycle is still retrying this event in place.
+        if (ms > 0) for (const listener of wakeListeners) listener();
+        return Promise.resolve();
+      },
+    });
+    await sub.start(); // nothing published yet: the startup drain settles idle, wakeups wired
+
+    feed.events = [seamEvent(1)];
+    failures.set(1, [stuck, stuck, stuck]); // this cycle exhausts its retries and holds
+    await sub.poll();
+
+    // The remembered wakeup drove a second pass in the same drain, against a healed world.
+    expect(handled).toEqual([1]);
+    expect(await checkpointOf()).toBe(1);
+  });
+
   it('names the failure in the standing-hold log, so a wedged seam says why', async () => {
     // The sustained operator signal for a hold that outlives the cycle. Without the failure on
     // the line, a seam stuck behind a transient fault logs an error every poll that never says
@@ -329,19 +367,22 @@ describe('CatchUpSubscription', () => {
   });
 
   it('a checkpoint save failure holds delivery rather than losing it', async () => {
-    feed.events = [seamEvent(1)];
+    feed.events = [seamEvent(1), seamEvent(2)];
     checkpoints.failSaves = true;
     const sub = subscription();
 
     await sub.start();
 
+    // The cycle stops at the event it could not record. Delivering 2 on top of an unrecorded 1
+    // would leapfrog a position the checkpoint still owes a redelivery of.
+    expect(handled).toEqual([1]);
     expect(await checkpointOf()).toBe(0);
 
     checkpoints.failSaves = false;
     await sub.poll();
-    // Redelivered (at-least-once); the handler ran twice and the checkpoint caught up.
-    expect(handled).toEqual([1, 1]);
-    expect(await checkpointOf()).toBe(1);
+    // Redelivered (at-least-once); the handler saw 1 twice and the checkpoint caught up.
+    expect(handled).toEqual([1, 1, 2]);
+    expect(await checkpointOf()).toBe(2);
   });
 
   it('drains in bounded batches, yielding between them', async () => {
@@ -367,6 +408,43 @@ describe('CatchUpSubscription', () => {
     expect(sub.isHalted).toBe(false); // held, not poisoned — the next cycle retries
   });
 
+  it('ends the cycle on a failed trailing-scan advance instead of reading on past it', async () => {
+    // The failed save leaves the drain unable to record where it got to, so reading on would
+    // re-scan the same positions and re-fail the same save on every pass of the same cycle —
+    // hammering an already-faulted store, and logging the hold over and over. One hold, one line.
+    feed.events = [seamEvent(1)];
+    const reads: number[] = [];
+    const scanningFeed = {
+      read: (from: number): Promise<Result<SeamFeedBatch, { kind: string }>> => {
+        reads.push(from);
+        return Promise.resolve(
+          ok({ events: feed.events.filter((event) => event.globalSeq > from), scannedTo: 9 }),
+        );
+      },
+    };
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const sub = subscription({
+      feed: scanningFeed,
+      logger,
+      checkpoints: {
+        load: (name: string) => checkpoints.load(name),
+        // The event's own advance lands; only the trailing scan past it is refused.
+        save: (name: string, globalSeq: number) =>
+          globalSeq > 1
+            ? errAsync(infraError('checkpoint.save', 'boom'))
+            : checkpoints.save(name, globalSeq),
+      },
+    });
+
+    await sub.start();
+
+    expect(handled).toEqual([1]);
+    expect(reads).toEqual([0]);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(await checkpointOf()).toBe(1); // the recorded position, not the scanned one
+  });
+
   it('advances the checkpoint past batches that contain no published events', async () => {
     const sub = subscription({
       feed: {
@@ -377,6 +455,33 @@ describe('CatchUpSubscription', () => {
     await sub.start();
 
     expect(await checkpointOf()).toBe(7);
+  });
+
+  it('keeps draining past a scan checkpoint — a scanned window is progress, not the end', async () => {
+    // The seam feed is a GLOBAL-position feed: most positions in a window belong to streams this
+    // consumer does not follow, so a batch can be all scan and no events. Recording that scan must
+    // not be read as "fully drained" — the events behind the window are still owed this cycle.
+    const head = 6;
+    const windowedFeed = {
+      read: (from: number, limit: number): Promise<Result<SeamFeedBatch, { kind: string }>> => {
+        const scannedTo = Math.min(from + limit, head);
+        return Promise.resolve(
+          ok({
+            events: feed.events.filter(
+              (event) => event.globalSeq > from && event.globalSeq <= scannedTo,
+            ),
+            scannedTo,
+          }),
+        );
+      },
+    };
+    feed.events = [seamEvent(1), seamEvent(5)];
+    const sub = subscription({ feed: windowedFeed });
+
+    await sub.start();
+
+    expect(handled).toEqual([1, 5]);
+    expect(await checkpointOf()).toBe(head);
   });
 
   it('concurrent polls coalesce instead of interleaving', async () => {
@@ -574,7 +679,13 @@ describe('CatchUpSubscription', () => {
 
     const outcome = await sub.reset(0);
 
-    expect(outcome._unsafeUnwrapErr()).toMatchObject({ operation: 'checkpoint.reset' });
+    // The operator is told a reset failed and why it could not be classified further: the defect
+    // is unexpected by construction, so the report names the operation and says exactly that.
+    expect(outcome._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'checkpoint.reset',
+      message: 'checkpoint reset failed unexpectedly',
+    });
   });
 
   it('stop detaches the wakeup listener and the fallback interval', async () => {

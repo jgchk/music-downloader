@@ -63,7 +63,10 @@ describe('FilesystemIntake', () => {
     const intake = new FilesystemIntake({ intakeRoot: root });
 
     const result = await intake.deleteRelease(path.join(outside, 'album'), testScope());
-    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'intake.deleteRelease',
+    });
     expect(result._unsafeUnwrapErr().message).toContain('refusing to delete');
   });
 

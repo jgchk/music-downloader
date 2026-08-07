@@ -99,6 +99,16 @@ describe('mapSearchResponses', () => {
     expect(mapSearchResponses([{}], 'album')).toEqual([]);
   });
 
+  it.each(['album', 'track'] as const)(
+    'drops a %s response whose files are advertised by no one',
+    (targetType) => {
+      // The username is half the identity we would later enqueue against, so a response that
+      // names no peer is unaddressable however good its files look — it is dropped, never
+      // admitted under a blank name that would collide with every other nameless peer.
+      expect(mapSearchResponses([{ files: [richFile] }], targetType)).toEqual([]);
+    },
+  );
+
   it('yields one candidate per file for a track target, dropping a nameless (pathless) file', () => {
     const candidates = mapSearchResponses([{ username: 'u1', files: [richFile, {}] }], 'track');
 

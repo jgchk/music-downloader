@@ -155,6 +155,10 @@ describe('the fold is prefix-consistent — the reactor’s dispatch contract', 
             retryAppliesChecked += 1;
             expect(effect.directory).toBe(asOf.location);
             expect(effect.mode).toEqual(asOf.mode);
+            // The state, not just the shape: this apply re-imports files that are already in the
+            // library, so it is lawful only while a retry is in flight. Without this the property
+            // accepts an apply fired at an applied import nobody asked to retry.
+            expect(asOf.remediation?.status).toBe('retrying');
           } else {
             expect.unreachable(`an apply effect from phase ${asOf.phase}`);
           }

@@ -92,6 +92,13 @@ export class Acquisition {
       attempts: 'attempts' in state ? state.attempts : 0,
       rejectedCount: 'rejected' in state ? state.rejected.length : 0,
       location: 'location' in state ? state.location : undefined,
+      // Stryker disable next-line ConditionalExpression: forcing this ternary's condition true is
+      // equivalent. `candidates` is declared on `AwaitingManualSelectionState` alone, and the one
+      // transition out of that phase (`EditionSelected`) destructures the field away rather than
+      // spreading it, so the unguarded read yields `undefined` on every other phase — exactly what
+      // the false arm supplies. The guard is the narrowing that lets the property type-check.
+      // Carrying the menu at all IS behaviour — blanking it is what `exposes the retained candidate
+      // editions while awaiting a choice` (read-models.test.ts) catches.
       candidates: state.phase === 'AwaitingManualSelection' ? state.candidates : undefined,
     };
   }
