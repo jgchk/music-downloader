@@ -124,7 +124,7 @@ flip is last (D5) — the gate must not block on pre-existing debt.
 The flip is TWO tasks rather than one, and its criterion is a measurement rather than a state of
 main. The old criterion — *"split the four narrowing-operand lines so their waivers become
 precise"* — is **deleted, not weakened**: it is unreachable twice over, and it is recorded as
-deleted here rather than silently dropped. There are twenty-seven, not four; and splitting cannot
+deleted here rather than silently dropped. There are seventeen of that mutator family, not four — twenty-seven survivors in all; and splitting cannot
 work for this mutator family at all, because `ConditionalExpression` emits `true` *and* `false`
 from one node and `EqualityOperator` emits both substitutions from one operator token, so the
 equivalent and its killable twin are co-located whatever the formatting (`design.md` D10, measured

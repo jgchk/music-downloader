@@ -66,7 +66,8 @@ the same method `result-lint-and-tier-enforcement.md` used before adopting a lin
 - **Documentation drift is fixed** (research §10): the job comment arguing from the retracted
   "464 → 6 (99.89%)" figure, the stale timeout comment, `design.md` task 3.3's unrepresentative
   2m31s, and `mutation-gate`'s task 4.1 — whose exit criterion ("split the four
-  narrowing-operand lines") is **unreachable as written**: there are twenty-seven, and `design.md`
+  narrowing-operand lines") is **unreachable as written**: there are seventeen of that family, and
+  `design.md`
   proves splitting cannot work for that mutator family. 4.1 is restated onto this change's
   premise, and task 2.1's "main becomes mutant-clean" framing is corrected.
 - **`test/boundaries/mutation-scope.test.ts` is updated with the job.** It pins the command

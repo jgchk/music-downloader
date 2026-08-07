@@ -35,7 +35,14 @@ const GIT_ENV = [
 ];
 
 function git(cwd: string, ...args: readonly string[]): string {
-  return execFileSync('git', [...GIT_ENV, ...args], { cwd, encoding: 'utf8' });
+  // The ambient git config is disowned: a developer's global `core.hooksPath` or `init.templateDir`
+  // would otherwise run someone else's hooks inside these throwaway repos, and the test would fail
+  // on one machine only.
+  return execFileSync('git', [...GIT_ENV, ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+  });
 }
 
 const workspaces: string[] = [];
@@ -173,18 +180,71 @@ describe('hunk headers', () => {
   });
 });
 
+describe('diff content that looks like diff syntax', () => {
+  it('does not read an added line beginning `++ ` as a new file header', () => {
+    // Under `-U0` every line inside a hunk is added or removed, and an ADDED line whose content
+    // starts with `++ ` is printed as `+++ ` — indistinguishable from a file header by shape alone.
+    // Misreading one re-keys every hunk after it onto a file that does not exist, which moves the
+    // gate off the real file silently: no findings, and the whole thing reads as clean.
+    const diff = [
+      'diff --git real.ts real.ts',
+      '--- real.ts',
+      '+++ real.ts',
+      '@@ -7 +7 @@',
+      '+++ not/a/file.ts',
+      '@@ -20 +20 @@',
+      '+const x = 1;',
+    ].join('\n');
+
+    const changed = parseChangedLines(diff);
+
+    expect(changed.keys().toArray()).toEqual(['real.ts']);
+    expect(changed.get('real.ts')).toEqual([
+      { start: 7, end: 7 },
+      { start: 20, end: 20 },
+    ]);
+  });
+
+  it('does not read a removed line beginning `-- ` as a header pair', () => {
+    const diff = [
+      'diff --git real.ts real.ts',
+      '--- real.ts',
+      '+++ real.ts',
+      '@@ -7,2 +7 @@',
+      '--- not/a/file.ts',
+      '+++ also/not/a/file.ts',
+    ].join('\n');
+
+    expect(parseChangedLines(diff).keys().toArray()).toEqual(['real.ts']);
+  });
+});
+
 describe('a diff with nothing in it', () => {
   it('reads an empty diff as no changed line anywhere', () => {
     expect(parseChangedLines('').size).toBe(0);
   });
 
-  it('reads a file header with no hunks as no changed line', () => {
-    // What a mode-only change looks like. The file is named but the branch touched no line of it.
+  it('names a mode-only change but gates no line in it', () => {
+    // git emits no `---`/`+++` pair for a mode change or a pure rename, yet `--diff-filter=ACMR`
+    // keeps such a file in the mutate scope — so it reaches the report. A parser that never named
+    // it would leave a reported file joining nothing, and the verdict would rightly refuse, over a
+    // branch that did nothing wrong. Named, with no ranges: changed, gating nothing.
     const modeOnly = ['diff --git edited.ts edited.ts', 'old mode 100644', 'new mode 100755'].join(
       '\n',
     );
 
-    expect(parseChangedLines(modeOnly).size).toBe(0);
+    expect(parseChangedLines(modeOnly).get('edited.ts')).toEqual([]);
+  });
+
+  it('names the destination of a pure rename', () => {
+    const renamed = [
+      'diff --git old.ts new.ts',
+      'similarity index 100%',
+      'rename from old.ts',
+      'rename to new.ts',
+    ].join('\n');
+
+    expect(parseChangedLines(renamed).keys().toArray()).toEqual(['new.ts']);
   });
 });
 

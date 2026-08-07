@@ -1,5 +1,5 @@
 import { byPath, isSurviving, type MutationReport, type ReportedMutant } from './report-model.ts';
-import { cell } from './summarize.ts';
+import { cell } from './markdown.ts';
 
 /**
  * Turns the weekly full run's report into tracker issues (change: mutation-gate).

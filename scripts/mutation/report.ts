@@ -12,9 +12,6 @@ import { summarizeReport } from './summarize.ts';
  * are deliberately different — a wide report under a narrow gate is strictly more information, and
  * "suppress the gate, never the feedback" is the whole reason this file still prints everything.
  *
- * (It used to say Stryker's exit code decides. It did, until `thresholds.break: 100` — "any survivor
- * anywhere in the reporting scope" — stopped being the verdict the job wanted.)
- *
  * So this only explains, and it prints a summary for every outcome including the ones where there is
  * no report at all.
  */

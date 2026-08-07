@@ -124,8 +124,9 @@ jobs:
     runs-on: ubuntu-latest
     # Measured in CI, three times, not projected: 2m32s on a 2-file diff, 9m37s on 53 changed files,
     # 13m58s on 36. Cost is mutants x tests per mutant rather than file count, which is why the
-    # smaller diff was the slower run. The largest was 66% of the old 20-minute budget. Once this
-    # check blocks, a timeout is a red required check on a CORRECT branch — unattributable and
+    # smaller diff was the slower run. The largest Stryker step, 13m16s, was 66% of the old
+    # 20-minute budget. Once this check blocks, a timeout is a red required check on a CORRECT
+    # branch — unattributable and
     # non-deterministically reproducible, which is exactly what teaches an agent loop that the
     # mutation check is the flaky one to ignore.
     timeout-minutes: 30
@@ -207,8 +208,11 @@ jobs:
       # below, which carries no such flag.
       #
       # Note what this flag also forgives: Stryker CRASHING, exactly as readily as it forgives
-      # survivors. That hole is closed downstream rather than here — the verdict fails on a missing
-      # or unreadable report instead of reading absence as a clean bill.
+      # survivors. That hole is closed downstream rather than here — the verdict REFUSES on a
+      # missing or unreadable report instead of reading absence as a clean bill. Read "refuses"
+      # precisely: while the gate ships in shadow, that refusal is a paragraph in the step summary
+      # and the job is still green. It becomes a job failure the moment MUTATION_GATE_ENFORCE is
+      # set, which is the same flip that makes everything else here bite.
       - name: Mutation-test the changed production files
         id: stryker
         if: steps.scope.outputs.files != ''
@@ -247,6 +251,7 @@ jobs:
         env:
           MUTATION_STRYKER_SECONDS: ${{ steps.stryker.outputs.seconds }}
         run: |
+          set -euo pipefail
           pnpm tsx scripts/mutation/pr-verdict.ts "${RUNNER_TEMP}/changed.diff" \
             >> "$GITHUB_STEP_SUMMARY"
 

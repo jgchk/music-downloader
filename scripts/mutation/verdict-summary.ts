@@ -1,4 +1,4 @@
-import { cell } from './summarize.ts';
+import { cell, plural } from './markdown.ts';
 import {
   ENFORCE_SWITCH,
   type SwitchReading,
@@ -36,10 +36,6 @@ export interface RenderContext {
   readonly strykerSeconds: number | undefined;
 }
 
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
 function duration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
@@ -48,6 +44,9 @@ function duration(seconds: number): string {
 
 /** Shadow says what it *would* do; enforcement says what it *is* doing. Never both. */
 function banner(reading: SwitchReading): readonly string[] {
+  if (reading.enforcement === 'enforce') {
+    return ['> **Enforcing.** A blocking verdict fails this job.'];
+  }
   const unrecognised =
     reading.unrecognised === undefined
       ? []
@@ -56,10 +55,6 @@ function banner(reading: SwitchReading): readonly string[] {
           `> \`${ENFORCE_SWITCH}\` is set to \`${cell(reading.unrecognised)}\`, which is not recognised as on or off —`,
           '> it was ignored and the gate stayed in shadow.',
         ];
-
-  if (reading.enforcement === 'enforce') {
-    return ['> **Enforcing.** A blocking verdict fails this job.', ...unrecognised];
-  }
   return [
     '> **Shadow mode.** This verdict is published, not enforced: it does not fail the job.',
     `> Set \`${ENFORCE_SWITCH}=true\` on the \`mutation\` job to make it blocking, once the shadow`,
@@ -79,25 +74,45 @@ function table(findings: readonly VerdictFinding[]): readonly string[] {
   ];
 }
 
-/** One sentence per refusal, because "unaudited" with no cause gets re-run rather than fixed. */
-function unauditedSentence(reason: UnauditedReason): readonly string[] {
-  if (reason === 'no-mutants') {
-    return [
-      'The scope produced no mutants at all, so nothing was audited. This is not a clean run.',
-    ];
-  }
-  if (reason === 'all-ignored') {
-    return [
-      'Every mutant in this scope was ignored as arid or unmeasurable, so nothing here was actually',
-      'audited. This is not a clean run.',
-    ];
-  }
-  return [
-    'The mutation report matched no file in the diff, so no mutant could be tested against any',
-    'changed line and nothing was audited. The two **path** spellings have drifted apart — the report',
-    "is keyed relative to the run's working directory, the diff by `git diff --no-prefix` — and until",
-    'they agree this gate measures nothing while looking exactly like success.',
-  ];
+/**
+ * One sentence per refusal, because "unaudited" with no cause gets re-run rather than fixed.
+ *
+ * A total record rather than an if-chain with a trailing `return`: that shape told a fourth reason,
+ * confidently and wrongly, that the path spellings had drifted — sending a reader to debug a
+ * normalisation bug that does not exist. `Record<UnauditedReason, …>` makes the next reason a build
+ * break here instead.
+ */
+const UNAUDITED_SENTENCE: Record<UnauditedReason, readonly string[]> = {
+  'no-mutants': [
+    'The scope produced no mutants at all, so nothing was audited. This is not a clean run.',
+  ],
+  'all-ignored': [
+    'Every mutant in this scope was ignored as arid or unmeasurable, so nothing here was actually',
+    'audited. This is not a clean run.',
+  ],
+  'no-diff': [
+    'No changed-line diff reached this step, so there was nothing to test the surviving mutants',
+    'against. The mutation run itself may be fine — this is the step BEFORE it that failed: the',
+    'scope step writes the diff, and either it did not run, wrote nothing, or wrote it somewhere',
+    'this step did not look. Read the job log above rather than the mutants.',
+  ],
+  'no-file-joined': [
+    'The mutation report names files the diff does not, so those mutants could not be tested against',
+    'any changed line and that part of the scope was not audited. The two **path** spellings have',
+    "drifted apart — the report is keyed relative to the run's working directory, the diff by",
+    '`git diff --no-prefix` — and until they agree this gate measures less than it appears to.',
+  ],
+};
+
+function unauditedSentence(
+  reason: UnauditedReason,
+  unjoined: readonly string[] | undefined,
+): readonly string[] {
+  const named =
+    unjoined === undefined || unjoined.length === 0
+      ? []
+      : ['', 'Reported but not found in the diff:', ...unjoined.map((file) => `- \`${file}\``)];
+  return [...UNAUDITED_SENTENCE[reason], ...named];
 }
 
 function body(verdict: Verdict, reading: SwitchReading): readonly string[] {
@@ -114,7 +129,7 @@ function body(verdict: Verdict, reading: SwitchReading): readonly string[] {
     ];
   }
   if (verdict.kind === 'unaudited') {
-    return unauditedSentence(verdict.reason);
+    return unauditedSentence(verdict.reason, verdict.unjoined);
   }
 
   const analysed = `Analysed **${plural(verdict.counted.mutants, 'mutant')}** across **${plural(verdict.counted.files, 'file')}**${
@@ -145,7 +160,8 @@ function body(verdict: Verdict, reading: SwitchReading): readonly string[] {
     '',
     analysed,
     '',
-    'Each row is a change to a line this branch wrote that the whole suite failed to notice. Kill it',
+    'Each row is a change the whole suite failed to notice, on a span overlapping a line this branch',
+    'wrote. Kill it',
     'with a test that asserts the behaviour, delete the code if it has none, or — if the line is',
     'genuinely arid — suppress it at the site with a written justification',
     '(`// Stryker disable next-line <mutator>: <reason>`).',

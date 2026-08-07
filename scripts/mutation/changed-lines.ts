@@ -56,8 +56,24 @@ export const DIFF_FLAGS: readonly string[] = ['-U0', '--no-prefix', '--diff-filt
  */
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/;
 
+/** Any hunk header, contributing a range or not — what closes a section's header region. */
+const HUNK_PREFIX = '@@ -';
+
 /** `+++ <path>` under `--no-prefix`; `/dev/null` when the change deleted the file. */
 const NEW_SIDE = /^\+\+\+ (.+)$/;
+
+/**
+ * Opens a file's section, and with it the region in which `+++` means a filename. Under
+ * `--no-prefix` the two paths are the source and destination spellings, so the second is the file as
+ * it exists after the change — the one Stryker will key its report by.
+ *
+ * The destination is registered from THIS line rather than only from `+++`, because git emits no
+ * `---`/`+++` pair at all for a pure rename or a mode-only change. Such a file is in the mutate
+ * scope (`--diff-filter=ACMR` keeps it) and therefore in the report, so a parser that never named it
+ * would leave a file in the report joining nothing — which the verdict is right to refuse, over a
+ * branch that did nothing wrong.
+ */
+const FILE_SECTION = /^diff --git (?:\S+) (\S+)$/;
 
 const DELETED = '/dev/null';
 
@@ -93,15 +109,36 @@ export function parseHunkHeader(line: string): LineRange | undefined {
 export function parseChangedLines(diff: string): ChangedLines {
   const changed = new Map<string, LineRange[]>();
   let file: string | undefined;
+  // `+++ x` names a file only in a section's HEADER region. Under `-U0` every line inside a hunk is
+  // an added or removed one, so an added line whose content begins `++ ` is printed as `+++ ` and is
+  // indistinguishable from a header by shape alone. Reading one as a header would re-key every hunk
+  // after it onto a file that does not exist — no findings, and the run reads clean. The region opens
+  // at `diff --git` (and at the start of the text, so an abbreviated fixture still parses) and closes
+  // at the section's first hunk.
+  let isInHeader = true;
 
   for (const line of diff.split('\n')) {
-    const newSide = NEW_SIDE.exec(line);
+    const section = FILE_SECTION.exec(line);
+    if (section !== null) {
+      isInHeader = true;
+      file = section[1];
+      if (file !== undefined) changed.set(file, changed.get(file) ?? []);
+      continue;
+    }
+
+    const newSide = isInHeader ? NEW_SIDE.exec(line) : null;
     if (newSide !== null) {
       const named = newSide[1]?.trim();
       file = named === DELETED ? undefined : named;
       if (file !== undefined) changed.set(file, changed.get(file) ?? []);
       continue;
     }
+
+    if (!line.startsWith(HUNK_PREFIX)) continue;
+    // Closed by ANY hunk header, including a pure deletion that contributes no range. Closing only
+    // on a contributing hunk would leave the region open across a deletion-only hunk, so the
+    // spoof guard would rest on the second fact that such a hunk emits no `+` lines.
+    isInHeader = false;
     const hunk = parseHunkHeader(line);
     if (hunk === undefined || file === undefined) continue;
     changed.set(file, [...(changed.get(file) ?? []), hunk]);
