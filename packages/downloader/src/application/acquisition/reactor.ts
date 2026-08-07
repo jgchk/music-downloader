@@ -38,8 +38,9 @@ type DispatchOutcome =
  * OWN stream (durable entry + exponential backoff) while the checkpoint advances past it, so one
  * poisoned acquisition never stalls the rest (reactor-durability D1); the retry scheduler runs on
  * the same drain mutex, and a spent budget lands somewhere modeled via the {@link EffectLander}
- * (D2). Operational logs are correlated by `acquisitionId` (bootstrap D15); the pure
- * `react`/`decide`/`evolve` stay log-free.
+ * (D2). Operational logs are correlated by the operation's `correlationId` (plus `streamId` and
+ * `globalSeq`), bound once per dispatch in `scopeFor` and inherited by everything below it; the
+ * pure `react`/`decide`/`evolve` stay log-free.
  */
 export const REACTOR_CONSUMER = 'acquisition-reactor';
 

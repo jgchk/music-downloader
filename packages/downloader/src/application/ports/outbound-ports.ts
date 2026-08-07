@@ -18,9 +18,12 @@ import type { InfraError } from './errors.js';
  * channel is an {@link InfraError}; *business* outcomes (unresolved metadata, a failed transfer,
  * an import conflict) are modeled as `Ok` values so `decide` can turn them into domain events.
  *
- * Every effect method takes the dispatching {@link OperationScope} as its LAST parameter — one
- * uniform rule, so there is no per-port exception to remember and the compiler catches a call site
- * that forgot. An adapter uses `scope.logger` (already bound to the operation, so its lines join
+ * Every OUTBOUND effect method takes the dispatching {@link OperationScope} as its LAST parameter —
+ * one uniform rule, so there is no per-port exception to remember and the compiler catches a call
+ * site that forgot. {@link DownloadObserverPort} is the exception because it is not an effect: it
+ * is the INBOUND half, implemented by the application, so `outcome` takes the pinned
+ * {@link CommandContext} to carry back into the shell and the fire-and-forget notifications take
+ * neither. An adapter uses `scope.logger` (already bound to the operation, so its lines join
  * the acquisition without the adapter knowing what correlation is) and carries `scope.context`
  * opaquely wherever it re-enters the shell asynchronously. No adapter reads a field of either.
  */

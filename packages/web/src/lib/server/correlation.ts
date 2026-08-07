@@ -1,4 +1,6 @@
 /**
+ * @file
+ *
  * The web layer's story mint (change: end-to-end-correlation).
  *
  * The BFF is the outermost trigger for every user-initiated operation, so this is where a story

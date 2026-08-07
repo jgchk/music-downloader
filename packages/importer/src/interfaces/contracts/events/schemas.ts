@@ -35,8 +35,6 @@ export const releaseVerdictDataSchema = z.object({
   reasons: z.array(z.string()),
 });
 
-/** The Standard Webhooks body: `{type, timestamp, data}`. */
-
 /**
  * The operation-correlation envelope (change: end-to-end-correlation) — OPTIONAL, additive, and
  * deliberately NOT part of `data`.
@@ -68,6 +66,7 @@ export const publishedCorrelationSchema = z.object({
 
 export type PublishedCorrelation = z.infer<typeof publishedCorrelationSchema>;
 
+/** The Standard Webhooks body: `{type, timestamp, data}`, plus the optional correlation block. */
 export const releaseVerdictEventSchema = z.object({
   type: z.literal(RELEASE_VERDICT_TYPE),
   timestamp: z.iso.datetime(), // when the verdict was recorded (stable across redeliveries)

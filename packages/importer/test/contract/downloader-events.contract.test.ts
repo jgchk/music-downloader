@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { fulfilledToSubmission } from '../../src/interfaces/contracts/intake/mapping.js';
+import {
+  contextForDelivery,
+  fulfilledToSubmission,
+} from '../../src/interfaces/contracts/intake/mapping.js';
+import { fixedCorrelation } from '../../src/application/__fixtures__/correlation.js';
 import {
   acquisitionFulfilledSchema,
   intakeEventEnvelopeSchema,
@@ -77,5 +81,59 @@ describe('the recorded acquisition.fulfilled fixture', () => {
         sizeBytes: 1000,
       },
     });
+  });
+});
+
+/**
+ * The correlation envelope, proved against the PRODUCER's own recorded bytes.
+ *
+ * The producer's `publishedCorrelationSchema` and this module's `inboundCorrelationSchema` are two
+ * independently hand-authored zod schemas that no type connects. Until this test they were pinned
+ * only against each other's authors' intentions: the producer suite asserted what it renders, the
+ * consumer suite asserted a hand-written literal, and a drift between them would have left both
+ * green while every cross-context trace silently detached — because `contextForDelivery` swallows
+ * an unreadable envelope into a fresh story by design.
+ */
+const recordedV2 = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../downloader/test/contract/fixtures/events/acquisition.fulfilled/v2.json',
+      import.meta.url,
+    ).pathname,
+    'utf8',
+  ),
+) as RecordedDelivery & { readonly event: { readonly metadata?: unknown } };
+
+describe('the recorded acquisition.fulfilled fixture carrying correlation metadata', () => {
+  it('is the schema version that first published the envelope', () => {
+    expect(recordedV2.provenance.schemaVersion).toBe(2);
+  });
+
+  it('still parses through the tolerant reader — the envelope is additive to the payload', () => {
+    expect(() => acquisitionFulfilledSchema.parse(recordedV2.event)).not.toThrow();
+  });
+
+  it('adopts the producer story verbatim, with causation naming the consumed event', () => {
+    const context = contextForDelivery(recordedV2.event.metadata, fixedCorrelation(), () =>
+      expect.unreachable("the producer's own bytes must be readable by this consumer"),
+    );
+
+    expect(context.correlationId).toBe('9f2c1d4e6a7b8c9d0e1f2a3b4c5d6e7f');
+    expect(context.causation).toEqual({
+      kind: 'event',
+      context: 'downloader',
+      streamId: '1e6cbf59-7f3f-4b39-8ad9-0d84b3d5c5f4',
+      version: 8,
+    });
+  });
+
+  it('mints its own story from the v1 fixture, which predates the envelope', () => {
+    const context = contextForDelivery(
+      (recorded.event as { metadata?: unknown }).metadata,
+      fixedCorrelation(),
+      () => expect.unreachable('an ABSENT envelope is expected history, not a drift signal'),
+    );
+
+    expect(context.causation).toMatchObject({ kind: 'command' });
   });
 });

@@ -1,0 +1,47 @@
+{
+  "provenance": {
+    "recordedAt": "2026-08-07T12:00:00.000Z",
+    "schemaVersion": 2,
+    "note": "Rendered by src/interfaces/contracts/events/mapping.ts over a deterministic fixture history, carrying the optional correlation envelope. FROZEN — never regenerate."
+  },
+  "event": {
+    "type": "acquisition.fulfilled",
+    "timestamp": "2026-08-07T12:00:00.000Z",
+    "data": {
+      "acquisitionId": "1e6cbf59-7f3f-4b39-8ad9-0d84b3d5c5f4",
+      "target": {
+        "type": "album",
+        "artist": "Radiohead",
+        "title": "Kid A",
+        "musicbrainzReleaseId": null,
+        "year": 2000,
+        "trackCount": 2
+      },
+      "candidate": {
+        "username": "peer1",
+        "path": "peer1/Radiohead - Kid A (2000) [FLAC]",
+        "sizeBytes": 1000
+      },
+      "location": "/library/Radiohead/Kid A (2000)",
+      "files": [
+        {
+          "name": "01.flac",
+          "path": "/library/Radiohead/Kid A (2000)/01.flac"
+        },
+        {
+          "name": "02.flac",
+          "path": "/library/Radiohead/Kid A (2000)/02.flac"
+        }
+      ]
+    },
+    "metadata": {
+      "correlationId": "9f2c1d4e6a7b8c9d0e1f2a3b4c5d6e7f",
+      "causation": {
+        "kind": "event",
+        "context": "downloader",
+        "streamId": "1e6cbf59-7f3f-4b39-8ad9-0d84b3d5c5f4",
+        "version": 8
+      }
+    }
+  }
+}
