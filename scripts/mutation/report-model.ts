@@ -25,7 +25,13 @@ export interface ReportedMutant {
   readonly status: string;
   readonly location: {
     readonly start: { readonly line: number };
-    readonly end: { readonly line: number };
+    /**
+     * `column` is read because Stryker's schema says **"Start is inclusive, end is exclusive"**. An
+     * end at column 1 therefore stops *before* that line, and reading the span as inclusive would
+     * gate one line more than the mutant occupies — a false positive, which is the direction the
+     * ten-percent admission bar is measured in.
+     */
+    readonly end: { readonly line: number; readonly column: number };
   };
   readonly replacement?: string;
 }
@@ -44,6 +50,15 @@ export interface MutationReport {
 export type VendorReportStaysAssignable = schema.MutationTestResult extends MutationReport
   ? true
   : never;
+
+/**
+ * ...and the alias has to be CONSUMED to mean anything. `type X = A extends B ? true : never` is a
+ * perfectly legal declaration when the answer is `never`; nothing errors, so an unread alias asserts
+ * exactly nothing and the comment above it would be a promise the compiler never made. Assigning
+ * `true` to it is what turns vendor drift into the build break this file claims.
+ */
+const VENDOR_REPORT_STAYS_ASSIGNABLE: VendorReportStaysAssignable = true;
+void VENDOR_REPORT_STAYS_ASSIGNABLE;
 
 /**
  * `status` stays an open `string` on the interface — a tolerant reader must not fail to *parse* a
@@ -109,14 +124,19 @@ export function countMutants(report: MutationReport): Counted {
   };
 }
 
+/** The two ways a scope can turn out not to have been audited at all. */
+export type AuditGap = 'no-mutants' | 'all-ignored';
+
 /**
- * Nothing in this scope was actually audited: either the scope produced no mutants at all, or every
- * mutant it produced was ignored as arid or unmeasurable. Neither is a clean bill, and the verdict
- * fails on both (design D4, condition 3) rather than reporting "no surviving mutants" over a scope
- * it never measured.
+ * Nothing in this scope was actually audited: either it produced no mutants at all, or every mutant
+ * it produced was ignored as arid or unmeasurable. Neither is a clean bill — the verdict refuses on
+ * both (design D4, condition 3) and the summary words them differently — so the classification is
+ * returned as a value here rather than derived once per presenter. Two derivations would be two
+ * chances to disagree about whether a scope was audited.
  */
-export function hasAuditedNothing(counted: Counted): boolean {
-  return counted.mutants === 0 || counted.mutants === counted.ignored;
+export function auditGap(counted: Counted): AuditGap | undefined {
+  if (counted.mutants === 0) return 'no-mutants';
+  return counted.mutants === counted.ignored ? 'all-ignored' : undefined;
 }
 
 /** Code-unit order — the order this repo's boundary guards report paths in. */
@@ -142,11 +162,20 @@ function isMutant(value: unknown): value is ReportedMutant {
   if (typeof value.mutatorName !== 'string' || typeof value.status !== 'string') return false;
   const location = value.location;
   if (!isRecord(location)) return false;
-  return isLine(location.start) && isLine(location.end);
+  return isLine(location.start) && isLine(location.end) && hasColumn(location.end);
 }
 
+/**
+ * Lines are 1-based integers in Stryker's schema. `typeof NaN === 'number'`, and a `NaN` line makes
+ * every overlap comparison false — the mutant drops silently out of the failure scope, which is the
+ * vacuously-green direction this door exists to close. So the door checks rather than assumes.
+ */
 function isLine(value: unknown): boolean {
-  return isRecord(value) && typeof value.line === 'number';
+  return isRecord(value) && Number.isSafeInteger(value.line) && (value.line as number) > 0;
+}
+
+function hasColumn(value: unknown): boolean {
+  return isRecord(value) && Number.isSafeInteger(value.column) && (value.column as number) > 0;
 }
 
 function isReport(value: unknown): value is MutationReport {
@@ -158,8 +187,10 @@ function isReport(value: unknown): value is MutationReport {
 
 /**
  * The report as a value, for every way there is not one: absent, unparseable, or parseable but not
- * a mutation report. All three are `undefined` here and are described out loud by the callers —
- * a crashed run must never read as a clean one, and the step that says so must not itself crash.
+ * a mutation report. All three are `undefined` here. Callers separate ABSENT (they hold the raw
+ * text, or do not) from unreadable, and say each out loud; the two unreadable shapes are reported
+ * together, because from here they are the same fact and the wording says so. A crashed run must
+ * never read as a clean one, and the step that says so must not itself crash.
  */
 export function readReport(raw: string | undefined): MutationReport | undefined {
   if (raw === undefined) return undefined;

@@ -348,15 +348,16 @@ relitigates it:
 with the arithmetic — *"A perfect test suite would detect all non-equivalent mutants; hence, 100%
 of undetected mutants would be equivalent"*); 7–40% of all mutants are equivalent across the
 historical range; under 5% of mutants are subsuming at all; and classifying a single equivalent
-costs 4.6–15 minutes of human-or-agent judgement. Seventeen unkillable survivors after a 464→19
-burn-down is the literature's **predicted outcome**, not a residue of incomplete work. Restated:
+costs 4.6–15 minutes of human-or-agent judgement. Twenty-seven unkillable survivors after a
+464 → 19 → 27 burn-down is the literature's **predicted outcome**, not a residue of incomplete work. Restated:
 2.1 closes on *the triage being complete with its residue recorded*, which it is, and its heading
 loses the unreachable parenthetical. Under line scope the recorded equivalents stop blocking
 without being suppressed, so nothing has to be done to them before a flip.
 
 **Task 4.1 — the required-check flip.** Its stated exit criterion is *"split the four
 narrowing-operand lines so their waivers become precise"*. That is doubly superseded by
-`mutation-gate`'s own `design.md`: there are **twenty-seven**, not four, and **splitting cannot work**
+`mutation-gate`'s own `design.md`: there are **seventeen** of that mutator family, not four (and
+**twenty-seven** survivors in all), and **splitting cannot work**
 for this mutator family (D10, second bullet). The task can never close as written. Restated as the
 two-step it now is, with the criterion this change makes reachable:
 
@@ -439,12 +440,13 @@ mutant — `ConditionalExpression` → `false` at line 51, the equivalent alread
 `mutation-gate`'s survivor table. Stryker exited **1** on that run, as `thresholds.break: 100`
 demands.
 
-| the branch's diff                    | verdict                    | shadow exit | enforcing exit |
-| ------------------------------------ | -------------------------- | ----------- | -------------- |
-| edits line **51** (the survivor's)    | `findings` — 1, named      | 0           | 1              |
-| edits line **200**, 149 lines away    | `clean`                    | 0           | 0              |
-| line 200, diff cut **without** `--no-prefix` | `unaudited: no-file-joined` | 0    | 1              |
-| line 51, report absent (crashed run)  | `no-report`                | 0           | 1              |
+| the branch's diff                            | verdict                     | shadow exit | enforcing exit |
+| -------------------------------------------- | --------------------------- | ----------- | -------------- |
+| edits line **51** (the survivor's)           | `findings` — 1, named       | 0           | 1              |
+| edits line **200**, 149 lines away           | `clean`                     | 0           | 0              |
+| line 200, diff cut **without** `--no-prefix` | `unaudited: no-file-joined` | 0           | 1              |
+| the diff file was never written              | `unaudited: no-diff`        | 0           | 1              |
+| line 51, report absent (crashed run)         | `no-report`                 | 0           | 1              |
 
 The second row is the whole thesis in one line: **Stryker exited 1 and the verdict is clean.** Under
 the shipped file scope that exit code was the gate, so a branch editing an unrelated line of that
@@ -453,8 +455,41 @@ file went red for a survivor it did not create. Under changed-line scope the sur
 branch" — and blocks nothing.
 
 The third row is the silent-green hazard, produced on purpose by dropping one flag. It fails as
-*unaudited* and the summary names the cause (path spellings drifted) rather than reporting a clean
-scope, which is the outcome that would otherwise have looked exactly like success forever.
+*unaudited*, names the cause, and **lists the offending path** rather than reporting a clean scope —
+the outcome that would otherwise have looked exactly like success forever. The fourth is its near
+neighbour, and it used to be told the same story: a diff the job never wrote once rendered the
+path-drift paragraph, sending a reader to debug a normalisation bug that does not exist. It now has
+its own refusal and its own sentence.
+
+## Known false-positive sources, for the shadow measurement to price
+
+Review found three ways this verdict can block a branch that did nothing wrong. None is fixed here,
+deliberately: shadow mode exists to measure exactly this, and guessing at a remedy before the data
+is the appeasement the admission contract warns about. Task 5.1 counts each one.
+
+- **A pure rename gates the whole moved file.** The job cuts the diff with a pathspec limited to the
+  in-scope files, which defeats git's rename pairing — so the destination is emitted as a whole-file
+  add, every line enters the failure scope, and every pre-existing survivor in the moved file becomes
+  a blocking finding on a branch that changed no behaviour. This is the "fails a branch for debt it
+  did not create" shape D1 rejects, arriving by a path D1 did not anticipate. Candidate remedies, if
+  the measurement says it matters: `--no-renames` in `DIFF_FLAGS`, or resolving hunks against the
+  pre-rename path.
+- **A scope in which every mutant errored reads as audited.** `auditGap` refuses a scope with no
+  mutants and one where all are `Ignored`, but `CompileError` / `RuntimeError` / `Pending` mutants
+  are neither surviving nor ignored, so a scope in which every mutant failed to compile passes the
+  refusal and returns `clean`. Reachable on a small, type-heavy diff. The fix is a fourth reason
+  keyed on the count of mutants actually *tested*, and it is a behaviour change to a refusal, which
+  is precisely the kind of thing to make on evidence.
+- **Reruns are unmeasured.** `report-model.ts` counts `Timeout` as detected, so a loaded runner
+  turning a `Killed` into a `Timeout` is safe — but a mutant killed only by a timing-sensitive test
+  is not, and nothing measures verdict stability across reruns of one commit. Task 5.1 records rerun
+  disagreements; a flaky blocking check is worse than no check.
+
+Two more findings are recorded as deliberate non-goals rather than risks. The shadow verdict is
+readable only in the step summary and the job log — there is no annotation, artifact or aggregation,
+so task 5.1's collection is manual by construction; and `pr-verdict.ts` remains the only module in
+`scripts/mutation/` whose coverage the tooling tier cannot see, because it is exercised as a
+subprocess.
 
 ## Open Questions
 

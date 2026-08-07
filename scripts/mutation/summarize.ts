@@ -1,4 +1,6 @@
+import { cell, plural } from './markdown.ts';
 import {
+  auditGap,
   byPath,
   type Counted,
   countMutants,
@@ -31,11 +33,6 @@ interface Finding {
   readonly folded: number;
 }
 
-/** Markdown table cells cannot carry a pipe or a newline. */
-export function cell(text: string): string {
-  return text.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ');
-}
-
 /** The surviving mutants of one file, grouped by the line they sit on, in line order. */
 function survivorsByLine(mutants: readonly ReportedMutant[]): Map<number, ReportedMutant[]> {
   const byLine = new Map<number, ReportedMutant[]>();
@@ -63,10 +60,6 @@ function findings(report: MutationReport): Finding[] {
   return Object.keys(report.files)
     .toSorted(byPath)
     .flatMap((file) => findingsIn(file, report.files[file]?.mutants ?? []));
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 const HEADING = '## Mutation gate';
@@ -118,9 +111,10 @@ export function summarizeSurvivors(report: MutationReport): string {
         (counted.ignored > 0 ? ` (${counted.ignored} ignored — arid or static)` : '') +
         '.',
       '',
-      counted.mutants === 0
+      // One derivation of "was this scope audited", shared with the verdict (`report-model.ts`).
+      auditGap(counted) === 'no-mutants'
         ? 'The scope produced no mutants at all, so nothing was audited.'
-        : counted.mutants === counted.ignored
+        : auditGap(counted) === 'all-ignored'
           ? 'Every mutant here was ignored, so nothing in this scope was actually audited.'
           : 'No surviving mutants.',
       ...unclassifiedNote(counted),

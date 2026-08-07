@@ -21,7 +21,7 @@ const survivor = (line: number, mutatorName = 'ConditionalExpression') =>
   ({
     mutatorName,
     status: 'Survived',
-    location: { start: { line, column: 1 }, end: { line, column: 1 } },
+    location: { start: { line, column: 1 }, end: { line, column: 20 } },
     replacement: 'true',
   }) as const;
 

@@ -16,7 +16,7 @@ import {
 const mutant = (status: string): ReportedMutant => ({
   mutatorName: 'ConditionalExpression',
   status,
-  location: { start: { line: 1 }, end: { line: 1 } },
+  location: { start: { line: 1 }, end: { line: 1, column: 20 } },
   replacement: 'true',
 });
 
@@ -92,7 +92,7 @@ describe('reading a report', () => {
             {
               mutatorName: 'BlockStatement',
               status: 'Survived',
-              location: { start: { line: 10 }, end: { line: 40 } },
+              location: { start: { line: 10 }, end: { line: 40, column: 20 } },
             },
           ],
         },

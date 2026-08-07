@@ -120,6 +120,11 @@ function pipelineText(): string {
 function mutationJob(): string {
   const text = pipelineText();
   const start = text.indexOf('\n  mutation:\n');
+  if (start === -1) {
+    // Without this the slice arithmetic returns '', and every `not.toContain` below passes over an
+    // empty string — the job could be renamed or deleted and four scenarios would go green.
+    throw new Error('The `mutation` job is not in pipeline.yml.');
+  }
   const after = /^ {2}[a-z][\w-]*:$/m.exec(text.slice(start + 1 + '  mutation:\n'.length));
   return after === null
     ? text.slice(start)
@@ -135,7 +140,24 @@ function mutationJob(): string {
 function mutationSteps(): string[] {
   return mutationJob()
     .split(/\n {6}- (?=name:|uses:|run:)/)
-    .slice(1);
+    .slice(1)
+    .map((step) => withoutComments(step));
+}
+
+/**
+ * A step's YAML with its `#` prose removed.
+ *
+ * Every positive claim below would otherwise be answerable by a COMMENT. That is not hypothetical:
+ * the flags scenario asserted `--no-prefix` against the step's whole text, the step's own comment
+ * explains why `--no-prefix` matters, and deleting the flag from the actual command left this tier
+ * 25/25 green. The comments are where this job explains itself, so they are exactly the text most
+ * likely to contain the words a guard is looking for.
+ */
+function withoutComments(step: string): string {
+  return step
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
 }
 
 /**
@@ -374,14 +396,31 @@ describe('mutation gate placement', () => {
 
   it('feeds the verdict a diff cut with the flags the parser was written against', () => {
     // The silent-green hazard. If the job's git spelling and `changed-lines.ts`'s expectations ever
-    // part company — a dropped `--no-prefix`, most likely — every intersection test returns false
-    // and the gate reads clean forever. One declaration, asserted against the job.
-    const scope = stepNamed('Resolve the changed production files');
+    // part company — a dropped `--no-prefix`, most likely — every intersection returns false and the
+    // gate stops measuring. Asserted against the INVOCATION, not the step: the step also runs two
+    // `git diff --name-only` commands that carry `--diff-filter=ACMR`, and its prose names
+    // `--no-prefix` outright, so a step-wide `toContain` is answered by text that does not run.
+    const hunkDiff = stepNamed('Resolve the changed production files')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('git diff -U0'));
 
-    expect(scope).toContain('git diff -U0');
+    expect(hunkDiff).toBeDefined();
     for (const flag of DIFF_FLAGS) {
-      expect(scope).toContain(flag);
+      expect(hunkDiff).toContain(flag);
     }
+  });
+
+  it('hands the verdict the very file the scope step wrote', () => {
+    // Two spellings of one path, in two steps. Rename one and the verdict reads nothing, refuses as
+    // `no-diff`, and — once enforcing — reddens every correct branch. This is the same three-way
+    // pin `REPORT_PATH` already gets, for the same reason.
+    const written = /(\$\{RUNNER_TEMP\}\/[\w.-]+\.diff)/.exec(
+      stepNamed('Resolve the changed production files'),
+    )?.[1];
+
+    expect(written).toBeDefined();
+    expect(stepNamed('pr-verdict.ts')).toContain(written);
   });
 
   it('resolves exactly one merge-base for the whole job', () => {
@@ -395,7 +434,11 @@ describe('mutation gate placement', () => {
     // Once this check blocks, a timeout is a red required check on a correct branch: unattributable
     // and non-deterministically reproducible, which is what teaches a loop that a check is flaky.
     // The largest observed run was 13m58s.
-    expect(mutationJob()).toMatch(/timeout-minutes: 30/);
+    // The number is read and compared, not matched: raising the budget after a slower run is the
+    // correct response to a slower run, and a literal pin would call that a regression.
+    const budget = Number(/timeout-minutes: (\d+)/.exec(mutationJob())?.[1]);
+
+    expect(budget).toBeGreaterThanOrEqual(28); // ~2x the largest observed run (13m58s)
     expect(mutationJob()).not.toMatch(/NOT yet observed in CI/);
   });
 

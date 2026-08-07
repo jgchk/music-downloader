@@ -20,7 +20,7 @@ const mutant = (
 ): ReportedMutant => ({
   mutatorName: 'ConditionalExpression',
   status: 'Survived',
-  location: { start: { line: start }, end: { line: end } },
+  location: { start: { line: start }, end: { line: end, column: 20 } },
   replacement: 'true',
   ...overrides,
 });
@@ -46,10 +46,11 @@ describe('a blocking finding', () => {
   it('names the file, the line and the mutation in a table', () => {
     const summary = renderVerdict(blocking, SHADOW);
 
-    expect(summary).toContain(FILE);
-    expect(summary).toContain('| 20 |');
-    expect(summary).toContain('ConditionalExpression');
-    expect(summary).toContain('true');
+    // Asserted as ONE row. Column by column, `toContain('true')` was answered by the shadow
+    // banner's `MUTATION_GATE_ENFORCE=true`, so the Replacement column was pinned by nothing.
+    expect(summary).toContain(
+      `| \`${FILE}\` | 20 | Survived | ConditionalExpression | \`true\` | — |`,
+    );
   });
 
   it('says the shadow verdict WOULD have blocked, and that the job is not failing on it', () => {
@@ -139,7 +140,7 @@ describe('a run that cannot be graded', () => {
       SHADOW,
     );
 
-    expect(summary).toMatch(/matched no file|did not match/i);
+    expect(summary).toMatch(/names files the diff does not/i);
     expect(summary).toMatch(/path/i);
   });
 
@@ -183,5 +184,54 @@ describe('an enforcement switch nobody recognises', () => {
 
     expect(summary).toContain('yes');
     expect(summary).toMatch(/not recognised|unrecognised/i);
+  });
+});
+
+describe('a scope with nothing surviving anywhere', () => {
+  it('says so, rather than reporting survivors it did not have', () => {
+    const clean = decideVerdict({
+      report: report({ [FILE]: { mutants: [mutant(1, 1, { status: 'Killed' })] } }),
+      diff: DIFF,
+    });
+
+    expect(renderVerdict(clean, SHADOW)).toContain('No surviving mutants anywhere in the scope.');
+  });
+
+  it('names how many mutants it ignored, when it ignored any', () => {
+    const withIgnored = decideVerdict({
+      report: report({
+        [FILE]: {
+          mutants: [mutant(1, 1, { status: 'Killed' }), mutant(2, 2, { status: 'Ignored' })],
+        },
+      }),
+      diff: DIFF,
+    });
+
+    expect(renderVerdict(withIgnored, SHADOW)).toContain('1 ignored');
+  });
+});
+
+describe('a diff that never arrived', () => {
+  it('blames the step that writes the diff, not the path normalisation', () => {
+    const summary = renderVerdict(
+      decideVerdict({ report: report({ [FILE]: { mutants: [mutant(20, 20)] } }), diff: undefined }),
+      SHADOW,
+    );
+
+    expect(summary).toMatch(/No changed-line diff reached this step/);
+    expect(summary).not.toMatch(/path.*spellings have\s+drifted/is);
+  });
+
+  it('names the files a real path drift left unjoined', () => {
+    const summary = renderVerdict(
+      decideVerdict({
+        report: report({ 'somewhere/else.ts': { mutants: [mutant(20, 20)] } }),
+        diff: DIFF,
+      }),
+      SHADOW,
+    );
+
+    expect(summary).toMatch(/path/i);
+    expect(summary).toContain('somewhere/else.ts');
   });
 });

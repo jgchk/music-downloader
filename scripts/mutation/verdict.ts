@@ -5,10 +5,11 @@ import {
   parseChangedLines,
 } from './changed-lines.ts';
 import {
+  type AuditGap,
+  auditGap,
   byPath,
   type Counted,
   countMutants,
-  hasAuditedNothing,
   isSurviving,
   type MutationReport,
   readReport,
@@ -39,9 +40,10 @@ import {
  *      same reason an empty scope does: nothing was measured. This is the most dangerous outcome
  *      available because it is shaped exactly like success (design D4).
  *
- * None of 2 or 3 is new machinery. `readReport` already models every way there is no report and
- * `hasAuditedNothing` already distinguishes an unmeasured scope from a clean one; this module ACTS
- * on what they already DETECT.
+ * None of 2 or 3 is new machinery. `readReport` already models every way there is no report, and
+ * `summarizeSurvivors` already distinguished an unmeasured scope from a clean one — `auditGap` is
+ * that distinction lifted into the model so both presenters and this decider read one answer. This
+ * module ACTS on what they DETECT.
  */
 
 /** One blocking finding: a survivor on a changed line, standing for the rest of its line. */
@@ -53,8 +55,11 @@ export interface VerdictFinding {
   readonly folded: number;
 }
 
-/** Why a run cannot be graded at all. All three are refusals, never pass-throughs. */
-export type UnauditedReason = 'no-mutants' | 'all-ignored' | 'no-file-joined';
+/**
+ * Why a run cannot be graded at all. Every one is a refusal, never a pass-through — and each earns
+ * its own sentence, because "unaudited" with no cause gets re-run rather than fixed.
+ */
+export type UnauditedReason = AuditGap | 'no-file-joined' | 'no-diff';
 
 export type Verdict =
   | {
@@ -66,13 +71,25 @@ export type Verdict =
   | { readonly kind: 'clean'; readonly counted: Counted; readonly reportedSurvivors: number }
   | { readonly kind: 'no-report' }
   | { readonly kind: 'unreadable-report' }
-  | { readonly kind: 'unaudited'; readonly reason: UnauditedReason; readonly counted: Counted };
+  | {
+      readonly kind: 'unaudited';
+      readonly reason: UnauditedReason;
+      readonly counted: Counted;
+      /** The report files that matched nothing in the diff — the evidence for `no-file-joined`. */
+      readonly unjoined?: readonly string[];
+    };
 
 export interface VerdictInput {
   /** The raw text of Stryker's JSON report, or `undefined` when the run wrote none. */
   readonly report: string | undefined;
-  /** The raw text of `git diff` run with {@link DIFF_FLAGS} over the same merge-base. */
-  readonly diff: string;
+  /**
+   * The raw text of `git diff` run with `changed-lines.ts`'s `DIFF_FLAGS` over the same merge-base,
+   * or `undefined` when the job wrote none. Absence is modelled here rather than flattened to `''`
+   * by the caller: "the diff was never produced" and "the report and the diff do not join" are
+   * different faults with different remedies, and telling someone their path spellings drifted when
+   * a shell step actually aborted sends them to debug code that is fine.
+   */
+  readonly diff: string | undefined;
 }
 
 /**
@@ -92,8 +109,17 @@ function normaliseKeys(changed: ChangedLines): ChangedLines {
   return new Map([...changed].map(([file, ranges]) => [normalisePath(file), ranges]));
 }
 
+/**
+ * The lines a mutant occupies, reading Stryker's END AS EXCLUSIVE — its schema says so in as many
+ * words: *"A location with start and end. Start is inclusive, end is exclusive."* A span ending at
+ * column 1 stops before that line, so reading it as inclusive would gate one line more than the
+ * mutant covers. That is a false positive, and false positives are the currency the ten-percent
+ * admission bar is counted in.
+ */
 function spanOf(mutant: ReportedMutant): LineRange {
-  return { start: mutant.location.start.line, end: mutant.location.end.line };
+  const start = mutant.location.start.line;
+  const { line, column } = mutant.location.end;
+  return { start, end: column === 1 ? Math.max(start, line - 1) : line };
 }
 
 /** Every surviving mutant of the report whose span overlaps a line the branch wrote. */
@@ -155,17 +181,24 @@ export function decideVerdict(input: VerdictInput): Verdict {
   if (report === undefined) return { kind: 'unreadable-report' };
 
   const counted = countMutants(report);
-  if (hasAuditedNothing(counted)) {
-    return {
-      kind: 'unaudited',
-      reason: counted.mutants === 0 ? 'no-mutants' : 'all-ignored',
-      counted,
-    };
-  }
+  const gap = auditGap(counted);
+  if (gap !== undefined) return { kind: 'unaudited', reason: gap, counted };
+
+  if (input.diff === undefined) return { kind: 'unaudited', reason: 'no-diff', counted };
 
   const changed = normaliseKeys(parseChangedLines(input.diff));
-  const hasJoined = Object.keys(report.files).some((file) => changed.has(normalisePath(file)));
-  if (!hasJoined) return { kind: 'unaudited', reason: 'no-file-joined', counted };
+  if (changed.size === 0) return { kind: 'unaudited', reason: 'no-diff', counted };
+
+  // EVERY file in the report must join, not merely one. The report's files come from `--mutate`,
+  // handed the same changed-file list the diff is cut over, so report ⊆ diff always holds: a file
+  // that fails to join means a spelling this join does not understand, and its mutants would be
+  // dropped from the failure scope with no trace. `some` clears the whole run on one file matching.
+  const unjoined = Object.keys(report.files)
+    .filter((file) => !changed.has(normalisePath(file)))
+    .toSorted(byPath);
+  if (unjoined.length > 0) {
+    return { kind: 'unaudited', reason: 'no-file-joined', counted, unjoined };
+  }
 
   const reportedSurvivors = countSurvivors(report);
   const findings = foldPerLine(survivorsOnChangedLines(report, changed));
@@ -174,9 +207,24 @@ export function decideVerdict(input: VerdictInput): Verdict {
     : { kind: 'findings', findings, counted, reportedSurvivors };
 }
 
-/** Would this verdict fail the job, were the gate enforcing? */
+/**
+ * Would this verdict fail the job, were the gate enforcing?
+ *
+ * A table rather than `kind !== 'clean'`. The negation form is a `default:` arm wearing a minus
+ * sign: it compiles for a variant nobody has classified and silently calls it blocking. `satisfies`
+ * makes a new variant a BUILD BREAK here, so the next arm's side is a decision somebody made rather
+ * than one it inherited — and the plausible next arms are the passing ones.
+ */
+const BLOCKING = {
+  findings: true,
+  clean: false,
+  'no-report': true,
+  'unreadable-report': true,
+  unaudited: true,
+} satisfies Record<Verdict['kind'], boolean>;
+
 export function isBlocking(verdict: Verdict): boolean {
-  return verdict.kind !== 'clean';
+  return BLOCKING[verdict.kind];
 }
 
 /** The environment variable that turns the shadow verdict into a blocking one. */
@@ -184,16 +232,23 @@ export const ENFORCE_SWITCH = 'MUTATION_GATE_ENFORCE';
 
 /**
  * Shadow computes and publishes; enforce additionally fails. One switch, read at the entrypoint,
- * changing the exit code and nothing else — so the shadow measurement (task 5.1) is a measurement of
- * the enforcing logic rather than of a different program.
+ * changing the exit code and the wording that reports it — never the DECISION — so the shadow
+ * measurement (task 5.1) measures the enforcing logic rather than a different program.
  */
 export type Enforcement = 'shadow' | 'enforce';
 
-export interface SwitchReading {
-  readonly enforcement: Enforcement;
-  /** A value neither on nor off, carried through so the summary can say it was ignored. */
-  readonly unrecognised: string | undefined;
-}
+/**
+ * Correlated, so `enforce` cannot carry an ignored value: `{ enforcement: 'enforce', unrecognised:
+ * 'yes' }` would render "**Enforcing.**" directly above "it was ignored and the gate stayed in
+ * shadow".
+ */
+export type SwitchReading =
+  | { readonly enforcement: 'enforce' }
+  | {
+      readonly enforcement: 'shadow';
+      /** A value neither on nor off, carried so the summary can say it was ignored. */
+      readonly unrecognised?: string;
+    };
 
 const ENABLED = new Set(['true', '1']);
 const DISABLED = new Set(['', 'false', '0']);
@@ -206,11 +261,10 @@ const DISABLED = new Set(['', 'false', '0']);
  */
 export function readEnforcement(raw: string | undefined): SwitchReading {
   const value = (raw ?? '').trim().toLowerCase();
-  if (ENABLED.has(value)) return { enforcement: 'enforce', unrecognised: undefined };
-  return {
-    enforcement: 'shadow',
-    unrecognised: DISABLED.has(value) ? undefined : (raw ?? undefined),
-  };
+  if (ENABLED.has(value)) return { enforcement: 'enforce' };
+  return DISABLED.has(value)
+    ? { enforcement: 'shadow' }
+    : { enforcement: 'shadow', unrecognised: raw };
 }
 
 /** The process exit code this verdict earns under this enforcement state. */

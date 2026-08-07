@@ -21,7 +21,7 @@ const mutant = (
 ): ReportedMutant => ({
   mutatorName: 'BlockStatement',
   status: 'Survived',
-  location: { start: { line: start }, end: { line: end } },
+  location: { start: { line: start }, end: { line: end, column: 20 } },
   replacement: '{}',
   ...overrides,
 });
@@ -37,7 +37,7 @@ const DIFF_AT_LINE_20 = [
   '+edited',
 ].join('\n');
 
-function decide(reportText: string | undefined, diff = DIFF_AT_LINE_20) {
+function decide(reportText: string | undefined, diff: string | undefined = DIFF_AT_LINE_20) {
   return decideVerdict({ report: reportText, diff });
 }
 
@@ -88,7 +88,10 @@ describe('a survivor on a changed line', () => {
     expect(verdict.kind).toBe('findings');
   });
 
-  it('does not count a mutant in a file the branch did not change', () => {
+  it('refuses a report naming a file the diff does not, rather than passing over it', () => {
+    // The report's files come from `--mutate`, handed the same changed-file list the diff is cut
+    // over — so a file in the report and not in the diff is a spelling this join does not
+    // understand, and its mutants would silently leave the failure scope. Not a pass.
     const verdict = decide(
       report({
         'a.ts': { mutants: [mutant(1, 1, { status: 'Killed' })] },
@@ -96,7 +99,7 @@ describe('a survivor on a changed line', () => {
       }),
     );
 
-    expect(verdict.kind).toBe('clean');
+    expect(verdict.kind === 'unaudited' && verdict.reason).toBe('no-file-joined');
   });
 });
 
@@ -167,10 +170,37 @@ describe('the report and the diff must join', () => {
     expect(isBlocking(verdict)).toBe(true);
   });
 
-  it('refuses a scope whose diff carried no changed line at all', () => {
-    const verdict = decide(report({ 'a.ts': { mutants: [mutant(20, 20)] } }), '');
+  it('refuses a diff that never reached this step, and does not call it a path drift', () => {
+    // Three different faults used to render one confident sentence about path spellings: a real
+    // drift, an empty diff, and a diff the job never wrote. Sending a reader to debug normalisation
+    // when a shell step aborted is the wrong remedy, delivered with conviction.
+    for (const missing of [undefined, '']) {
+      // NOT via `decide()`: a default parameter fires on an explicit `undefined`, so the helper
+      // would quietly substitute a real diff and the scenario would test the opposite of its name.
+      const verdict = decideVerdict({
+        report: report({ 'a.ts': { mutants: [mutant(20, 20)] } }),
+        diff: missing,
+      });
+
+      expect(verdict.kind === 'unaudited' && verdict.reason).toBe('no-diff');
+    }
+  });
+
+  it('refuses when only SOME of the reported files join the diff', () => {
+    // `some` would clear the whole run because one file matched, and the unjoined file's mutants
+    // would drop out of the failure scope with nothing said. The report's files come from the same
+    // changed-file list the diff is cut over, so every one of them must join.
+    const diff = ['diff --git a.ts a.ts', '+++ a.ts', '@@ -20 +20 @@', '+edited'].join('\n');
+    const verdict = decideVerdict({
+      report: report({
+        'a.ts': { mutants: [mutant(20, 20, { status: 'Killed' })] },
+        'b.ts': { mutants: [mutant(20, 20)] },
+      }),
+      diff,
+    });
 
     expect(verdict.kind === 'unaudited' && verdict.reason).toBe('no-file-joined');
+    expect(verdict.kind === 'unaudited' && verdict.unjoined).toEqual(['b.ts']);
   });
 
   it('passes a branch that only deleted lines from an audited file', () => {
@@ -264,10 +294,22 @@ describe('the enforcement switch', () => {
   it('treats a value it does not recognise as shadow, and says which value', () => {
     // Not a new way to fail the job — a way to be visible. A switch set to `yes` that silently did
     // nothing is how an enforcement flip gets believed without ever happening.
-    expect(readEnforcement('yes').enforcement).toBe('shadow');
-    expect(readEnforcement('yes').unrecognised).toBe('yes');
-    expect(readEnforcement('true').unrecognised).toBeUndefined();
-    expect(readEnforcement(undefined).unrecognised).toBeUndefined();
+    const unknown = readEnforcement('yes');
+
+    expect(unknown.enforcement).toBe('shadow');
+    expect(unknown.enforcement === 'shadow' && unknown.unrecognised).toBe('yes');
+  });
+
+  it('cannot represent an enforcing reading that also ignored a value', () => {
+    // The pair is correlated in the type, so `{ enforcement: 'enforce', unrecognised: 'yes' }` is
+    // unwritable — it would have rendered "**Enforcing.**" directly above "it was ignored and the
+    // gate stayed in shadow". Reading `unrecognised` here requires narrowing to shadow first, and
+    // that narrowing is the assertion.
+    const off = readEnforcement('false');
+    const on = readEnforcement('true');
+
+    expect(off.enforcement === 'shadow' && off.unrecognised).toBeUndefined();
+    expect(on.enforcement).toBe('enforce');
   });
 });
 
@@ -298,5 +340,85 @@ describe('shadow and enforce differ in the exit code and nothing else', () => {
       expect(exitCodeFor(verdict, 'enforce')).toBe(1);
       expect(exitCodeFor(verdict, 'shadow')).toBe(0);
     }
+  });
+});
+
+describe("Stryker's span end is exclusive", () => {
+  it('does not gate the line a span merely reaches the start of', () => {
+    // The schema says "Start is inclusive, end is exclusive". A block ending at column 1 of line 21
+    // stops before line 21; reading it inclusively gates a line the mutant does not occupy, which
+    // is a false positive — the currency the ten-percent admission bar is counted in.
+    const verdict = decide(
+      report({
+        'a.ts': {
+          mutants: [
+            mutant(10, 20, { location: { start: { line: 10 }, end: { line: 20, column: 1 } } }),
+          ],
+        },
+      }),
+    );
+
+    expect(verdict.kind).toBe('clean');
+  });
+
+  it('still gates a span that genuinely reaches into the changed line', () => {
+    const verdict = decide(
+      report({
+        'a.ts': {
+          mutants: [
+            mutant(10, 20, { location: { start: { line: 10 }, end: { line: 20, column: 9 } } }),
+          ],
+        },
+      }),
+    );
+
+    expect(verdict.kind).toBe('findings');
+  });
+
+  it('never inverts a single-line span that ends at column 1', () => {
+    const verdict = decide(
+      report({
+        'a.ts': {
+          mutants: [
+            mutant(20, 20, { location: { start: { line: 20 }, end: { line: 20, column: 1 } } }),
+          ],
+        },
+      }),
+    );
+
+    expect(verdict.kind).toBe('findings');
+  });
+});
+
+describe('ordering and counting', () => {
+  it('orders findings across files, not only within one', () => {
+    const diff = [
+      'diff --git b.ts b.ts',
+      '+++ b.ts',
+      '@@ -5 +5 @@',
+      '+edited',
+      'diff --git a.ts a.ts',
+      '+++ a.ts',
+      '@@ -40 +40 @@',
+      '+edited',
+    ].join('\n');
+    const verdict = decideVerdict({
+      report: report({
+        'b.ts': { mutants: [mutant(5, 5)] },
+        'a.ts': { mutants: [mutant(40, 40)] },
+      }),
+      diff,
+    });
+
+    expect(verdict.kind === 'findings' && verdict.findings.map((f) => f.file)).toEqual([
+      'a.ts',
+      'b.ts',
+    ]);
+  });
+
+  it('reports zero survivors when the scope really had none', () => {
+    const verdict = decide(report({ 'a.ts': { mutants: [mutant(1, 1, { status: 'Killed' })] } }));
+
+    expect(verdict.kind === 'clean' && verdict.reportedSurvivors).toBe(0);
   });
 });

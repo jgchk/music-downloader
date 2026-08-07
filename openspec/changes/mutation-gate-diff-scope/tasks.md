@@ -94,8 +94,8 @@ criterion for enforcement. Enforcement itself is deliberately not in this change
       _Rewritten around D5's actual reason. The boundary tier fails if the job ever again contains
       `99.89` or `464`._
 - [x] 3.4 Raise `timeout-minutes` to 30 and replace `# projected low-minutes on a 4-core runner;
-      NOT yet observed in CI` with the three measured runs (2m32s / 9m37s / 13m58s, the largest at
-      66% of the old budget) and the reason a blocking job must not time out. Surface the Stryker
+      NOT yet observed in CI` with the three measured runs (2m32s / 9m37s / 13m58s, whose largest
+      Stryker step — 13m16s — was 66% of the old budget) and the reason a blocking job must not time out. Surface the Stryker
       step's duration in the job summary so variant (B)'s trigger is a number rather than an
       irritation (design D2/D6). Done when the comment states measurements, not projections.
       _30 minutes, with the three measured runs in the comment and the Stryker step's duration surfaced
