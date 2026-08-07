@@ -987,6 +987,54 @@ describe('Reactor correlation propagation', () => {
     expect(appended[0]!.metadata.correlationId).toBe(OTHER_STORY);
   });
 
+  it('notes at debug — not warn — that a pre-correlation row was given a synthesized story', async () => {
+    // A row written before this capability existed can never gain a story: permanent, expected and
+    // unactionable. It is still recorded, so a reader can see why the story starts late — but at the
+    // level that says "not yours to fix", because a boot drain over historical streams emits it once
+    // per stream and a louder level would bury the malformed case below.
+    seedLegacy([requested()]);
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(realInterpret(stubPorts()), {
+      logger,
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
+
+    const entry = lines
+      .map((line) => JSON.parse(line) as { level: number; msg: string })
+      .find((line) => line.msg.includes('predates correlation metadata'));
+    expect(entry).toBeDefined();
+    expect(entry!.level).toBe(20); // pino debug
+  });
+
+  it('reports no synthesized story at all when the triggering event carries a usable one', async () => {
+    // The normal path is silent. That silence is what gives the two diagnostics above their meaning:
+    // a "synthesized" line that also appeared for well-formed stories would be standing noise, and
+    // the malformed warning would stop being a credible claim that a writer is emitting bad ids.
+    await seed([requested()]);
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(realInterpret(stubPorts()), {
+      logger,
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
+
+    const synthesized = lines
+      .map((line) => JSON.parse(line) as { msg: string })
+      .filter((line) => line.msg.includes('synthesized'));
+    expect(synthesized).toEqual([]);
+  });
+
   it('warns — not debug — when a stored story exists but is unusable', async () => {
     // A malformed id is not history: every append since this capability shipped goes through the
     // write gate, so it means a writer is emitting bad ids right now. Reporting it at the same

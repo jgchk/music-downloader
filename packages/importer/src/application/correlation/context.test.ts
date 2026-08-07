@@ -68,8 +68,8 @@ describe('newOperation', () => {
 });
 
 describe('continueFrom', () => {
-  it('copies the triggering event story verbatim and points causation at its coordinates', () => {
-    const { context } = continueFrom(
+  it('copies the triggering event story verbatim and reports it as carried', () => {
+    const { context, origin } = continueFrom(
       storedEvent({
         importId: 'imp-1',
         occurredAt: '2026-08-06T00:00:00.000Z',
@@ -78,26 +78,31 @@ describe('continueFrom', () => {
       source(OTHER, 'unused'),
     );
 
+    expect(origin).toBe('carried');
     expect(context).toEqual({
       correlationId: STORY,
       causation: { kind: 'event', context: CONTEXT_NAME, streamId: 'imp-1', version: 3 },
     });
   });
 
-  it('mints a fresh story when the triggering event predates correlation metadata', () => {
-    const { context } = continueFrom(
+  it('mints a fresh story when the triggering event predates correlation metadata, reporting it as absent', () => {
+    // `absent` and `malformed` are not interchangeable — a pre-capability row is permanent and
+    // unactionable, an unusable one means a writer is emitting bad ids right now — and the caller
+    // logs them at different levels off this field alone.
+    const { context, origin } = continueFrom(
       storedEvent({ importId: 'imp-1', occurredAt: '2026-08-06T00:00:00.000Z' }),
       source(OTHER),
     );
 
+    expect(origin).toBe('absent');
     expect(context).toEqual({
       correlationId: OTHER,
       causation: { kind: 'event', context: CONTEXT_NAME, streamId: 'imp-1', version: 3 },
     });
   });
 
-  it('mints a fresh story when the stored id is not a well-formed correlation id', () => {
-    const { context } = continueFrom(
+  it('mints a fresh story when the stored id is not a well-formed correlation id, reporting it as malformed', () => {
+    const { context, origin } = continueFrom(
       storedEvent({
         importId: 'imp-1',
         occurredAt: '2026-08-06T00:00:00.000Z',
@@ -106,6 +111,7 @@ describe('continueFrom', () => {
       source(OTHER),
     );
 
+    expect(origin).toBe('malformed');
     expect(context.correlationId).toBe(OTHER);
   });
 });
@@ -149,6 +155,9 @@ describe('parseCausation', () => {
 
   it.each([
     ['a null', null],
+    // The column is absent altogether on rows written before causation existed, so `undefined` is
+    // the likeliest input of all — and the one a reader must be sure cannot fault the parse.
+    ['an absent value', undefined],
     ['a primitive', 'event'],
     ['an unknown kind', { kind: 'saga', streamId: 's', version: 1 }],
     ['a missing kind', { context: 'x', streamId: 's', version: 1 }],
