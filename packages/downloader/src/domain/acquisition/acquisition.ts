@@ -41,7 +41,14 @@ export interface AcquisitionSnapshot {
   readonly attempts: number;
   readonly rejectedCount: number;
   readonly location?: string;
-  /** The retained candidate editions, present only while awaiting manual selection. */
+  /**
+   * The retained candidate editions, present only while awaiting manual selection.
+   *
+   * "Only while" is an invariant of the state union, not just of this projection: no phase but
+   * `AwaitingManualSelection` may carry a `candidates` field, and a new phase that did would be
+   * published here by key presence alone. `state.property.test.ts` asserts it over a pinned
+   * corpus of generated histories — read that before adding a phase with an edition menu.
+   */
   readonly candidates?: readonly EditionCandidate[];
 }
 
@@ -92,15 +99,27 @@ export class Acquisition {
       attempts: 'attempts' in state ? state.attempts : 0,
       rejectedCount: 'rejected' in state ? state.rejected.length : 0,
       location: 'location' in state ? state.location : undefined,
-      // RECORDED SURVIVOR, waiver withheld: forcing this ternary's condition true is equivalent.
-      // `candidates` is declared on `AwaitingManualSelectionState` alone, and the one transition
-      // out of that phase (`EditionSelected`) destructures the field away rather than spreading it,
-      // so the unguarded read yields `undefined` on every other phase — exactly what the false arm
-      // supplies. The guard is the narrowing that lets the property type-check. Carrying the menu
-      // at all IS behaviour: forcing the condition FALSE blanks it, which `exposes the retained
-      // candidate editions while awaiting a choice` (read-models.test.ts) catches — and that
-      // mutant sits on this same line under the same mutator, so it gets no waiver.
-      candidates: state.phase === 'AwaitingManualSelection' ? state.candidates : undefined,
+      // Asked the same way as the three lines above. `candidates` is declared on
+      // `AwaitingManualSelectionState` alone, so under this union's own rule — each variant carries
+      // exactly the fields valid in it — presence of the key IS the discriminant, restated.
+      //
+      // That equivalence is a property of the FOLD, not of the type, and nothing in the compiler
+      // holds it: every exit from AwaitingManualSelection has to drop the key (`EditionSelected`
+      // destructures it away; `AcquisitionCancelled` rebuilds field by field), and a `{ ...state }`
+      // rewrite of either — the form eight other arms of `evolve` use — would leak a stale menu onto
+      // a phase that has none, which this projection would then publish. So it is asserted, over
+      // a pinned corpus of histories, by `carries \`candidates\` on no state but AwaitingManualSelection`
+      // (state.property.test.ts). Verified to fail without it.
+      //
+      // Secondary, and not the reason: `in` is also the spelling that stays honestly measurable.
+      // A `state.phase === '…'` test yields an equivalent mutant (forced TRUE reads `undefined` on
+      // every other phase — exactly what the false arm supplies) welded to killable siblings on the
+      // same AST node, and neither a line-scoped waiver nor an ignore-plugin can separate them.
+      // `in` is not an operator either mutator rewrites, so that mutant does not exist, while the
+      // one that carries the behaviour — emptying the property name so the menu is never carried —
+      // remains and is killed by `exposes the retained candidate editions while awaiting a choice`
+      // (read-models.test.ts).
+      candidates: 'candidates' in state ? state.candidates : undefined,
     };
   }
 }

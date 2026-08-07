@@ -126,6 +126,39 @@ describe('evolve is total over every event a stream can contain', () => {
   });
 });
 
+describe('the edition menu belongs to one phase and no other', () => {
+  it('carries `candidates` on no state but AwaitingManualSelection', () => {
+    let menusObserved = 0;
+
+    assertProperty(
+      fc.property(arbHistory, (history) => {
+        // `Acquisition.snapshot` reads the menu with `'candidates' in state`, and that is only the
+        // same question as the phase because every exit from AwaitingManualSelection drops the key:
+        // `EditionSelected` destructures it away, and `AcquisitionCancelled` rebuilds the state
+        // field by field rather than spreading. Eight other arms of `evolve` use the
+        // `{ ...state, phase: 'X' }` form, so either exit is one plausible tidy-up away from
+        // carrying a stale menu onto a phase that has none — which the projection would publish and
+        // the UI would render as "choose an edition" for a dead acquisition. The compiler does not
+        // catch it (excess-property checking does not apply to spread-in properties), so the
+        // invariant the projection now leans on is asserted here, over the pinned corpus of histories
+        // this suite generates, rather than resting on a comment.
+        let state: AcquisitionState = initialState;
+        for (const event of history) {
+          state = evolve(state, event);
+          if ('candidates' in state) {
+            menusObserved += 1;
+            expect(state.phase).toBe('AwaitingManualSelection');
+          }
+        }
+      }),
+    );
+
+    // The anti-vacuity guard the suites above use: a generator that never reached a manual
+    // selection would satisfy the property without having tested anything.
+    expect(menusObserved).toBeGreaterThan(0);
+  });
+});
+
 describe('the fold is deterministic', () => {
   it('replays a history to the same state every time', () => {
     assertProperty(
