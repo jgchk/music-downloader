@@ -1520,7 +1520,9 @@ describe('Reactor correlation propagation', () => {
     const trigger = store.all().at(-1)!;
     const before = store.all().length;
 
-    await reactor(stubPorts()).process(trigger);
+    // The mint source can only produce OTHER_STORY, so "copied verbatim" and "minted fresh" are
+    // distinguishable outcomes rather than the same string by coincidence.
+    await reactor(stubPorts(), { correlation: fixedCorrelation(OTHER_STORY) }).process(trigger);
 
     const appended = appendedAfter(before);
     expect(appended.length).toBeGreaterThan(0);
@@ -1576,7 +1578,9 @@ describe('Reactor correlation propagation', () => {
       destination: { write: (line: string) => void lines.push(line) },
     });
 
-    await reactor(stubPorts(), { logger }).process(trigger);
+    await reactor(stubPorts(), { logger, correlation: fixedCorrelation(OTHER_STORY) }).process(
+      trigger,
+    );
 
     const dispatched = lines
       .map(
@@ -1595,5 +1599,81 @@ describe('Reactor correlation propagation', () => {
       expect(entry.streamId).toBe(trigger.streamId);
       expect(entry.globalSeq).toBe(trigger.globalSeq);
     }
+  });
+});
+
+/**
+ * The trigger inventory (operation-correlation, task 2.4). Every unit of work that starts without
+ * an inbound request is named here. The pins record what each one actually does, which is NOT what
+ * a first reading of "non-HTTP triggers mint fresh" suggests: a reactor trigger only *delivers* a
+ * stored event, and a stored event already has a story, so the trigger CONTINUES it. A fresh mint
+ * happens only where there is genuinely no parent — a pre-correlation row, or a seam delivery whose
+ * producer sent no envelope (pinned by the consumers' own suites).
+ */
+describe('Reactor — non-HTTP triggers and the story they run under', () => {
+  const storyOfAppendedAfter = (before: number): readonly (string | undefined)[] =>
+    store
+      .all()
+      .filter((entry) => entry.globalSeq > before)
+      .map((entry) => entry.metadata.correlationId);
+
+  it('a fallback poll tick dispatches on the delivered event story, it does not open a new one', async () => {
+    await seed(requestedHistory());
+    let tick = () => {};
+    const before = store.all().length;
+    const r = reactor(stubPorts(), {
+      correlation: fixedCorrelation(OTHER_STORY),
+      interval: (function_) => {
+        tick = function_;
+        return () => {};
+      },
+    });
+    await r.start();
+    const afterStart = store.all().length;
+    await seed(selectedHistory([matchingCandidate('a')]), 'acq-2');
+
+    tick(); // the trigger under test — no request, no bus wakeup
+    await vi.waitFor(() => {
+      expect(store.all().length).toBeGreaterThan(afterStart);
+    });
+    r.stop();
+
+    expect(storyOfAppendedAfter(before)).not.toContain(undefined);
+    expect(new Set(storyOfAppendedAfter(before))).toEqual(new Set([STORY]));
+  });
+
+  it('the boot re-drive dispatches on the story its stream already carries', async () => {
+    await seed(requestedHistory(), 'acq-pending');
+    const head = store.all().at(-1)!.globalSeq;
+    await checkpoints.save(REACTOR_CONSUMER, head); // the drain has nothing to do; only the re-drive
+    const before = store.all().length;
+
+    // A mint source that can only produce OTHER_STORY, so "it continued the stream's story" and
+    // "it minted a fresh one" are distinguishable outcomes rather than the same string.
+    const r = reactor(stubPorts(), { correlation: fixedCorrelation(OTHER_STORY) });
+    await r.start();
+    r.stop();
+
+    expect(storyOfAppendedAfter(before).length).toBeGreaterThan(0);
+    expect(new Set(storyOfAppendedAfter(before))).toEqual(new Set([STORY]));
+  });
+
+  it('a parked-effect retry resumes the story the parked event carries', async () => {
+    await seed(requestedHistory());
+    const parkedEvent = store.all().at(-1)!;
+    await parked.park({
+      streamId: parkedEvent.streamId,
+      globalSeq: parkedEvent.globalSeq,
+      attempt: 1,
+      parkedAt: clock.now().toISOString(),
+      nextRetryAt: clock.now().toISOString(), // already due
+      lastError: 'boom',
+    });
+    const before = store.all().length;
+
+    await reactor(stubPorts(), { correlation: fixedCorrelation(OTHER_STORY) }).drain(); // the retry scheduler runs on the drain pass
+
+    expect(storyOfAppendedAfter(before).length).toBeGreaterThan(0);
+    expect(new Set(storyOfAppendedAfter(before))).toEqual(new Set([STORY]));
   });
 });
