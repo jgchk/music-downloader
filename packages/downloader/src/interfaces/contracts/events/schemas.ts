@@ -43,11 +43,42 @@ export const acquisitionFulfilledDataSchema = z.object({
   files: z.array(publishedFileSchema),
 });
 
-/** The Standard Webhooks body: `{type, timestamp, data}`. */
+/**
+ * The operation-correlation envelope (change: end-to-end-correlation) — OPTIONAL, additive, and
+ * deliberately NOT part of `data`.
+ *
+ * `correlationId` is the STORY: the id this operation has carried since its outermost trigger. A
+ * consumer adopts it verbatim as the story of whatever work the consumption triggers, so one id
+ * follows one operation across both stores. It is an opaque observability identity, not producer
+ * vocabulary — the anti-corruption layer translates the MODEL (`data`), never this envelope.
+ *
+ * `causation` is THIS event's own coordinates in the producer's store, namespaced by context: the
+ * reference a consumer should record as the causal parent of the work it does on receipt. The
+ * producer's own internal causation chain is deliberately NOT published — it is provenance the
+ * consumer has no use for, and shipping it would leak the producer's stream graph across the seam.
+ *
+ * The whole block is absent for events stored before this capability existed. That absence is
+ * permanent and normal: nothing is backfilled and no upcaster fabricates a story, so a consumer
+ * must treat it as optional forever and mint fresh when it is missing.
+ */
+export const publishedCorrelationSchema = z.object({
+  correlationId: z.string().regex(/^[0-9a-f]{32}$/),
+  causation: z.object({
+    kind: z.literal('event'),
+    context: z.literal('downloader'),
+    streamId: z.string().min(1),
+    version: z.number().int().nonnegative(),
+  }),
+});
+
+export type PublishedCorrelation = z.infer<typeof publishedCorrelationSchema>;
+
+/** The Standard Webhooks body: `{type, timestamp, data}`, plus the optional correlation block. */
 export const acquisitionFulfilledEventSchema = z.object({
   type: z.literal(ACQUISITION_FULFILLED_TYPE),
   timestamp: z.iso.datetime(), // when the acquisition was fulfilled (stable across redeliveries)
   data: acquisitionFulfilledDataSchema,
+  metadata: publishedCorrelationSchema.optional(),
 });
 
 export type AcquisitionFulfilledData = z.infer<typeof acquisitionFulfilledDataSchema>;

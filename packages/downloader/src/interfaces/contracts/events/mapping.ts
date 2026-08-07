@@ -6,7 +6,28 @@ import type {
   PublishedEventMapping,
   RenderError,
 } from '../../../application/ports/published-events-port.js';
+import { CONTEXT_NAME, isCorrelationId } from '../../../application/correlation/context.js';
 import { ACQUISITION_FULFILLED_TYPE, acquisitionFulfilledEventSchema } from './schemas.js';
+
+/**
+ * The correlation envelope for a stored event, or `undefined` when the row predates the
+ * capability. Never fabricated: an absent story stays absent all the way to the consumer, which
+ * mints its own rather than inheriting an invented one.
+ */
+function correlationOf(stored: StoredEvent): Record<string, unknown> | undefined {
+  const story = stored.metadata.correlationId;
+  if (story === undefined || !isCorrelationId(story)) return undefined;
+  return {
+    correlationId: story,
+    // This event's OWN coordinates — the causal parent of whatever the consumer does on receipt.
+    causation: {
+      kind: 'event',
+      context: CONTEXT_NAME,
+      streamId: stored.streamId,
+      version: stored.version,
+    },
+  };
+}
 
 /**
  * Renders `acquisition.fulfilled` from the stream prefix (change: acquisition-outbound-events).
@@ -42,6 +63,7 @@ function renderFulfilled(
   const envelope = {
     type: ACQUISITION_FULFILLED_TYPE,
     timestamp: stored.metadata.occurredAt,
+    metadata: correlationOf(stored),
     data: {
       acquisitionId: stored.streamId,
       target: {

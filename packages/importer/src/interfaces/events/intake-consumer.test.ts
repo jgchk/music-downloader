@@ -1,3 +1,4 @@
+import { publishedEventMapping } from '../contracts/events/mapping.js';
 import { appendMetadata, testContext } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
@@ -392,5 +393,95 @@ describe('the intake event consumer', () => {
       kind: 'Transient',
       reason: 'ConcurrencyConflict',
     });
+  });
+});
+
+describe('intake consumer — crossing the seam', () => {
+  const DOWNLOADER_STORY = '00112233445566778899aabbccddeeff';
+
+  it('adopts the producer story and points causation at the consumed event', async () => {
+    const wiring = testWiring();
+    const event: SeamEvent = {
+      ...fulfilledEvent(),
+      metadata: {
+        correlationId: DOWNLOADER_STORY,
+        causation: { kind: 'event', context: 'downloader', streamId: 'acq-1', version: 6 },
+      },
+    };
+
+    const outcome = await consumer(wiring)(event);
+
+    expect(outcome.isOk()).toBe(true);
+    const appended = wiring.store.all();
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      // Verbatim: the ACL translates the model, never the observability envelope.
+      expect(entry.metadata.correlationId).toBe(DOWNLOADER_STORY);
+      expect(entry.metadata.causation).toEqual({
+        kind: 'event',
+        context: 'downloader',
+        streamId: 'acq-1',
+        version: 6,
+      });
+    }
+  });
+
+  it('integrates an event with no metadata block unchanged, on a freshly minted story', async () => {
+    const wiring = testWiring();
+
+    const outcome = await consumer(wiring)(fulfilledEvent());
+
+    expect(outcome.isOk()).toBe(true); // absence degrades the trace, never the work
+    const appended = wiring.store.all();
+    expect(appended.length).toBeGreaterThan(0);
+    expect(appended[0]!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
+    expect(appended[0]!.metadata.correlationId).not.toBe(DOWNLOADER_STORY);
+  });
+
+  it('mints fresh rather than trusting a malformed metadata block', async () => {
+    const wiring = testWiring();
+    const event: SeamEvent = { ...fulfilledEvent(), metadata: { correlationId: 42 } };
+
+    const outcome = await consumer(wiring)(event);
+
+    expect(outcome.isOk()).toBe(true);
+    expect(wiring.store.all()[0]!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
+  });
+});
+
+describe('the full circle — one story, downloader → importer → verdict → downloader', () => {
+  const DOWNLOADER_STORY = '00112233445566778899aabbccddeeff';
+
+  it('publishes the verdict under the story that crossed the seam inbound', async () => {
+    const wiring = testWiring();
+    // 1. The downloader's fulfilment arrives carrying its story; intake adopts it.
+    await consumer(wiring)({
+      ...fulfilledEvent(),
+      metadata: {
+        correlationId: DOWNLOADER_STORY,
+        causation: { kind: 'event', context: 'downloader', streamId: 'acq-1', version: 6 },
+      },
+    });
+    const importId = importIdFor(`${INTAKE_ROOT}/Radiohead - Kid A`);
+    await wiring.dispatch(importId, {
+      type: 'Propose',
+      directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
+    });
+    wiring.sync();
+
+    // 2. A human rejects the delivery as unusable — the verb that mints a verdict for the sender.
+    const resolved = await wiring.facade.resolveReview(
+      { id: importId, resolution: { verb: 'reject-unusable-delivery', reasons: ['corrupt'] } },
+      // A DIFFERENT request drives the resolution; its own story must NOT overwrite the operation's.
+      'ffffffffffffffffffffffffffffffff',
+    );
+    expect(resolved.ok).toBe(true);
+
+    // 3. The verdict renders onto the outbound feed still carrying the downloader's story.
+    const stream = wiring.store.all().filter((entry) => entry.streamId === importId);
+    const verdict = stream.find((entry) => entry.type === 'ReleaseVerdictRecorded');
+    expect(verdict).toBeDefined();
+    const rendered = publishedEventMapping.render(verdict!, stream)._unsafeUnwrap();
+    expect(rendered.metadata).toMatchObject({ correlationId: DOWNLOADER_STORY });
   });
 });

@@ -2,8 +2,7 @@ import { err, ok } from 'neverthrow';
 import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
 import { recordExternalValidationFailure } from '../../application/acquisition/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
-import { newOperation } from '../../application/correlation/context.js';
-import { verdictToFailureInput } from '../contracts/verdicts/mapping.js';
+import { contextForDelivery, verdictToFailureInput } from '../contracts/verdicts/mapping.js';
 import { externalVerdictDeliverySchema } from '../contracts/verdicts/schemas.js';
 
 /**
@@ -29,7 +28,7 @@ export function verdictEventConsumer(dependencies: UseCaseDependencies): Consume
       dependencies,
       acquisitionId,
       { candidate, reasons },
-      newOperation(dependencies.correlation),
+      contextForDelivery(event.metadata, dependencies.correlation),
     );
     return recorded.match(
       () => ok<void, { kind: 'Transient'; reason: string }>(undefined),
