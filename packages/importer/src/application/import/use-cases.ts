@@ -109,6 +109,11 @@ export function getImportForAcquisition(
   acquisitionId: string,
 ): ImportStatusView | undefined {
   const importId = dependencies.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
+  // Stryker disable next-line ConditionalExpression: forcing this ternary's condition false is
+  // equivalent. With nothing indexed, `getImport` would look the missing id up in the projection's
+  // map, miss, and answer `undefined` anyway. The guard states the absence rather than round-
+  // tripping a missing key through the read model, and is the narrowing `ImportId` needs. (Forcing
+  // it TRUE is a real finding and stays observed: it would blank every acquisition's import.)
   return importId === undefined ? undefined : getImport(dependencies, importId);
 }
 

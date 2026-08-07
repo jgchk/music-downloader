@@ -83,6 +83,10 @@ function folderCandidates(
 ): Candidate[] {
   const byFolder = new Map<string, { file: SlskdSearchFile; filename: string }[]>();
   for (const file of files) {
+    // Stryker disable next-line StringLiteral: a file slskd named nothing has no folder either.
+    // The default is read only by `folderOf`, which yields '' for any text carrying no separator —
+    // Stryker's replacement included — so the file lands in the same rootless group, which
+    // `parseCandidateIdentity` then rejects for its empty path. Nothing downstream can tell.
     const filename = file.filename ?? '';
     const folder = folderOf(filename);
     const entry = { file, filename };
@@ -115,6 +119,10 @@ export function mapSearchResponses(
   return responses.flatMap((response) => {
     const username = response.username ?? '';
     const source = reliabilityOf(response);
+    // Stryker disable next-line ArrayDeclaration: seeding the fallback cannot be observed. Both
+    // groupings read `.filename` off each element and fall back to '' when it has none, and an
+    // element with no filename yields an empty path that `parseCandidateIdentity` rejects — so a
+    // seeded fallback produces the same empty candidate list as the empty one.
     const files = response.files ?? [];
     return targetType === 'track'
       ? trackCandidates(username, files, source)

@@ -15,7 +15,7 @@ import {
   reviewListResultSchema,
   submitImportResultSchema,
 } from './facade.js';
-import type { ImporterFacade } from './facade.js';
+import type { FacadeResult, ImporterFacade } from './facade.js';
 
 /**
  * The wire-shaped facade (module-architecture): every input and output is a plain serializable
@@ -27,6 +27,14 @@ const INTAKE = '/intake/Artist - Album';
 // The deterministic id `importIdFor(INTAKE)` mints, pinned as a golden literal so the test proves
 // the actual derivation rather than re-deriving the expected value with the code under test.
 const GOLDEN_IMPORT_ID = 'imp-ab1aa9bf67fc1a5beafaf243';
+
+/** The message a rejected call hands the caller — fails loudly if the call did not fail validation. */
+function validationMessage(result: FacadeResult<unknown>): string {
+  if (result.ok || result.error.kind !== 'ValidationFailed') {
+    throw new Error(`expected a ValidationFailed error, got ${JSON.stringify(result)}`);
+  }
+  return result.error.message;
+}
 
 /** Round-trip a value through JSON and assert nothing was lost. */
 function roundTrip<T>(value: T): T {
@@ -73,6 +81,19 @@ describe('createImporterFacade', () => {
         expect(result.error.kind).toBe('ValidationFailed');
         expect(importerFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
       }
+      // The rejection says what was wrong — the BFF renders this message verbatim, so a blank one
+      // would leave the caller with nothing to act on.
+      expect(validationMessage(result)).toContain('expected string');
+    });
+
+    it('reports every rejected field in one validation message, not only the first', async () => {
+      const facade = createImporterFacade(testWiring().deps);
+      const result = await facade.submitImport({ path: 7, hints: 'the usual' }, STORY);
+
+      const problems = validationMessage(result).split('; ');
+      expect(problems).toHaveLength(2);
+      expect(problems[0]).toContain('expected string');
+      expect(problems[1]).toContain('expected object');
     });
 
     it('passes an append race through as a modeled conflict value', async () => {

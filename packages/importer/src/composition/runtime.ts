@@ -115,6 +115,10 @@ export type ImporterStartupError =
 
 /** True only for the "the directory is not there (yet)" errnos — everything else is a real fault. */
 function isDirectoryAbsent(error: unknown): boolean {
+  // Stryker disable next-line OptionalChaining: equivalent — the sole caller is the `catch` below,
+  // whose only thrower is `fs.promises.stat`, and node rejects it with an `Error` instance, never
+  // with `null`/`undefined`. The optional chain guards a rejection value that cannot occur here,
+  // so removing it changes no outcome; it stays as the cheap total-function guard on `unknown`.
   const code = (error as NodeJS.ErrnoException | null)?.code;
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
@@ -279,6 +283,12 @@ export async function createImporterRuntime(
         retry: { attempts: 3, baseDelayMs: 250 },
         batchSize: 100,
         pollIntervalMs: 5000,
+        // Stryker disable next-line ArrowFunction: equivalent in every observable respect — the
+        // subscription only ever `await`s this value (retry backoff, and the yield between
+        // batches), so a resolved `undefined` changes elapsed wall-clock and nothing else: same
+        // attempts, same order, same checkpoint advances, same hold/halt decisions. Wall-clock is
+        // the one thing a behavioural assertion here may not pin, and a test that faked the timer
+        // to observe the delay would be asserting that a timer is used, not what the seam does.
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         wakeups: acquisitionWakeups,
       });

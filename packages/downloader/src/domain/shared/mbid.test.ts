@@ -13,6 +13,12 @@ describe('parseMbid', () => {
     );
   });
 
+  it('accepts an id padded with whitespace, canonicalizing the padding away', () => {
+    expect(parseMbid('  b1392450-e666-3926-a536-22c65f834433\n')._unsafeUnwrap()).toBe(
+      'b1392450-e666-3926-a536-22c65f834433',
+    );
+  });
+
   it('rejects an empty string', () => {
     expect(parseMbid('')._unsafeUnwrapErr()).toEqual({ kind: 'InvalidMbid', value: '' });
   });

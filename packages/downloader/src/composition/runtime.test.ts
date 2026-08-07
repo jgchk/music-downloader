@@ -2,7 +2,7 @@ import { STORY, appendMetadata, testContext } from '../application/__fixtures__/
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { ResultAsync, okAsync, ok } from 'neverthrow';
+import { ResultAsync, errAsync, okAsync, ok } from 'neverthrow';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SqliteCheckpointStore,
@@ -14,6 +14,7 @@ import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import type { EffectPorts } from '../application/acquisition/interpreter.js';
 import { FakeDeadLetterStore, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
+import { infraError } from '../application/ports/errors.js';
 import type { DownloadObserverPort, DownloadResult } from '../application/ports/outbound-ports.js';
 import {
   defaultPolicies,
@@ -134,6 +135,68 @@ async function untilFulfilled(runtime: DownloaderRuntime, id: string): Promise<v
     if (!status.ok) throw new Error('not found yet');
     expect(status.value.status).toBe('Fulfilled');
   });
+}
+
+/** The instant the injected boot clock starts at; the test moves it to make a retry come due. */
+const BOOT_INSTANT = '2026-07-22T12:00:00.000Z';
+
+/**
+ * Boot a runtime whose FIRST metadata resolution faults (a retryable infrastructure error) and
+ * whose later ones answer "no confident match". The first dispatch therefore parks the stream for
+ * a backed-off retry, and — since nothing further is appended — only the reactor's own fallback
+ * poll can pick the retry up. `reactorTiming` is deliberately NOT overridden: the production
+ * jitter source is part of what parking exercises.
+ */
+async function bootWithParkingFirstEffect(): Promise<{
+  runtime: DownloaderRuntime;
+  resolutions: () => number;
+  setNow: (instant: Date) => void;
+  errorLines: string[];
+}> {
+  let calls = 0;
+  let now = new Date(BOOT_INSTANT);
+  const errorLines: string[] = [];
+  const logger = createLogger({
+    level: 'error',
+    destination: { write: (line: string) => void errorLines.push(line) },
+  });
+  const ports = (observer: DownloadObserverPort): EffectPorts => ({
+    ...fakePorts(observer),
+    metadata: {
+      resolve: () => {
+        calls += 1;
+        return calls === 1
+          ? errAsync(infraError('musicbrainz.resolve', 'musicbrainz unreachable'))
+          : okAsync({ kind: 'unresolved' as const });
+      },
+    },
+  });
+  const runtime = await bootDownloaderRuntime(
+    {
+      databaseFile: ':memory:',
+      libraryRoot: '/library',
+      stagingRoot: '/staging',
+      musicbrainz: {},
+      slskd: {},
+    },
+    logger,
+    { ports, clock: { now: () => now } },
+  );
+  return {
+    runtime,
+    resolutions: () => calls,
+    setNow: (instant) => {
+      now = instant;
+    },
+    errorLines,
+  };
+}
+
+/** Advance fake time in `stepMs` slices until `isDone`, or give up after `slices` of them. */
+async function advanceUntil(isDone: () => boolean, stepMs: number, slices = 30): Promise<void> {
+  for (let slice = 0; slice < slices && !isDone(); slice += 1) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
 }
 
 describe('createDownloaderRuntime', () => {
@@ -485,6 +548,86 @@ describe('createDownloaderRuntime', () => {
     expect(runtime.readiness()).toEqual({ status: 'up' });
     // A pure read of runtime state advances no stream and creates no work.
     expect(runtime.facade.listAcquisitions()).toEqual({ acquisitions: [] });
+  });
+
+  it('holds a parked effect until its backoff comes due, however often the poll fires', async () => {
+    // The failed effect is parked with a jittered backoff, and the wall clock — not the poll
+    // cadence — says when it may run again. A poll that re-dispatched on sight would hammer an
+    // upstream that is already failing, at the poll's own frequency.
+    vi.useFakeTimers();
+    try {
+      const { runtime, resolutions } = await bootWithParkingFirstEffect();
+      cleanups.push(() => runtime.stop());
+
+      const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
+      if (!submitted.ok) throw new Error('submit failed');
+      const id = submitted.value.acquisitionId;
+      await advanceUntil(() => resolutions() === 1, 10);
+
+      // Six poll intervals pass, but the clock the backoff is measured against does not move.
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(resolutions()).toBe(1);
+      expect(runtime.facade.getAcquisition({ id })).toMatchObject({
+        ok: true,
+        value: { status: 'Pending' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a parked effect from the reactor’s fallback poll once its backoff is due', async () => {
+    // Nothing appends to the stream while the park waits, so the periodic poll composition wires
+    // is the ONLY thing that can pick the retry up. Without it a single transient MusicBrainz
+    // outage would strand the acquisition until the next restart.
+    vi.useFakeTimers();
+    try {
+      const { runtime, resolutions, setNow } = await bootWithParkingFirstEffect();
+      cleanups.push(() => runtime.stop());
+
+      const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
+      if (!submitted.ok) throw new Error('submit failed');
+      const id = submitted.value.acquisitionId;
+      await advanceUntil(() => resolutions() === 1, 10);
+
+      // Time passes beyond the backoff. No new event is appended and no wakeup fires.
+      setNow(new Date(Date.parse(BOOT_INSTANT) + 20 * 60_000));
+      await advanceUntil(() => resolutions() > 1, 1000);
+
+      expect(runtime.facade.getAcquisition({ id })).toMatchObject({
+        ok: true,
+        value: { status: 'MetadataFailed' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the reactor’s fallback poll on stop() so it cannot read the closed database', async () => {
+    // The mirror of the retry above: once stop() has closed the store handle, the same periodic
+    // poll must be detached. A surviving one re-enters the drain, reads a closed database and
+    // logs a fault on every tick forever — while keeping the process's event loop alive.
+    vi.useFakeTimers();
+    try {
+      const { runtime, resolutions, setNow, errorLines } = await bootWithParkingFirstEffect();
+
+      const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
+      if (!submitted.ok) throw new Error('submit failed');
+      await advanceUntil(() => resolutions() === 1, 10);
+
+      await runtime.stop();
+      const errorsAtStop = errorLines.length;
+
+      // The parked retry is now due — the very work a leaked poll would pick up.
+      setNow(new Date(Date.parse(BOOT_INSTANT) + 20 * 60_000));
+      await vi.advanceTimersByTimeAsync(30_000); // several 5s poll intervals
+
+      expect(errorLines).toHaveLength(errorsAtStop);
+      expect(resolutions()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

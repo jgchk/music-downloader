@@ -1,6 +1,6 @@
 import { STORY } from '../application/__fixtures__/correlation.js';
 import { appendMetadata } from '../application/__fixtures__/correlation.js';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { errAsync, ok, okAsync } from 'neverthrow';
@@ -13,6 +13,7 @@ import { UpcasterRegistry } from '../adapters/sqlite/upcaster.js';
 import { legacyRejectResolvedData } from '../adapters/sqlite/__fixtures__/legacy-review-resolved.js';
 import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
+import type { Logger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
 import { REACTOR_CONSUMER } from '../application/import/reactor.js';
 import type {
@@ -55,6 +56,35 @@ function fakeTagger(): TaggerPort {
   };
 }
 
+const APPLIED_LOCATION = '/music/Artist/Album';
+
+/**
+ * A bridge that proposes exactly one candidate at `distance` and applies successfully — the two
+ * outcomes the auto-apply routing chooses between.
+ */
+function taggerProposing(distance: number): TaggerPort {
+  return {
+    ...fakeTagger(),
+    propose: () =>
+      okAsync({
+        kind: 'proposal' as const,
+        candidates: [candidate({ distance: asDistance(distance) })],
+        duplicates: [],
+      }),
+    apply: () => okAsync({ kind: 'applied' as const, location: APPLIED_LOCATION, failures: [] }),
+  };
+}
+
+/** A logger whose emitted lines the test can read back (the operator's view of the seam). */
+function capturingLogger(level: string): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const logger = createLogger({
+    level,
+    destination: { write: (line: string) => void lines.push(line) },
+  });
+  return { logger, lines };
+}
+
 /** The position the gated feed reports having scanned - the save the shutdown races. */
 const SCANNED_TO = 7;
 
@@ -79,6 +109,20 @@ function config(overrides: Partial<ImporterRuntimeConfig> = {}): ImporterRuntime
 async function testRuntime(): Promise<ImporterRuntime> {
   const result = await createImporterRuntime(config(), silentLogger(), {
     tagger: fakeTagger(),
+    intake: { deleteRelease: () => okAsync<void>(undefined) },
+  });
+  const runtime = result._unsafeUnwrap();
+  cleanups.push(() => runtime.stop());
+  return runtime;
+}
+
+/** Boot with the given auto-apply bound and a bridge that proposes one candidate at `distance`. */
+async function bootProposing(
+  autoApplyThreshold: number,
+  distance: number,
+): Promise<ImporterRuntime> {
+  const result = await createImporterRuntime(config({ autoApplyThreshold }), silentLogger(), {
+    tagger: taggerProposing(distance),
     intake: { deleteRelease: () => okAsync<void>(undefined) },
   });
   const runtime = result._unsafeUnwrap();
@@ -298,38 +342,66 @@ describe('createImporterRuntime', () => {
     });
   });
 
-  it('holds delivery when the re-rooted directory is not visible yet (real filesystem probe)', async () => {
-    const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
-    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+  /**
+   * The two errnos the real probe reads as "the delivered files have not landed yet". Both are
+   * held for redelivery — as opposed to a probe that FAULTS (the next test), which the consumer
+   * must report differently so an operator can tell "still copying" from "the filesystem is sick".
+   */
+  const notThereYet = [
+    {
+      situation: 'the delivered directory does not exist yet (ENOENT)',
+      relativePath: 'not-there-yet',
+      stage: () => {},
+    },
+    {
+      situation: 'a component of the delivered path is a file, not a directory (ENOTDIR)',
+      relativePath: 'blocker/album',
+      stage: (intakeRoot: string) => writeFileSync(path.join(intakeRoot, 'blocker'), ''),
+    },
+  ];
 
-    const result = await createImporterRuntime(config({ intakeRoot: directory }), silentLogger(), {
-      tagger: fakeTagger(),
-      clock: fixedClock(),
-    });
-    const runtime = result._unsafeUnwrap();
-    cleanups.push(() => runtime.stop());
+  it.each(notThereYet)(
+    'holds delivery, reporting it as missing, when $situation (real filesystem probe)',
+    async ({ relativePath, stage }) => {
+      const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
+      cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+      stage(directory);
+      const { logger, lines } = capturingLogger('warn');
 
-    const missing: SeamEvent = {
-      globalSeq: 1,
-      type: 'acquisition.fulfilled',
-      timestamp: '2026-07-18T12:00:00.000Z',
-      data: {
-        acquisitionId: 'acq-2',
-        location: '/staging/not-there-yet',
-        target: { type: 'album', artist: 'Artist', title: 'Album', musicbrainzReleaseId: null },
-      },
-    };
-    const feed: SeamFeed = {
-      read: (from) =>
-        Promise.resolve(ok({ events: from < 1 ? [missing] : [], scannedTo: Math.max(from, 1) })),
-    };
-    const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
-    await subscription.start();
-    cleanups.push(() => subscription.stop());
+      const result = await createImporterRuntime(config({ intakeRoot: directory }), logger, {
+        tagger: fakeTagger(),
+        clock: fixedClock(),
+      });
+      const runtime = result._unsafeUnwrap();
+      cleanups.push(() => runtime.stop());
 
-    // The directory never appears: the checkpoint holds and no import is created.
-    expect(runtime.facade.listImports().imports).toHaveLength(0);
-  });
+      const missing: SeamEvent = {
+        globalSeq: 1,
+        type: 'acquisition.fulfilled',
+        timestamp: '2026-07-18T12:00:00.000Z',
+        data: {
+          acquisitionId: 'acq-2',
+          location: `/staging/${relativePath}`,
+          target: { type: 'album', artist: 'Artist', title: 'Album', musicbrainzReleaseId: null },
+        },
+      };
+      const feed: SeamFeed = {
+        read: (from) =>
+          Promise.resolve(ok({ events: from < 1 ? [missing] : [], scannedTo: Math.max(from, 1) })),
+      };
+      const subscription = runtime.connectAcquisitionFeed(feed, { sourceRoot: '/staging' });
+      await subscription.start();
+      cleanups.push(() => subscription.stop());
+
+      // The directory never appears: the checkpoint holds and no import is created.
+      expect(runtime.facade.listImports().imports).toHaveLength(0);
+      expect(subscription.isHalted).toBe(false);
+      // The hold names the situation an operator would act on — the files have not landed.
+      expect(lines.join('')).toContain(
+        `IntakeDirectoryMissing: ${path.join(directory, relativePath)}`,
+      );
+    },
+  );
 
   it('lets an in-flight acquisition drain finish before it closes the store', async () => {
     // Stopping the subscription clears its poll interval, which only cancels the NEXT cycle. This
@@ -384,13 +456,18 @@ describe('createImporterRuntime', () => {
     expect(checkpoint._unsafeUnwrap()).toBe(SCANNED_TO);
   });
 
-  it('constructs the real bridge when no tagger override is given, surfacing its failure as a value', async () => {
+  it('constructs the real bridge on the configured interpreter, surfacing its failure as a value', async () => {
+    // `/bin/false` stands in for a broken interpreter: it runs and exits 1. The boot error must
+    // carry what the bridge actually did — an operator's only clue is this detail, and a boot
+    // that could not even spawn the configured binary is a different fault with a different fix.
     const result = await createImporterRuntime(
       config({ bridgePython: '/bin/false', bridgeTimeoutMs: 2000 }),
       silentLogger(),
     );
     expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().kind).toBe('BeetsConfigUnusable');
+    const startupError = result._unsafeUnwrapErr();
+    expect(startupError.kind).toBe('BeetsConfigUnusable');
+    expect(startupError.detail).toContain('bridge exited 1');
   });
 
   it('reports readiness up on a freshly booted runtime (value, no throw)', async () => {
@@ -499,8 +576,9 @@ describe('createImporterRuntime', () => {
   it('classifies a genuine probe fault as transient (not a missing directory) via the real probe', async () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'intake-'));
     cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const { logger, lines } = capturingLogger('warn');
 
-    const result = await createImporterRuntime(config({ intakeRoot: directory }), silentLogger(), {
+    const result = await createImporterRuntime(config({ intakeRoot: directory }), logger, {
       tagger: fakeTagger(),
       clock: fixedClock(),
     });
@@ -530,5 +608,81 @@ describe('createImporterRuntime', () => {
 
     expect(runtime.facade.listImports().imports).toHaveLength(0);
     expect(subscription.isHalted).toBe(false);
+    // Reported as a probe FAULT, never as "not there yet": the two situations need different
+    // operator responses (fix the filesystem vs. wait for the copy), so they hold under
+    // different reasons.
+    expect(lines.join('')).toContain('IntakeProbeFailed');
+    expect(lines.join('')).not.toContain('IntakeDirectoryMissing');
+  });
+
+  it('routes a proposal weaker than the configured auto-apply threshold to human review', async () => {
+    // 0.5 is well outside the configured 0.04 bound: a human must look at it.
+    const runtime = await bootProposing(0.04, 0.5);
+
+    const submitted = await runtime.facade.submitImport({ path: '/intake/album' }, STORY);
+    expect(submitted.ok).toBe(true);
+    if (!submitted.ok) return;
+
+    await vi.waitFor(() => {
+      expect(runtime.facade.listPendingReviews().reviews).toHaveLength(1);
+    });
+    expect(runtime.facade.getImport({ id: submitted.value.importId })).toMatchObject({
+      ok: true,
+      value: { status: 'awaiting-review' },
+    });
+  });
+
+  it('auto-applies a proposal within the configured auto-apply threshold', async () => {
+    // The same 0.5 proposal against a bound that admits it — so it is the CONFIGURED number, not
+    // the distance alone, that decides review versus auto-apply.
+    const runtime = await bootProposing(0.9, 0.5);
+
+    const submitted = await runtime.facade.submitImport({ path: '/intake/album' }, STORY);
+    expect(submitted.ok).toBe(true);
+    if (!submitted.ok) return;
+
+    await vi.waitFor(() => {
+      expect(runtime.facade.getImport({ id: submitted.value.importId })).toMatchObject({
+        ok: true,
+        value: { status: 'applied', location: APPLIED_LOCATION },
+      });
+    });
+    expect(runtime.facade.listPendingReviews().reviews).toHaveLength(0);
+  });
+
+  it('deletes a rejected release from the intake root through the real filesystem adapter', async () => {
+    // No `intake` override: the production FilesystemIntake is the one under test, so a rejected
+    // release must actually disappear from disk — the review queue owns intake hygiene (D5).
+    const intakeRoot = mkdtempSync(path.join(tmpdir(), 'intake-'));
+    cleanups.push(() => rmSync(intakeRoot, { recursive: true, force: true }));
+    const releaseDirectory = path.join(intakeRoot, 'Artist - Album');
+    mkdirSync(releaseDirectory);
+    writeFileSync(path.join(releaseDirectory, '01.flac'), '');
+
+    const result = await createImporterRuntime(config({ intakeRoot }), silentLogger(), {
+      tagger: taggerProposing(0.5),
+    });
+    const runtime = result._unsafeUnwrap();
+    cleanups.push(() => runtime.stop());
+
+    const submitted = await runtime.facade.submitImport({ path: releaseDirectory }, STORY);
+    expect(submitted.ok).toBe(true);
+    if (!submitted.ok) return;
+    await vi.waitFor(() => {
+      expect(runtime.facade.listPendingReviews().reviews).toHaveLength(1);
+    });
+
+    const resolved = await runtime.facade.resolveReview(
+      {
+        id: submitted.value.importId,
+        resolution: { verb: 'reject' },
+      },
+      STORY,
+    );
+    expect(resolved.ok).toBe(true);
+
+    await vi.waitFor(() => {
+      expect(existsSync(releaseDirectory)).toBe(false);
+    });
   });
 });

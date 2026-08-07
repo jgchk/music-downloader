@@ -94,6 +94,28 @@ describe('FilesystemLibrary.import', () => {
     expect(existsSync(file.path)).toBe(false);
   });
 
+  it('reserves the copy fallback for EXDEV: another rename fault is surfaced, not worked around', async () => {
+    // The fallback exists because rename cannot cross a filesystem boundary — nothing else. A
+    // rename refused for any other reason (here: permissions) must reach the caller as a fault
+    // even though copy-then-remove would have "worked", or a misconfigured library silently
+    // reports every release as imported.
+    const ws = await workspace();
+    const file = await ws.stage('01.flac');
+    const deniedFs: LibraryFileSystem = {
+      ...nodeLibraryFileSystem,
+      rename: () => Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' })),
+    };
+    const library = new FilesystemLibrary(ws, deniedFs);
+
+    const result = await library.import([file], TARGET, testScope());
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'library.import',
+    });
+    expect(existsSync(file.path)).toBe(true); // the staged file was never copied away
+  });
+
   it('surfaces a non-EXDEV filesystem fault as an InfraError', async () => {
     const ws = await workspace();
     const missing: DownloadedFile = {
@@ -108,6 +130,19 @@ describe('FilesystemLibrary.import', () => {
       kind: 'InfraError',
       operation: 'library.import',
     });
+  });
+});
+
+describe('nodeLibraryFileSystem', () => {
+  it('answers whether a path is there, reporting an unreachable one as absent', async () => {
+    // `exists` is the seam the import conflict check turns on, and its contract is a boolean
+    // answer: an unreachable path is an absence, never a raised fault the caller has to catch.
+    const ws = await workspace();
+
+    expect(await nodeLibraryFileSystem.exists(ws.stagingRoot)).toBe(true);
+    expect(await nodeLibraryFileSystem.exists(path.join(ws.stagingRoot, 'never-written'))).toBe(
+      false,
+    );
   });
 });
 

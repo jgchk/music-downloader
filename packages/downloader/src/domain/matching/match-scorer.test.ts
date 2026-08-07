@@ -45,6 +45,12 @@ describe('isAudioFile / audioFiles', () => {
     expect(isAudioFile({ name: 'README', sizeBytes: 1 })).toBe(false);
   });
 
+  it('does not read an extensionless file as audio because its name looks like a codec', () => {
+    // Shares carry extensionless files. "The part after the last dot" of a name with no dot is
+    // nothing — not the whole name, which would make a file called `flac` an audio file.
+    expect(isAudioFile({ name: 'flac', sizeBytes: 1 })).toBe(false);
+  });
+
   it('filters a candidate to its audio files', () => {
     const c = candidate([
       { name: '01.flac', sizeBytes: 1 },
@@ -59,6 +65,20 @@ describe('candidateText', () => {
     const c = candidate([{ name: '01 - Mysterons.flac', sizeBytes: 1 }], '/downloads/Portishead');
     expect(candidateText(c)).toContain('portishead');
     expect(candidateText(c)).toContain('mysterons');
+  });
+
+  it('keeps file names apart, so no token spans two of them', () => {
+    // Run the names together and the last token of one fuses with the first of the next — here
+    // `mysterons.flac` + `02` would become the single token `flac02`, and the title tokens the
+    // match signals look for would silently stop being present.
+    const c = candidate(
+      [
+        { name: '01 - Mysterons.flac', sizeBytes: 1 },
+        { name: '02 - Sour Times.flac', sizeBytes: 1 },
+      ],
+      '/downloads/Portishead - Dummy',
+    );
+    expect(candidateText(c)).toBe('portishead dummy 01 mysterons flac 02 sour times flac');
   });
 });
 
@@ -89,7 +109,11 @@ describe('scoreMatch', () => {
       { name: '02.flac', sizeBytes: 1, durationMs: 250_000 },
       { name: '03.flac', sizeBytes: 1, durationMs: 240_000 },
     ]);
-    expect(scoreMatch(noYear, c)).toBeGreaterThan(0.9);
+    // A perfect candidate scores a perfect 1: an unaskable signal leaves the mean rather than
+    // scoring zero inside it, so a target with no year is not quietly penalised for not having one.
+    // (Scored as zero the confidence would be 0.95 — still "high", which is why > 0.9 proved
+    // nothing. The mean must renormalize over the signals that actually applied.)
+    expect(scoreMatch(noYear, c)).toBeCloseTo(1, 10);
   });
 
   it('returns 0 when no signal in the pipeline applies', () => {
@@ -132,8 +156,24 @@ describe('trackCountSignal', () => {
   });
 });
 
+describe('durationSignal', () => {
+  it('cannot be evaluated against a candidate that reports no durations', () => {
+    // `null` is the signal's "not applicable", and it is not the same answer as 0: scored zero, a
+    // source that simply omits durations would be ranked as badly as one whose durations disagree.
+    const c = candidate([
+      { name: '01.flac', sizeBytes: 1 },
+      { name: '02.flac', sizeBytes: 1 },
+    ]);
+    expect(durationSignal.score(target, c)).toBeNull();
+  });
+});
+
 describe('yearSignal', () => {
   const files = [{ name: '01.flac', sizeBytes: 1, durationMs: 300_000 }];
+
+  it('cannot be evaluated when the target names no year', () => {
+    expect(yearSignal.score({ ...target, year: undefined }, candidate(files))).toBeNull();
+  });
 
   it('scores 1 when the year appears in the candidate text', () => {
     expect(yearSignal.score(target, candidate(files, 'Portishead - Dummy 1994'))).toBe(1);

@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AcquisitionStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
   StalledReadModel,
   projectStatus,
+  seedStalledReadModel,
 } from './read-models.js';
+import { FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import { infraError } from '../ports/errors.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import { asUnit } from '../../domain/shared/__fixtures__/unit.js';
 import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
@@ -478,5 +481,61 @@ describe('StalledReadModel', () => {
     expect(() => {
       model.clear('never-marked');
     }).not.toThrow();
+  });
+});
+
+describe('seedStalledReadModel', () => {
+  const SUBSCRIPTION = 'downloader:reactor';
+  const HORIZON = '2026-06-01T00:00:00.000Z';
+
+  function letter(streamId: string, occurredAt: string) {
+    return {
+      subscription: SUBSCRIPTION,
+      globalSeq: 1,
+      streamId,
+      error: 'budget spent',
+      occurredAt,
+    };
+  }
+
+  function seeded(): { deadLetters: FakeDeadLetterStore; stalled: StalledReadModel } {
+    const deadLetters = new FakeDeadLetterStore();
+    deadLetters.letters = [
+      letter('acq-aged', '2026-01-01T00:00:00.000Z'),
+      letter('acq-recent', '2026-07-01T00:00:00.000Z'),
+    ];
+    return { deadLetters, stalled: new StalledReadModel() };
+  }
+
+  it('exposes the surviving dead-lettered streams as stalled and forgets the aged ones', async () => {
+    const { deadLetters, stalled } = seeded();
+    const logger = silentLogger();
+    const warn = vi.spyOn(logger, 'warn');
+
+    await seedStalledReadModel(deadLetters, stalled, SUBSCRIPTION, HORIZON, logger);
+
+    expect(stalled.isStalled('acq-recent')).toBe(true);
+    expect(stalled.isStalled('acq-aged')).toBe(false);
+    // A boot whose retention pass converged has nothing to report — a warning here would send an
+    // operator looking for a store fault that never happened.
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('over-retains instead of failing the boot when the retention prune fails', async () => {
+    const { deadLetters, stalled } = seeded();
+    deadLetters.failPrune = true;
+    const logger = silentLogger();
+    const warn = vi.spyOn(logger, 'warn');
+
+    await seedStalledReadModel(deadLetters, stalled, SUBSCRIPTION, HORIZON, logger);
+
+    // The letters are still in the store, so the aged acquisition stays exposed as stalled — the
+    // safe direction — and the reason it did is the one thing this boot has to say about it.
+    expect(stalled.isStalled('acq-aged')).toBe(true);
+    expect(stalled.isStalled('acq-recent')).toBe(true);
+    expect(warn).toHaveBeenCalledWith(
+      { err: infraError('dead-letters.prune', 'boom') },
+      'stalled retention prune failed',
+    );
   });
 });

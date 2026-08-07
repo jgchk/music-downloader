@@ -105,6 +105,10 @@ export class CatchUpSubscription {
   private cursor = 0;
   private halted = false;
   private running = false;
+  // Stryker disable next-line BooleanLiteral: the initializer is never read. `runCycles` assigns
+  // `pending = false` at the top of every iteration, and its `while` test is the field's only
+  // reader — so every read is preceded by that assignment and no initial value can reach one.
+  // A value is required here only because the field is declared non-optional.
   private pending = false;
   private resets = 0;
   private resetQueue: Promise<void> = Promise.resolve();

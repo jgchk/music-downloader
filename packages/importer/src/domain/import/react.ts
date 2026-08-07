@@ -1,4 +1,5 @@
 import type { ApplyMode, ImportEvent } from './events.js';
+import { hasRemediation } from './state.js';
 import type { ImportState } from './state.js';
 
 /**
@@ -80,10 +81,17 @@ export function react(event: ImportEvent, state: ImportState): readonly Effect[]
         case 'retry-enrichment': {
           // Re-run beets over the already-imported location: a deterministic in-place re-import
           // that re-fires the full plugin chain against files beets already owns.
-          return state.phase === 'applied' && state.remediation?.status === 'retrying'
+          return hasRemediation(state, 'retrying')
             ? [{ type: 'Apply', directory: state.location, mode: state.mode }]
             : [];
         }
+        // Stryker disable next-line StringLiteral,ConditionalExpression,BlockStatement: equivalent —
+        // this arm falls through to one that returns the same `[]`. Proof, in full:
+        // This is the last arm of the inner switch, and control leaving that switch falls straight
+        // through into the outer switch's next case group — the no-effect arm that also returns
+        // `[]`. So emptying this body, deleting it, or making the label unmatchable all reach the
+        // same `[]` by the longer road. It is written out because relying on a fall-through across
+        // two switch levels to state "accept closes the review, nothing to run" is not readable.
         case 'accept': {
           return [];
         }

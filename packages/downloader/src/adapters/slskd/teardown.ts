@@ -57,12 +57,14 @@ export class TransferTeardown {
           unconfirmed.push(transfer);
         }
       }
-      if (unconfirmed.length === 0) return new Set(); // every terminal record removed cleanly
+      // Nothing left to confirm: every terminal record was removed cleanly, or the cancelled ones
+      // transitioned and are already gone from the re-poll below (an empty re-poll leaves nothing
+      // for the next round to cancel, so it reaches this same return one round later).
+      if (unconfirmed.length === 0) return new Set();
       if (round >= MAX_REMOVE_ROUNDS)
         return new Set(unconfirmed.map((transfer) => transfer.filename));
       await this.timer.sleep(this.pollIntervalMs);
       current = await pollOwnedTransfers(this.client, username, wanted);
-      if (current.length === 0) return new Set(); // the cancelled records transitioned and are gone
     }
   }
 }

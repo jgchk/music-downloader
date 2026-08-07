@@ -194,7 +194,11 @@ export class SlskdSearch implements SearchPort {
   }
 }
 
-/** A source-agnostic query from the normalized target: artist plus album/track title. */
+/**
+ * A source-agnostic query from the normalized target: artist plus album/track title. Both fields
+ * are non-empty and already trimmed — `createTarget` is the only way to mint a `Target` and it
+ * rejects a blank artist or title — so there is nothing left here to normalize.
+ */
 export function buildQuery(target: Target): string {
-  return `${target.artist} ${target.title}`.trim();
+  return `${target.artist} ${target.title}`;
 }

@@ -18,10 +18,11 @@ export function alignmentScore(expected: readonly number[], actual: readonly num
   if (expected.length === 0) return 0;
   const sortedExpected = expected.toSorted((x, y) => x - y);
   const sortedActual = actual.toSorted((x, y) => x - y);
-  const pairs = Math.min(sortedExpected.length, sortedActual.length);
-  let matches = 0;
-  for (let index = 0; index < pairs; index += 1) {
-    if (isWithinDurationTolerance(sortedExpected[index]!, sortedActual[index]!)) matches += 1;
-  }
-  return matches / expected.length;
+  const aligned = sortedExpected.filter((expectedMs, index) => {
+    // An expectation with no counterpart track — the release is short of the target — aligns with
+    // nothing. Pairing by position over the sorted lists makes the shorter list the bound.
+    const actualMs = sortedActual[index];
+    return actualMs !== undefined && isWithinDurationTolerance(expectedMs, actualMs);
+  });
+  return aligned.length / expected.length;
 }

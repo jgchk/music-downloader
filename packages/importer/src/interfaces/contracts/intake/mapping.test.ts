@@ -66,11 +66,13 @@ describe('rerootLocation', () => {
     expect(result._unsafeUnwrap()).toBe('/music/intake/Artist - Album');
   });
 
-  it('handles nested remainders and cosmetic trailing slashes on either side', () => {
+  it('handles nested remainders and runs of cosmetic trailing slashes on either side', () => {
+    // A trailing separator is cosmetic however many times the sender (or the configured root)
+    // repeats it — unlike an empty segment inside the path, which is an escape attempt below.
     const result = rerootLocation({
-      location: '/downloads/import/Artist/Album/',
+      location: '/downloads/import/Artist/Album//',
       sourceRoot: '/downloads/import/',
-      intakeRoot: '/music/intake/',
+      intakeRoot: '/music/intake///',
     });
     expect(result._unsafeUnwrap()).toBe('/music/intake/Artist/Album');
   });

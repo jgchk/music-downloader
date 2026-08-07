@@ -50,6 +50,10 @@ describe('applyCommand', () => {
     const d = dependencies();
     await d.store.append('imp-1', 0, awaitingMatchReview(), appendMetadata('imp-1', fixedClock()));
     const before = d.store.all().length;
+    // Any append at all would come back a conflict here, so an Ok is proof the write path was
+    // never entered: a command the decider ignores must not be able to fail on a write it never
+    // makes — a redelivered duplicate has to stay answerable while another writer holds the stream.
+    d.store.conflictOnAppend = true;
     const result = await applyCommand(
       d,
       'imp-1',

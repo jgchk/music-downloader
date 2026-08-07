@@ -67,12 +67,17 @@ describe('SqliteParkedEffectStore', () => {
       ['park', (store: SqliteParkedEffectStore) => store.park(ENTRY)],
       ['find', (store: SqliteParkedEffectStore) => store.find(3)],
       ['clear', (store: SqliteParkedEffectStore) => store.clear(3)],
-    ] as const)('%s', async (_operation, call) => {
+    ] as const)('%s', async (operation, call) => {
       const database = freshDatabase();
       const store = new SqliteParkedEffectStore(database);
       database.close();
       const result = await call(store);
-      expect(result.isErr()).toBe(true);
+      // Every one of these faults is the same closed connection, so the operation is the only
+      // thing telling an operator which store call broke — and this table is the closed set.
+      expect(result._unsafeUnwrapErr()).toMatchObject({
+        kind: 'InfraError',
+        operation: `parked-effects.${operation}`,
+      });
     });
   });
 });

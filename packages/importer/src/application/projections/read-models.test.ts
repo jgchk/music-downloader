@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   APPLIED,
   AUTO_APPLIED,
@@ -24,6 +24,7 @@ import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import { REACTOR_CONSUMER } from '../import/reactor.js';
 import { FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
+import { infraError } from '../ports/errors.js';
 import {
   ImportStatusProjection,
   StalledReadModel,
@@ -109,6 +110,17 @@ describe('projectStatus', () => {
 
     const manual = projectStatus(toImportId('imp-2'), storedAll('imp-2', appliedHistory()));
     expect(manual.acquisitionId).toBeUndefined();
+  });
+
+  it('reads the acquisition from the request itself, not from whatever opens the stream', () => {
+    // The projection folds whatever the log holds: `evolve` is documented to degrade an externally
+    // edited or corrupt history rather than throw, and the view follows it. The acquisition is a
+    // fact OF the request, so it is read off the request wherever the request sits.
+    const view = projectStatus(
+      toImportId('imp-1'),
+      storedAll('imp-1', [MATCH_REVIEW, requested({ source: SOURCE })]),
+    );
+    expect(view.acquisitionId).toBe('acq-1');
   });
 
   it('explains why review was required and what the human chose', () => {
@@ -265,11 +277,16 @@ describe('seedStalledReadModel', () => {
     await deadLetters.record(letter('imp-old', '2026-06-01T00:00:00.000Z'));
     await deadLetters.record(letter('imp-live', '2026-07-21T12:00:00.000Z'));
     const stalled = new StalledReadModel();
+    const logger = silentLogger();
+    const warnSpy = vi.spyOn(logger, 'warn');
 
-    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, logger);
 
     expect(stalled.isStalled('imp-live')).toBe(true);
     expect(stalled.isStalled('imp-old')).toBe(false); // pruned before seeding
+    // A clean boot seeds quietly: a retention warning on every start is how an operator learns to
+    // scroll past the one that finally means something.
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('marks only letters that carry an owning stream (seam letters never stall an import)', async () => {
@@ -295,14 +312,22 @@ describe('seedStalledReadModel', () => {
     expect(stalled.isStalled('imp-live')).toBe(false);
   });
 
-  it('over-retains (keeps marking) when the retention prune fails', async () => {
+  it('over-retains (keeps marking) when the retention prune fails, and says so', async () => {
     const deadLetters = new FakeDeadLetterStore();
     await deadLetters.record(letter('imp-live', '2026-07-21T12:00:00.000Z'));
     deadLetters.failPrune = true;
     const stalled = new StalledReadModel();
+    const logger = silentLogger();
+    const warnSpy = vi.spyOn(logger, 'warn');
 
-    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, silentLogger());
+    await seedStalledReadModel(deadLetters, stalled, REACTOR_CONSUMER, HORIZON, logger);
 
     expect(stalled.isStalled('imp-live')).toBe(true);
+    // Over-retention is survivable but not silent: aged letters go on stalling imports until the
+    // store recovers, and only this line tells an operator that is what they are looking at.
+    expect(warnSpy).toHaveBeenCalledWith(
+      { subscription: REACTOR_CONSUMER, err: infraError('dead-letters.prune', 'boom') },
+      'stalled retention prune failed',
+    );
   });
 });

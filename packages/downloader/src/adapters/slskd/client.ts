@@ -130,6 +130,12 @@ export class SlskdClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
+      // Stryker disable next-line ConditionalExpression: the guard is a *type-level* one. With the
+      // condition forced true the spread yields `body: JSON.stringify(undefined)` — the key present
+      // and undefined — which every `HttpClient` reads identically to an absent key (the fetch
+      // adapter destructures `body` and hands undefined to `fetch`, which sends no body). The
+      // conditional exists so the request satisfies `exactOptionalPropertyTypes`, and a compiler
+      // rule is not a behavior a test can observe.
       ...(body !== undefined && { body: JSON.stringify(body) }),
     });
   }

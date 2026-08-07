@@ -11,7 +11,7 @@ import type {
 } from './events.js';
 import { react } from './react.js';
 import type { Effect } from './react.js';
-import { foldEvents, isTerminal } from './state.js';
+import { foldEvents, hasRemediation, isTerminal } from './state.js';
 import type { ImportPhase, ImportState } from './state.js';
 
 /**
@@ -119,14 +119,17 @@ function openReviewOf(state: ImportState): OpenReview | undefined {
       }),
     };
   }
-  if (state.phase === 'applied' && state.remediation?.status === 'open') {
+  if (hasRemediation(state, 'open')) {
+    // A remediation review lists no candidates and offers no delivery-rejection verb — true, but
+    // unobservable: `permittedActionsFor`'s `remediation-review` arm returns its two verbs outright
+    // and never consults `isAllowed`, so no value here can change the set. Kept because the
+    // parameter is required, and hoisted so the waiver below covers exactly these three mutants.
+    // Stryker disable next-line ObjectLiteral,BooleanLiteral: unread on this path, as argued above
+    const facts = { hasCandidates: false, hasRetainedCandidate: false };
     return {
       cause: { kind: 'remediation-review', failures: state.remediation.failures },
       candidates: [],
-      availableActions: permittedActionsFor('remediation-review', {
-        hasCandidates: false,
-        hasRetainedCandidate: false,
-      }),
+      availableActions: permittedActionsFor('remediation-review', facts),
     };
   }
   return undefined;
@@ -170,7 +173,7 @@ export class Import {
         state.phase === 'rejected'
           ? { reason: state.reason, filesDeleted: state.filesDeleted }
           : undefined,
-      seamWatermark: state.phase === 'empty' ? undefined : state.seamWatermark,
+      seamWatermark: state.seamWatermark,
     };
   }
 }

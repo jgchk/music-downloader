@@ -126,9 +126,12 @@ describe('pollCatchUp', () => {
       throw new Error('follower bug');
     });
 
+    // Catch-up reports two faults under one operation — the store failing to read, and a follower
+    // throwing — and only the message separates them for whoever reads the dead letter.
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
       operation: 'event-bus.pollCatchUp',
+      message: 'catch-up handler failed',
     });
   });
 

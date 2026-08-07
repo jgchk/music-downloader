@@ -144,7 +144,7 @@ describe('deliverDownloadOutcome', () => {
     expect(types(store)).toContain('CandidateRejected');
   });
 
-  it('hands an infrastructure fault back for the supervisor to retry', async () => {
+  it('hands an infrastructure fault back for the supervisor to retry, naming what faulted', async () => {
     const store = await seeded(selectedHistory([candidate]));
     store.failAppends = true;
 
@@ -159,10 +159,15 @@ describe('deliverDownloadOutcome', () => {
       testContext(),
     );
 
-    expect(delivered._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+    // The store's own fault travels out as itself: re-labelling it with this consumer's name
+    // would point the operator at the delivery path instead of at the store that broke.
+    expect(delivered._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'event-store.append',
+    });
   });
 
-  it('hands a concurrency conflict back as a retryable fault', async () => {
+  it('hands a concurrency conflict back as a retryable fault attributed to the delivery', async () => {
     const store = await seeded(selectedHistory([candidate]));
     store.conflictAppends = true;
 
@@ -177,6 +182,10 @@ describe('deliverDownloadOutcome', () => {
       testContext(),
     );
 
-    expect(delivered._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+    // A conflict is not an infrastructure error, so it has no operation of its own — the delivery
+    // names itself as the place that could not land, and carries the conflict as the reason.
+    const error = delivered._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError', operation: 'download-outcome.deliver' });
+    expect(error.message).toContain('ConcurrencyConflict');
   });
 });

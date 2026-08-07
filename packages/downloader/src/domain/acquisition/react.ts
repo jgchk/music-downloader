@@ -68,6 +68,17 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
         ? [{ type: 'Search', target: state.target, round: event.round }]
         : [];
     }
+    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent on every history
+    // the decider can mint. Deleting or emptying this arm falls through to `DownloadStarted`,
+    // which returns the same `Download` effect under the same phase guard, differing only in
+    // reading the candidate from `state.current` rather than from the event. Those two agree by
+    // construction: `evolve` reaches `Downloading` only via its own `CandidateSelected` case,
+    // which sets `current` from the event — so as of this event they are the same candidate. (They
+    // can diverge only on a corrupted stream that splices a selection onto an already-downloading
+    // acquisition, where the tolerant fold ignores the event; that divergence is documented in
+    // `state.property.test.ts` and deliberately not asserted anywhere.) The arms stay separate
+    // because this one reads the full candidate its event carries (D3), while `DownloadStarted`
+    // carries only an identity and must reach into state for the rest.
     case 'CandidateSelected': {
       return state.phase === 'Downloading'
         ? [{ type: 'Download', candidate: event.candidate, policy: state.policies.download }]
@@ -99,6 +110,11 @@ export function react(event: AcquisitionEvent, state: AcquisitionState): readonl
         ? [{ type: 'Import', files: state.downloadedFiles, target: state.target }]
         : [];
     }
+    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — deleting or
+    // emptying this arm falls through to `Imported`, the next arm, whose body is character-for-
+    // character the same expression (`Cleanup` over `event.files ?? []`, a field both events
+    // declare as optional). No test can tell the two roads apart; the arms stay separate because
+    // they clean up for different reasons, each stated in its own comment.
     case 'CandidateRejected': {
       // A rejected candidate's staged files must never reach the library (D13). The files ride on
       // the event (stamped by `decide` at mint time), so cleanup targets slskd's reported location

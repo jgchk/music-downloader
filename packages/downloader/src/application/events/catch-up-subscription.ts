@@ -105,6 +105,9 @@ export class CatchUpSubscription {
   private cursor = 0;
   private halted = false;
   private running = false;
+  // Stryker disable next-line BooleanLiteral: equivalent — `runCycles()` assigns `pending = false`
+  // at the top of its loop before anything reads it, so this initialiser is never observed. The
+  // field needs an initialiser (strict property initialisation), so there is nothing to delete.
   private pending = false;
   private resets = 0;
   private resetQueue: Promise<void> = Promise.resolve();

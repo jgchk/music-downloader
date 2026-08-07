@@ -51,10 +51,22 @@ export interface RemediationState {
 
 export interface EmptyState {
   readonly phase: 'empty';
+  /**
+   * Declared, and only ever absent: a stream with no cycle has recorded no delivery. Stating the
+   * absence here — rather than narrowing on the phase at every read — makes `seamWatermark`
+   * uniformly readable across the whole union, and removes three copies of a guard that only ever
+   * satisfied the type checker (the unguarded read yields `undefined` on this phase either way).
+   */
+  readonly seamWatermark?: undefined;
 }
 export interface RequestedState extends Requested {
   readonly phase: 'requested';
   readonly candidates: readonly ProposedCandidate[];
+  /**
+   * Never pinned, for the same reason and in the same shape as {@link EmptyState.seamWatermark}: a
+   * pin can only arrive on the `supply-id` that moves the import to `proposing`.
+   */
+  readonly pinnedId?: undefined;
 }
 export interface ProposingState extends Requested {
   readonly phase: 'proposing';
@@ -109,6 +121,21 @@ export const initialState: EmptyState = { phase: 'empty' };
 /** Terminal for the submitted files: they either entered the library or were deleted. */
 export function isTerminal(state: ImportState): boolean {
   return state.phase === 'applied' || state.phase === 'rejected';
+}
+
+/** An applied import that is actually carrying a remediation review. */
+export type RemediatingState = AppliedState & { readonly remediation: RemediationState };
+
+/**
+ * Is this import's remediation review in `status`? Stated once, because `remediation` is declared on
+ * {@link AppliedState} alone: every question about it is also a question about the phase, and four
+ * callers were spelling that pairing out for themselves.
+ */
+export function hasRemediation(
+  state: ImportState,
+  status: RemediationState['status'],
+): state is RemediatingState {
+  return state.phase === 'applied' && state.remediation?.status === status;
 }
 
 function requestedOf(state: Exclude<ImportState, EmptyState>): Requested {
@@ -195,10 +222,7 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         hints: event.hints,
         policy: event.policy,
         source: event.source,
-        seamWatermark: maxWatermark(
-          state.phase === 'empty' ? undefined : state.seamWatermark,
-          event.source?.feedPosition,
-        ),
+        seamWatermark: maxWatermark(state.seamWatermark, event.source?.feedPosition),
         candidates: [],
       };
     }
@@ -236,7 +260,7 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
       if (state.phase === 'awaiting-review' && state.settled === undefined) {
         return evolveResolved(state, event.resolution);
       }
-      if (state.phase === 'applied' && state.remediation?.status === 'open') {
+      if (hasRemediation(state, 'open')) {
         // Remediation verbs: accept closes the item; retry-enrichment marks the re-apply in flight.
         return event.resolution.kind === 'retry-enrichment'
           ? { ...state, remediation: { failures: state.remediation.failures, status: 'retrying' } }

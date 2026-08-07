@@ -29,11 +29,12 @@ const gone = payload([]);
 const present = (state: string, id = 'live-id'): HttpResponse =>
   payload([{ id, filename: String.raw`@@a\Album\01.flac`, state }]);
 
-function fakeTimer(): Timer {
+function fakeTimer(sleeps: number[]): Timer {
   let current = 0;
   return {
     now: () => current,
     sleep: (ms) => {
+      sleeps.push(ms);
       current += ms;
       return Promise.resolve();
     },
@@ -48,8 +49,11 @@ function remover(
   remover: SlskdResourceRemover;
   deletes: string[];
   getCount: () => number;
+  /** Every wait the remover took between rounds, in milliseconds. */
+  sleeps: number[];
 } {
   const deletes: string[] = [];
+  const sleeps: number[] = [];
   const queue = [...gets];
   let requestCount = 0;
   const http: HttpClient = {
@@ -64,9 +68,10 @@ function remover(
     },
   };
   return {
-    remover: new SlskdResourceRemover(silentLogger(), new SlskdClient(http), fakeTimer(), 10),
+    remover: new SlskdResourceRemover(silentLogger(), new SlskdClient(http), fakeTimer(sleeps), 10),
     deletes,
     getCount: () => requestCount,
+    sleeps,
   };
 }
 
@@ -166,8 +171,34 @@ describe('SlskdResourceRemover', () => {
     expect(getCount()).toBe(1);
   });
 
+  it('leaves another tenant’s transfer alone even while holding a captured GUID', async () => {
+    // Holding a GUID widens *how* our own transfer can be recognised; it must not widen *what*
+    // counts as ours. A record matching neither the filename nor the GUID is someone else's.
+    const foreign = payload([
+      { id: 'someone-else', filename: String.raw`@@a\Other\9.flac`, state: 'InProgress' },
+    ]);
+    const { remover: r, deletes } = remover([foreign]);
+
+    const result = await r.remove(transfer('guid-9'));
+
+    expect(result._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([]);
+  });
+
+  it('does not adopt an id-less foreign transfer when no GUID was ever captured', async () => {
+    // With no GUID to match on, the filename is the only claim of ownership — a record that
+    // carries neither must not be swept out from under whoever does own it.
+    const foreign = payload([{ filename: String.raw`@@a\Other\9.flac`, state: 'InProgress' }]);
+    const { remover: r, deletes } = remover([foreign]);
+
+    const result = await r.remove(transfer());
+
+    expect(result._unsafeUnwrap()).toBe(true);
+    expect(deletes).toEqual([]);
+  });
+
   it('reports a lingering transfer unconfirmed after the retry bound', async () => {
-    const { remover: r, deletes } = remover([present('InProgress')]); // never transitions
+    const { remover: r, deletes, sleeps } = remover([present('InProgress')]); // never transitions
 
     // Cancelled each round but never terminal, so it is left for the next boot's sweep.
     const removalResult9 = await r.remove(transfer('live-id'));
@@ -177,6 +208,25 @@ describe('SlskdResourceRemover', () => {
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
       'http://localhost:5030/api/v0/transfers/downloads/u1/live-id?remove=false',
     ]);
+    // Cancellation transitions asynchronously, so each round waits the configured interval for it;
+    // rounds that raced back at once would spend the whole bound inside slskd's transition window.
+    expect(sleeps).toEqual([10, 10]);
+  });
+
+  it('confirms the removal when the record disappears on the final check', async () => {
+    // The bound is on the cancel→remove rounds, not on the confirmation: a record that is gone by
+    // the last look is gone, and its ledger row is retired rather than left for the next boot.
+    const { remover: r, deletes } = remover([
+      present('InProgress'),
+      present('InProgress'),
+      present('InProgress'),
+      gone,
+    ]);
+
+    const result = await r.remove(transfer('live-id'));
+
+    expect(result._unsafeUnwrap()).toBe(true);
+    expect(deletes).toHaveLength(3);
   });
 
   it('treats a 404 transfer listing as already-gone: confirms the removal (prod 2026-07-22)', async () => {

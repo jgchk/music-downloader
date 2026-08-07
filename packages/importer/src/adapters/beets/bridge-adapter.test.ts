@@ -275,6 +275,19 @@ describe('apply', () => {
     });
   });
 
+  it('reports a failed apply under its own operation, not another verb’s', async () => {
+    // The three verbs fail into one retryable InfraError, so the operation is what tells an
+    // operator (and a dead letter) which bridge call stalled the import.
+    const runner = runnerReturning(completed('', { code: 1, stderr: 'boom' }));
+
+    const applyFailure = await bridge(runner).apply('/intake/a', { kind: 'as-is' }, testScope());
+
+    expect(applyFailure._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'bridge.apply',
+    });
+  });
+
   it('translates an apply refusal to a doomed outcome', async () => {
     const runner = runnerReturning(
       completed(JSON.stringify({ status: 'doomed', kind: 'candidate-not-found', reason: 'nope' })),
@@ -301,6 +314,12 @@ describe('validate', () => {
     );
     const validateResult = await bridge(runner).validate();
     const config = validateResult._unsafeUnwrap();
+    expect(runner.calls[0]).toEqual([
+      '/app/bridge.py',
+      '--config',
+      '/config/beets/config.yaml',
+      'validate',
+    ]);
     expect(config).toEqual({
       beetsVersion: '2.12.0',
       libraryDatabase: '/config/beets/library.db',
@@ -331,10 +350,14 @@ describe('validate', () => {
 });
 
 describe('failure surfaces', () => {
+  // Every fault below is the same retryable InfraError from the same verb, so each test pins the
+  // operation as well as the message: together they are the whole of what an operator gets when
+  // the reactor parks or dead-letters the effect.
   it('maps a timeout to an InfraError', async () => {
     const runner = runnerReturning(completed('', { timedOut: true }));
     const proposeResult4 = await bridge(runner).propose('/intake/a', {}, testScope());
     const error = proposeResult4._unsafeUnwrapErr();
+    expect(error.operation).toBe('bridge.propose');
     expect(error.message).toContain('timed out after 1000ms');
   });
 
@@ -342,8 +365,21 @@ describe('failure surfaces', () => {
     const runner = runnerReturning(completed('', { code: 1, stderr: 'Traceback: boom' }));
     const proposeResult5 = await bridge(runner).propose('/intake/a', {}, testScope());
     const error = proposeResult5._unsafeUnwrapErr();
+    expect(error.operation).toBe('bridge.propose');
     expect(error.message).toContain('bridge exited 1');
     expect(error.message).toContain('Traceback: boom');
+  });
+
+  it('keeps the tail of a flood of stderr, where a Python traceback names its cause', async () => {
+    // This message is persisted on the parked effect and read by an operator. An unbounded dump
+    // of the bridge's stderr would bury the cause — which, in a traceback, is at the very end.
+    const runner = runnerReturning(
+      completed('', { code: 1, stderr: `${'x'.repeat(5000)}\nValueError: no such album` }),
+    );
+    const floodResult = await bridge(runner).propose('/intake/a', {}, testScope());
+    const error = floodResult._unsafeUnwrapErr();
+    expect(error.message).toContain('ValueError: no such album');
+    expect(error.message).not.toContain('x'.repeat(2001));
   });
 
   it('reports a signal-terminated bridge distinctly', async () => {
@@ -381,13 +417,19 @@ describe('failure surfaces', () => {
     expect(joined).toContain('propose');
   });
 
-  it('stays quiet when a successful run writes nothing to stderr', async () => {
+  // Whitespace is not a diagnostic: a bridge that exits 0 having written only a stray newline has
+  // reported nothing, and warning on it would cry wolf on runs that are entirely healthy.
+  it.each([
+    ['nothing at all', ''],
+    ['a bare newline', '\n'],
+    ['blank padding', ' \n\t '],
+  ])('stays quiet when a successful run writes %s to stderr', async (_case, stderr) => {
     const lines: string[] = [];
     const logger = createLogger({
       level: 'warn',
       destination: { write: (line: string) => void lines.push(line) },
     });
-    const runner = runnerReturning(completed(PROPOSAL_JSON));
+    const runner = runnerReturning(completed(PROPOSAL_JSON, { stderr }));
     const proposeQuiet = await new BeetsBridge(logger, CONFIG, runner).propose(
       '/intake/a',
       {},
@@ -407,10 +449,21 @@ describe('failure surfaces', () => {
     expect(error.message).toContain('non-JSON output');
   });
 
+  it('keeps the head of a flood of non-JSON output, where the garbage begins', async () => {
+    // The opposite end from stderr, deliberately: what a `JSON.parse` failure needs is the start
+    // of the output — the traceback or usage banner the bridge printed instead of a document.
+    const runner = runnerReturning(completed(`Usage: bridge.py [-h]\n${'y'.repeat(5000)}`));
+    const floodResult = await bridge(runner).propose('/intake/a', {}, testScope());
+    const error = floodResult._unsafeUnwrapErr();
+    expect(error.message).toContain('Usage: bridge.py');
+    expect(error.message).not.toContain('y'.repeat(501));
+  });
+
   it('maps contract drift (schema mismatch) to an InfraError, never silent misbehavior', async () => {
     const runner = runnerReturning(completed(JSON.stringify({ status: 'proposal' })));
     const proposeResult8 = await bridge(runner).propose('/intake/a', {}, testScope());
     const error = proposeResult8._unsafeUnwrapErr();
+    expect(error.operation).toBe('bridge.propose');
     expect(error.message).toContain('contract validation');
   });
 
@@ -474,6 +527,7 @@ describe('failure surfaces', () => {
     const runner: CommandRunner = { run: () => Promise.reject(new Error('ENOENT')) };
     const proposeResult9 = await bridge(runner).propose('/intake/a', {}, testScope());
     const error = proposeResult9._unsafeUnwrapErr();
+    expect(error.operation).toBe('bridge.propose');
     expect(error.message).toContain('bridge spawn failed');
   });
 });

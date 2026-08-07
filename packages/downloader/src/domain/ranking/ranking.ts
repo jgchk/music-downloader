@@ -37,6 +37,11 @@ export function candidateQualityBucket(candidate: Candidate, policy: QualityPoli
   if (buckets.length === 0) return 'UNKNOWN';
   let worst = buckets[0]!;
   for (const bucket of buckets) {
+    // Stryker disable next-line EqualityOperator: `>=` is equivalent. `bucketRank` is `indexOf`, so
+    // two distinct buckets can only share a rank by both being absent from the policy order, where
+    // both rank Infinity — and every consumer of this verdict (`isFloorMet`, `compareQuality`)
+    // compares ranks alone, so keeping the first or the last of an equal-rank pair is the same
+    // answer. When the ranks do differ, `>` and `>=` cannot disagree.
     if (bucketRank(policy, bucket) > bucketRank(policy, worst)) worst = bucket;
   }
   return worst;

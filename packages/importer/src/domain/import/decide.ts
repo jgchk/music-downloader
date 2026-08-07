@@ -5,7 +5,7 @@ import { candidateReferenceKey } from './events.js';
 import type { DuplicateIncumbent, ImportEvent, ProposedCandidate, Resolution } from './events.js';
 import { isNonEmpty } from '../shared/non-empty-array.js';
 import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
-import { isTerminal } from './state.js';
+import { hasRemediation, isTerminal } from './state.js';
 import type { AppliedState, AwaitingReviewState, ImportState } from './state.js';
 
 /**
@@ -41,6 +41,20 @@ function bestOf(candidates: NonEmptyReadonlyArray<ProposedCandidate>): ProposedC
   return best;
 }
 
+/**
+ * Is this submission a NEW delivery for the stream? Only a sourced submission is a delivery at all
+ * (a manual resubmission carries no position and is never one), and it is new when it sits past
+ * every position the stream ever recorded — or when the stream has no watermark to compare against.
+ * Anything else is a redelivery of a position this stream has already run.
+ *
+ * The one place the rule is written down, because `decide` needs it in both directions: a live
+ * cycle refuses a new delivery, and a settled one converges everything that is not new.
+ */
+function isNewDelivery(watermark: number | undefined, incoming: number | undefined): boolean {
+  if (incoming === undefined) return false;
+  return watermark === undefined || incoming > watermark;
+}
+
 function decideProposal(
   state: ImportState,
   candidates: readonly ProposedCandidate[],
@@ -57,10 +71,7 @@ function decideProposal(
   // prior supply-id re-propose, or the original submission hint. `hinted` stays exactly its old
   // boolean (an id was in play); the id itself rides along so a reader can tell a contradicted hint
   // (best candidate's album id differs) from a merely-weak match on the pinned release.
-  const hintedReleaseId =
-    pinnedId ??
-    (state.phase === 'proposing' ? state.pinnedId : undefined) ??
-    state.hints?.mbReleaseId;
+  const hintedReleaseId = pinnedId ?? state.pinnedId ?? state.hints?.mbReleaseId;
   const isHinted = hintedReleaseId !== undefined;
   if (best.distance > state.policy.autoApplyThreshold) {
     // A weak — or hint-contradicted — match goes to a human with the evidence: the candidate list
@@ -171,26 +182,14 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
       // terminal starts a fresh cycle — the shipped consumer's converge-first ordering is
       // what protects that legacy population.
       const incoming = command.source?.feedPosition;
+      const watermark = state.seamWatermark;
       if (state.phase !== 'empty' && !isTerminal(state)) {
-        const watermark = state.seamWatermark;
-        if (incoming !== undefined && (watermark === undefined || incoming > watermark)) {
-          return err({ kind: 'CycleInFlight' });
-        }
+        if (isNewDelivery(watermark, incoming)) return err({ kind: 'CycleInFlight' });
         return NOTHING;
       }
-      const watermark = state.phase === 'empty' ? undefined : state.seamWatermark;
-      // Stryker disable next-line LogicalOperator: equivalent mutant. Turning this `&&` into `||`
-      // cannot change the outcome, because the only use below guards a comparison against both
-      // values: whenever either is `undefined` that comparison is false regardless, and whenever
-      // both are defined the two operators agree. No test can distinguish them.
-      //
-      // Hoisted onto its own line for exactly that reason — the suppression is line-scoped, and on
-      // the combined condition it also covered the outer `&&`, which IS killable and is now left
-      // audited where it belongs.
-      const hasBothPositions = watermark !== undefined && incoming !== undefined;
-      if (hasBothPositions && incoming <= watermark) {
-        return NOTHING;
-      }
+      // Settled or fresh: a delivery the stream has already seen converges. A manual resubmission
+      // carries no position at all, so it is never compared and always starts a fresh cycle.
+      if (incoming !== undefined && !isNewDelivery(watermark, incoming)) return NOTHING;
       return ok([
         {
           type: 'ImportRequested',
@@ -205,7 +204,7 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
       return decideProposal(state, command.candidates, command.duplicates, command.pinnedId);
     }
     case 'RecordApplied': {
-      const isRetrying = state.phase === 'applied' && state.remediation?.status === 'retrying';
+      const isRetrying = hasRemediation(state, 'retrying');
       if (!isRetrying && state.phase !== 'applying') return NOTHING; // stale outcome
       const applied: ImportEvent = { type: 'ImportApplied', location: command.location };
       return ok(

@@ -16,6 +16,26 @@ function ffprobeJson(streams: unknown[], format?: unknown): CommandResult {
   return { code: 0, stdout: JSON.stringify({ streams, format }), stderr: '', timedOut: false };
 }
 
+interface RunCall {
+  readonly command: string;
+  readonly arguments_: readonly string[];
+  readonly timeoutMs: number;
+}
+
+/** A {@link runner} that also records how each binary was invoked. */
+function recordingRunner(calls: RunCall[], probe: CommandResult, decode: CommandResult) {
+  const inner = runner(probe, decode);
+  return {
+    run: (command: string, arguments_: readonly string[], timeoutMs: number) => {
+      calls.push({ command, arguments_, timeoutMs });
+      return inner.run(command, arguments_, timeoutMs);
+    },
+  } satisfies CommandRunner;
+}
+
+/** Healthy ffprobe output for a readable file, where the test's subject is not the metadata. */
+const FLAC_META = ffprobeJson([{ codec_type: 'audio', codec_name: 'flac', duration: '10' }]);
+
 function probeWith(runnerImpl: CommandRunner): FfmpegAudioProbe {
   return new FfmpegAudioProbe(runnerImpl);
 }
@@ -49,6 +69,50 @@ describe('FfmpegAudioProbe', () => {
       bitrate: 900_000,
       channels: 2,
     });
+  });
+
+  it('validates playability with a full decode-to-null pass, not a header parse', async () => {
+    // A truncated or corrupt P2P download parses its header perfectly; only decoding every frame
+    // catches it. `-i <file> -f null -` is what makes ffmpeg decode-and-discard rather than
+    // inspect, and `-v error` keeps ffmpeg's banner out of the stderr this adapter logs as the
+    // operator's diagnosis. (ffprobe's own argument list is pinned in the contract tier, where it
+    // has to match the arguments the recorded fixtures were captured with.)
+    const calls: RunCall[] = [];
+
+    await probeWith(recordingRunner(calls, FLAC_META, OK)).probe('/staging/01.flac', testScope());
+
+    const decode = calls.find((call) => call.command === 'ffmpeg');
+    expect(decode?.arguments_).toEqual([
+      '-v',
+      'error',
+      '-i',
+      '/staging/01.flac',
+      '-f',
+      'null',
+      '-',
+    ]);
+  });
+
+  it('applies a configured per-run kill budget to both binaries', async () => {
+    const calls: RunCall[] = [];
+    const probe = new FfmpegAudioProbe(recordingRunner(calls, FLAC_META, OK), {
+      timeoutMs: 5000,
+    });
+
+    await probe.probe('/x.flac', testScope());
+
+    expect(calls.map((call) => call.timeoutMs)).toEqual([5000, 5000]);
+  });
+
+  it('still bounds every run when the config declares no kill budget', async () => {
+    // "A run always terminates" has to hold for a caller that configured nothing: an unbounded
+    // ffmpeg on a stalled staging mount wedges the reactor's dispatch forever.
+    const calls: RunCall[] = [];
+
+    await probeWith(recordingRunner(calls, FLAC_META, OK)).probe('/x.flac', testScope());
+
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect(call.timeoutMs).toBeGreaterThan(0);
   });
 
   it('marks a file unplayable when the decode pass fails', async () => {
@@ -106,6 +170,25 @@ describe('FfmpegAudioProbe', () => {
 
     expect(result._unsafeUnwrap().decodedCleanly).toBe(false);
     expect(lines.join('')).toContain('moov atom not found');
+  });
+
+  it('warns about neither pass when the decode and the metadata read both succeed', async () => {
+    // Those two warn lines exist to expose a *systematic* environmental fault — bad permissions, a
+    // codec missing from the image — reading every candidate as "corrupt". One emitted on every
+    // healthy file would bury exactly the signal they were added for.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    const result = await new FfmpegAudioProbe(runner(FLAC_META, OK)).probe('/x.flac', {
+      context: testContext(),
+      logger,
+    });
+
+    expect(result._unsafeUnwrap().decodedCleanly).toBe(true);
+    expect(lines).toEqual([]);
   });
 
   it('surfaces a timed-out run as an InfraError, never as a bad-file verdict', async () => {
@@ -222,9 +305,14 @@ describe('FfmpegAudioProbe', () => {
     expect(result.bitDepth).toBeUndefined();
   });
 
-  it('reads an empty-string numeric field as absent rather than zero', async () => {
+  it.each([
+    ['an empty string', ''],
+    ['whitespace', ' '],
+  ])('reads a numeric field that is %s as absent rather than a real zero', async (_case, raw) => {
+    // `Number('')` and `Number(' ')` are both `0`, not `NaN`. A blank sample rate that became a
+    // measured 0 Hz would reach the quality policy as a genuine reading of the file.
     const meta = ffprobeJson([
-      { codec_type: 'audio', codec_name: 'flac', duration: '10', sample_rate: '' },
+      { codec_type: 'audio', codec_name: 'flac', duration: '10', sample_rate: raw },
     ]);
 
     const probeResult = await probeWith(runner(meta, OK)).probe('/x.flac', testScope());
@@ -244,6 +332,14 @@ describe('FfmpegAudioProbe', () => {
     expect(error.kind).toBe('InfraError');
     expect(error.operation).toBe('ffmpeg.probe');
     expect(error.message).toContain('ffprobe');
+    // Unreadable output and *schema-drifted* output are two different operator situations, so the
+    // report has to say which one happened rather than collapsing both into "bad ffprobe output".
+    expect(error.message).toContain('non-JSON output');
+    // What ffprobe actually emitted, and where it stopped being JSON, lives only in the parse
+    // error: the message above is the wrapper's own words. Dropping the cause chain would leave an
+    // operator holding "not JSON" and nothing to look at.
+    expect(error.cause).toBeInstanceOf(Error);
+    expect((error.cause as Error).cause).toBeInstanceOf(SyntaxError);
   });
 
   it('surfaces an InfraError when ffprobe JSON violates the consumed contract shape', async () => {
@@ -261,6 +357,7 @@ describe('FfmpegAudioProbe', () => {
     const error = result._unsafeUnwrapErr();
     expect(error.kind).toBe('InfraError');
     expect(error.message).toContain('ffprobe');
+    expect(error.message).toContain('failed contract validation'); // not "emitted non-JSON output"
   });
 
   it('surfaces a failure to spawn the binaries as an InfraError', async () => {

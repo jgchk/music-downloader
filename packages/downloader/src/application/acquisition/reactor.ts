@@ -77,6 +77,9 @@ export class Reactor {
   private unsubscribe: (() => void) | undefined;
   private stopInterval: (() => void) | undefined;
   private running = false;
+  // Stryker disable next-line BooleanLiteral: equivalent — `drain()` assigns `pending = false` at
+  // the top of its loop before anything reads it, so this initialiser is never observed. The field
+  // needs an initialiser (strict property initialisation), so there is nothing here to delete.
   private pending = false;
   private stopped = false;
   /** The dispatch mutex: drain passes and the startup re-drive serialize through this chain. */
@@ -403,7 +406,15 @@ export class Reactor {
     switch (classifyCommandError(error)) {
       case 'permanent': {
         const isLanded = await this.lander.land(stored, effect, error, 1, scope);
-        return isLanded ? { kind: 'stop' } : { kind: 'retry', effect, error };
+        if (isLanded) {
+          // Stryker disable next-line ObjectLiteral,StringLiteral: equivalent — `stop` is a unit
+          // value. `dispatchEvent` is its only consumer and tests solely for `kind === 'retry'`,
+          // halting on everything else, so no mutation of this literal changes an outcome. It
+          // stays a named variant because the two halts are different reasons, not because any
+          // code reads the name.
+          return { kind: 'stop' };
+        }
+        return { kind: 'retry', effect, error };
       }
       case 'retryable': {
         return { kind: 'retry', effect, error };
@@ -415,6 +426,9 @@ export class Reactor {
           { acquisitionId: stored.streamId, effect: effect.type, err: error },
           'effect follow-on rejected as stale; advancing past it',
         );
+        // Stryker disable next-line ObjectLiteral,StringLiteral: equivalent, for the same reason
+        // as the `stop` returned by the `permanent` arm above — `dispatchEvent` branches only on
+        // `kind === 'retry'`.
         return { kind: 'stop' };
       }
     }

@@ -39,6 +39,10 @@ const AUDIO_EXTENSIONS: ReadonlySet<string> = new Set([
 
 function fileExtension(name: string): string {
   const dot = name.lastIndexOf('.');
+  // Stryker disable next-line StringLiteral: equivalent. The sentinel only has to be a string that
+  // is not an audio extension — `AUDIO_EXTENSIONS.has(…)` is its one consumer — so no test can tell
+  // one such string from another. What the guard itself decides IS pinned: an extensionless file is
+  // not audio just because its whole name reads like a codec.
   return dot === -1 ? '' : name.slice(dot + 1).toLowerCase();
 }
 
@@ -143,5 +147,8 @@ export function scoreMatch(
     weighted += score * signal.weight;
     totalWeight += signal.weight;
   }
-  return clampUnit(totalWeight === 0 ? 0 : weighted / totalWeight);
+  // No `totalWeight === 0 ? 0 : …` guard: a zero total weight means no signal contributed, so
+  // `weighted` is zero too and the mean is `0/0`, which `clampUnit` is documented to collapse to 0.
+  // The guard could never change the answer — an equivalent condition, removed rather than waived.
+  return clampUnit(weighted / totalWeight);
 }

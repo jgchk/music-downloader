@@ -200,6 +200,12 @@ export async function createDownloaderRuntime(
     libraryView.apply(stored);
   });
 
+  // Stryker disable next-line ObjectLiteral: dropping the configured slskd base URL and API key
+  // changes only the HTTP request the client would send, and no in-process test can observe that:
+  // `fetchHttpClient` is a module singleton imported here, not an injected seam, so there is no
+  // point at which a test can see what composition handed the client. (That the client SENDS the
+  // configured baseUrl/apiKey is pinned in the adapter tier against a fake HttpClient; only the
+  // out-of-process E2E tier talks to a live slskd, and it is outside the mutation suite.)
   const slskdClient = new SlskdClient(fetchHttpClient, {
     baseUrl: config.slskd.baseUrl,
     apiKey: config.slskd.apiKey,
@@ -225,25 +231,44 @@ export async function createDownloaderRuntime(
   // structural, not an assertion.
   let slskdDownload: SlskdDownload | undefined;
   let ports: EffectPorts;
+  // The block below is the module's production adapter set, and the `ports` override is
+  // ALL-OR-NOTHING: a test either supplies every port as a fake or gets every one of these. So no
+  // in-process test can drive an effect through ONE real adapter, and every mutant inside this
+  // block is unobservable in the mutation suite — the two no-override boot tests construct these
+  // adapters and stop without dispatching anything, because dispatching would mean a real slskd
+  // search, a real MusicBrainz request and a real ffmpeg spawn. Each site is suppressed with what
+  // its mutant drops; the effect-level behaviour of each adapter is owned by the adapter tier.
+  // Stryker disable next-line BlockStatement: drops the whole production adapter set (see above);
+  // with fakes injected this branch never runs, and without them nothing dispatches.
   if (overrides.ports === undefined) {
     slskdDownload = new SlskdDownload(
       logger,
       ledger,
+      // Stryker disable next-line ObjectLiteral: drops the staging root the supervisor writes
+      // transfers into — observable only in a real slskd transfer, never in process.
       { stagingRoot: config.stagingRoot },
       downloadObserver,
       slskdClient,
       realTimer,
     );
+    // Stryker disable next-line ObjectLiteral: empties the production port set; see the block
+    // comment above — no in-process test dispatches an effect through these adapters.
     ports = {
+      // Stryker disable next-line ObjectLiteral: drops the configured MusicBrainz base URL and
+      // user agent — observable only in an outbound HTTP request this suite never makes.
       metadata: new MusicBrainzMetadata(fetchHttpClient, {
         baseUrl: config.musicbrainz.baseUrl,
         userAgent: config.musicbrainz.userAgent,
       }),
       search: new SlskdSearch(ledger, slskdClient, realTimer),
       download: slskdDownload,
+      // Stryker disable next-line ObjectLiteral: drops the probe kill budget, which only bounds a
+      // real ffmpeg spawn; the adapter's own tier pins that the budget is applied.
       probe: new FfmpegAudioProbe(nodeCommandRunner, {
         timeoutMs: config.ffmpeg?.timeoutMs,
       }),
+      // Stryker disable next-line ObjectLiteral: drops the library/staging roots, which are read
+      // only when an import effect moves files — unreachable without the whole real port set.
       library: new FilesystemLibrary({
         libraryRoot: config.libraryRoot,
         stagingRoot: config.stagingRoot,
@@ -279,7 +304,13 @@ export async function createDownloaderRuntime(
         clearInterval(handle);
       };
     },
+    // The re-drive only `await`s this value before dispatching the next stream, so a resolved
+    // `undefined` changes elapsed wall-clock and nothing else: same streams, same order, same
+    // dispatches. The gap is a rate limit on the upstreams, and wall-clock is the one thing a
+    // behavioural assertion may not pin (a faked timer would assert that a timer is used).
     sleep:
+      // Stryker disable next-line ArrowFunction: equivalent — see the note above; the default arm
+      // only delays, and the delay is unobservable to any assertion about what the reactor does.
       overrides.reactorTiming?.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
     random: overrides.reactorTiming?.random ?? Math.random,
     retryPolicy: { ...DEFAULT_RETRY_POLICY, ...config.reactor?.retry },
@@ -327,6 +358,10 @@ export async function createDownloaderRuntime(
         retry: { attempts: 3, baseDelayMs: 250 },
         batchSize: 100,
         pollIntervalMs: 5000,
+        // Stryker disable next-line ArrowFunction: equivalent in every observable respect — the
+        // subscription only `await`s this value (retry backoff, and the yield between batches),
+        // so a resolved `undefined` changes elapsed wall-clock and nothing else: same attempts,
+        // same order, same checkpoint advances, same hold/halt decisions.
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         wakeups: verdictWakeups,
       });

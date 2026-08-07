@@ -63,6 +63,22 @@ describe('evolve — the tolerant, total fold', () => {
     expect(state).toMatchObject({ phase: 'requested', candidates: [candidate()] });
   });
 
+  it('replaces the candidate list when a re-proposal lands while proposing', () => {
+    // A supply-id/refresh sends the import back to `proposing`, and the answer that comes back is
+    // what the review must show. Ignoring it here would leave the human staring at the candidates
+    // the re-proposal was asked to replace.
+    const reProposed = candidate({
+      ref: { dataSource: 'MusicBrainz', albumId: 'album-2' },
+      distance: asDistance(0.4),
+    });
+    const state = foldEvents([
+      ...awaitingMatchReview(),
+      resolved({ kind: 'supply-id', mbReleaseId: 'mb-2' }),
+      proposed([reProposed]),
+    ]);
+    expect(state).toMatchObject({ phase: 'proposing', candidates: [reProposed] });
+  });
+
   it('ignores CandidatesProposed outside a proposing phase', () => {
     const state = foldEvents(appliedHistory());
     expect(evolve(state, proposed([candidate()]))).toBe(state);
@@ -74,6 +90,21 @@ describe('evolve — the tolerant, total fold', () => {
       phase: 'applying',
       mode: { kind: 'candidate', ref: { dataSource: 'MusicBrainz', albumId: 'album-1' } },
       candidates: [candidate()],
+    });
+  });
+
+  it('moves to applying when a re-proposal comes back strong enough to auto-apply', () => {
+    // The second half of the supply-id loop: a re-proposal that clears the threshold must advance
+    // the import, or a pinned release strands in `proposing` with nothing left to move it.
+    const state = foldEvents([
+      ...awaitingMatchReview(),
+      resolved({ kind: 'supply-id', mbReleaseId: 'mb-2' }),
+      proposed([candidate()]),
+      AUTO_APPLIED,
+    ]);
+    expect(state).toMatchObject({
+      phase: 'applying',
+      mode: { kind: 'candidate', ref: { dataSource: 'MusicBrainz', albumId: 'album-1' } },
     });
   });
 
@@ -99,6 +130,22 @@ describe('evolve — the tolerant, total fold', () => {
       { type: 'ReviewRequired', cause: { kind: 'duplicate-review', incumbents: [INCUMBENT] } },
     ]);
     expect(state).toMatchObject({ phase: 'awaiting-review', cause: { kind: 'duplicate-review' } });
+  });
+
+  it('returns a re-proposal that is still weak to the human, carrying its new cause', () => {
+    // The other half of the supply-id loop: a re-proposal that is no better goes back to review
+    // rather than resting in `proposing`, where nothing would ever ask about it again.
+    const state = foldEvents([
+      ...awaitingMatchReview(),
+      resolved({ kind: 'refresh-candidates' }),
+      proposed([candidate({ distance: asDistance(0.7) })]),
+      MATCH_REVIEW,
+    ]);
+    expect(state).toMatchObject({
+      phase: 'awaiting-review',
+      cause: { kind: 'match-review' },
+      candidates: [candidate({ distance: asDistance(0.7) })],
+    });
   });
 
   it('ignores ReviewRequired in a terminal phase', () => {

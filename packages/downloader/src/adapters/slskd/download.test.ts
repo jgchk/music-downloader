@@ -24,6 +24,16 @@ const SILENT_SCOPE: OperationScope = { context: testContext(), logger: silentLog
 const STAGING = '/staging';
 const DOWNLOADS_ROOT = '/downloads';
 const ACQ = 'acq-1';
+/**
+ * The wall-clock the fake clocks below start from. Deliberately NOT zero: every budget the watch
+ * enforces is an *elapsed* time measured against `Timer.now()`, which in production is `Date.now()`.
+ * A clock whose origin is zero makes "now minus the mark" and "now plus the mark" agree, so the
+ * budgets would be pinned only for a clock no deployment ever has.
+ */
+const CLOCK_EPOCH = 1_770_000_000_000;
+/** The two persistent-failure loops' retry lines — asserted often enough to be worth naming. */
+const TICK_RETRY = 'download watch tick failed; retrying on the next tick';
+const DELIVERY_RETRY = 'download outcome delivery failed; retrying on the watch cadence';
 const candidate: Candidate = {
   identity: asCandidateIdentity({ username: 'u1', path: String.raw`@@a\Album`, sizeBytes: 200 }),
   files: [
@@ -85,7 +95,7 @@ function stagedPath(onDisk: string): string {
 }
 
 function fakeTimer(): Timer {
-  let current = 0;
+  let current = CLOCK_EPOCH;
   return {
     now: () => current,
     sleep: (ms) => {
@@ -117,7 +127,7 @@ async function tickUntil(
 }
 
 function manualTimer(): { timer: Timer; tick: () => Promise<void> } {
-  let current = 0;
+  let current = CLOCK_EPOCH;
   const waiters: (() => void)[] = [];
   return {
     timer: {
@@ -186,6 +196,8 @@ interface Harness {
   progress: DownloadProgress[];
   finished: string[];
   errorLogs: string[];
+  /** Pushed in lockstep with {@link Harness.errorLogs}, so an index found in one indexes the other. */
+  errorContexts: Record<string, unknown>[];
   warnLogs: string[];
   warnContexts: Record<string, unknown>[];
 }
@@ -202,6 +214,7 @@ function downloader(options: Options): Harness {
   const progress: DownloadProgress[] = [];
   const finished: string[] = [];
   const errorLogs: string[] = [];
+  const errorContexts: Record<string, unknown>[] = [];
   const warnLogs: string[] = [];
   const warnContexts: Record<string, unknown>[] = [];
   const polls = [...options.polls];
@@ -263,8 +276,9 @@ function downloader(options: Options): Harness {
       warnLogs.push(message ?? '');
       warnContexts.push(context as Record<string, unknown>);
     },
-    error: (_context: unknown, message?: string) => {
+    error: (context: unknown, message?: string) => {
       errorLogs.push(message ?? '');
+      errorContexts.push(context as Record<string, unknown>);
     },
   };
   const adapter = new SlskdDownload(
@@ -288,6 +302,7 @@ function downloader(options: Options): Harness {
     progress,
     finished,
     errorLogs,
+    errorContexts,
     warnLogs,
     warnContexts,
   };
@@ -622,6 +637,57 @@ describe('SlskdDownload', () => {
       'http://localhost:5030/api/v0/transfers/downloads/u1/?remove=false',
     ]);
     expect(harness.ledger.removed).toHaveLength(2);
+    // Ids are attached as slskd first reports them: the transfer it has not named yet is left for a
+    // later tick, and the one already ledgered is not re-recorded on every poll.
+    expect(harness.ledger.ids.map((entry) => entry.id)).toEqual(['01.flac']);
+  });
+
+  it('keeps a transfer alive as long as it keeps moving bytes', async () => {
+    // The stall budget measures time since the LAST progress, not since the watch began: a slow
+    // download that keeps delivering bytes must never be abandoned, however long it runs. Here the
+    // candidate spends three poll intervals — twice the budget — transferring steadily.
+    const moved = (bytes: number): HttpResponse =>
+      poll([
+        transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: bytes }),
+        transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 0 }),
+      ]);
+    const harness = downloader({
+      polls: [moved(10), moved(20), moved(30), bothSucceeded],
+      events: [bothCompleted],
+    });
+
+    const result = await run(harness, policy(150, 100_000));
+
+    expect(result.kind).toBe('completed');
+  });
+
+  it('abandons a queued transfer the moment the queue budget is exactly spent', async () => {
+    // The budget is spent when the wait *reaches* it. The third listing shows the transfers running
+    // — it is what teardown re-polls to confirm removal, and what a budget firing a tick late would
+    // have settled on instead, turning a hopeless queue into a spurious completion.
+    const queued = poll([
+      transfer('01.flac', { state: 'Queued, Remotely', size: 100 }),
+      transfer('02.flac', { state: 'Queued, Remotely', size: 100 }),
+    ]);
+    const harness = downloader({ polls: [queued, queued, bothSucceeded] });
+
+    const result = await run(harness, policy(100_000, 100));
+
+    expect(result).toEqual({ kind: 'failed', reason: 'QueueTimeout', files: [] });
+  });
+
+  it('abandons a transfer the moment the stall budget is exactly spent', async () => {
+    // Same boundary on the stall side: two listings carrying identical byte counts one poll
+    // interval apart is exactly the budget's worth of silence, and that settles it.
+    const inFlight = poll([
+      transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+      transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
+    ]);
+    const harness = downloader({ polls: [inFlight, inFlight, bothSucceeded] });
+
+    const result = await run(harness, policy(100, 100_000));
+
+    expect(result).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
   });
 
   it('surfaces live progress while transferring and completes on the next poll', async () => {
@@ -729,6 +795,26 @@ describe('SlskdDownload', () => {
     expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
   });
 
+  // The enqueue is accepted only inside the 2xx window, closed at BOTH ends. Anything else means
+  // slskd did not take the request, so watching for transfers it never created would hang the
+  // candidate on a queue budget instead of advancing the ladder.
+  it.each([199, 300])(
+    'treats HTTP %i on the enqueue as a refusal, not an acceptance',
+    async (status) => {
+      const harness = downloader({ enqueue: { status, body: 'not an acceptance' }, polls: [] });
+
+      const started = await harness.adapter.start(
+        ACQ,
+        candidate,
+        policy(1000, 1000),
+        harness.scope,
+      );
+
+      expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
+      expect(harness.counts.polls).toBe(0); // no watch was registered to poll for them
+    },
+  );
+
   it('surfaces a 5xx enqueue response as a retryable InfraError, not a candidate defeat', async () => {
     // A 503 is slskd itself faulting/overloaded — transient infrastructure. Marking it a candidate
     // failure would manufacture AcquisitionExhausted from a passing slskd hiccup; the reactor must
@@ -821,6 +907,10 @@ describe('SlskdDownload', () => {
     const result = await run(harness);
 
     expect(result.kind).toBe('completed');
+    // A one-tick blip is a warn; escalation to error is reserved for a run of failures, so an
+    // operator scanning errors sees wedges only.
+    expect(harness.warnLogs).toContain(TICK_RETRY);
+    expect(harness.errorLogs).not.toContain(TICK_RETRY);
   });
 
   it('starting an already-watched candidate is an idempotent no-op (level-triggered ensure)', async () => {
@@ -891,6 +981,10 @@ describe('SlskdDownload', () => {
     expect(result.kind).toBe('completed');
     expect(harness.counts.deliveries).toBe(2); // one failed attempt, one landed — never a duplicate
     expect(harness.outcomes).toHaveLength(1);
+    // A single missed delivery is a warn — an undeliverable outcome only becomes an error once it
+    // persists, so the error stream stays a list of things actually stuck.
+    expect(harness.warnLogs).toContain(DELIVERY_RETRY);
+    expect(harness.errorLogs).not.toContain(DELIVERY_RETRY);
   });
 
   it('records transfers write-ahead, captures their ids, and removes records on completion', async () => {
@@ -912,6 +1006,8 @@ describe('SlskdDownload', () => {
       'http://localhost:5030/api/v0/transfers/downloads/u1/02.flac?remove=true',
     ]);
     expect(harness.ledger.removed).toHaveLength(2);
+    // Every ledger write landed, so nothing was reported as a stewardship fault.
+    expect(harness.warnLogs.filter((message) => message.startsWith('ledger:'))).toEqual([]);
   });
 
   it('dooms the candidate and cancels the remainder the moment one file fails', async () => {
@@ -953,8 +1049,10 @@ describe('SlskdDownload', () => {
 
     expect(result).toEqual({ kind: 'failed', reason: 'Stalled', files: [] });
     // Cancelled each round but never confirmed terminal, so no row is marked removed — the startup
-    // sweep converges them next boot. Only cancels (remove=false) are ever issued.
+    // sweep converges them next boot. Only cancels (remove=false) are ever issued, and only for the
+    // bounded number of rounds: teardown gives the transition three tries, not an open-ended wait.
     expect(harness.deletes.every((url) => url.endsWith('?remove=false'))).toBe(true);
+    expect(harness.deletes).toHaveLength(6); // two transfers × three rounds
     expect(harness.ledger.removed).toHaveLength(0);
   });
 
@@ -1042,6 +1140,29 @@ describe('SlskdDownload', () => {
 
     expect(result.kind).toBe('completed');
     expect(harness.ledger.created).toEqual([]);
+    // Degraded stewardship is invisible in the download's outcome, so each failed write says which
+    // one it was: no write-ahead trail, no id to delete with, no row retired.
+    expect(harness.warnLogs.filter((message) => message.startsWith('ledger:'))).toEqual([
+      'ledger: record transfer failed',
+      'ledger: record transfer failed',
+      'ledger: record transfer id failed',
+      'ledger: record transfer id failed',
+      'ledger: mark transfer removed failed',
+      'ledger: mark transfer removed failed',
+    ]);
+  });
+
+  it('still rejects a refused enqueue when the ledger cannot release the write-ahead rows', async () => {
+    // Stewardship is best-effort in both directions: a ledger fault must not turn slskd's refusal
+    // into something else. The rows stay live for the startup sweep, and the log names the fault.
+    const harness = downloader({ enqueue: { status: 400, body: 'boom' }, polls: [] });
+    harness.ledger.fail = true;
+
+    const started = await harness.adapter.start(ACQ, candidate, policy(1000, 1000), harness.scope);
+
+    expect(started._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
+    expect(harness.ledger.removed).toEqual([]);
+    expect(harness.warnLogs).toContain('ledger: release rejected transfer failed');
   });
 
   it('drives an abandoned candidate’s in-flight transfers to fully removed at the source', async () => {
@@ -1146,9 +1267,16 @@ describe('SlskdDownload', () => {
     expect(result.kind).toBe('completed');
     expect(harness.counts.deliveries).toBe(ESCALATE_EVERY + 1);
     expect(harness.outcomes).toHaveLength(1);
-    expect(harness.errorLogs).toContain(
-      'download outcome delivery failed; retrying on the watch cadence',
+    expect(harness.warnLogs.filter((message) => message === DELIVERY_RETRY)).toHaveLength(
+      ESCALATE_EVERY - 1,
     );
+    expect(harness.errorLogs.filter((message) => message === DELIVERY_RETRY)).toHaveLength(1);
+    // The promoted report names which outcome is stuck and how many attempts it has cost.
+    expect(harness.errorContexts[harness.errorLogs.indexOf(DELIVERY_RETRY)]).toMatchObject({
+      acquisitionId: ACQ,
+      outcome: 'completed',
+      attempt: ESCALATE_EVERY,
+    });
   });
 
   it('self-heals through escalated persistent tick failures', async () => {
@@ -1161,7 +1289,17 @@ describe('SlskdDownload', () => {
     const result = await run(harness);
 
     expect(result.kind).toBe('completed');
-    expect(harness.errorLogs).toContain('download watch tick failed; retrying on the next tick');
+    // Exactly the Nth consecutive failure is promoted; the N-1 before it stay warns.
+    expect(harness.warnLogs.filter((message) => message === TICK_RETRY)).toHaveLength(
+      ESCALATE_EVERY - 1,
+    );
+    expect(harness.errorLogs.filter((message) => message === TICK_RETRY)).toHaveLength(1);
+    // The promoted report names the run length — the one thing telling a wedge from a blip.
+    expect(harness.errorContexts[harness.errorLogs.indexOf(TICK_RETRY)]).toMatchObject({
+      acquisitionId: ACQ,
+      username: 'u1',
+      consecutiveTickFailures: ESCALATE_EVERY,
+    });
   });
 
   it('watches two acquisitions independently and delivers each outcome to its owner', async () => {
@@ -1258,6 +1396,9 @@ describe('SlskdDownload', () => {
     await harness.adapter.settled();
 
     expect(harness.outcomes).toEqual([]); // the outcome was lost to the bug — and said so
+    expect(harness.errorLogs).toContain(
+      'download watch failed unexpectedly; a restart re-drive resumes the candidate',
+    );
     expect(harness.finished).toEqual([ACQ]); // progress still retired on the way down
   });
 
@@ -1278,6 +1419,11 @@ describe('SlskdDownload', () => {
 
     expect(result).toMatchObject({ kind: 'failed', reason: 'TransferError' });
     expect(harness.ledger.removed).toHaveLength(0);
+    // The rows outliving the attempt are the sweep's problem now, and this line is the only place
+    // that says so — a silently absorbed teardown fault leaves records nobody knows to chase.
+    expect(harness.warnLogs).toContain(
+      'transfer teardown failed after the outcome settled; ledger rows stay live for the sweep',
+    );
   });
 
   it('a predecessor watch winding down does not retire a successor candidate’s progress', async () => {
@@ -1319,7 +1465,9 @@ describe('SlskdDownload', () => {
       transfer('02.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
     ]);
     const harness = downloader({
-      polls: [inFlight, poll([]), bothSucceeded, poll([])],
+      // The fresh watch's first tick sees the pair still in flight and parks, so the latched
+      // predecessor's cleanup runs while the replacement is live — the race this guards.
+      polls: [inFlight, poll([]), inFlight, bothSucceeded, poll([])],
       events: [bothCompleted],
       timer: control.timer,
     });
@@ -1341,10 +1489,24 @@ describe('SlskdDownload', () => {
     );
     expect(again._unsafeUnwrap()).toEqual({ kind: 'started' }); // a fresh watch, not the latched one
 
+    await control.tick(); // wake the latched predecessor; it sees the abort and winds down
+    // Its cleanup released only its own reservation: the acquisition is not retired while the
+    // replacement still watches, and an ensure still finds that replacement rather than enqueueing.
+    expect(harness.finished).toEqual([]);
+    const ensure = await harness.adapter.start(
+      ACQ,
+      candidate,
+      policy(100_000, 100_000),
+      harness.scope,
+    );
+    expect(ensure._unsafeUnwrap()).toEqual({ kind: 'started' });
+    expect(harness.counts.posts).toBe(2); // one per real start — the ensure enqueued nothing
+
     await tickUntil(control, () => harness.outcomes.length > 0, 'the fresh watch to deliver');
     await harness.adapter.settled();
     expect(harness.outcomes).toHaveLength(1);
     expect(harness.outcomes[0]!.result.kind).toBe('completed');
+    expect(harness.finished).toEqual([ACQ]); // retired exactly once, by the last watch out
   });
 
   it('reserves the watch key before any I/O: concurrent ensures cause one enqueue, one outcome', async () => {

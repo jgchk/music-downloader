@@ -1,6 +1,7 @@
 import { testScope } from '../../application/__fixtures__/correlation.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import { describe, expect, it } from 'vitest';
-import { FakeResourceLedger } from '../../application/__fixtures__/fakes.js';
+import { FakeResourceLedger, silentLogger } from '../../application/__fixtures__/fakes.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import type { HttpClient, HttpRequest, HttpResponse } from '../support/http.js';
@@ -50,16 +51,31 @@ interface Harness {
   adapter: SlskdSearch;
   ledger: FakeResourceLedger;
   requests: HttpRequest[];
+  /** Every warning the adapter logged, in order — the operator's only account of a swallowed fault. */
+  warnings: string[];
+  /** The scope to hand `search` when the test asserts on {@link Harness.warnings}. */
+  scope: OperationScope;
 }
 
 function searcher(routes: Routes, timeoutMs = 15_000): Harness {
   const ledger = new FakeResourceLedger();
   const requests: HttpRequest[] = [];
+  const warnings: string[] = [];
+  // The adapter logs through the scope it is handed, so the capturing logger rides in on the scope.
+  const scope: OperationScope = {
+    ...testScope(),
+    logger: {
+      ...silentLogger(),
+      warn: (_context: unknown, message?: string) => {
+        warnings.push(message ?? '');
+      },
+    },
+  };
   const adapter = new SlskdSearch(ledger, new SlskdClient(httpFor(routes, requests)), fakeTimer(), {
     pollIntervalMs: 10,
     searchTimeoutMs: timeoutMs,
   });
-  return { adapter, ledger, requests };
+  return { adapter, ledger, requests, warnings, scope };
 }
 
 const albumTarget: Target = createTarget({
@@ -77,6 +93,12 @@ const albumResponses = [
   },
 ];
 
+function createdSearchTexts(requests: readonly HttpRequest[]): unknown[] {
+  return requests
+    .filter((r) => r.method === 'POST')
+    .map((r) => JSON.parse(r.body ?? 'null') as unknown);
+}
+
 function deletedSearchIds(requests: readonly HttpRequest[]): string[] {
   return requests
     .filter((r) => r.method === 'DELETE' && r.url.includes('/api/v0/searches/'))
@@ -92,6 +114,8 @@ describe('SlskdSearch', () => {
 
     const result = await adapter.search(ACQ, albumTarget, 1, testScope());
 
+    // What slskd is asked to search for: the target's artist and title, and nothing else.
+    expect(createdSearchTexts(requests)).toEqual([{ searchText: 'Artist Album' }]);
     expect(result._unsafeUnwrap()).toEqual([
       {
         identity: { username: 'u1', path: String.raw`@@a\Album`, sizeBytes: 100 },
@@ -130,6 +154,24 @@ describe('SlskdSearch', () => {
 
     expect(polls).toBe(2);
     expect(result._unsafeUnwrap()).toHaveLength(1);
+  });
+
+  it('stops polling at the deadline rather than one interval past it', async () => {
+    // The deadline is inclusive: the poll that observes it is the last one. `pollIntervalMs` is 10
+    // and the fake clock only advances on a sleep, so the third poll is the one that reads 20ms.
+    let polls = 0;
+    const result = await searcher(
+      {
+        state: () => {
+          polls += 1;
+          return json({ isComplete: false });
+        },
+      },
+      20,
+    ).adapter.search(ACQ, albumTarget, 1, testScope());
+
+    expect(result._unsafeUnwrapErr().message).toContain('incomplete');
+    expect(polls).toBe(3);
   });
 
   it('faults when the deadline elapses with the search still in progress', async () => {
@@ -261,6 +303,36 @@ describe('SlskdSearch', () => {
 
     expect(result._unsafeUnwrap()).toHaveLength(1);
     expect(ledger.created).toEqual([]); // recording was attempted but swallowed
+  });
+
+  it('names which ledger write failed when the bookkeeping is refused', async () => {
+    const { adapter, ledger, warnings, scope } = searcher({
+      state: () => json({ isComplete: true, responseCount: 1 }),
+      responses: json(albumResponses),
+    });
+    ledger.fail = true;
+
+    await adapter.search(ACQ, albumTarget, 1, scope);
+
+    // Swallowed from the caller, so the log is the only place an operator learns which write went
+    // missing — and the two mean different things: a search that was never recorded is one the
+    // sweep will never find, while one that was never marked removed leaves a live row the sweep
+    // will chase against a search that is already gone.
+    expect(warnings).toEqual([
+      'ledger: record search failed',
+      'ledger: mark search removed failed',
+    ]);
+  });
+
+  it('warns about nothing when the search and its bookkeeping both go through', async () => {
+    const { adapter, warnings, scope } = searcher({
+      state: () => json({ isComplete: true, responseCount: 1 }),
+      responses: json(albumResponses),
+    });
+
+    await adapter.search(ACQ, albumTarget, 1, scope);
+
+    expect(warnings).toEqual([]);
   });
 
   it('falls back to default poll and timeout config', async () => {

@@ -32,7 +32,15 @@ export const nodeCommandRunner: CommandRunner = {
       // Decode the stream, not the chunks: a multi-byte code point split across two chunks
       // corrupts under a per-chunk `Buffer#toString` — and this stdout is `JSON.parse`d, so a
       // split non-ASCII artist name would read back as a bridge crash.
+      //
+      // Stryker disable next-line StringLiteral: equivalent mutant. Emptying this literal cannot
+      // change behaviour: `setEncoding` builds a `StringDecoder`, and `new StringDecoder('')`
+      // normalizes a falsy encoding to utf8 (`new StringDecoder('').encoding === 'utf8'`), so
+      // `setEncoding('')` and `setEncoding('utf8')` install the identical decoder — runner.test.ts's
+      // split-code-point scenario passes under both. No test can tell them apart.
       child.stdout.setEncoding('utf8');
+      // Stryker disable next-line StringLiteral: equivalent for the same reason as the stdout line
+      // directly above — `''` normalizes to utf8 inside `StringDecoder`.
       child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => (stdout += chunk));
       child.stderr.on('data', (chunk: string) => (stderr += chunk));

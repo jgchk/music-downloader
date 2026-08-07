@@ -130,6 +130,9 @@ describe('Acquisition.execute — happy path', () => {
       .execute({ type: 'RecordSearchResults', candidates: [] })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'SearchRequested']);
+    // The completion numbers the round just spent, and the request the one about to start — the
+    // accounting the round budget is measured against.
+    expect(events[0]).toMatchObject({ type: 'SearchCompleted', round: 1 });
     expect(events[2]).toEqual({ type: 'SearchRequested', round: 2 });
   });
 
@@ -166,6 +169,9 @@ describe('Acquisition.execute — happy path', () => {
       ._unsafeUnwrap();
     // The round arrived non-empty, but the ranked working set is empty — the ladder still re-searches.
     expect(types(events)).toEqual(['SearchCompleted', 'CandidatesRanked', 'SearchRequested']);
+    // The second round's results complete round 2 — the round the history's SearchRequested asked
+    // for — and the ladder then asks for round 3.
+    expect(events[0]).toMatchObject({ type: 'SearchCompleted', round: 2 });
     expect(events[2]).toEqual({ type: 'SearchRequested', round: 3 });
   });
 
@@ -573,6 +579,15 @@ describe('Acquisition.execute — cleanup events carry the staged files (D3)', (
       })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual(sampleFiles);
+  });
+
+  it('carries no staged files when an aborted download reports none', () => {
+    // The abort landed before any file completed, so the settlement's rejection names nothing to
+    // clean up — an absent report is no files, never an unknown list.
+    const events = Acquisition.fromHistory(cancelledHistory)
+      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
+      ._unsafeUnwrap();
+    expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
   });
 
   it('stamps the imported candidate’s staged files onto the Imported event', () => {
@@ -1135,6 +1150,13 @@ describe('Acquisition.execute — the downloading phase is a recorded fact', () 
     // reactor's own start report — lawful ordering, absorbed without an event or an error.
     expect(
       Acquisition.fromHistory(validatingHistory([candidate]))
+        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        ._unsafeUnwrap(),
+    ).toEqual([]);
+    // The same lawful ordering one phase further on: validation has already passed and the import
+    // is under way when the start report finally lands.
+    expect(
+      Acquisition.fromHistory(importingHistory([candidate]))
         .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);

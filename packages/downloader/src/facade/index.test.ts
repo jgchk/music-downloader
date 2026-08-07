@@ -22,6 +22,7 @@ import {
   selectEditionResultSchema,
   submitAcquisitionResultSchema,
 } from './facade.js';
+import type { FacadeResult } from './facade.js';
 
 /**
  * The wire-shaped facade (module-architecture): every input and output is a plain serializable
@@ -37,6 +38,14 @@ const OFF_MENU_EDITION = '33333333-3333-4333-8333-333333333333';
 const VALID_SUBMIT = {
   request: { kind: 'musicbrainz', mbid: MBID_1, targetType: 'album' },
 } as const;
+
+/** The message a rejected call hands the caller — fails loudly if the call did not fail validation. */
+function validationMessage(result: FacadeResult<unknown>): string {
+  if (result.ok || result.error.kind !== 'ValidationFailed') {
+    throw new Error(`expected a ValidationFailed error, got ${JSON.stringify(result)}`);
+  }
+  return result.error.message;
+}
 
 /** Round-trip a value through JSON and assert nothing was lost. */
 function roundTrip<T>(value: T): T {
@@ -69,6 +78,26 @@ describe('createDownloaderFacade', () => {
         expect(result.error.kind).toBe('ValidationFailed');
         expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
       }
+      // The rejection says what was wrong — the BFF renders this message verbatim, so a blank one
+      // would leave the caller with nothing to act on.
+      expect(validationMessage(result)).toContain('musicbrainz');
+    });
+
+    it('reports every rejected field in one validation message, not only the first', async () => {
+      const facade = createDownloaderFacade(testWiring().deps);
+      const result = await facade.submitAcquisition(
+        {
+          ...VALID_SUBMIT,
+          qualityPolicy: 'lossless-please',
+          matchPolicy: { threshold: 'high' },
+        },
+        STORY,
+      );
+
+      const problems = validationMessage(result).split('; ');
+      expect(problems).toHaveLength(2);
+      expect(problems[0]).toContain('expected object');
+      expect(problems[1]).toContain('expected number');
     });
 
     it('rejects a schema-valid but non-UUID MusicBrainz id as a validation error', async () => {
@@ -82,7 +111,12 @@ describe('createDownloaderFacade', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.kind).toBe('ValidationFailed');
+        // The message names the request's id, not some other field: the schema accepted the shape,
+        // so only the message tells the caller which value to fix.
+        expect(result.error).toEqual({
+          kind: 'ValidationFailed',
+          message: 'request carries a malformed MusicBrainz id',
+        });
         expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
       }
     });
@@ -275,7 +309,14 @@ describe('createDownloaderFacade', () => {
       );
 
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
+      if (!result.ok) {
+        // Both inputs are non-empty strings the schema accepts, so the message is the only thing
+        // that tells the caller it is the chosen edition — not the acquisition id — that is bad.
+        expect(result.error).toEqual({
+          kind: 'ValidationFailed',
+          message: 'releaseMbid is not a valid MusicBrainz id',
+        });
+      }
     });
   });
 

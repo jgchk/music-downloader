@@ -190,6 +190,19 @@ describe('bestMatchId', () => {
     ).toBe('a');
   });
 
+  it('accepts a hit sitting exactly on the confidence floor', () => {
+    expect(bestMatchId([{ id: 'a', score: 90 }])).toBe('a');
+  });
+
+  it('accepts a lead of exactly the ambiguity margin as unambiguous', () => {
+    expect(
+      bestMatchId([
+        { id: 'a', score: 100 },
+        { id: 'b', score: 90 },
+      ]),
+    ).toBe('a');
+  });
+
   it('accepts a single confident hit and treats a missing score as zero', () => {
     expect(bestMatchId([{ id: 'a', score: 92 }])).toBe('a');
     expect(bestMatchId([{ id: 'a' }])).toBeUndefined();
@@ -197,6 +210,10 @@ describe('bestMatchId', () => {
 });
 
 describe('normalizeTitle', () => {
+  it('reduces a title to lowercased words separated by single spaces', () => {
+    expect(normalizeTitle('  MIDNIGHTS — [3am] Edition!  ')).toBe('midnights 3am edition');
+  });
+
   it('treats case, punctuation, parentheses, and whitespace variants as equal', () => {
     const canonical = normalizeTitle('Midnights (3am Edition)');
     expect(normalizeTitle('midnights  3AM edition')).toBe(canonical);
@@ -515,6 +532,149 @@ describe('releaseCandidateIds', () => {
   it('skips a hit that carries no id', () => {
     expect(releaseCandidateIds([{ score: 100, title: 'Album' }], 'Album')).toEqual([]);
   });
+
+  it('identifies an album by its release-group title, not by its editions own titles', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'threeam',
+          title: 'Midnights (3am Edition)',
+          'release-group': { id: 'rg-mid', title: 'Midnights' },
+        }),
+        hit({
+          id: 'remixed',
+          score: 94,
+          title: 'Midnights Remixed',
+          'release-group': { id: 'rg-remix', title: 'Midnights Remixed' },
+        }),
+      ],
+      'Midnights',
+    );
+
+    // no *edition* is titled "Midnights", but rg-mid's group title is — and that identity is what
+    // the request names, so it wins over the within-margin remix group
+    expect(ids).toEqual(['threeam']);
+  });
+
+  it('identifies a group when only some of its hits carry the release-group title', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'titled',
+          title: 'Discovery',
+          'release-group': { id: 'rg-1', title: 'Discovery' },
+        }),
+        // the same group, but this hit omits the group title (MusicBrainz populates it sparsely)
+        hit({ id: 'untitled', title: 'Discovery', 'release-group': { id: 'rg-1' } }),
+        hit({
+          id: 'remixed',
+          score: 94,
+          title: 'Discovery Remixed',
+          'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+        }),
+      ],
+      'Discovery',
+    );
+
+    expect(ids).toEqual(['titled', 'untitled']);
+  });
+
+  it('ranks the groups by score rather than by the order the search returned them', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'weak',
+          score: 70,
+          title: 'Album Live',
+          'release-group': { id: 'rg-live', title: 'Album Live' },
+        }),
+        hit({
+          id: 'strong',
+          score: 100,
+          title: 'Album (Deluxe)',
+          'release-group': { id: 'rg-deluxe', title: 'Album (Deluxe)' },
+        }),
+      ],
+      'Album',
+    );
+
+    // neither group bears the requested title, so the confidence guard judges the ranking: the
+    // strongest group must lead it even though it came second in the results
+    expect(ids).toEqual(['strong']);
+  });
+
+  it('lets a group exactly on the confidence floor win the exact-title preference', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'base',
+          score: 90,
+          title: 'Discovery',
+          'release-group': { id: 'rg-base', title: 'Discovery' },
+        }),
+        hit({
+          id: 'remixed',
+          score: 88,
+          title: 'Discovery Remixed',
+          'release-group': { id: 'rg-remix', title: 'Discovery Remixed' },
+        }),
+      ],
+      'Discovery',
+    );
+
+    expect(ids).toEqual(['base']);
+  });
+
+  it('resolves a group sitting exactly on the confidence floor when no title matches', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'deluxe',
+          score: 90,
+          title: 'Album (Deluxe)',
+          'release-group': { id: 'rg-1', title: 'Album (Deluxe)' },
+        }),
+      ],
+      'Album',
+    );
+
+    expect(ids).toEqual(['deluxe']);
+  });
+
+  it('resolves when the leading group beats the runner-up by exactly the ambiguity margin', () => {
+    const ids = releaseCandidateIds(
+      [
+        hit({
+          id: 'lead',
+          score: 100,
+          title: 'Album (Deluxe)',
+          'release-group': { id: 'rg-1', title: 'Album (Deluxe)' },
+        }),
+        hit({
+          id: 'rival',
+          score: 90,
+          title: 'Album Live',
+          'release-group': { id: 'rg-2', title: 'Album Live' },
+        }),
+      ],
+      'Album',
+    );
+
+    expect(ids).toEqual(['lead']);
+  });
+
+  it('orders the winning group the same way whatever order the search returned its editions in', () => {
+    const editions = [
+      hit({ id: 'named', title: 'Album (Deluxe)', status: 'Official', date: '2020' }),
+      hit({ id: 'early', title: 'Album', status: 'Official', date: '2001' }),
+      hit({ id: 'late', title: 'Album', status: 'Official', date: '2005' }),
+      hit({ id: 'boot', title: 'Album', status: 'Bootleg', date: '1990' }),
+    ];
+    const preference = ['named', 'early', 'late', 'boot'];
+
+    expect(releaseCandidateIds(editions, 'Album (Deluxe)')).toEqual(preference);
+    expect(releaseCandidateIds(editions.toReversed(), 'Album (Deluxe)')).toEqual(preference);
+  });
 });
 
 describe('releaseGroupEditionIds', () => {
@@ -580,6 +740,18 @@ describe('releaseGroupEditionIds', () => {
     expect(ids).toEqual(['a12', 'c12']);
   });
 
+  it('breaks a modal tie toward the lower count even when the higher count comes first', () => {
+    // the same tie as above, with the browse order reversed: the lower count still wins, so the
+    // rule is the tie-break itself and not the order MusicBrainz happened to list the editions in
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'a14', trackCount: 14, date: '2001' }),
+      edition({ id: 'b12', trackCount: 12, date: '2002' }),
+      edition({ id: 'c14', trackCount: 14, date: '2003' }),
+      edition({ id: 'd12', trackCount: 12, date: '2004' }),
+    ]);
+    expect(ids).toEqual(['b12', 'd12']);
+  });
+
   it('orders modal editions by earliest date, precise before year-only within a year', () => {
     const ids = releaseGroupEditionIds([
       edition({ id: 'yearonly', date: '2012' }),
@@ -589,12 +761,31 @@ describe('releaseGroupEditionIds', () => {
     expect(ids).toEqual(['full', 'yearonly', 'later']);
   });
 
+  it('orders same-year editions by month, then by day', () => {
+    // listed newest-first so that only a component-wise (year, month, day) comparison reorders them
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'may-25', date: '2012-05-25' }),
+      edition({ id: 'may-21', date: '2012-05-21' }),
+      edition({ id: 'march', date: '2012-03-30' }),
+    ]);
+    expect(ids).toEqual(['march', 'may-21', 'may-25']);
+  });
+
+  it('treats a date that does not begin with a year as undated, sorting it last', () => {
+    const ids = releaseGroupEditionIds([
+      edition({ id: 'garbled', date: 'circa 1998' }),
+      edition({ id: 'dated', date: '2020' }),
+    ]);
+    expect(ids).toEqual(['dated', 'garbled']);
+  });
+
   it('keeps stable input order among modal editions with equal dates', () => {
     const ids = releaseGroupEditionIds([
       edition({ id: 'first', date: '2000' }),
+      edition({ id: 'earlier', date: '1990' }),
       edition({ id: 'second', date: '2000' }),
     ]);
-    expect(ids).toEqual(['first', 'second']);
+    expect(ids).toEqual(['earlier', 'first', 'second']);
   });
 });
 
@@ -769,6 +960,19 @@ describe('releaseGroupEditionCandidates', () => {
     expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([
       fakeMbid('early-modal'),
       fakeMbid('late-modal'),
+      fakeMbid('odd'),
+    ]);
+  });
+
+  it('ranks a modal-track-count edition ahead of an older divergent one', () => {
+    const candidates = releaseGroupEditionCandidates([
+      { id: fakeMbid('modal'), date: '2005', media: [{ 'track-count': 12 }] },
+      { id: fakeMbid('odd'), date: '1990', media: [{ 'track-count': 20 }] },
+    ]);
+
+    // the modal count leads even though the divergent edition is the older one
+    expect(candidates.map((candidate) => candidate.releaseMbid)).toEqual([
+      fakeMbid('modal'),
       fakeMbid('odd'),
     ]);
   });

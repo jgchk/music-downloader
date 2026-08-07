@@ -254,6 +254,16 @@ describe('evolve — cancellation retains and settles the mid-download candidate
     expect(cancelledSettled.staging).toEqual({ kind: 'settled', current: a });
   });
 
+  it('retains the candidate for cleanup when cancelled while importing', () => {
+    // The files are staged and stable from the moment the transfer settles, so a cancellation
+    // during the import retains them for cleanup exactly as one during validation does.
+    const cancelledWhileImporting = foldEvents([
+      ...importingHistory([a]),
+      { type: 'AcquisitionCancelled' },
+    ]) as Extract<AcquisitionState, { phase: 'Cancelled' }>;
+    expect(cancelledWhileImporting.staging).toEqual({ kind: 'settled', current: a });
+  });
+
   it('clears staging to `none` when the aborted candidate settles and is rejected, staying Cancelled', () => {
     const settled = evolve(cancelledInFlight, {
       type: 'CandidateRejected',

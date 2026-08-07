@@ -446,12 +446,61 @@ describe('resolving a review', () => {
     expect(error).toEqual({ kind: 'UnknownCandidate', candidate: 'Discogs:nope' });
   });
 
-  it('refuses remediation verbs on a non-remediation review', () => {
-    const error = given(awaitingMatchReview())
-      .execute(resolve({ kind: 'accept' }))
+  it('refuses to apply any candidate at all on a review that listed none', () => {
+    // A no-match review has an empty list, so every reference is unknown to it — there is nothing
+    // for `apply-candidate` to name.
+    const noMatchReview: ImportEvent[] = [
+      requested(),
+      proposed([]),
+      { type: 'ReviewRequired', cause: { kind: 'no-match' } },
+    ];
+
+    const error = given(noMatchReview)
+      .execute(
+        resolve({
+          kind: 'apply-candidate',
+          ref: { dataSource: 'MusicBrainz', albumId: 'album-1' },
+        }),
+      )
       ._unsafeUnwrapErr();
-    expect(error).toMatchObject({ kind: 'InvalidResolution' });
+
+    expect(error).toEqual({ kind: 'UnknownCandidate', candidate: 'MusicBrainz:album-1' });
   });
+
+  it('applies the candidate a human picked out of several listed ones', () => {
+    // The ordinary shape of a match review: beets offers a shortlist and the human names one of
+    // them. Recognising a reference must mean "this list contains it", not "this list is all it".
+    const runnerUp = candidate({
+      ref: { dataSource: 'MusicBrainz', albumId: 'album-2' },
+      distance: asDistance(0.6),
+    });
+    const shortlist: ImportEvent[] = [
+      requested(),
+      proposed([candidate({ distance: asDistance(0.5) }), runnerUp]),
+      MATCH_REVIEW,
+    ];
+    const resolution = { kind: 'apply-candidate', ref: runnerUp.ref } as const;
+
+    const events = given(shortlist).execute(resolve(resolution))._unsafeUnwrap();
+
+    expect(events).toEqual([{ type: 'ReviewResolved', resolution }]);
+  });
+
+  // Both remediation verbs, not just the first: they are refused by one condition, and a row per
+  // verb is what says the condition covers the pair rather than only the one that got written down.
+  it.each(['accept', 'retry-enrichment'] as const)(
+    'refuses %s on a non-remediation review, naming the verb and the review it belongs to',
+    (kind) => {
+      const error = given(awaitingMatchReview()).execute(resolve({ kind }))._unsafeUnwrapErr();
+
+      expect(error.kind).toBe('InvalidResolution');
+      // The detail is the only thing separating this refusal from its mirror image below, so it
+      // has to identify both sides: what was asked, and the review that cannot take it.
+      const detail = 'detail' in error ? error.detail : '';
+      expect(detail).toContain(kind);
+      expect(detail).toContain('match-review');
+    },
+  );
 
   it('mints the release verdict beside the rejection on reject-unusable-delivery', () => {
     const resolution = {
@@ -556,11 +605,18 @@ describe('resolving a review', () => {
         .execute(resolve({ kind: 'retry-enrichment' }))
         ._unsafeUnwrap(),
     ).toEqual([{ type: 'ReviewResolved', resolution: { kind: 'retry-enrichment' } }]);
-    expect(
-      given(remediationHistory())
-        .execute(resolve({ kind: 'import-as-is' }))
-        ._unsafeUnwrapErr(),
-    ).toMatchObject({ kind: 'InvalidResolution' });
+
+    const error = given(remediationHistory())
+      .execute(resolve({ kind: 'import-as-is' }))
+      ._unsafeUnwrapErr();
+
+    expect(error.kind).toBe('InvalidResolution');
+    // The mirror of the refusal above, and told apart from it only by this detail: it names the
+    // verb that was offered and the two this review does take.
+    const detail = 'detail' in error ? error.detail : '';
+    expect(detail).toContain('import-as-is');
+    expect(detail).toContain('accept');
+    expect(detail).toContain('retry-enrichment');
   });
 
   it('no-ops a resolution on an applied import without an open remediation', () => {
@@ -768,6 +824,17 @@ describe('react — the reflex', () => {
     expect(given([]).reactTo(resolved({ kind: 'retry-enrichment' }))).toEqual([]);
   });
 
+  it('fires nothing for a retry-enrichment no retry is actually in flight for', () => {
+    // The in-place apply re-runs beets over files already in the library, so it may only fire while
+    // a retry is genuinely in flight. A redelivered resolution landing on an applied import with no
+    // open remediation — or on one whose remediation is still open, nobody having asked for the
+    // retry — must not re-import the library location behind the operator's back.
+    const resolution = resolved({ kind: 'retry-enrichment' });
+
+    expect(given(appliedHistory()).reactTo(resolution)).toEqual([]);
+    expect(given(remediationHistory()).reactTo(resolution)).toEqual([]);
+  });
+
   it('fires nothing on accept', () => {
     const resolution = resolved({ kind: 'accept' });
     expect(given([...remediationHistory(), resolution]).reactTo(resolution)).toEqual([]);
@@ -844,10 +911,17 @@ describe('the snapshot projection', () => {
     expect(snapshot.openReview).toBeUndefined();
   });
 
-  it('exposes an open remediation as a remediation review', () => {
+  it('exposes an open remediation as a remediation review, with nothing to choose between', () => {
     const snapshot = given(remediationHistory()).snapshot;
     expect(snapshot.phase).toBe('applied');
-    expect(snapshot.openReview).toMatchObject({ cause: { kind: 'remediation-review' } });
+    // A remediation review is about what failed after the files landed, so it carries the failures
+    // and an empty candidate list — a queue that showed candidates here would be offering a choice
+    // this review does not have.
+    expect(snapshot.openReview).toEqual({
+      cause: { kind: 'remediation-review', failures: [FAILURE] },
+      candidates: [],
+      availableActions: ['accept', 'retry-enrichment'],
+    });
   });
 
   it('hides a remediation while its retry is in flight', () => {
