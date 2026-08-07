@@ -21,6 +21,7 @@ import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import { infraError } from '../ports/errors.js';
 import type { CheckpointStore } from '../ports/event-store-port.js';
+import type { Clock } from '../ports/system-ports.js';
 import { createLogger } from '../logging/logger.js';
 import type { Logger } from '../logging/logger.js';
 import {
@@ -73,6 +74,7 @@ function reactor(
     retryBudget?: number;
     logger?: Logger;
     correlation?: ReactorDependencies['correlation'];
+    clock?: Clock;
   } = {},
 ): Reactor {
   return new Reactor({
@@ -82,7 +84,7 @@ function reactor(
     deadLetters,
     parked,
     stalled,
-    clock: fixedClock(),
+    clock: overrides.clock ?? fixedClock(),
     logger: overrides.logger ?? silentLogger(),
     correlation: overrides.correlation ?? fixedCorrelation(),
     interpret,
@@ -243,21 +245,60 @@ describe('Reactor', () => {
   it('skips reacting when the stream read fails, leaving the checkpoint put', async () => {
     await seed([requested()]);
     store.failReads = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const interpret = vi.fn(() => okAsync([]));
-    await reactor(interpret).start();
+    await reactor(interpret, { logger }).start();
 
     expect(interpret).not.toHaveBeenCalled();
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      { importId: 'imp-1', err: infraError('readStream', 'boom') },
+      'reactor stream read failed',
+    );
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'reactor pass failed unexpectedly',
+    );
   });
 
-  it('logs and carries on when the backlog read fails', async () => {
+  it('reports a failed backlog read as a handled catch-up fault and carries on', async () => {
     store.failReadAll = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const interpret = vi.fn(() => okAsync([]));
-    const r = reactor(interpret);
+    const r = reactor(interpret, { logger });
     await r.start();
 
     expect(bus.subscriberCount()).toBe(1); // still follows live events
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: infraError('readAll', 'boom') },
+      'reactor catch-up failed',
+    );
+    // A store fault is a value the pass handles, never a defect escaping into the containment
+    // catch — an operator triaging "reactor pass failed unexpectedly" is hunting a bug in our code.
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'reactor pass failed unexpectedly',
+    );
     r.stop();
+  });
+
+  it('stays silent at error level through a clean pass', async () => {
+    // Error-level noise on the happy path is how an operator learns to scroll past the log that
+    // finally matters: a healthy checkpoint load reports no replay, and a cleared retry tally
+    // reports no failure.
+    await seed([requested()]);
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+
+    await reactor(
+      vi.fn(() => okAsync([])),
+      { logger },
+    ).start();
+
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('replays from the log start and surfaces the fault when the checkpoint load fails', async () => {
@@ -385,12 +426,36 @@ describe('Reactor', () => {
       );
 
       r.stop();
-      await seed([requested()]);
+      // A SECOND import, appended with the bus detached, so only a still-running poll could reach
+      // it. (Re-seeding `imp-1` would be rejected by optimistic concurrency and prove nothing.)
+      store.bus = undefined;
+      await store.append('imp-2', 0, [requested()], appendMetadata('imp-2', 't'));
+      store.bus = bus;
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(interpret).toHaveBeenCalledTimes(1);
+      expect(interpret).toHaveBeenCalledTimes(1); // the timer really was cleared, not just dropped
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('falls back to a five-second poll when none is configured', async () => {
+    // The poll is the delivery guarantee — wakeups are only a latency hint — so the interval the
+    // reactor asks for when composition names none is a behavior, not an implementation detail.
+    const gaps: number[] = [];
+    const r = reactor(
+      vi.fn(() => okAsync([])),
+      {
+        interval: (_function, ms) => {
+          gaps.push(ms);
+          return () => {};
+        },
+      },
+    );
+
+    await r.start();
+
+    expect(gaps).toEqual([5000]);
+    r.stop();
   });
 
   it('coalesces wakeups that arrive while a drain is running', async () => {
@@ -416,7 +481,36 @@ describe('Reactor', () => {
     await vi.waitFor(() => {
       expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
     });
+    // Coalescing is what keeps at-least-once from becoming at-least-thrice: the wakeups that
+    // arrived mid-drain re-ran the pass, they did not re-dispatch the event already in flight.
+    expect(slowFirst).toHaveBeenCalledTimes(1);
     r.stop();
+  });
+
+  it('does not leapfrog a held event to dispatch the ones queued behind it', async () => {
+    // Two reactive events in one backlog: ImportRequested (Propose) and AutoApplySelected (Apply).
+    await seed([
+      requested(),
+      {
+        type: 'CandidatesProposed',
+        candidates: [candidate({ distance: asDistance(0.01) })],
+        duplicates: [],
+      },
+      { type: 'AutoApplySelected', ref: candidate().ref, distance: asDistance(0.01) },
+    ]);
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'spawn failed')));
+
+    await reactor(interpret).start();
+
+    // The first event's effect failed retryably and holds the checkpoint. Dispatching the Apply
+    // behind it would apply a release whose proposal never landed — order is the guarantee here.
+    expect(interpret).toHaveBeenCalledTimes(1);
+    expect(interpret).toHaveBeenCalledWith(
+      'imp-1',
+      expect.objectContaining({ type: 'Propose' }),
+      expect.anything(),
+    );
+    expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
   });
 
   it('checkpoints record-only events without firing effects', async () => {
@@ -464,7 +558,9 @@ describe('Reactor', () => {
     expect(deadLetters.letters).toHaveLength(1);
     const [letter] = deadLetters.letters;
     expect(letter).toMatchObject({ subscription: REACTOR_CONSUMER, globalSeq: 1 });
-    expect(letter?.error).toContain('bridge.propose');
+    // The letter is what an operator reads before a redrive, so an infrastructure fault is rendered
+    // as the failing effect, the operation, and the message — not as a JSON dump of the error value.
+    expect(letter?.error).toBe('Propose: bridge.propose: beets always fails');
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1); // the queue is not wedged behind the poison
   });
 
@@ -478,7 +574,11 @@ describe('Reactor', () => {
     await r.start();
 
     expect(deadLetters.letters).toHaveLength(1);
-    expect(deadLetters.letters[0]?.error).toContain('ConcurrencyConflict');
+    // No operation/message pair to render for a non-infrastructure error, so the whole value is
+    // serialized rather than lost — the conflicting stream and version stay legible to the operator.
+    expect(deadLetters.letters[0]?.error).toBe(
+      'Propose: {"kind":"ConcurrencyConflict","streamId":"imp-1","expectedVersion":0}',
+    );
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
 
@@ -528,21 +628,25 @@ describe('Reactor — durable retry budget & stalled exposure', () => {
     await seed([requested()]);
     const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'beets always fails')));
     // Each boot is a fresh reactor instance over the SAME durable stores — a process restart.
-    const boot = async (): Promise<void> => {
-      const r = reactor(interpret, { retryBudget: 3 });
+    const boot = async (at: string): Promise<void> => {
+      const r = reactor(interpret, { retryBudget: 3, clock: fixedClock(at) });
       await r.start();
       r.stop();
     };
 
-    await boot(); // attempt 1: parked, held
+    await boot('2026-07-18T12:00:00.000Z'); // attempt 1: parked, held
     expect(parked.peek(1)?.attempt).toBe(1);
+    expect(parked.peek(1)?.parkedAt).toBe('2026-07-18T12:00:00.000Z');
     expect(deadLetters.letters).toHaveLength(0);
 
-    await boot(); // attempt 2: resumes the durable tally (would be 1 again if it were in memory)
+    await boot('2026-07-18T13:30:00.000Z'); // attempt 2: resumes the durable tally (in memory it would be 1 again)
     expect(parked.peek(1)?.attempt).toBe(2);
+    // `parkedAt` is the FIRST failure's instant, not the latest attempt's: it is how long this
+    // effect has been stuck, which is the number an operator triages on.
+    expect(parked.peek(1)?.parkedAt).toBe('2026-07-18T12:00:00.000Z');
     expect(deadLetters.letters).toHaveLength(0);
 
-    await boot(); // attempt 3 hits the budget: dead-lettered and advanced past
+    await boot('2026-07-18T15:00:00.000Z'); // attempt 3 hits the budget: dead-lettered and advanced past
     expect(deadLetters.letters).toHaveLength(1);
     expect(deadLetters.letters[0]?.streamId).toBe('imp-1'); // the letter names its owning import
     expect(parked.peek(1)).toBeUndefined(); // the tally is cleared once dead-lettered
@@ -553,12 +657,36 @@ describe('Reactor — durable retry budget & stalled exposure', () => {
   it('holds the checkpoint when the durable retry tally cannot be written', async () => {
     await seed([requested()]);
     parked.failPark = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'spawn failed')));
-    await reactor(interpret).start();
+    await reactor(interpret, { logger }).start();
 
     expect(interpret).toHaveBeenCalled(); // the hold came from the park-write fault, not an early return
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
     expect(deadLetters.letters).toHaveLength(0);
+    // The lost write is named as itself: a budget that is not being recorded never converges on a
+    // dead letter, which is a different problem from the dispatch that failed.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ importId: 'imp-1', effect: 'Propose' }),
+      'failed to record retry attempt; holding checkpoint',
+    );
+  });
+
+  it('records the attempt tally on a retryable dispatch failure', async () => {
+    await seed([requested()]);
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const interpret = vi.fn(() => errAsync(infraError('bridge.propose', 'spawn failed')));
+
+    await reactor(interpret, { logger }).start();
+
+    // The attempt number is how an operator sees a poison effect converging on its budget rather
+    // than a one-off blip — and it distinguishes this from a tally that could not be written.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ importId: 'imp-1', effect: 'Propose', attempt: 1 }),
+      'effect dispatch failed',
+    );
   });
 
   it('holds the checkpoint when the durable retry tally cannot be read', async () => {
@@ -569,15 +697,26 @@ describe('Reactor — durable retry budget & stalled exposure', () => {
 
     expect(interpret).toHaveBeenCalled(); // the hold came from the find fault, not an early return
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBeUndefined();
+    // Nothing is written on an unreadable tally. Parking here would restart the count from one, so
+    // a store that fails to read intermittently would refill the budget and retry a poison effect
+    // forever instead of converging on its dead letter.
+    expect(parked.count()).toBe(0);
   });
 
   it('advances even when clearing the resolved retry tally fails (harmless leftover)', async () => {
     await seed([requested()]);
     parked.failClear = true;
+    const logger = silentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
     const interpret = vi.fn(() => okAsync([]));
-    await reactor(interpret).start();
+    await reactor(interpret, { logger }).start();
 
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
+    // Harmless, but not silent: a stale tally left behind would spend a later failure's budget.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ importId: 'imp-1', globalSeq: 1 }),
+      'failed to clear the resolved retry tally',
+    );
   });
 
   it('clears the stalled exposure and its dead letters once the stream drives again', async () => {
@@ -762,6 +901,28 @@ describe('isRetryable', () => {
     // Unreachable from effect dispatch today (the reactor never submits imports), but the
     // command-error union must stay fully classified; this pins the arm's direction.
     expect(isRetryable({ kind: 'CycleInFlight' })).toBe(true);
+  });
+
+  // Every variant of the closed union, each pinned to a boolean rather than to truthiness: an
+  // unclassified variant falls out of the switch as `undefined`, which reads as "not retryable" at
+  // every call site and would silently drop a transient fault instead of retrying it.
+  it.each<{ error: CommandError; retryable: boolean }>([
+    { error: infraError('bridge.propose', 'spawn failed'), retryable: true },
+    {
+      error: { kind: 'ConcurrencyConflict', streamId: 'imp-1', expectedVersion: 0 },
+      retryable: true,
+    },
+    { error: { kind: 'CycleInFlight' }, retryable: true },
+    { error: { kind: 'UnknownImport' }, retryable: false },
+    { error: { kind: 'NoOpenReview' }, retryable: false },
+    {
+      error: { kind: 'InvalidResolution', detail: 'a remediation verb on a match review' },
+      retryable: false,
+    },
+    { error: { kind: 'UnknownCandidate', candidate: 'Discogs:nope' }, retryable: false },
+    { error: { kind: 'NoRetainedCandidate' }, retryable: false },
+  ])('classifies $error.kind as retryable=$retryable, leaving no variant unclassified', (row) => {
+    expect(isRetryable(row.error)).toBe(row.retryable);
   });
 });
 
