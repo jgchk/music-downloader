@@ -784,7 +784,11 @@ describe('Reactor correlation propagation', () => {
     const trigger = store.all().at(-1)!;
     const before = store.all().length;
 
-    await reactor(realInterpret(stubPorts())).process(trigger);
+    // The mint source can only produce OTHER_STORY, so "copied verbatim" and "minted fresh" are
+    // distinguishable outcomes rather than the same string by coincidence.
+    await reactor(realInterpret(stubPorts()), {
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
 
     const appended = store.all().filter((entry) => entry.globalSeq > before);
     expect(appended.length).toBeGreaterThan(0);
@@ -822,7 +826,10 @@ describe('Reactor correlation propagation', () => {
       destination: { write: (line: string) => void lines.push(line) },
     });
 
-    await reactor(realInterpret(stubPorts()), { logger }).process(trigger);
+    await reactor(realInterpret(stubPorts()), {
+      logger,
+      correlation: fixedCorrelation(OTHER_STORY),
+    }).process(trigger);
 
     const dispatched = lines
       .map(
