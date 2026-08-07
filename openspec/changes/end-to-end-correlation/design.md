@@ -148,3 +148,60 @@ event-driven, and the seam subscription's poll is its trigger. Likewise, the rea
 triggers (fallback poll, boot re-drive, parked retry) do not mint: they DELIVER a stored event,
 which already has a story, so they continue it. Fresh minting outside the BFF happens only where
 there is genuinely no parent — a pre-correlation row, or a seam delivery with no envelope.
+
+## Decisions taken during review (cycle 1)
+
+**D16 — `absent` and `malformed` are different facts and are reported differently.** D8's
+debug-level ruling reasons entirely from pre-capability rows: permanent, expected, and something no
+operator can act on. A story that is PRESENT but unusable is the opposite — every append since this
+capability shipped passes a compiler-checked write gate, so a malformed stored id means a writer is
+emitting bad ids right now. `continueFrom` and `adoptOrMint` therefore return a `StoryOrigin`
+instead of leaving each caller to re-derive the condition (which is how a log line and the
+behaviour it describes drift apart), reactors warn on malformed and debug on absent, and the seam —
+where malformed means a live producer's envelope has diverged and every cross-context trace is
+broken until it is fixed — announces it through an injected channel.
+
+**D17 — The correlation envelope is attached AFTER outbound validation.** Rendering it inside the
+validated payload made a defect in a purely diagnostic field a `RenderError`, which is permanent by
+contract: the feed surfaces it, the consumer's checkpoint holds, and it recurs identically on every
+retry. A broken trace could have head-of-line-blocked the whole seam indefinitely. Telemetry may
+degrade the trace; it may never stop the work.
+
+**D18 — The persisted causation union is parsed, not cast.** Event payloads go through the upcaster
+registry; metadata goes through neither an upcaster nor a schema, and it now carries a discriminated
+union. `parseCausation` re-establishes the tag at the read edge and drops anything unrecognised, so
+the first reader to narrow on `kind` cannot read a field off a shape nothing verified.
+
+**D19 — The format invariant is enforced by the mint, not by documentation.** `CorrelationSource`
+mints the BRANDED id, so the composition root is the single place the 32-hex format is established
+and every downstream lift follows from a constructor. The write-side metadata's story is branded
+too, which closes the "fabricate provenance by spreading a read-side metadata" hole.
+
+**D20 — What opens an import cycle is the aggregate's fact.** The verdict renderer originally
+string-matched `ImportRequested` itself; a second cycle-opening event would have left it compiling,
+validating, and silently publishing the previous cycle's story. `isCycleStart` is an exhaustive
+switch in the importer's domain, so that change becomes a compile error at the one place that must
+decide.
+
+**D21 — The seam is pinned by producer-rendered fixtures, not by two authors' intentions.** The
+producer's published schema and the consumer's tolerant reader are independently hand-authored and
+no type connects them, while `contextForDelivery` swallows an unreadable envelope into a fresh
+story by design — so a drift between them would have left every suite green and silently detached
+every cross-context trace, caught only by the main-gated e2e. Both directions now carry a v2 fixture
+rendered by the producer's own mapping and replayed through the consumer's reader in the contract
+tier, which runs on every PR.
+
+**D22 — Deliberate duplication is pinned.** A boundaries test asserts the two contexts' correlation
+modules are identical modulo the context name, so D13's shared-kernel avoidance cannot decay into
+accidental divergence.
+
+**Recorded, not fixed** (raised in review, deliberately deferred):
+- The slskd supervisor's long-lived collaborators (`TransferLedger`, `TransferTeardown`,
+  `StagedFileResolver`) are constructed once and outlive any operation, so their lines carry
+  `acquisitionId` but no story. Documented at the constructor.
+- The facade's malformed-story degradation is silent: the facade owns no logger, and its only
+  production caller mints the id itself, so the branch is unreachable today. The day a second
+  interface (MCP, HTTP) exists it should report — `adoptOrMint` already returns the origin for it.
+- `OperationScope` is wider than most ports need (only `DownloadPort` reads its context). The
+  uniform rule is kept deliberately: the alternative is a per-port distinction that gets forgotten
+  at a new call site, and the compiler-catches-a-miss property is worth more than the narrowing.

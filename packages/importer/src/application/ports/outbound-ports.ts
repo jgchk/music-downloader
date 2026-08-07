@@ -17,8 +17,9 @@ import type { InfraError } from './errors.js';
  * Every effect method takes the dispatching {@link OperationScope} as its LAST parameter — one
  * uniform rule, so there is no per-port exception to remember and the compiler catches a call site
  * that forgot. An adapter uses `scope.logger` (already bound to the operation, so its lines join
- * the import without the adapter knowing what correlation is) and carries `scope.context`
- * opaquely wherever it re-enters the shell. No adapter reads a field of either. `validate` is
+ * the import without the adapter knowing what correlation is). No importer adapter re-enters the
+ * shell asynchronously today, so none reads `scope.context`; the parameter is uniform so that one
+ * can, and so there is no per-port rule to remember. No adapter reads a field of either. `validate` is
  * exempt: it is a startup gate, not an operation.
  */
 

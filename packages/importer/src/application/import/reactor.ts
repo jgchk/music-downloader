@@ -70,7 +70,8 @@ function describeError(error: CommandError): string {
  * `checkpoint + 1` and is re-processed on the fallback poll and after a restart, with no separate
  * scheduler. When the budget is spent the event is dead-lettered (with its owning stream) and the
  * import is exposed as stalled by the read model (D2); once the stream is reprocessed without a
- * held failure that exposure is cleared. Operational logs are correlated by `importId`; the pure
+ * held failure that exposure is cleared. Operational logs are correlated by the operation's `correlationId` (plus `streamId` and
+ * `globalSeq`), bound once per dispatch in `scopeFor`; the pure
  * `react`/`decide`/`evolve` stay log-free.
  */
 export const REACTOR_CONSUMER = 'import-reactor';

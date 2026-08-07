@@ -1,4 +1,5 @@
 import { err, ok } from 'neverthrow';
+import { isCycleStart } from '../../../domain/import/events.js';
 import type { Result } from 'neverthrow';
 import type { StoredEvent } from '../../../application/ports/event-store-port.js';
 import type {
@@ -19,6 +20,10 @@ import { RELEASE_VERDICT_TYPE, releaseVerdictEventSchema } from './schemas.js';
  * story of whatever triggered the last hop — for a verdict, the human request that resolved the
  * review, which is a different story and would break the round trip.
  *
+ * What opens a cycle is the aggregate's fact, not this renderer's: `isCycleStart` answers it, so a
+ * second cycle-opening event becomes a compile error there rather than a renderer that silently
+ * publishes the previous cycle's story.
+ *
  * Walking back to the cycle start (rather than to the head of the stream) is what keeps the
  * revival loop honest: a replacement delivery opens a NEW cycle with its own adopted story, and
  * its verdict must be published under that one, not the original delivery's.
@@ -31,7 +36,7 @@ function correlationOf(
   prefix: readonly StoredEvent[],
 ): Record<string, unknown> | undefined {
   const cycleStart = prefix.findLast(
-    (entry) => entry.version <= stored.version && entry.event.type === 'ImportRequested',
+    (entry) => entry.version <= stored.version && isCycleStart(entry.event),
   );
   const story = cycleStart?.metadata.correlationId;
   if (story === undefined || !isCorrelationId(story)) return undefined;

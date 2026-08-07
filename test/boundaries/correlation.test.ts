@@ -78,3 +78,32 @@ describe('no correlation id reaches user-visible copy', () => {
     expect(offendingLines(files)).toEqual([]);
   });
 });
+
+/**
+ * D13 duplicates the correlation module into both bounded contexts on purpose: a shared module
+ * would be a shared kernel over the one identity that crosses the seam, and the repo already owns
+ * byte-identical copies of `EventStorePort` and `EventMetadata` for the same reason.
+ *
+ * Deliberate duplication still has to be protected, or it drifts into accidental divergence — at
+ * which point the two contexts disagree about what a story IS, and the seam's whole premise (each
+ * side reads the other's envelope with its own schema) quietly stops holding.
+ */
+describe('the per-context correlation modules are duplicated deliberately, not drifting', () => {
+  /** Erase what each context is ALLOWED to differ on: its own name, and its aggregate's id field. */
+  const normalize = (source: string): string =>
+    source
+      .replaceAll(/\bdownloader\b|\bimporter\b/g, 'CONTEXT')
+      .replaceAll(/\bacquisitionId\b|\bimportId\b/g, 'STREAM_ID')
+      .replaceAll(/\bacq-1\b|\bimp-1\b/g, 'STREAM');
+
+  it.each([
+    ['correlation/context.ts', 'src/application/correlation/context.ts'],
+    ['correlation/correlation-id.ts', 'src/application/correlation/correlation-id.ts'],
+    ['__fixtures__/correlation.ts', 'src/application/__fixtures__/correlation.ts'],
+  ])('%s is identical in both contexts modulo the context name', (_label, relative) => {
+    const read = (module_: string): string =>
+      readFileSync(path.join(REPO_ROOT, 'packages', module_, relative), 'utf8');
+
+    expect(normalize(read('importer'))).toEqual(normalize(read('downloader')));
+  });
+});

@@ -273,3 +273,34 @@ export type ImportEvent =
     };
 
 export type ImportEventType = ImportEvent['type'];
+
+/**
+ * Whether `event` OPENS an import cycle.
+ *
+ * A stream can hold several cycles: the revival loop reopens the same import when a replacement
+ * delivery arrives, and each cycle is its own unit of work. "Where does a cycle begin" is a fact
+ * about this aggregate's lifecycle, so it is answered here — once — rather than re-derived by
+ * whoever needs it. The outbound renderer needs it to publish a verdict under its cycle's story,
+ * and got it wrong-by-construction while it was string-matching one variant itself.
+ *
+ * Exhaustive with no `default`: add a second cycle-opening event and this becomes a compile error
+ * at the one place that must decide, instead of a renderer that silently publishes the previous
+ * cycle's story.
+ */
+export function isCycleStart(event: ImportEvent): boolean {
+  switch (event.type) {
+    case 'ImportRequested': {
+      return true;
+    }
+    case 'CandidatesProposed':
+    case 'AutoApplySelected':
+    case 'ReviewRequired':
+    case 'ReviewResolved':
+    case 'ImportApplied':
+    case 'RemediationRequired':
+    case 'ImportRejected':
+    case 'ReleaseVerdictRecorded': {
+      return false;
+    }
+  }
+}

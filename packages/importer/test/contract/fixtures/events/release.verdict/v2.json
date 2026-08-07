@@ -1,0 +1,32 @@
+{
+  "provenance": {
+    "recordedAt": "2026-08-07T12:00:00.000Z",
+    "schemaVersion": 2,
+    "note": "Rendered by src/interfaces/contracts/events/mapping.ts over a deterministic fixture history, carrying the optional correlation envelope. FROZEN — never regenerate."
+  },
+  "event": {
+    "type": "release.verdict",
+    "timestamp": "2026-08-07T12:00:00.000Z",
+    "data": {
+      "acquisitionId": "acq-1",
+      "candidate": {
+        "username": "peer1",
+        "path": "peer1/Artist - Album [FLAC]",
+        "sizeBytes": 123456
+      },
+      "verdict": "rejected",
+      "reasons": [
+        "corrupt rip"
+      ]
+    },
+    "metadata": {
+      "correlationId": "9f2c1d4e6a7b8c9d0e1f2a3b4c5d6e7f",
+      "causation": {
+        "kind": "event",
+        "context": "importer",
+        "streamId": "e3a1b2c4-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+        "version": 4
+      }
+    }
+  }
+}
