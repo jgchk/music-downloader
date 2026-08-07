@@ -1,5 +1,26 @@
 # Proposal: redrivable-stalled-imports
 
+> **WITHDRAWN 2026-08-07 — never implemented. Superseded by `stalled-work-recovery`.**
+>
+> This proposal was drafted 2026-08-02, before the 2026-08-05 grilling session and the
+> `dead-letter-redrive-semantics` research that `stalled-work-recovery` is built on. That later
+> change answers the same need — the operator affordance this proposal asks for — but decides two
+> of its central questions the other way:
+>
+> | This proposal | `stalled-work-recovery` (the decision that stands) |
+> | --- | --- |
+> | A redrive is a **domain fact**: new `RetryApply` command → `ApplyRetryRequested` event | A redrive is an **infrastructure operation**: no command, no event, no domain/event-schema change in either module |
+> | Stalled imports **join** the attention queue with an ask-oriented chip | Stalled items are **excluded** from the queue — it is for human decisions, and a stall offers the user no verb |
+>
+> The contradiction is settled by shipped code, not just by design docs: `stalled-work-recovery`'s
+> `redriveStalled(streamId)` landed in both reactors as an infrastructure operation that takes the
+> dispatch mutex, clears dead letters through the existing seam, and re-dispatches from folded
+> state — with no new command and no new event.
+>
+> Kept in the archive for provenance: the 2026-08-02 incident analysis in the "Why" section below
+> is still the accurate account of what went wrong, and it is the motivation `stalled-work-recovery`
+> inherited.
+
 ## Why
 
 The 2026-08-02 incident (chromaprint abort → dead-lettered apply) proved that when an import
