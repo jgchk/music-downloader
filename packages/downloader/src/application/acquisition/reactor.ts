@@ -249,11 +249,11 @@ export class Reactor {
 
     const gap = this.dependencies.redriveGapMs ?? DEFAULT_REDRIVE_GAP_MS;
     await this.dependencies.sleep(gap * this.dependencies.random());
-    this.dependencies.logger.info(
+    const scope = this.scopeFor(last);
+    scope.logger.info(
       { acquisitionId: streamId, phase: acquisition.phase },
       'startup re-drive dispatching the pending effect',
     );
-    const scope = this.scopeFor(last);
     const outcome = await this.dispatchEvent(last, events, scope);
     if (outcome.kind === 'retry') {
       const isParkedOk = await this.parkStream(last, outcome.effect, outcome.error, scope);
@@ -270,9 +270,15 @@ export class Reactor {
   async process(stored: StoredEvent): Promise<void> {
     if (stored.globalSeq <= this.lastProcessed) return; // already handled (at-least-once dedupe)
 
+    // Built BEFORE the park checks, so every delivered event is examined exactly once — the two
+    // early returns below would otherwise checkpoint past a row without ever inspecting its story,
+    // and a malformed one would then be published by the outbound feed with nobody having said so.
+    // Matches the importer, which builds its scope first for the same reason.
+    const scope = this.scopeFor(stored);
+
     const park = await this.dependencies.parked.find(stored.streamId);
     if (park.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { acquisitionId: stored.streamId, err: park.error },
         'reactor park lookup failed',
       );
@@ -281,7 +287,7 @@ export class Reactor {
     if (park.value !== undefined) {
       // The stream is parked: this later event queues behind the parked effect (no-leapfrog, D1).
       // The checkpoint advances — the event stays reachable through the stream for catch-up.
-      this.dependencies.logger.debug(
+      scope.logger.debug(
         { acquisitionId: stored.streamId, globalSeq: stored.globalSeq },
         'stream parked; event queued behind the parked effect',
       );
@@ -289,7 +295,6 @@ export class Reactor {
       return;
     }
 
-    const scope = this.scopeFor(stored);
     const stream = await this.dependencies.store.readStream(stored.streamId);
     if (stream.isErr()) {
       scope.logger.error(

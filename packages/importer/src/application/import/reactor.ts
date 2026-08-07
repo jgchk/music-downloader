@@ -298,8 +298,8 @@ export class Reactor {
       );
       return;
     }
-    await this.clearPark(stored);
-    if (!isDeadLettered && wasStalled) await this.clearStalled(stored.streamId);
+    await this.clearPark(stored, scope);
+    if (!isDeadLettered && wasStalled) await this.clearStalled(stored.streamId, scope);
     this.lastProcessed = stored.globalSeq;
   }
 
@@ -375,10 +375,10 @@ export class Reactor {
   }
 
   /** Drop the resolved event's retry tally (idempotent); a lingering row is harmless but logged. */
-  private async clearPark(stored: StoredEvent): Promise<void> {
+  private async clearPark(stored: StoredEvent, scope: OperationScope): Promise<void> {
     const cleared = await this.dependencies.parked.clear(stored.globalSeq);
     if (cleared.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: stored.streamId, globalSeq: stored.globalSeq, err: cleared.error },
         'failed to clear the resolved retry tally',
       );
@@ -391,16 +391,16 @@ export class Reactor {
    * exposure together. On a clear fault it stays marked — the letters still exist; a later
    * successful event retries the clear.
    */
-  private async clearStalled(streamId: string): Promise<void> {
+  private async clearStalled(streamId: string, scope: OperationScope): Promise<void> {
     const cleared = await this.dependencies.deadLetters.clearStream(REACTOR_CONSUMER, streamId);
     if (cleared.isErr()) {
-      this.dependencies.logger.error(
+      scope.logger.error(
         { importId: streamId, err: cleared.error },
         'failed to clear resolved dead letters',
       );
       return;
     }
     this.dependencies.stalled.clear(streamId);
-    this.dependencies.logger.info({ importId: streamId }, 'stalled import resumed');
+    scope.logger.info({ importId: streamId }, 'stalled import resumed');
   }
 }
