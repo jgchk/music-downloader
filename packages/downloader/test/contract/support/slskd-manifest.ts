@@ -45,7 +45,7 @@ export interface IssuedRequest {
 }
 
 /** Whether a concrete pathname is an instance of an OpenAPI-style path template. */
-function pathMatches(template: string, path: string): boolean {
+function isPathMatch(template: string, path: string): boolean {
   const wanted = template.split('/');
   const actual = path.split('/');
   if (wanted.length !== actual.length) return false;
@@ -69,11 +69,11 @@ export function undeclaredOperations(
 ): string[] {
   const undeclared: string[] = [];
   for (const request of requests) {
-    const declared = operations.some(
-      (op) => op.method === request.method.toLowerCase() && pathMatches(op.path, request.path),
+    const isDeclared = operations.some(
+      (op) => op.method === request.method.toLowerCase() && isPathMatch(op.path, request.path),
     );
     const label = `${request.method.toUpperCase()} ${request.path}`;
-    if (!declared && !undeclared.includes(label)) undeclared.push(label);
+    if (!isDeclared && !undeclared.includes(label)) undeclared.push(label);
   }
   return undeclared;
 }
@@ -94,7 +94,7 @@ export function undeclaredQueryParams(
     const op = operations.find(
       (candidate) =>
         candidate.method === request.method.toLowerCase() &&
-        pathMatches(candidate.path, request.path),
+        isPathMatch(candidate.path, request.path),
     );
     if (op === undefined) continue; // an undeclared *operation* is the other check's finding
     for (const param of Object.keys(request.query)) {

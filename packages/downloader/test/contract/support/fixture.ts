@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 
 /**
  * A recorded contract fixture: one real request/response interaction captured from a live external
@@ -43,24 +43,24 @@ function readFixture(path: string, name: string): ContractFixture {
   const raw = readFileSync(path, 'utf8');
   try {
     return JSON.parse(raw) as ContractFixture;
-  } catch (cause) {
+  } catch (error) {
     // A bare SyntaxError names neither the file nor the directory it was found in, which the
     // recursive walk makes harder to locate rather than easier.
-    throw new Error(`fixture ${name} is not valid JSON: ${String(cause)}`);
+    throw new Error(`fixture ${name} is not valid JSON: ${String(error)}`);
   }
 }
 
 export function loadFixtures(service: string): { name: string; fixture: ContractFixture }[] {
-  const root = join(CONTRACT_FIXTURE_ROOT, service);
+  const root = path.join(CONTRACT_FIXTURE_ROOT, service);
 
   const walk = (dir: string, prefix: string): { name: string; fixture: ContractFixture }[] =>
     readdirSync(dir, { withFileTypes: true })
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .toSorted((a, b) => a.name.localeCompare(b.name))
       .flatMap((entry) => {
         const name = `${prefix}${entry.name}`;
-        if (entry.isDirectory()) return walk(join(dir, entry.name), `${name}/`);
+        if (entry.isDirectory()) return walk(path.join(dir, entry.name), `${name}/`);
         if (!entry.name.endsWith('.json')) return [];
-        return [{ name, fixture: readFixture(join(dir, entry.name), name) }];
+        return [{ name, fixture: readFixture(path.join(dir, entry.name), name) }];
       });
 
   return walk(root, '');

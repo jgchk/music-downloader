@@ -5,6 +5,7 @@ import {
   undeclaredOperations,
   undeclaredQueryParams,
 } from './support/slskd-manifest.js';
+import type { IssuedRequest } from './support/slskd-manifest.js';
 import { checkSlskdSpec } from './support/spec-compat.js';
 import type { OpenApiSpec } from './support/spec-compat.js';
 
@@ -138,7 +139,7 @@ describe('the manifest cannot under-declare the consumed surface', () => {
   });
 
   it('accepts the query parameters the manifest does declare', () => {
-    const requests = [
+    const requests: IssuedRequest[] = [
       { method: 'GET', path: '/api/v0/events', query: { offset: '0', limit: '100' } },
       {
         method: 'DELETE',

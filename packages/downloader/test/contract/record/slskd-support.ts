@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { CONTRACT_FIXTURE_ROOT, type ContractFixture } from '../support/fixture.js';
 
 /**
@@ -61,12 +61,14 @@ export function createAnonymizer(seed: readonly string[] = []): {
     let scrubbed = text;
     // Longest name first: with `bob` before `bobby`, scrubbing `bobby` would leave `peer1by` — a
     // corrupted capture that still looks plausible. Sorting makes the longest match win.
-    const byLength = [...usernames].sort(([a], [b]) => b.length - a.length);
+    const byLength = [...usernames].toSorted(([a], [b]) => b.length - a.length);
     for (const [username, replacement] of byLength) {
-      scrubbed = scrubbed.replaceAll(username, replacement);
+      // A function replacement, so a `$&`/`$1` sequence in an alias could never be expanded as a
+      // substitution pattern — the alias is inserted literally.
+      scrubbed = scrubbed.replaceAll(username, () => replacement);
     }
     // IPv4 host:port as slskd formats peer endpoints.
-    return scrubbed.replace(/\b\d{1,3}(?:\.\d{1,3}){3}:\d+\b/g, '<peer-address>');
+    return scrubbed.replaceAll(/\b\d{1,3}(?:\.\d{1,3}){3}:\d+\b/g, '<peer-address>');
   };
 
   /**
@@ -89,7 +91,7 @@ export function createAnonymizer(seed: readonly string[] = []): {
   };
 
   const rewrite = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(rewrite);
+    if (Array.isArray(value)) return value.map((item) => rewrite(item));
     if (value !== null && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value).map(([key, val]) =>
@@ -138,7 +140,7 @@ export function projectEvents(body: unknown, keep: number, mustInclude?: string)
     if (event.type !== 'DownloadFileComplete' || typeof event.data !== 'string') continue;
     const data = JSON.parse(event.data) as { localFilename?: string; transfer?: { id?: string } };
     const id = data.transfer?.id;
-    if (data.localFilename === undefined || id === undefined) continue;
+    if (id === undefined || data.localFilename === undefined) continue;
     seen.push(id);
     kept.push({
       timestamp: event.timestamp,
@@ -172,7 +174,7 @@ export function createCaller(
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body !== undefined && { body: JSON.stringify(body) }),
     });
     const text = await response.text();
     // slskd answers an enqueue rejection with a bare exception *message* — capture it verbatim
@@ -220,10 +222,10 @@ export function sleep(ms: number): Promise<void> {
 
 /** Write a fixture under `fixtures/slskd/<scenario>/`, creating the scenario directory. */
 export function createWriter(scenarioDir: string): (name: string, f: ContractFixture) => void {
-  const dir = join(CONTRACT_FIXTURE_ROOT, 'slskd', scenarioDir);
+  const dir = path.join(CONTRACT_FIXTURE_ROOT, 'slskd', scenarioDir);
   mkdirSync(dir, { recursive: true });
   return (name, fixture) => {
-    writeFileSync(join(dir, name), `${JSON.stringify(fixture, null, 2)}\n`);
+    writeFileSync(path.join(dir, name), `${JSON.stringify(fixture, null, 2)}\n`);
     console.log(`wrote slskd/${scenarioDir}/${name} (${fixture.response.status})`);
   };
 }
