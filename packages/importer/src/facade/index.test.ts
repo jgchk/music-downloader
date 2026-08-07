@@ -1,3 +1,5 @@
+import { testContext } from '../application/__fixtures__/correlation.js';
+import { STORY } from '../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { submitImport } from '../application/import/use-cases.js';
 import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
@@ -38,7 +40,7 @@ function roundTrip<T>(value: T): T {
 
 /** Submit through the facade and drive the stubbed propose dispatch, like the reactor would. */
 async function submitAndPropose(wiring: TestWiring, facade: ImporterFacade): Promise<string> {
-  const submitted = await facade.submitImport({ path: INTAKE });
+  const submitted = await facade.submitImport({ path: INTAKE }, STORY);
   if (!submitted.ok) throw new Error('submit failed');
   await wiring.dispatch(submitted.value.importId, { type: 'Propose', directory: INTAKE });
   wiring.sync();
@@ -49,7 +51,10 @@ describe('createImporterFacade', () => {
   describe('submitImport', () => {
     it('accepts a submission and returns the deterministic import id', async () => {
       const facade = createImporterFacade(testWiring().deps);
-      const result = await facade.submitImport({ path: INTAKE, hints: { mbReleaseId: 'mb-1' } });
+      const result = await facade.submitImport(
+        { path: INTAKE, hints: { mbReleaseId: 'mb-1' } },
+        STORY,
+      );
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -61,7 +66,7 @@ describe('createImporterFacade', () => {
 
     it('returns a modeled validation error for schema-invalid input, without throwing', async () => {
       const facade = createImporterFacade(testWiring().deps);
-      const result = await facade.submitImport({});
+      const result = await facade.submitImport({}, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -74,7 +79,7 @@ describe('createImporterFacade', () => {
       const wiring = testWiring();
       wiring.store.conflictOnAppend = true;
       const facade = createImporterFacade(wiring.deps);
-      const result = await facade.submitImport({ path: INTAKE });
+      const result = await facade.submitImport({ path: INTAKE }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -87,7 +92,7 @@ describe('createImporterFacade', () => {
       const wiring = testWiring();
       wiring.store.failReads = true;
       const facade = createImporterFacade(wiring.deps);
-      const result = await facade.submitImport({ path: INTAKE });
+      const result = await facade.submitImport({ path: INTAKE }, STORY);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -104,7 +109,10 @@ describe('createImporterFacade', () => {
       const facade = createImporterFacade(wiring.deps);
       const importId = await submitAndPropose(wiring, facade);
 
-      const result = await facade.resolveReview({ id: importId, resolution: { verb: 'reject' } });
+      const result = await facade.resolveReview(
+        { id: importId, resolution: { verb: 'reject' } },
+        STORY,
+      );
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -114,10 +122,13 @@ describe('createImporterFacade', () => {
 
     it('returns UnknownImport for an id no stream exists for', async () => {
       const facade = createImporterFacade(testWiring().deps);
-      const result = await facade.resolveReview({
-        id: 'imp-unknown',
-        resolution: { verb: 'reject' },
-      });
+      const result = await facade.resolveReview(
+        {
+          id: 'imp-unknown',
+          resolution: { verb: 'reject' },
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -128,10 +139,13 @@ describe('createImporterFacade', () => {
 
     it('rejects an unknown verb as a modeled validation error', async () => {
       const facade = createImporterFacade(testWiring().deps);
-      const result = await facade.resolveReview({
-        id: 'imp-1',
-        resolution: { verb: 'transmogrify' },
-      });
+      const result = await facade.resolveReview(
+        {
+          id: 'imp-1',
+          resolution: { verb: 'transmogrify' },
+        },
+        STORY,
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ValidationFailed');
@@ -188,10 +202,14 @@ describe('createImporterFacade', () => {
   describe('getImportForAcquisition', () => {
     it('returns the view for the acquisition that submitted it, carrying the acquisition id', async () => {
       const wiring = testWiring();
-      await submitImport(wiring.deps, {
-        directory: INTAKE,
-        source: { acquisitionId: toAcquisitionId('acq-9') },
-      });
+      await submitImport(
+        wiring.deps,
+        {
+          directory: INTAKE,
+          source: { acquisitionId: toAcquisitionId('acq-9') },
+        },
+        testContext(),
+      );
       wiring.sync();
 
       const result = wiring.facade.getImportForAcquisition({ acquisitionId: 'acq-9' });
@@ -246,11 +264,38 @@ describe('createImporterFacade', () => {
 
       // A downloader-delivered import that retains its candidate: the retry verb joins the set.
       const delivered = testWiring();
-      await submitImport(delivered.deps, { directory: INTAKE, source: SOURCE });
+      await submitImport(delivered.deps, { directory: INTAKE, source: SOURCE }, testContext());
       await delivered.dispatch(GOLDEN_IMPORT_ID, { type: 'Propose', directory: INTAKE });
       const deliveredActions =
         delivered.facade.listPendingReviews().reviews[0]?.availableActions ?? [];
       expect(deliveredActions).toContain('reject-unusable-delivery');
     });
+  });
+});
+
+describe('facade correlation carriage', () => {
+  it('threads the caller-minted story into the metadata of the events a command appends', async () => {
+    const wiring = testWiring();
+
+    const result = await wiring.facade.submitImport({ path: INTAKE }, STORY);
+
+    expect(result.ok).toBe(true);
+    const appended = wiring.store.all();
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.causation).toMatchObject({ kind: 'command' });
+    }
+  });
+
+  it('degrades to a fresh story rather than refusing work when the caller supplies a malformed id', async () => {
+    const wiring = testWiring();
+
+    const result = await wiring.facade.submitImport({ path: INTAKE }, 'not-a-trace-id');
+
+    expect(result.ok).toBe(true);
+    const [first] = wiring.store.all();
+    expect(first!.metadata.correlationId).not.toBe('not-a-trace-id');
+    expect(first!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
   });
 });

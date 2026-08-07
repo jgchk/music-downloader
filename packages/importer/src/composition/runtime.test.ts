@@ -1,3 +1,5 @@
+import { STORY } from '../application/__fixtures__/correlation.js';
+import { appendMetadata } from '../application/__fixtures__/correlation.js';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -92,7 +94,7 @@ describe('createImporterRuntime', () => {
     const wokeUp = vi.fn();
     cleanups.push(runtime.wakeups.subscribe(wokeUp));
 
-    const submitted = await runtime.facade.submitImport({ path: '/intake/album' });
+    const submitted = await runtime.facade.submitImport({ path: '/intake/album' }, STORY);
     expect(submitted.ok).toBe(true);
     if (!submitted.ok) return;
 
@@ -123,10 +125,12 @@ describe('createImporterRuntime', () => {
       new UpcasterRegistry(),
       new InProcessEventBus(silentLogger()),
     );
-    const appendResult = await store.append('imp-stalled', 0, [requested()], {
-      importId: 'imp-stalled',
-      occurredAt: '2026-07-10T12:00:00.000Z',
-    });
+    const appendResult = await store.append(
+      'imp-stalled',
+      0,
+      [requested()],
+      appendMetadata('imp-stalled', fixedClock()),
+    );
     appendResult._unsafeUnwrap();
     const saveResult = await new SqliteCheckpointStore(database).save(REACTOR_CONSUMER, 1);
     saveResult._unsafeUnwrap();
@@ -187,7 +191,7 @@ describe('createImporterRuntime', () => {
       `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
        VALUES (?, ?, ?, 1, ?, ?)`,
     );
-    const meta = JSON.stringify({ importId: 'imp-legacy', occurredAt: '2026-07-10T12:00:00.000Z' });
+    const meta = JSON.stringify(appendMetadata('imp-legacy', fixedClock()));
     const legacyStream: Record<string, unknown>[] = [
       requested({ source: SOURCE }),
       proposed([candidate({ distance: asDistance(0.5) })]),

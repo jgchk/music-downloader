@@ -5,6 +5,7 @@ import type {
   DuplicateIncumbent,
   ProposedCandidate,
 } from '../../domain/import/events.js';
+import type { OperationScope } from '../correlation/context.js';
 import type { InfraError } from './errors.js';
 
 /**
@@ -12,6 +13,13 @@ import type { InfraError } from './errors.js';
  * translate raw wire/tool payloads into the domain vocabulary (anti-corruption). Business sadness
  * (no candidates, a doomed directory, a duplicate skip) travels in the `Ok` channel as data;
  * `InfraError` is reserved for faults worth retrying (spawn failures, timeouts, contract drift).
+ *
+ * Every effect method takes the dispatching {@link OperationScope} as its LAST parameter — one
+ * uniform rule, so there is no per-port exception to remember and the compiler catches a call site
+ * that forgot. An adapter uses `scope.logger` (already bound to the operation, so its lines join
+ * the import without the adapter knowing what correlation is) and carries `scope.context`
+ * opaquely wherever it re-enters the shell. No adapter reads a field of either. `validate` is
+ * exempt: it is a startup gate, not an operation.
  */
 
 /** What to pin a proposal's candidate search to (hints aid matching, never override it — D4). */
@@ -64,10 +72,18 @@ export interface TaggerConfig {
  */
 export interface TaggerPort {
   /** Run beets' matcher over a directory, optionally pinned by hints. */
-  propose(directory: string, pins: ProposePins): ResultAsync<ProposeOutcome, InfraError>;
+  propose(
+    directory: string,
+    pins: ProposePins,
+    scope: OperationScope,
+  ): ResultAsync<ProposeOutcome, InfraError>;
 
   /** Perform the import for a chosen outcome, firing beets' full pipeline. */
-  apply(directory: string, mode: ApplyMode): ResultAsync<ApplyOutcome, InfraError>;
+  apply(
+    directory: string,
+    mode: ApplyMode,
+    scope: OperationScope,
+  ): ResultAsync<ApplyOutcome, InfraError>;
 
   /**
    * Validate the beets configuration and report the effective merged view (startup gate). An
@@ -80,5 +96,5 @@ export interface TaggerPort {
 /** Intake-directory stewardship: the only filesystem writes this service performs itself (D5). */
 export interface IntakePort {
   /** Delete a rejected release's directory from intake, tolerating an already-gone one. */
-  deleteRelease(directory: string): ResultAsync<void, InfraError>;
+  deleteRelease(directory: string, scope: OperationScope): ResultAsync<void, InfraError>;
 }

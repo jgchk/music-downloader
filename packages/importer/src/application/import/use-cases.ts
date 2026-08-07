@@ -1,3 +1,4 @@
+import type { CorrelationSource } from '../ports/system-ports.js';
 import { createHash } from 'node:crypto';
 import type { ResultAsync } from 'neverthrow';
 import type {
@@ -15,6 +16,7 @@ import type {
   PendingReviewView,
   StalledReadModel,
 } from '../projections/read-models.js';
+import type { CommandContext } from '../correlation/context.js';
 import { applyCommand } from './command-handler.js';
 import type { CommandDependencies, CommandError } from './command-handler.js';
 
@@ -28,6 +30,8 @@ export interface UseCaseDependencies extends CommandDependencies {
   readonly status: ImportStatusProjection;
   readonly stalled: StalledReadModel;
   readonly policy: ImportPolicy;
+  /** Mints a story where a trigger has none to carry — see `operation-correlation`. */
+  readonly correlation: CorrelationSource;
 }
 
 /** Join the stalled exposure onto a projected view — additive, absent unless dead-lettered. */
@@ -57,24 +61,33 @@ export interface SubmitImportInput {
 export function submitImport(
   dependencies: UseCaseDependencies,
   input: SubmitImportInput,
+  context: CommandContext,
 ): ResultAsync<{ readonly importId: ImportId }, CommandError> {
   const directory = normalizeDirectory(input.directory);
   const importId = importIdFor(directory);
-  return applyCommand(dependencies, importId, {
-    type: 'SubmitImport',
-    directory,
-    hints: input.hints,
-    policy: dependencies.policy,
-    source: input.source,
-  }).map(() => ({ importId }));
+  return applyCommand(
+    dependencies,
+    importId,
+    {
+      type: 'SubmitImport',
+      directory,
+      hints: input.hints,
+      policy: dependencies.policy,
+      source: input.source,
+    },
+    context,
+  ).map(() => ({ importId }));
 }
 
 export function resolveReview(
   dependencies: UseCaseDependencies,
   importId: ImportId,
   resolution: Resolution,
+  context: CommandContext,
 ): ResultAsync<void, CommandError> {
-  return applyCommand(dependencies, importId, { type: 'ResolveReview', resolution }).map(() => {});
+  return applyCommand(dependencies, importId, { type: 'ResolveReview', resolution }, context).map(
+    () => {},
+  );
 }
 
 export function getImport(

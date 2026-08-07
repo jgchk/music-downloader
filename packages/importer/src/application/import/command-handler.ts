@@ -3,9 +3,10 @@ import type { ResultAsync } from 'neverthrow';
 import { Import } from '../../domain/import/import.js';
 import type { DomainError } from '../../domain/import/import.js';
 import type { ImportCommand } from '../../domain/import/commands.js';
+import type { CommandContext } from '../correlation/context.js';
 import type {
   AppendError,
-  EventMetadata,
+  AppendMetadata,
   EventStorePort,
   StoredEvent,
 } from '../ports/event-store-port.js';
@@ -27,15 +28,21 @@ export function applyCommand(
   dependencies: CommandDependencies,
   importId: string,
   command: ImportCommand,
+  context: CommandContext,
 ): ResultAsync<readonly StoredEvent[], CommandError> {
   return dependencies.store.readStream(importId).andThen((stored) => {
     const aggregate = Import.fromHistory(stored.map((entry) => entry.event));
     const decision = aggregate.execute(command);
     if (decision.isErr()) return errAsync(decision.error);
     if (decision.value.length === 0) return okAsync<readonly StoredEvent[], CommandError>([]);
-    const metadata: EventMetadata = {
+    // ONE metadata per decision, so every event of this batch shares ONE causation: the command
+    // that decided them is their common parent. Chaining event-to-event inside a batch would
+    // invent a causal order the decider never expressed.
+    const metadata: AppendMetadata = {
       importId,
       occurredAt: dependencies.clock.now().toISOString(),
+      correlationId: context.correlationId,
+      causation: context.causation,
     };
     return dependencies.store.append(importId, stored.length, decision.value, metadata);
   });

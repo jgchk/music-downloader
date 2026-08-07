@@ -1,3 +1,4 @@
+import type { OperationScope } from '../../application/correlation/context.js';
 import { fileURLToPath } from 'node:url';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import type { z } from 'zod';
@@ -117,7 +118,11 @@ export class BeetsBridge implements TaggerPort {
     this.script = config.bridgeScript ?? defaultBridgeScript();
   }
 
-  propose(directory: string, pins: ProposePins): ResultAsync<ProposeOutcome, InfraError> {
+  propose(
+    directory: string,
+    pins: ProposePins,
+    scope: OperationScope,
+  ): ResultAsync<ProposeOutcome, InfraError> {
     const arguments_ = [
       'propose',
       directory,
@@ -125,21 +130,28 @@ export class BeetsBridge implements TaggerPort {
       ...(pins.searchArtist === undefined ? [] : ['--search-artist', pins.searchArtist]),
       ...(pins.searchAlbum === undefined ? [] : ['--search-album', pins.searchAlbum]),
     ];
-    return this.invoke('propose', arguments_, bridgeProposeOutputSchema).map((output) => {
-      if (output.status === 'doomed') return { kind: 'doomed', reason: output.reason };
-      return {
-        kind: 'proposal',
-        candidates: output.candidates.map((item) => candidateToDomain(item)),
-        duplicates: output.duplicates,
-      };
-    });
+    return this.invoke('propose', arguments_, bridgeProposeOutputSchema, scope.logger).map(
+      (output) => {
+        if (output.status === 'doomed') return { kind: 'doomed', reason: output.reason };
+        return {
+          kind: 'proposal',
+          candidates: output.candidates.map((item) => candidateToDomain(item)),
+          duplicates: output.duplicates,
+        };
+      },
+    );
   }
 
-  apply(directory: string, mode: ApplyMode): ResultAsync<ApplyOutcome, InfraError> {
+  apply(
+    directory: string,
+    mode: ApplyMode,
+    scope: OperationScope,
+  ): ResultAsync<ApplyOutcome, InfraError> {
     return this.invoke(
       'apply',
       ['apply', directory, ...applyArguments(mode)],
       bridgeApplyOutputSchema,
+      scope.logger,
     ).map((output): ApplyOutcome => {
       switch (output.status) {
         case 'applied': {
@@ -156,7 +168,7 @@ export class BeetsBridge implements TaggerPort {
   }
 
   validate(): ResultAsync<TaggerConfig, InfraError | ConfigInvalid> {
-    return this.invoke('validate', ['validate'], bridgeValidateOutputSchema).andThen(
+    return this.invoke('validate', ['validate'], bridgeValidateOutputSchema, this.logger).andThen(
       (output): ResultAsync<TaggerConfig, InfraError | ConfigInvalid> => {
         if (output.status === 'invalid') {
           // An unusable beets config is operator-fixable, not a transient fault: surface it as the
@@ -179,6 +191,7 @@ export class BeetsBridge implements TaggerPort {
     operation: string,
     verbArguments: readonly string[],
     schema: Schema,
+    logger: Logger,
   ): ResultAsync<z.infer<Schema>, InfraError> {
     const arguments_ = ['--config', this.config.beetsConfigPath, ...verbArguments];
     const run = this.enqueue(() =>
@@ -186,13 +199,14 @@ export class BeetsBridge implements TaggerPort {
     );
     return ResultAsync.fromPromise(run, (cause) =>
       infraError(`bridge.${operation}`, `bridge spawn failed: ${String(cause)}`, cause),
-    ).andThen((result) => this.parse(operation, result, schema));
+    ).andThen((result) => this.parse(operation, result, schema, logger));
   }
 
   private parse<Schema extends z.ZodType>(
     operation: string,
     result: CommandResult,
     schema: Schema,
+    logger: Logger,
   ): ResultAsync<z.infer<Schema>, InfraError> {
     if (result.timedOut) {
       return errAsync(
@@ -211,7 +225,7 @@ export class BeetsBridge implements TaggerPort {
       // A zero exit with stderr is the bridge reporting partial degradation (e.g. files skipped
       // as unreadable) — stderr is that report's only channel on the success path, so it is
       // logged here, never dropped: the operator's alternative is an unexplained thin proposal.
-      this.logger.warn(
+      logger.warn(
         { operation, stderr: result.stderr.slice(-2000) },
         'bridge reported diagnostics on a successful run',
       );
@@ -230,7 +244,7 @@ export class BeetsBridge implements TaggerPort {
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
       // Contract drift (e.g. an unverified beets upgrade): loud, retryable, never silent.
-      this.logger.error(
+      logger.error(
         { operation, issues: parsed.error.issues },
         'bridge output failed contract validation',
       );

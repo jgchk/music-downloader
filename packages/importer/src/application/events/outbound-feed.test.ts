@@ -1,3 +1,5 @@
+import { fixedClock } from '../__fixtures__/fakes.js';
+import { appendMetadata } from '../__fixtures__/correlation.js';
 import { err, ok } from 'neverthrow';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ImportEvent } from '../../domain/import/events.js';
@@ -43,7 +45,7 @@ beforeEach(() => {
 });
 
 async function seed(streamId: string): Promise<void> {
-  await store.append(streamId, 0, verdictHistory(), { importId: streamId, occurredAt: 'T0' });
+  await store.append(streamId, 0, verdictHistory(), appendMetadata(streamId, 'T0'));
 }
 
 describe('OutboundFeed', () => {
@@ -93,7 +95,7 @@ describe('OutboundFeed', () => {
       'imp-2',
       0,
       [...verdictHistory(), { type: 'ImportRejected', reason: 'gone', filesDeleted: true }],
-      { importId: 'imp-2', occurredAt: 'T0' },
+      appendMetadata('imp-2', fixedClock()),
     );
     const feed = new OutboundFeed(store, mapping);
 

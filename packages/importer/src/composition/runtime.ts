@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -17,7 +18,7 @@ import type { InterpreterDependencies } from '../application/import/interpreter.
 import { REACTOR_CONSUMER, Reactor } from '../application/import/reactor.js';
 import type { UseCaseDependencies } from '../application/import/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
-import type { Clock } from '../application/ports/system-ports.js';
+import type { Clock, CorrelationSource } from '../application/ports/system-ports.js';
 import type { IntakePort, TaggerConfig, TaggerPort } from '../application/ports/outbound-ports.js';
 import {
   ImportStatusProjection,
@@ -67,6 +68,7 @@ export interface ImporterRuntimeOverrides {
   readonly tagger?: TaggerPort;
   readonly intake?: IntakePort;
   readonly clock?: Clock;
+  readonly correlation?: CorrelationSource;
   readonly directoryExists?: (directory: string) => Promise<boolean>;
 }
 
@@ -135,6 +137,11 @@ export async function createImporterRuntime(
   overrides: ImporterRuntimeOverrides = {},
 ): Promise<Result<ImporterRuntime, ImporterStartupError>> {
   const clock = overrides.clock ?? { now: () => new Date() };
+  // 32 lowercase hex = a W3C trace id. Chosen so a later OpenTelemetry adoption can carry this
+  // exact value as its trace id instead of minting a parallel one (operation-correlation D1).
+  const correlation: CorrelationSource = overrides.correlation ?? {
+    mint: () => randomBytes(16).toString('hex'),
+  };
 
   // The configured auto-apply threshold crosses the edge here: parse it into a branded Distance so
   // the domain's `distance > threshold` routing can never turn on an out-of-range or NaN bound.
@@ -213,8 +220,7 @@ export async function createImporterRuntime(
     status.apply(stored);
   });
 
-  const intake =
-    overrides.intake ?? new FilesystemIntake({ intakeRoot: config.intakeRoot }, logger);
+  const intake = overrides.intake ?? new FilesystemIntake({ intakeRoot: config.intakeRoot });
   const interpreter: InterpreterDependencies = { store, clock, ports: { tagger, intake } };
   const reactor = new Reactor({
     store,
@@ -225,13 +231,15 @@ export async function createImporterRuntime(
     stalled: stalledModel,
     clock,
     logger,
-    interpret: (importId, effect) => interpretEffect(interpreter, importId, effect),
+    correlation,
+    interpret: (importId, effect, scope) => interpretEffect(interpreter, importId, effect, scope),
   });
   await reactor.start();
 
   const dependencies: UseCaseDependencies = {
     store,
     clock,
+    correlation,
     status,
     stalled: stalledModel,
     policy: { autoApplyThreshold: autoApplyThreshold.value },

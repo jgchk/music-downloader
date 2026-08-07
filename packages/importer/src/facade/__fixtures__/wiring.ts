@@ -1,3 +1,4 @@
+import { fixedCorrelation, testScope } from '../../application/__fixtures__/correlation.js';
 import { okAsync } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { POLICY } from '../../domain/import/__fixtures__/import-fixtures.js';
@@ -69,6 +70,7 @@ export function testWiring(): TestWiring {
     status,
     stalled,
     policy: POLICY,
+    correlation: fixedCorrelation(),
   };
   return {
     deps: dependencies,
@@ -83,6 +85,7 @@ export function testWiring(): TestWiring {
         { store, clock: fixedClock(), ports },
         importId,
         effect,
+        testScope(),
       );
       status.rebuild(store.all());
       return interpreted;
