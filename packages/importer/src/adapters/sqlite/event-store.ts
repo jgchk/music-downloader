@@ -176,12 +176,27 @@ export class SqliteEventStore implements EventStorePort {
  * written before end-to-end-correlation has none, permanently.
  */
 function parseMetadata(raw: unknown): EventMetadata {
-  // A row whose metadata is not an object at all (DB surgery is a documented ops procedure here)
-  // must degrade like every other unreadable provenance — NOT throw, which `readStream` would turn
-  // into an InfraError for the whole stream and wedge the reactor's checkpoint on one bad row.
-  // A row whose metadata is not an object at all (DB surgery is a documented ops procedure here)
-  // must degrade like every other unreadable provenance — NOT throw, which `readStream` would turn
-  // into an InfraError for the whole stream and wedge the reactor's checkpoint on one bad row.
+  // A row whose metadata is not an object at all (DB surgery is a documented ops procedure here) is
+  // handed back exactly as found. THIS PARSE does not throw — `readStream` would turn a throw here
+  // into an InfraError for the whole stream — and reshaping the value would fabricate provenance
+  // nobody wrote: `{...'gone'}` is `{0:'g',1:'o',…}`, indistinguishable from a row really written
+  // that way.
+  //
+  // Scope that claim honestly: it is a statement about this function, NOT about the row's fate. For
+  // a JSON scalar the degradation is real (`'gone'.correlationId` is `undefined`). For `null` it is
+  // not — `continueFrom` opens with `stored.metadata.correlationId`
+  // (`application/correlation/context.ts`), so a `null` column throws a TypeError at the reader. It
+  // does NOT take the process down (the reactors' `drain()` paths each catch and log; measured, not
+  // assumed), but the checkpoint is untouched, so that row redelivers on every poll forever.
+  //
+  // Known defect, deliberately not fixed here. The obvious repair — returning `{}` for every
+  // non-object — was drafted and rejected on review: `{}` is byte-identical to a legitimate
+  // pre-correlation row, so `continueFrom` reports `origin: 'absent'` and both reactors log
+  // corruption at DEBUG as "predates correlation metadata", which is the one arm the correlation
+  // design (D16) reserves for permanent, unactionable history. It also leaves `occurredAt`
+  // undefined behind a required declaration, which reaches a `z.iso.datetime()` field. The real fix
+  // carries unreadability as a value — a third `StoryOrigin` the reactor can log as `malformed` —
+  // and that is a cross-context change with its own design, not a line in a patch release.
   if (typeof raw !== 'object' || raw === null) return raw as EventMetadata;
   const parsed = raw as EventMetadata;
   // Unconditional: `parseCausation` already answers `undefined` for absent AND for unreadable, and
