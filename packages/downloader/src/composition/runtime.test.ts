@@ -339,6 +339,113 @@ describe('createDownloaderRuntime', () => {
     });
   });
 
+  it('announces a verdict envelope the consumer cannot read, and still applies the verdict', async () => {
+    // The consumer owns no logger — the runtime hands it the one channel it needs, for the one
+    // thing it can silently get wrong: a producer whose correlation envelope has drifted out of
+    // this reader's reach. Unannounced, the symptom (cross-context traces that stop joining at the
+    // seam) is indistinguishable from a producer that predates the capability, which is silent and
+    // permanent. The work proceeds either way: correlation may degrade the trace, never the verdict.
+    const warnLines: string[] = [];
+    const runtime = await bootDownloaderRuntime(
+      {
+        databaseFile: ':memory:',
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      createLogger({
+        level: 'warn',
+        destination: { write: (line: string) => void warnLines.push(line) },
+      }),
+      { ports: fakePorts },
+    );
+    cleanups.push(() => runtime.stop());
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
+    if (!submitted.ok) throw new Error('submit failed');
+    const id = submitted.value.acquisitionId;
+    await untilFulfilled(runtime, id);
+
+    const readResult = await runtime.feed.read(0, 100);
+    const fulfilled = readResult._unsafeUnwrap().events.at(-1)!;
+    const verdict: SeamEvent = {
+      globalSeq: 1,
+      type: 'release.verdict',
+      timestamp: '2026-07-03T12:00:00.000Z',
+      data: {
+        acquisitionId: id,
+        candidate: (fulfilled.data as { candidate: unknown }).candidate,
+        verdict: 'rejected',
+        reasons: ['wrong pressing'],
+      },
+      // A live producer's envelope, in a shape this reader's schema rejects.
+      metadata: { correlationId: 'not-a-trace-id' },
+    };
+    const feed: SeamFeed = {
+      read: (from) =>
+        Promise.resolve(ok({ events: from < 1 ? [verdict] : [], scannedTo: Math.max(from, 1) })),
+    };
+    const subscription = runtime.connectVerdictFeed(feed, { subscribe: () => () => {} });
+    await subscription.start();
+    cleanups.push(() => subscription.stop());
+
+    await vi.waitFor(() => {
+      const status = runtime.facade.getAcquisition({ id });
+      if (!status.ok) throw new Error('missing');
+      expect(status.value.status).not.toBe('Fulfilled');
+    });
+    const announced = warnLines
+      .map((line) => JSON.parse(line) as { msg: string })
+      .find((line) => line.msg.includes('correlation envelope this consumer cannot read'));
+    expect(announced).toBeDefined();
+  });
+
+  it('mints the story, in the format every reader checks against, when the caller supplies an unusable one', async () => {
+    // The runtime's correlation source is the ONE place this module's story format is established
+    // (32 lowercase hex — a W3C trace id, so a later OpenTelemetry adoption carries this exact
+    // value). A caller with no usable story gets one minted here, and it has to be a story every
+    // downstream reader accepts: the seam's published envelope DROPS an id that fails the pattern
+    // and the reactor treats one as a broken writer, so a mint in some other shape would detach
+    // every trace it starts while the work itself went on looking healthy.
+    const directory = mkdtempSync(path.join(tmpdir(), 'runtime-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, 'events.db');
+    const runtime = await bootDownloaderRuntime(
+      {
+        databaseFile: file,
+        libraryRoot: '/library',
+        stagingRoot: '/staging',
+        musicbrainz: {},
+        slskd: {},
+      },
+      silentLogger(),
+      { ports: fakePorts },
+    );
+    let isStopped = false;
+    const stopOnce = async () => {
+      if (isStopped) return;
+      isStopped = true;
+      await runtime.stop();
+    };
+    cleanups.push(stopOnce);
+
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT, 'not-a-trace-id');
+    if (!submitted.ok) throw new Error('submit failed');
+    await untilFulfilled(runtime, submitted.value.acquisitionId);
+    await stopOnce(); // the store is this runtime's; read it back only once it has let go
+
+    const reopened = openEventDatabase(file);
+    const row = reopened
+      .prepare(`SELECT metadata FROM events WHERE stream_id = ? AND version = 0`)
+      .get(submitted.value.acquisitionId) as { metadata: string };
+    reopened.close();
+    const { correlationId } = JSON.parse(row.metadata) as { correlationId?: string };
+    // Hardcoded, not the production constant: this scenario's whole claim is that THIS composition
+    // root establishes the format, so importing the regex it is meant to pin would make the test
+    // agree with any edit to it. 32 lowercase hex — a W3C trace id.
+    expect(correlationId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
   it('stops the connected verdict subscription on stop() so its poll loop cannot outlive the db', async () => {
     vi.useFakeTimers();
     try {

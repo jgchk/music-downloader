@@ -346,6 +346,48 @@ describe('SqliteEventStore — correlation metadata round trip', () => {
     expect(read.isOk()).toBe(true);
   });
 
+  it('hands a metadata column holding a JSON scalar back untouched, fabricating nothing', async () => {
+    // `null` is not the only thing hand-editing leaves in the column. Reshaping a scalar into the
+    // metadata object it is declared to be would BUILD provenance out of nothing — `{...'gone'}`
+    // is `{0:'g',1:'o',…}`, indistinguishable to a reader from a row that really was written that
+    // way. An unreadable row stays exactly as unreadable as it was found.
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    const seeded = await store.append('imp-1', 0, [APPLIED], META);
+    seeded._unsafeUnwrap();
+    database.prepare('UPDATE events SET metadata = ?').run('"gone"');
+
+    const read = await store.readStream('imp-1');
+
+    expect(read._unsafeUnwrap()[0]!.metadata as unknown).toBe('gone');
+  });
+
+  it('drops a stored causation reference it cannot parse, leaving the rest of the row readable', async () => {
+    // The write path types `causation` as the union, but the column is JSON with no upcaster and
+    // no schema behind it, so a row hand-edited (or written by some past version) can hold any
+    // shape at all. A reference this reader cannot read is NO reference — it must come back
+    // `undefined` rather than as a half-built object whose tag a reader would narrow on. The story
+    // beside it is independently readable and must survive.
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    const seeded = await store.append('imp-1', 0, [APPLIED], META);
+    seeded._unsafeUnwrap();
+    database.prepare('UPDATE events SET metadata = ?').run(
+      JSON.stringify({
+        importId: 'imp-1',
+        occurredAt: '2026-07-03T12:00:00.000Z',
+        correlationId: STORY,
+        causation: { kind: 'event', context: 'elsewhere', streamId: 'other-1' }, // no version
+      }),
+    );
+
+    const stream = await store.readStream('imp-1');
+
+    const read = stream._unsafeUnwrap();
+    expect(read[0]!.metadata.causation).toBeUndefined();
+    expect(read[0]!.metadata.correlationId).toBe(STORY);
+  });
+
   it('reads a stored causation reference back as the union it was written as', async () => {
     // The column is JSON and metadata has no upcaster, so the read-edge parse is the only thing
     // standing between a persisted union and a reader narrowing on a tag nothing ever checked.

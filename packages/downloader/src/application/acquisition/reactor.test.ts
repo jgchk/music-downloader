@@ -1819,6 +1819,31 @@ describe('Reactor correlation propagation', () => {
     expect(entry!.level).toBe(40); // pino warn
   });
 
+  it('says nothing about the story when the triggering row carries a usable one', async () => {
+    // Both reports above describe a DEGRADED row, and the malformed one accuses a live writer of
+    // emitting bad ids. Announcing either on the healthy path would put the loudest line the
+    // reactor has on every dispatch — which is exactly how a real one stops being read.
+    await seed(requestedHistory());
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(stubPorts(), { logger, correlation: fixedCorrelation(OTHER_STORY) }).process(
+      trigger,
+    );
+
+    const reports = lines
+      .map((line) => JSON.parse(line) as { msg: string })
+      .filter(
+        (entry) =>
+          entry.msg.includes('malformed') || entry.msg.includes('predates correlation metadata'),
+      );
+    expect(reports).toEqual([]);
+  });
+
   it('binds the story, stream and position onto every log line of one dispatch', async () => {
     await seed(requestedHistory());
     const trigger = store.all().at(-1)!;
