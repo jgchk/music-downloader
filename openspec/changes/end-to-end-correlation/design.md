@@ -90,8 +90,61 @@ Additive deploy; no data migration; old events trace-degrade by design. Rollback
 previous image — new metadata is ignored by old readers (optional fields under tolerant
 schemas).
 
-## Open Questions
+## Decisions settled at implementation
 
-- Whether the reactor's fresh-mint-on-absent path should log at info or debug when it
-  synthesizes a story for a pre-change stream — a log-noise calibration settled at
-  implementation.
+**D8 — Fresh-mint-on-absent logs at DEBUG** (the open question, closed). A pre-correlation row
+can never gain a story, so the line says nothing an operator can act on; and the boot drain over
+historical streams would emit it once per stream. It is a trace-quality note for whoever is
+already reading debug output, not an operational event.
+
+**D9 — Two compiler gates instead of call-site discipline.** The Risks section called context
+threading "mechanical, compiler-driven"; concretely that is: (a) `applyCommand` takes a required
+`CommandContext`, and (b) `EventStorePort.append` takes an `AppendMetadata` whose pair is
+NON-optional while the read-side `EventMetadata` keeps both optional forever. The asymmetry is the
+point — tolerance belongs to the reader. `applyCommand` is the only production append path in
+either module, so between the two gates there is no way to write an uncorrelated event from today
+on, and no way to read historical rows incorrectly.
+
+**D10 — `OperationScope` on every effect port.** Effects receive `{context, logger}` — the identity
+to carry plus a logger already bound to it — as the LAST parameter of every outbound port method,
+without exception, so there is no per-port rule to remember and the compiler catches a missed site.
+Adapters consequently no longer own a constructor logger: they log through what each operation
+hands them, which is what makes D5's "adapters change zero lines of correlation awareness" true in
+substance (they never name the pair) even though their signatures did change. `TaggerPort.validate`
+is the one exemption: it is a startup gate, not an operation.
+
+**D11 — The published block carries the story plus the event's OWN coordinates.** Not the
+producer's internal causation chain: that is provenance the consumer has no use for, and shipping
+it would leak the producer's stream graph across the seam. The consumer turns the published
+coordinates into its causation reference. The block sits beside `data`, never inside it, because it
+is an observability identity rather than either context's vocabulary.
+
+**D12 — The verdict publishes its CYCLE's story, not the resolving request's.** A human resolving
+a review is its own outermost trigger with its own story, so `ReleaseVerdictRecorded` carries that
+one in its metadata — which would break the round trip `importer-outbound-events` requires. The
+renderer therefore folds the prefix back to the most recent `ImportRequested` and publishes under
+that cycle's story. Walking to the CYCLE start rather than the stream start is what keeps the
+revival loop honest: a replacement delivery opens a new cycle under its own adopted story.
+Alternative considered and deferred: making every command against an existing stream continue that
+stream's story. That is a broader semantic change (it would supersede the request's own mint for
+cancel/select/resolve) and was out of scope here.
+
+**D13 — The pair is duplicated per context, not shared.** Each module owns its own
+`CommandContext`/`CausationReference`/`CorrelationSource`, exactly as each already owns a
+byte-identical `EventStorePort` and `EventMetadata`. A shared correlation module would be a shared
+kernel coupling the two languages; the envelope crosses the seam as DATA, never as a common type.
+The web layer mints its own story too, because a story belongs to neither module — one request
+drives both, and each adopts what it is handed. The facades therefore take a plain `StoryId`
+string, not either module's branded `CorrelationId`.
+
+**D14 — The e2e proves the join over the STORES, not captured logs.** D7 proposed a grep against
+container logs. The stored metadata carries the same id by construction (the reactor binds its
+child logger from the very context it appends with), and the store is deterministic where captured
+stdout is not — so `full-loop` asserts the BFF-minted story appears, verbatim and alone, in both
+modules' event stores. Log binding itself is pinned by unit tests at the BFF and both reactors.
+
+**D15 — There is no intake scanner.** D3 enumerated one; the codebase has none — intake is purely
+event-driven, and the seam subscription's poll is its trigger. Likewise, the reactor's non-HTTP
+triggers (fallback poll, boot re-drive, parked retry) do not mint: they DELIVER a stored event,
+which already has a story, so they continue it. Fresh minting outside the BFF happens only where
+there is genuinely no parent — a pre-correlation row, or a seam delivery with no envelope.

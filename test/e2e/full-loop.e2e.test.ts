@@ -6,6 +6,7 @@ import {
   DEPOSIT_DIR,
   DOWNLOADER_DB,
   IMPORTER_DB,
+  correlationIds,
   IMPORT_VOICE_PHRASE,
   LIBRARY_DIR,
   MBID,
@@ -97,6 +98,16 @@ describe('out-of-process full loop (web interface, real socket)', () => {
     expect(eventTypes(DOWNLOADER_DB).length).toBeGreaterThan(0);
     expect(countEvents(IMPORTER_DB, 'ImportRequested')).toBe(1);
     expect(countEvents(IMPORTER_DB, 'ImportApplied')).toBe(1);
+
+    // One operation, one story, BOTH stores (operation-correlation). This is the end-to-end
+    // claim the whole capability exists to make, and the only place it is proved across a real
+    // process boundary: the id the BFF minted for the submission is the id the downloader wrote
+    // on its events, crossed the seam on the published fulfilment, and the importer adopted
+    // verbatim onto its own. Every id is well-formed, and neither module invented one of its own.
+    const acquisitionStories = correlationIds(DOWNLOADER_DB, acquisitionId);
+    expect(acquisitionStories).toHaveLength(1);
+    expect(acquisitionStories[0]).toMatch(/^[0-9a-f]{32}$/);
+    expect(correlationIds(IMPORTER_DB)).toEqual(acquisitionStories);
 
     // Source-resource stewardship survives the merge: the app deletes the search it created and
     // removes the completed transfer's record — and touches no resource it does not own.

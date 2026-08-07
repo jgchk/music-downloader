@@ -254,6 +254,33 @@ export function countEvents(dbFile: string, type: string): number {
   }
 }
 
+/**
+ * The distinct correlation ids recorded on a stream's stored events (operation-correlation).
+ *
+ * Read from the durable metadata rather than scraped from container logs: the log line and the
+ * stored envelope carry the same id by construction (the reactor binds its child logger from the
+ * very context it appends with), and the store is deterministic where captured stdout is not.
+ * Events written before the capability existed carry no id and are simply absent from the result.
+ */
+export function correlationIds(dbFile: string, streamId?: string): string[] {
+  const db = new Database(dbFile, { readonly: true, fileMustExist: true });
+  try {
+    const rows = db
+      .prepare(
+        streamId === undefined
+          ? 'SELECT metadata FROM events ORDER BY global_seq ASC'
+          : 'SELECT metadata FROM events WHERE stream_id = ? ORDER BY global_seq ASC',
+      )
+      .all(...(streamId === undefined ? [] : [streamId])) as { metadata: string }[];
+    const ids = rows
+      .map((row) => (JSON.parse(row.metadata) as { correlationId?: string }).correlationId)
+      .filter((id): id is string => id !== undefined);
+    return [...new Set(ids)];
+  } finally {
+    db.close();
+  }
+}
+
 export async function pollForEvent(
   dbFile: string,
   type: string,
