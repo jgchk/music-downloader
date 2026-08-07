@@ -149,6 +149,45 @@ describe('createImporterRuntime', () => {
     expect(wokeUp).toHaveBeenCalled();
   });
 
+  it('stamps its own W3C-trace-shaped story on what it appends when the caller supplies an unusable one', async () => {
+    // This factory is the ONE place the module's story format is established — 32 lowercase hex, so
+    // a later OpenTelemetry adoption can carry the very same value — and a caller story it cannot
+    // use degrades to a freshly minted one rather than refusing the work. Overriding the source in
+    // every other test would leave that production mint unspecified: what lands in the log has to be
+    // the real format, not merely a value that is present.
+    const directory = mkdtempSync(path.join(tmpdir(), 'importer-db-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const databaseFile = path.join(directory, 'events.db');
+
+    const result = await createImporterRuntime(config({ databaseFile }), silentLogger(), {
+      tagger: fakeTagger(),
+      intake: { deleteRelease: () => okAsync<void>(undefined) },
+    });
+    const runtime = result._unsafeUnwrap();
+    cleanups.push(() => runtime.stop());
+
+    const submitted = await runtime.facade.submitImport(
+      { path: '/intake/album' },
+      'not-a-trace-id',
+    );
+    expect(submitted.ok).toBe(true);
+    await vi.waitFor(() => {
+      expect(runtime.facade.listPendingReviews().reviews).toHaveLength(1);
+    });
+
+    // Read the durable rows back over a second connection (WAL): the story is only real if it is
+    // what got persisted, and every event of the cycle has to carry it, not just the first.
+    const reader = openEventDatabase(databaseFile);
+    const rows = reader.prepare('SELECT metadata FROM events').all() as { metadata: string }[];
+    reader.close();
+
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const { correlationId } = JSON.parse(row.metadata) as { correlationId?: string };
+      expect(correlationId).toMatch(/^[0-9a-f]{32}$/);
+    }
+  });
+
   /**
    * Seed a legacy on-disk DB: the import exists, its effect was dead-lettered (the reactor
    * checkpoint already advanced past it), and a dead letter naming the import stream is on record
