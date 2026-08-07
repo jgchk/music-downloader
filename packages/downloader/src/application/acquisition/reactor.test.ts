@@ -14,6 +14,13 @@ import {
 } from '../__fixtures__/fakes.js';
 import type { SettableClock } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
+import {
+  OTHER_STORY,
+  STORY,
+  appendMetadata,
+  fixedCorrelation,
+  testContext,
+} from '../__fixtures__/correlation.js';
 import { StalledReadModel } from '../projections/read-models.js';
 import { deliverDownloadOutcome } from './download-outcome-consumer.js';
 import { infraError, permanentInfraError } from '../ports/errors.js';
@@ -68,6 +75,7 @@ interface ReactorOverrides {
   readonly logger?: ReactorDependencies['logger'];
   readonly sleep?: (ms: number) => Promise<void>;
   readonly redriveGapMs?: number;
+  readonly correlation?: ReactorDependencies['correlation'];
 }
 
 function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor {
@@ -79,6 +87,7 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     deadLetters,
     stalled,
     logger: overrides.logger ?? silentLogger(),
+    correlation: overrides.correlation ?? fixedCorrelation(),
     interpreter: interpreter(ports),
     clock,
     // Tests drive drains explicitly; the timer wiring itself is pinned by its own test below.
@@ -95,7 +104,18 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
 
 async function seed(history: readonly AcquisitionEvent[], streamId = 'acq-1'): Promise<void> {
   const current = store.all().filter((entry) => entry.streamId === streamId).length;
-  await store.append(streamId, current, history, { acquisitionId: streamId, occurredAt: 't' });
+  await store.append(streamId, current, history, {
+    acquisitionId: streamId,
+    occurredAt: 't',
+    correlationId: STORY,
+    causation: { kind: 'command', commandId: 'command-1' },
+  });
+}
+
+/** Seed rows exactly as a build BEFORE end-to-end-correlation wrote them: no pair at all. */
+function seedLegacy(history: readonly AcquisitionEvent[], streamId = 'acq-1'): void {
+  const current = store.all().filter((entry) => entry.streamId === streamId).length;
+  store.seedLegacy(streamId, current, history, { acquisitionId: streamId, occurredAt: 't' });
 }
 
 function storedOfType(type: AcquisitionEvent['type']): StoredEvent {
@@ -330,7 +350,7 @@ describe('Reactor.process', () => {
         // First delivery (acq-1, from the backlog): a second stream lands and publishes while
         // this very effect is still being processed — the mid-drain wakeup.
         return store
-          .append('acq-2', 0, requestedHistory(), { acquisitionId: 'acq-2', occurredAt: 't' })
+          .append('acq-2', 0, requestedHistory(), appendMetadata('acq-2', clock))
           .map((appended) => {
             bus.publish(appended);
             return resolution;
@@ -1423,7 +1443,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
       },
     });
     await reactor(ports).process(imported);
-    expect(ports.library.discardStaging).toHaveBeenCalledWith(sampleFiles);
+    expect(ports.library.discardStaging).toHaveBeenCalledWith(sampleFiles, expect.anything());
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(imported.globalSeq);
   });
 
@@ -1436,10 +1456,13 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     await seed(selectedHistory([a]));
     const outcomeDependencies = { store, clock, logger: silentLogger() };
     const start = vi.fn(() =>
-      deliverDownloadOutcome(outcomeDependencies, 'acq-1', a.identity, {
-        kind: 'completed',
-        files: sampleFiles,
-      }).map(() => ({ kind: 'started' }) as const),
+      deliverDownloadOutcome(
+        outcomeDependencies,
+        'acq-1',
+        a.identity,
+        { kind: 'completed', files: sampleFiles },
+        testContext(),
+      ).map(() => ({ kind: 'started' }) as const),
     );
     const probe = vi.fn((path: string) =>
       okAsync({
@@ -1484,5 +1507,93 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(selected.globalSeq);
     expect(streamEventTypes('acq-1')).toEqual(before); // the late start report appended nothing
     expect(lines.join('')).not.toContain('rejected as stale'); // a lawful ordering, not a warn
+  });
+});
+
+describe('Reactor correlation propagation', () => {
+  /** The events a dispatch appended, in append order. */
+  const appendedAfter = (before: number): readonly StoredEvent[] =>
+    store.all().filter((entry) => entry.globalSeq > before);
+
+  it('continues the triggering event story in the events its follow-up command appends', async () => {
+    await seed(requestedHistory());
+    const trigger = store.all().at(-1)!;
+    const before = store.all().length;
+
+    await reactor(stubPorts()).process(trigger);
+
+    const appended = appendedAfter(before);
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      expect(entry.metadata.correlationId).toBe(STORY);
+      expect(entry.metadata.causation).toEqual({
+        kind: 'event',
+        context: 'downloader',
+        streamId: trigger.streamId,
+        version: trigger.version,
+      });
+    }
+  });
+
+  it('mints a fresh story for a stream written before correlation existed', async () => {
+    seedLegacy(requestedHistory());
+    const trigger = store.all().at(-1)!;
+    const before = store.all().length;
+
+    await reactor(stubPorts(), { correlation: fixedCorrelation(OTHER_STORY) }).process(trigger);
+
+    const appended = appendedAfter(before);
+    expect(appended.length).toBeGreaterThan(0);
+    expect(appended[0]!.metadata.correlationId).toBe(OTHER_STORY);
+  });
+
+  it('announces a synthesized story at debug — a permanent property of old rows, not an operator action', async () => {
+    seedLegacy(requestedHistory());
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(stubPorts(), { logger, correlation: fixedCorrelation(OTHER_STORY) }).process(
+      trigger,
+    );
+
+    const minted = lines
+      .map((line) => JSON.parse(line) as { level: number; msg: string; correlationId?: string })
+      .find((entry) => entry.msg.includes('no correlation metadata'));
+    expect(minted).toBeDefined();
+    expect(minted!.level).toBe(20); // pino debug
+  });
+
+  it('binds the story, stream and position onto every log line of one dispatch', async () => {
+    await seed(requestedHistory());
+    const trigger = store.all().at(-1)!;
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'debug',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+
+    await reactor(stubPorts(), { logger }).process(trigger);
+
+    const dispatched = lines
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            msg: string;
+            correlationId?: string;
+            streamId?: string;
+            globalSeq?: number;
+          },
+      )
+      .filter((entry) => entry.msg === 'effect dispatched');
+    expect(dispatched.length).toBeGreaterThan(0);
+    for (const entry of dispatched) {
+      expect(entry.correlationId).toBe(STORY);
+      expect(entry.streamId).toBe(trigger.streamId);
+      expect(entry.globalSeq).toBe(trigger.globalSeq);
+    }
   });
 });

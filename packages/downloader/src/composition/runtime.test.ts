@@ -1,3 +1,4 @@
+import { STORY, testContext } from '../application/__fixtures__/correlation.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -59,7 +60,12 @@ function fakePorts(observer: DownloadObserverPort): EffectPorts {
           // At-least-once like the real watch, but BOUNDED so a regression fails fast instead of
           // hanging the suite (the expected loser is one benign concurrency conflict).
           for (let attempt = 1; attempt <= 100; attempt += 1) {
-            const delivered = await observer.outcome(id, candidate.identity, COMPLETED);
+            const delivered = await observer.outcome(
+              id,
+              candidate.identity,
+              COMPLETED,
+              testContext(),
+            );
             if (delivered.isOk()) {
               observer.finished(id);
               return;
@@ -136,7 +142,7 @@ describe('createDownloaderRuntime', () => {
     const wokeUp = vi.fn();
     cleanups.push(runtime.wakeups.subscribe(wokeUp));
 
-    const submitted = await runtime.facade.submitAcquisition(SUBMIT);
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
     expect(submitted.ok).toBe(true);
     if (!submitted.ok) return;
     const id = submitted.value.acquisitionId;
@@ -168,7 +174,12 @@ describe('createDownloaderRuntime', () => {
             observer.progress(id, { percent: 42, bytesTransferred: 42, bytesTotal: 100 });
             await gate;
             for (let attempt = 1; attempt <= 100; attempt += 1) {
-              const delivered = await observer.outcome(id, candidate.identity, COMPLETED);
+              const delivered = await observer.outcome(
+                id,
+                candidate.identity,
+                COMPLETED,
+                testContext(),
+              );
               if (delivered.isOk()) {
                 observer.finished(id);
                 return;
@@ -196,7 +207,7 @@ describe('createDownloaderRuntime', () => {
     );
     cleanups.push(() => runtime.stop());
 
-    const submitted = await runtime.facade.submitAcquisition(SUBMIT);
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
     if (!submitted.ok) throw new Error('submit failed');
     const id = submitted.value.acquisitionId;
 
@@ -231,7 +242,7 @@ describe('createDownloaderRuntime', () => {
 
   it('consumes importer verdicts over the connected feed and revives the acquisition', async () => {
     const runtime = await testRuntime();
-    const submitted = await runtime.facade.submitAcquisition(SUBMIT);
+    const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
     if (!submitted.ok) throw new Error('submit failed');
     const id = submitted.value.acquisitionId;
     await untilFulfilled(runtime, id);
@@ -367,7 +378,7 @@ describe('createDownloaderRuntime', () => {
     const file = path.join(directory, 'events.db');
 
     const first = await testRuntime(file);
-    const submitted = await first.facade.submitAcquisition(SUBMIT);
+    const submitted = await first.facade.submitAcquisition(SUBMIT, STORY);
     if (!submitted.ok) throw new Error('submit failed');
     await untilFulfilled(first, submitted.value.acquisitionId);
     await first.stop();

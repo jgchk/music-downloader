@@ -4,6 +4,7 @@ import type { InfraError } from '../../application/ports/errors.js';
 import type { AudioProbePort } from '../../application/ports/outbound-ports.js';
 import type { ProbedAudio } from '../../domain/validation/validators.js';
 import type { Logger } from '../../application/logging/logger.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import { nodeCommandRunner } from './runner.js';
 import type { CommandRunner } from './runner.js';
 import { ffprobeOutputSchema } from './schemas.js';
@@ -102,7 +103,6 @@ export class FfmpegAudioProbe implements AudioProbePort {
   private readonly timeoutMs: number;
 
   constructor(
-    private readonly logger: Logger,
     private readonly runner: CommandRunner = nodeCommandRunner,
     config: FfmpegConfig = {},
   ) {
@@ -111,14 +111,14 @@ export class FfmpegAudioProbe implements AudioProbePort {
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
-  probe(filePath: string): ResultAsync<ProbedAudio, InfraError> {
-    return ResultAsync.fromPromise(this.runProbe(filePath), (cause) =>
+  probe(filePath: string, scope: OperationScope): ResultAsync<ProbedAudio, InfraError> {
+    return ResultAsync.fromPromise(this.runProbe(filePath, scope.logger), (cause) =>
       infraError('ffmpeg.probe', String(cause), cause),
     );
   }
 
-  private async runProbe(filePath: string): Promise<ProbedAudio> {
-    this.logger.debug({ filePath }, 'probing audio file');
+  private async runProbe(filePath: string, logger: Logger): Promise<ProbedAudio> {
+    logger.debug({ filePath }, 'probing audio file');
     const [meta, decode] = await Promise.all([
       this.runner.run(
         this.ffprobe,
@@ -140,13 +140,13 @@ export class FfmpegAudioProbe implements AudioProbePort {
     // diagnosis when a *systematic* environmental fault (permissions, a missing codec in the
     // image) starts reading every candidate as "corrupt" — so they are never discarded silently.
     if (decode.code !== 0) {
-      this.logger.warn(
+      logger.warn(
         { filePath, code: decode.code, stderr: decode.stderr },
         'audio decode failed; treating the file as unplayable',
       );
     }
     if (meta.code !== 0) {
-      this.logger.warn(
+      logger.warn(
         { filePath, code: meta.code, stderr: meta.stderr },
         'ffprobe could not read audio metadata',
       );

@@ -1,5 +1,5 @@
+import { testScope } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
-import { silentLogger } from '../../application/__fixtures__/fakes.js';
 import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
@@ -49,7 +49,7 @@ function uuid(seed: string): string {
 }
 
 function resolver(routes: [string, HttpResponse][]): MusicBrainzMetadata {
-  return new MusicBrainzMetadata(silentLogger(), http(routes));
+  return new MusicBrainzMetadata(http(routes));
 }
 
 const albumById: AcquisitionRequest = {
@@ -67,7 +67,7 @@ describe('MusicBrainzMetadata', () => {
   it('resolves a release by MBID into a canonical target', async () => {
     const resolveResult = await resolver([
       ['/release/rel-1', releaseFixture(uuid('rel-1'))],
-    ]).resolve(albumById);
+    ]).resolve(albumById, testScope());
     const result = resolveResult._unsafeUnwrap();
 
     expect(result).toMatchObject({
@@ -77,7 +77,7 @@ describe('MusicBrainzMetadata', () => {
   });
 
   it('reports unresolved when the release MBID is not found', async () => {
-    const resolveResult2 = await resolver([]).resolve(albumById);
+    const resolveResult2 = await resolver([]).resolve(albumById, testScope());
     const result = resolveResult2._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -85,7 +85,10 @@ describe('MusicBrainzMetadata', () => {
 
   it('reports unresolved when the release cannot form a valid target', async () => {
     const empty = ok({ id: 'rel-1', title: 'Album', 'artist-credit': [{ name: 'Artist' }] });
-    const resolveResult3 = await resolver([['/release/rel-1', empty]]).resolve(albumById);
+    const resolveResult3 = await resolver([['/release/rel-1', empty]]).resolve(
+      albumById,
+      testScope(),
+    );
     const result = resolveResult3._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -95,19 +98,25 @@ describe('MusicBrainzMetadata', () => {
     const resolveResult4 = await resolver([
       ['/release?query=', ok({ releases: [{ id: 'rel-2', score: 95 }] })],
       ['/release/rel-2', releaseFixture(uuid('rel-2'))],
-    ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
+    ]).resolve(
+      { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+      testScope(),
+    );
     const result = resolveResult4._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('rel-2') } });
   });
 
   it('reports unresolved when an album search has no confident match', async () => {
-    const resolveResult5 = await resolver([['/release?query=', ok({ releases: [] })]]).resolve({
-      kind: 'descriptor',
-      targetType: 'album',
-      artist: 'Artist',
-      title: 'Album',
-    });
+    const resolveResult5 = await resolver([['/release?query=', ok({ releases: [] })]]).resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'Artist',
+        title: 'Album',
+      },
+      testScope(),
+    );
     const result = resolveResult5._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -124,7 +133,10 @@ describe('MusicBrainzMetadata', () => {
           ],
         }),
       ],
-    ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
+    ]).resolve(
+      { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+      testScope(),
+    );
     const result = resolveResult6._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -154,12 +166,15 @@ describe('MusicBrainzMetadata', () => {
     const resolveResult7 = await resolver([
       ['/release?query=', search],
       ['/release/deluxe', releaseFixture(uuid('deluxe'))],
-    ]).resolve({
-      kind: 'descriptor',
-      targetType: 'album',
-      artist: 'Artist',
-      title: 'Album (Deluxe)',
-    });
+    ]).resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'Artist',
+        title: 'Album (Deluxe)',
+      },
+      testScope(),
+    );
     const result = resolveResult7._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('deluxe') } });
@@ -191,7 +206,10 @@ describe('MusicBrainzMetadata', () => {
       ['/release?query=', search],
       ['/release/early', sparse], // earliest official, but no tracks → no valid target
       ['/release/late', releaseFixture(uuid('late'))],
-    ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
+    ]).resolve(
+      { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+      testScope(),
+    );
     const result = resolveResult8._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('late') } });
@@ -205,7 +223,10 @@ describe('MusicBrainzMetadata', () => {
     const resolveResult9 = await resolver([
       ['/release?query=', search],
       ['/release/only', sparse],
-    ]).resolve({ kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' });
+    ]).resolve(
+      { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
+      testScope(),
+    );
     const result = resolveResult9._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -236,7 +257,7 @@ describe('MusicBrainzMetadata', () => {
         ]),
       ],
       ['/release/std', releaseFixture(uuid('std'))],
-    ]).resolve(byReleaseGroup('rg-1'));
+    ]).resolve(byReleaseGroup('rg-1'), testScope());
     const result = resolveResult10._unsafeUnwrap();
 
     expect(result).toMatchObject({
@@ -260,7 +281,7 @@ describe('MusicBrainzMetadata', () => {
       },
     };
 
-    await new MusicBrainzMetadata(silentLogger(), capturing).resolve(byReleaseGroup('rg-9'));
+    await new MusicBrainzMetadata(capturing).resolve(byReleaseGroup('rg-9'), testScope());
 
     const browseUrl = new URL(urls[0]!);
     expect(browseUrl.searchParams.get('release-group')).toBe('rg-9');
@@ -268,7 +289,7 @@ describe('MusicBrainzMetadata', () => {
   });
 
   it('reports unresolved when the release group is not found', async () => {
-    const resolveResult11 = await resolver([]).resolve(byReleaseGroup('missing'));
+    const resolveResult11 = await resolver([]).resolve(byReleaseGroup('missing'), testScope());
     const result = resolveResult11._unsafeUnwrap();
     expect(result).toEqual({ kind: 'unresolved' });
   });
@@ -288,7 +309,7 @@ describe('MusicBrainzMetadata', () => {
           },
         ]),
       ],
-    ]).resolve(byReleaseGroup('rg-2'));
+    ]).resolve(byReleaseGroup('rg-2'), testScope());
     const result = resolveResult12._unsafeUnwrap();
 
     expect(result).toEqual({
@@ -317,7 +338,7 @@ describe('MusicBrainzMetadata', () => {
         ]),
       ],
       ['/release/off', sparse], // official edition resolves to no valid target
-    ]).resolve(byReleaseGroup('rg-5'));
+    ]).resolve(byReleaseGroup('rg-5'), testScope());
     const result = resolveResult13._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -339,7 +360,7 @@ describe('MusicBrainzMetadata', () => {
         ]),
       ],
       ['/release/official', releaseFixture(uuid('official'))],
-    ]).resolve(byReleaseGroup('rg-null'));
+    ]).resolve(byReleaseGroup('rg-null'), testScope());
     const result = resolveResult14._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('official') } });
@@ -348,6 +369,7 @@ describe('MusicBrainzMetadata', () => {
   it('reports unresolved when the release group is empty', async () => {
     const resolveResult15 = await resolver([['/release?release-group=rg-3', browse([])]]).resolve(
       byReleaseGroup('rg-3'),
+      testScope(),
     );
     const result = resolveResult15._unsafeUnwrap();
 
@@ -366,7 +388,7 @@ describe('MusicBrainzMetadata', () => {
       ],
       ['/release/edition-a', sparse], // earliest modal edition, but no tracks → no valid target
       ['/release/edition-b', releaseFixture(uuid('edition-b'))],
-    ]).resolve(byReleaseGroup('rg-4'));
+    ]).resolve(byReleaseGroup('rg-4'), testScope());
     const result = resolveResult16._unsafeUnwrap();
 
     expect(result).toMatchObject({ kind: 'resolved', target: { mbid: uuid('edition-b') } });
@@ -375,7 +397,7 @@ describe('MusicBrainzMetadata', () => {
   it('resolves a recording by MBID into a single-track target', async () => {
     const resolveResult17 = await resolver([
       ['/recording/rec-1', recordingFixture(uuid('rec-1'))],
-    ]).resolve(trackById);
+    ]).resolve(trackById, testScope());
     const result = resolveResult17._unsafeUnwrap();
 
     expect(result).toMatchObject({
@@ -388,7 +410,10 @@ describe('MusicBrainzMetadata', () => {
     const resolveResult18 = await resolver([
       ['/recording?query=', ok({ recordings: [{ id: 'rec-2', score: 97 }] })],
       ['/recording/rec-2', recordingFixture(uuid('rec-2'))],
-    ]).resolve({ kind: 'descriptor', targetType: 'track', artist: 'Artist', title: 'Song' });
+    ]).resolve(
+      { kind: 'descriptor', targetType: 'track', artist: 'Artist', title: 'Song' },
+      testScope(),
+    );
     const result = resolveResult18._unsafeUnwrap();
 
     expect(result).toMatchObject({
@@ -398,7 +423,7 @@ describe('MusicBrainzMetadata', () => {
   });
 
   it('reports unresolved when the recording MBID is not found', async () => {
-    const resolveResult19 = await resolver([]).resolve(trackById);
+    const resolveResult19 = await resolver([]).resolve(trackById, testScope());
     const result = resolveResult19._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -406,7 +431,10 @@ describe('MusicBrainzMetadata', () => {
 
   it('reports unresolved when the recording cannot form a valid target', async () => {
     const noLength = ok({ id: 'rec-1', title: 'Song', 'artist-credit': [{ name: 'Artist' }] });
-    const resolveResult20 = await resolver([['/recording/rec-1', noLength]]).resolve(trackById);
+    const resolveResult20 = await resolver([['/recording/rec-1', noLength]]).resolve(
+      trackById,
+      testScope(),
+    );
     const result = resolveResult20._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -420,6 +448,7 @@ describe('MusicBrainzMetadata', () => {
         artist: 'Artist',
         title: 'Song',
       },
+      testScope(),
     );
     const result = resolveResult21._unsafeUnwrap();
 
@@ -435,12 +464,15 @@ describe('MusicBrainzMetadata', () => {
       },
     };
 
-    await new MusicBrainzMetadata(silentLogger(), capturing).resolve({
-      kind: 'descriptor',
-      targetType: 'album',
-      artist: 'David Bowie',
-      title: '"Heroes"',
-    });
+    await new MusicBrainzMetadata(capturing).resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'David Bowie',
+        title: '"Heroes"',
+      },
+      testScope(),
+    );
 
     const query = new URL(urls[0]!).searchParams.get('query');
     expect(query).toBe(String.raw`release:"\"Heroes\"" AND artist:"David Bowie"`);
@@ -449,6 +481,7 @@ describe('MusicBrainzMetadata', () => {
   it('surfaces an unexpected HTTP status as an InfraError', async () => {
     const result = await resolver([['/release/rel-1', { status: 503, body: '' }]]).resolve(
       albumById,
+      testScope(),
     );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
@@ -459,7 +492,7 @@ describe('MusicBrainzMetadata', () => {
 
   it('surfaces a contract-violating 200 response as an InfraError without mapping it', async () => {
     const malformed = ok({ id: 'rel-1', media: 'not-an-array' });
-    const result = await resolver([['/release/rel-1', malformed]]).resolve(albumById);
+    const result = await resolver([['/release/rel-1', malformed]]).resolve(albumById, testScope());
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -474,7 +507,7 @@ describe('MusicBrainzMetadata', () => {
   it('treats a 400 (invalid mbid) on a lookup as unresolved, not a retryable fault', async () => {
     const resolveResult22 = await resolver([
       ['/release/rel-1', { status: 400, body: '{"error":"Invalid mbid."}' }],
-    ]).resolve(albumById);
+    ]).resolve(albumById, testScope());
     const result = resolveResult22._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -483,7 +516,7 @@ describe('MusicBrainzMetadata', () => {
   it('treats a 400 (invalid mbid) on the release-group browse as unresolved', async () => {
     const resolveResult23 = await resolver([
       ['/release?release-group=bad', { status: 400, body: '{"error":"Invalid mbid."}' }],
-    ]).resolve(byReleaseGroup('bad'));
+    ]).resolve(byReleaseGroup('bad'), testScope());
     const result = resolveResult23._unsafeUnwrap();
 
     expect(result).toEqual({ kind: 'unresolved' });
@@ -493,12 +526,15 @@ describe('MusicBrainzMetadata', () => {
   // defect, not "no result". It must surface as an attributable InfraError, never be swallowed as
   // silently unresolved (which would hide a query-construction bug behind a clean no-match).
   it('surfaces a 400 on an album descriptor search as an InfraError (query-construction defect)', async () => {
-    const result = await resolver([['/release?query=', { status: 400, body: '' }]]).resolve({
-      kind: 'descriptor',
-      targetType: 'album',
-      artist: 'Artist',
-      title: 'Album',
-    });
+    const result = await resolver([['/release?query=', { status: 400, body: '' }]]).resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'album',
+        artist: 'Artist',
+        title: 'Album',
+      },
+      testScope(),
+    );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',
@@ -507,12 +543,15 @@ describe('MusicBrainzMetadata', () => {
   });
 
   it('surfaces a 400 on a track descriptor search as an InfraError (query-construction defect)', async () => {
-    const result = await resolver([['/recording?query=', { status: 400, body: '' }]]).resolve({
-      kind: 'descriptor',
-      targetType: 'track',
-      artist: 'Artist',
-      title: 'Song',
-    });
+    const result = await resolver([['/recording?query=', { status: 400, body: '' }]]).resolve(
+      {
+        kind: 'descriptor',
+        targetType: 'track',
+        artist: 'Artist',
+        title: 'Song',
+      },
+      testScope(),
+    );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({
       kind: 'InfraError',

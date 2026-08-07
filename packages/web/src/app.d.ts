@@ -13,8 +13,17 @@ declare global {
     interface Locals {
       /** The module facades, wired by the init/handle hooks — the only module surface routes see. */
       facades: Facades;
-      /** The composed process's structured logger, for request-scoped diagnostics. */
+      /**
+       * The request's structured logger, already bound to {@link Locals.correlationId} — use it
+       * for every server-side line so the request's diagnostics stay joinable.
+       */
       logger: Logger;
+      /**
+       * The story this request opened (operation-correlation): minted once by the `handle` hook,
+       * passed to every facade COMMAND so the modules' events and logs carry it too. Never shown
+       * to a user — it is a diagnostic identity, not interface copy.
+       */
+      correlationId: string;
       /** The wall clock, injected here (the one impure edge) so loads stay clock-testable. */
       now: () => string;
       /** The access-control composition (session secret + PlexAccess port) for the login flow. */

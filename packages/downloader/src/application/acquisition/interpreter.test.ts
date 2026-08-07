@@ -1,3 +1,7 @@
+import { appendMetadata, testScope } from '../__fixtures__/correlation.js';
+
+/** One scope instance: the port assertions below pin that the SAME scope reaches the adapter. */
+const SCOPE = testScope();
 import { errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { interpretEffect } from './interpreter.js';
@@ -42,7 +46,7 @@ function dependencies(ports: EffectPorts): InterpreterDependencies {
 }
 
 async function seed(history: readonly AcquisitionEvent[]): Promise<void> {
-  await store.append('acq-1', 0, history, { acquisitionId: 'acq-1', occurredAt: 't' });
+  await store.append('acq-1', 0, history, appendMetadata('acq-1', fixedClock()));
 }
 
 function appendedTypes(): string[] {
@@ -61,10 +65,15 @@ describe('interpretEffect — metadata resolution', () => {
         resolve: vi.fn(() => okAsync({ kind: 'resolved' as const, target: sampleTarget })),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'ResolveMetadata',
-      request: sampleRequest,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'ResolveMetadata',
+        request: sampleRequest,
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('TargetResolved');
   });
 
@@ -73,10 +82,15 @@ describe('interpretEffect — metadata resolution', () => {
     const ports = stubPorts({
       metadata: { resolve: vi.fn(() => okAsync({ kind: 'unresolved' as const })) },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'ResolveMetadata',
+        request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('MetadataResolutionFailed');
   });
 
@@ -91,10 +105,15 @@ describe('interpretEffect — metadata resolution', () => {
         ),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'ResolveMetadata',
-      request: sampleGroupRequest,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'ResolveMetadata',
+        request: sampleGroupRequest,
+      },
+      SCOPE,
+    );
     const paused = store
       .all()
       .map((entry) => entry.event)
@@ -116,10 +135,15 @@ describe('interpretEffect — metadata resolution', () => {
       },
     });
     // The effect `react` emits for EditionSelected: the direct-by-release-id request.
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: asMbid('boot-1'), targetType: 'album' },
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'ResolveMetadata',
+        request: { kind: 'musicbrainz', mbid: asMbid('boot-1'), targetType: 'album' },
+      },
+      SCOPE,
+    );
     const resolved = store
       .all()
       .map((entry) => entry.event)
@@ -135,10 +159,15 @@ describe('interpretEffect — metadata resolution', () => {
     const ports = stubPorts({
       metadata: { resolve: vi.fn(() => errAsync(infraError('mb', 'down'))) },
     });
-    const result = await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'ResolveMetadata',
-      request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
-    });
+    const result = await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'ResolveMetadata',
+        request: { kind: 'musicbrainz', mbid: asMbid('x'), targetType: 'album' },
+      },
+      SCOPE,
+    );
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });
 });
@@ -149,11 +178,16 @@ describe('interpretEffect — search', () => {
     const ports = stubPorts({
       search: { search: vi.fn(() => okAsync([matchingCandidate('a')])) },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Search',
-      target: sampleTarget,
-      round: 1,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Search',
+        target: sampleTarget,
+        round: 1,
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toEqual(
       expect.arrayContaining(['SearchCompleted', 'CandidatesRanked', 'CandidateSelected']),
     );
@@ -166,12 +200,17 @@ describe('interpretEffect — download', () => {
     await seed(selectedHistory([candidate]));
     const start = vi.fn(() => okAsync({ kind: 'started' as const }));
     const ports = stubPorts({ download: { start, abort: vi.fn() } });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Download',
-      candidate,
-      policy: DEFAULT_DOWNLOAD_POLICY,
-    });
-    expect(start).toHaveBeenCalledWith('acq-1', candidate, DEFAULT_DOWNLOAD_POLICY);
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Download',
+        candidate,
+        policy: DEFAULT_DOWNLOAD_POLICY,
+      },
+      SCOPE,
+    );
+    expect(start).toHaveBeenCalledWith('acq-1', candidate, DEFAULT_DOWNLOAD_POLICY, SCOPE);
     expect(appendedTypes()).toContain('DownloadStarted');
     // The start returns promptly — no outcome is recorded here; that arrives asynchronously.
     expect(appendedTypes()).not.toContain('DownloadCompleted');
@@ -183,11 +222,16 @@ describe('interpretEffect — download', () => {
     const ports = stubPorts({
       download: { start: vi.fn(() => okAsync({ kind: 'started' as const })), abort: vi.fn() },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Download',
-      candidate,
-      policy: DEFAULT_DOWNLOAD_POLICY,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Download',
+        candidate,
+        policy: DEFAULT_DOWNLOAD_POLICY,
+      },
+      SCOPE,
+    );
     expect(appendedTypes().filter((type) => type === 'DownloadStarted')).toHaveLength(1);
   });
 
@@ -201,11 +245,16 @@ describe('interpretEffect — download', () => {
         abort: vi.fn(),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Download',
-      candidate: matchingCandidate('a'),
-      policy: DEFAULT_DOWNLOAD_POLICY,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Download',
+        candidate: matchingCandidate('a'),
+        policy: DEFAULT_DOWNLOAD_POLICY,
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('DownloadFailed');
   });
 
@@ -215,9 +264,14 @@ describe('interpretEffect — download', () => {
     const abort = vi.fn(() => okAsync([]));
     const ports = stubPorts({ download: { start: vi.fn(), abort } });
 
-    await interpretEffect(dependencies(ports), 'acq-1', { type: 'AbortDownload', candidate });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      { type: 'AbortDownload', candidate },
+      SCOPE,
+    );
 
-    expect(abort).toHaveBeenCalledWith('acq-1', candidate);
+    expect(abort).toHaveBeenCalledWith('acq-1', candidate, SCOPE);
     // The settlement rejects the pending candidate; the acquisition stays cancelled.
     expect(appendedTypes()).toContain('CandidateRejected');
   });
@@ -232,7 +286,12 @@ describe('interpretEffect — download', () => {
       library: { import: vi.fn(), discardStaging },
     });
 
-    await interpretEffect(dependencies(ports), 'acq-1', { type: 'AbortDownload', candidate });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      { type: 'AbortDownload', candidate },
+      SCOPE,
+    );
 
     const rejected = store.all().find((entry) => entry.type === 'CandidateRejected')?.event as
       Extract<AcquisitionEvent, { type: 'CandidateRejected' }> | undefined;
@@ -249,10 +308,15 @@ describe('interpretEffect — download', () => {
       },
     });
 
-    const result = await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'AbortDownload',
-      candidate,
-    });
+    const result = await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'AbortDownload',
+        candidate,
+      },
+      SCOPE,
+    );
 
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
     expect(appendedTypes()).not.toContain('CandidateRejected');
@@ -273,12 +337,17 @@ describe('interpretEffect — validation', () => {
         ),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Validate',
-      files: sampleFiles,
-      target: sampleTarget,
-      matchPolicy: createMatchPolicy(0.5)._unsafeUnwrap(),
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Validate',
+        files: sampleFiles,
+        target: sampleTarget,
+        matchPolicy: createMatchPolicy(0.5)._unsafeUnwrap(),
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('ValidationPassed');
   });
 
@@ -289,12 +358,17 @@ describe('interpretEffect — validation', () => {
         probe: vi.fn(() => okAsync({ decodedCleanly: false, codec: 'flac', durationMs: 0 })),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Validate',
-      files: sampleFiles,
-      target: sampleTarget,
-      matchPolicy: createMatchPolicy(0.9)._unsafeUnwrap(),
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Validate',
+        files: sampleFiles,
+        target: sampleTarget,
+        matchPolicy: createMatchPolicy(0.9)._unsafeUnwrap(),
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('ValidationFailed');
   });
 });
@@ -308,11 +382,16 @@ describe('interpretEffect — import and cleanup', () => {
         discardStaging: vi.fn(),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Import',
-      files: sampleFiles,
-      target: sampleTarget,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Import',
+        files: sampleFiles,
+        target: sampleTarget,
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toEqual(expect.arrayContaining(['Imported', 'AcquisitionFulfilled']));
   });
 
@@ -324,11 +403,16 @@ describe('interpretEffect — import and cleanup', () => {
         discardStaging: vi.fn(),
       },
     });
-    await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Import',
-      files: sampleFiles,
-      target: sampleTarget,
-    });
+    await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Import',
+        files: sampleFiles,
+        target: sampleTarget,
+      },
+      SCOPE,
+    );
     expect(appendedTypes()).toContain('ImportConflicted');
   });
 
@@ -338,11 +422,16 @@ describe('interpretEffect — import and cleanup', () => {
     const ports = stubPorts({
       library: { import: vi.fn(), discardStaging },
     });
-    const result = await interpretEffect(dependencies(ports), 'acq-1', {
-      type: 'Cleanup',
-      files: sampleFiles,
-    });
+    const result = await interpretEffect(
+      dependencies(ports),
+      'acq-1',
+      {
+        type: 'Cleanup',
+        files: sampleFiles,
+      },
+      SCOPE,
+    );
     expect(result._unsafeUnwrap()).toEqual([]);
-    expect(discardStaging).toHaveBeenCalledWith(sampleFiles);
+    expect(discardStaging).toHaveBeenCalledWith(sampleFiles, SCOPE);
   });
 });

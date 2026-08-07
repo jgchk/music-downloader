@@ -1,6 +1,7 @@
 import type { Effect } from '../../domain/acquisition/acquisition.js';
 import type { AcquisitionCommand } from '../../domain/acquisition/commands.js';
 import type { Logger } from '../logging/logger.js';
+import type { OperationScope } from '../correlation/context.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { Clock } from '../ports/system-ports.js';
@@ -81,10 +82,17 @@ export class EffectLander {
     effect: Effect,
     error: CommandError,
     attempt: number,
+    scope: OperationScope,
   ): Promise<boolean> {
     const command = degradeCommand(effect);
     if (command !== undefined) {
-      const applied = await applyCommand(this.dependencies.interpreter, stored.streamId, command);
+      // The degrade belongs to the dispatch that failed, so it continues that dispatch's story.
+      const applied = await applyCommand(
+        this.dependencies.interpreter,
+        stored.streamId,
+        command,
+        scope.context,
+      );
       if (applied.isOk()) {
         this.dependencies.logger.error(
           { acquisitionId: stored.streamId, effect: effect.type, attempt, err: error },

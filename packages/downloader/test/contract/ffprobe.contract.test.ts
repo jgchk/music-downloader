@@ -1,7 +1,7 @@
+import { testScope } from '../../src/application/__fixtures__/correlation.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { silentLogger } from '../../src/application/__fixtures__/fakes.js';
 import { FfmpegAudioProbe } from '../../src/adapters/ffmpeg/probe.js';
 import type { CommandResult, CommandRunner } from '../../src/adapters/ffmpeg/runner.js';
 import { CONTRACT_FIXTURE_ROOT } from './support/fixture.js';
@@ -35,9 +35,9 @@ describe('ffprobe contract (tier 1)', () => {
   it('parses and maps the consumed fields from recorded lossless-FLAC stdout', async () => {
     const fixture = loadFixture('lossless-flac.json');
     const runner = replayRunner(JSON.stringify(fixture.stdout));
-    const probe = new FfmpegAudioProbe(silentLogger(), runner);
+    const probe = new FfmpegAudioProbe(runner);
 
-    const probed = await probe.probe('/staging/01.flac');
+    const probed = await probe.probe('/staging/01.flac', testScope());
     const result = probed._unsafeUnwrap();
 
     // Fed the identical bytes real ffprobe emitted, the adapter must recover every consumed field:
@@ -59,9 +59,9 @@ describe('ffprobe contract (tier 1)', () => {
     // the FLAC fixture only exercises the string `bits_per_raw_sample` path.
     const fixture = loadFixture('lossless-pcm.json');
     const runner = replayRunner(JSON.stringify(fixture.stdout));
-    const probe = new FfmpegAudioProbe(silentLogger(), runner);
+    const probe = new FfmpegAudioProbe(runner);
 
-    const probed = await probe.probe('/staging/01.wav');
+    const probed = await probe.probe('/staging/01.wav', testScope());
     const result = probed._unsafeUnwrap();
 
     expect(result).toEqual({

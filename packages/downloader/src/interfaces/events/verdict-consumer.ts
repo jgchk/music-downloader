@@ -2,6 +2,7 @@ import { err, ok } from 'neverthrow';
 import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
 import { recordExternalValidationFailure } from '../../application/acquisition/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
+import { newOperation } from '../../application/correlation/context.js';
 import { verdictToFailureInput } from '../contracts/verdicts/mapping.js';
 import { externalVerdictDeliverySchema } from '../contracts/verdicts/schemas.js';
 
@@ -24,10 +25,12 @@ export function verdictEventConsumer(dependencies: UseCaseDependencies): Consume
     }
 
     const { acquisitionId, candidate, reasons } = verdictToFailureInput(parsed.data);
-    const recorded = await recordExternalValidationFailure(dependencies, acquisitionId, {
-      candidate,
-      reasons,
-    });
+    const recorded = await recordExternalValidationFailure(
+      dependencies,
+      acquisitionId,
+      { candidate, reasons },
+      newOperation(dependencies.correlation),
+    );
     return recorded.match(
       () => ok<void, { kind: 'Transient'; reason: string }>(undefined),
       // Infra faults and append races both heal on redelivery; the decider converges either way.

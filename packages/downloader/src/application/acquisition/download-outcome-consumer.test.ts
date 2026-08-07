@@ -1,3 +1,4 @@
+import { appendMetadata, testContext } from '../__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { deliverDownloadOutcome } from './download-outcome-consumer.js';
 import { FakeEventStore, fixedClock, silentLogger } from '../__fixtures__/fakes.js';
@@ -25,7 +26,7 @@ function consumer(store: FakeEventStore) {
 
 async function seeded(history: readonly AcquisitionEvent[]): Promise<FakeEventStore> {
   const store = new FakeEventStore();
-  await store.append('acq-1', 0, history, { acquisitionId: 'acq-1', occurredAt: 't' });
+  await store.append('acq-1', 0, history, appendMetadata('acq-1', fixedClock()));
   return store;
 }
 
@@ -37,10 +38,16 @@ describe('deliverDownloadOutcome', () => {
   it('records a completed outcome through the normal decision path', async () => {
     const store = await seeded(startedHistory([candidate]));
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'completed',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'completed',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered.isOk()).toBe(true);
     expect(types(store)).toContain('DownloadCompleted');
@@ -49,11 +56,17 @@ describe('deliverDownloadOutcome', () => {
   it('records a failed outcome as the rejection-and-advance batch', async () => {
     const store = await seeded(startedHistory([candidate, matchingCandidate('b')]));
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'failed',
-      reason: 'Stalled',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'failed',
+        reason: 'Stalled',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered.isOk()).toBe(true);
     expect(types(store)).toEqual(
@@ -76,10 +89,16 @@ describe('deliverDownloadOutcome', () => {
     ]);
     const before = types(store);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'failed',
-      reason: 'Stalled',
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'failed',
+        reason: 'Stalled',
+      },
+      testContext(),
+    );
 
     expect(delivered.isOk()).toBe(true); // recorded-and-skipped, not an error to retry
     expect(types(store)).toEqual(before); // nothing appended, nothing mis-attached
@@ -91,10 +110,16 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(validatingHistory([candidate]));
     const before = types(store);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'completed',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'completed',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered.isOk()).toBe(true);
     expect(types(store)).toEqual(before);
@@ -103,11 +128,17 @@ describe('deliverDownloadOutcome', () => {
   it('settles a cancelled in-flight candidate so its staging is cleaned', async () => {
     const store = await seeded([...startedHistory([candidate]), { type: 'AcquisitionCancelled' }]);
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'failed',
-      reason: 'Cancelled',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'failed',
+        reason: 'Cancelled',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered.isOk()).toBe(true);
     expect(types(store)).toContain('CandidateRejected');
@@ -117,10 +148,16 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(selectedHistory([candidate]));
     store.failAppends = true;
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'completed',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'completed',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });
@@ -129,10 +166,16 @@ describe('deliverDownloadOutcome', () => {
     const store = await seeded(selectedHistory([candidate]));
     store.conflictAppends = true;
 
-    const delivered = await deliverDownloadOutcome(consumer(store), 'acq-1', candidate.identity, {
-      kind: 'completed',
-      files: sampleFiles,
-    });
+    const delivered = await deliverDownloadOutcome(
+      consumer(store),
+      'acq-1',
+      candidate.identity,
+      {
+        kind: 'completed',
+        files: sampleFiles,
+      },
+      testContext(),
+    );
 
     expect(delivered._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });

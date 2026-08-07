@@ -9,6 +9,7 @@ import type {
   SourceResourceKey,
 } from '../../application/ports/resource-ledger-port.js';
 import type { Logger } from '../../application/logging/logger.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import type { SlskdClient } from './client.js';
 import type { SlskdConfig } from './client.js';
 import { mapSearchResponses } from './mapping.js';
@@ -45,7 +46,6 @@ export class SlskdSearch implements SearchPort {
   private readonly searchTimeoutMs: number;
 
   constructor(
-    private readonly logger: Logger,
     private readonly ledger: ResourceLedgerStore,
     client: SlskdClient,
     private readonly timer: Timer = realTimer,
@@ -60,9 +60,11 @@ export class SlskdSearch implements SearchPort {
     acquisitionId: string,
     target: Target,
     round: number,
+    scope: OperationScope,
   ): ResultAsync<readonly Candidate[], InfraError> {
-    return ResultAsync.fromPromise(this.doSearch(acquisitionId, target, round), (cause) =>
-      infraError('slskd.search', String(cause), cause),
+    return ResultAsync.fromPromise(
+      this.doSearch(acquisitionId, target, round, scope.logger),
+      (cause) => infraError('slskd.search', String(cause), cause),
     );
   }
 
@@ -70,9 +72,10 @@ export class SlskdSearch implements SearchPort {
     acquisitionId: string,
     target: Target,
     round: number,
+    logger: Logger,
   ): Promise<readonly Candidate[]> {
     const searchText = buildQuery(target);
-    this.logger.debug({ searchText, round }, 'creating slskd search');
+    logger.debug({ searchText, round }, 'creating slskd search');
     const created = slskdSearchStateSchema.parse(
       await this.client.post('/api/v0/searches', { searchText }),
     );
@@ -91,23 +94,29 @@ export class SlskdSearch implements SearchPort {
     await this.bestEffort(
       () => this.ledger.recordCreated({ ...key, resourceId: id }),
       'record search',
+      logger,
     );
     const state = await this.awaitCompletion(id);
-    this.ensureConfirmedComplete(id, round, state);
+    this.ensureConfirmedComplete(id, round, state, logger);
     const responses = slskdSearchResponsesSchema.parse(
       await this.client.get(`/api/v0/searches/${encodeURIComponent(id)}/responses`),
     );
-    this.ensureHarvestConsistent(id, round, state, responses);
+    this.ensureHarvestConsistent(id, round, state, responses, logger);
     const candidates = mapSearchResponses(responses, target.type);
-    await this.deleteSearch(id, key);
-    this.logger.debug({ round, candidateCount: candidates.length }, 'slskd search complete');
+    await this.deleteSearch(id, key, logger);
+    logger.debug({ round, candidateCount: candidates.length }, 'slskd search complete');
     return candidates;
   }
 
   /** Harvest gate 1: only a search slskd has confirmed complete may be harvested. */
-  private ensureConfirmedComplete(id: string, round: number, state: SlskdSearchState): void {
+  private ensureConfirmedComplete(
+    id: string,
+    round: number,
+    state: SlskdSearchState,
+    logger: Logger,
+  ): void {
     if (state.isComplete === true) return;
-    this.logger.warn(
+    logger.warn(
       { id, round, state: state.state, responseCount: state.responseCount },
       'slskd search still incomplete at deadline; faulting and leaving it for the sweep',
     );
@@ -127,16 +136,17 @@ export class SlskdSearch implements SearchPort {
     round: number,
     state: SlskdSearchState,
     responses: readonly unknown[],
+    logger: Logger,
   ): void {
     if (state.responseCount === undefined) {
-      this.logger.warn(
+      logger.warn(
         { id, round },
         'slskd search state omits responseCount; the harvest-consistency gate is disarmed',
       );
       return;
     }
     if (state.responseCount === 0 || responses.length > 0) return;
-    this.logger.warn(
+    logger.warn(
       { id, round, responseCount: state.responseCount },
       'slskd harvest contradicts the search state; faulting and leaving it for the sweep',
     );
@@ -146,17 +156,14 @@ export class SlskdSearch implements SearchPort {
   }
 
   /** Delete the harvested search from slskd and mark the ledger row removed; failures are logged. */
-  private async deleteSearch(id: string, key: SourceResourceKey): Promise<void> {
+  private async deleteSearch(id: string, key: SourceResourceKey, logger: Logger): Promise<void> {
     try {
       await this.client.delIfPresent(`/api/v0/searches/${encodeURIComponent(id)}`);
     } catch (error) {
-      this.logger.warn(
-        { err: error, id },
-        'failed to delete slskd search; leaving it for the sweep',
-      );
+      logger.warn({ err: error, id }, 'failed to delete slskd search; leaving it for the sweep');
       return;
     }
-    await this.bestEffort(() => this.ledger.markRemoved(key), 'mark search removed');
+    await this.bestEffort(() => this.ledger.markRemoved(key), 'mark search removed', logger);
   }
 
   /**
@@ -164,9 +171,13 @@ export class SlskdSearch implements SearchPort {
    * write is passed as a thunk rather than a started `ResultAsync` so the caller's Result is
    * visibly consumed here (`neverthrow/must-use-result` cannot see a Result handed to a callee).
    */
-  private async bestEffort(op: () => ResultAsync<void, InfraError>, what: string): Promise<void> {
+  private async bestEffort(
+    op: () => ResultAsync<void, InfraError>,
+    what: string,
+    logger: Logger,
+  ): Promise<void> {
     const result = await op();
-    if (result.isErr()) this.logger.warn({ err: result.error }, `ledger: ${what} failed`);
+    if (result.isErr()) logger.warn({ err: result.error }, `ledger: ${what} failed`);
   }
 
   /** Poll until slskd confirms completion or the deadline passes; returns the last observed state. */

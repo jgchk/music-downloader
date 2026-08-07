@@ -9,6 +9,7 @@ import type {
   DownloadedFile,
   EditionCandidate,
 } from '../../domain/acquisition/events.js';
+import type { CommandContext, OperationScope } from '../correlation/context.js';
 import type { InfraError } from './errors.js';
 
 /**
@@ -16,6 +17,12 @@ import type { InfraError } from './errors.js';
  * adapters implement (DIP + ISP). Every method returns a neverthrow `ResultAsync` whose `Err`
  * channel is an {@link InfraError}; *business* outcomes (unresolved metadata, a failed transfer,
  * an import conflict) are modeled as `Ok` values so `decide` can turn them into domain events.
+ *
+ * Every effect method takes the dispatching {@link OperationScope} as its LAST parameter — one
+ * uniform rule, so there is no per-port exception to remember and the compiler catches a call site
+ * that forgot. An adapter uses `scope.logger` (already bound to the operation, so its lines join
+ * the acquisition without the adapter knowing what correlation is) and carries `scope.context`
+ * opaquely wherever it re-enters the shell asynchronously. No adapter reads a field of either.
  */
 
 // --- MetadataPort (first adapter: MusicBrainz) -------------------------------------------------
@@ -27,7 +34,10 @@ export type MetadataResolution =
   | { readonly kind: 'needsSelection'; readonly candidates: readonly EditionCandidate[] };
 
 export interface MetadataPort {
-  resolve(request: AcquisitionRequest): ResultAsync<MetadataResolution, InfraError>;
+  resolve(
+    request: AcquisitionRequest,
+    scope: OperationScope,
+  ): ResultAsync<MetadataResolution, InfraError>;
 }
 
 // --- SearchPort (first adapter: slskd) ---------------------------------------------------------
@@ -42,6 +52,7 @@ export interface SearchPort {
     acquisitionId: string,
     target: Target,
     round: number,
+    scope: OperationScope,
   ): ResultAsync<readonly Candidate[], InfraError>;
 }
 
@@ -90,6 +101,7 @@ export interface DownloadObserverPort {
     acquisitionId: string,
     candidate: CandidateIdentity,
     result: DownloadResult,
+    context: CommandContext,
   ): ResultAsync<void, InfraError>;
   /**
    * Every watch for the acquisition has ended — settled, or aborted. Live progress for the
@@ -112,6 +124,7 @@ export interface DownloadPort {
     acquisitionId: string,
     candidate: Candidate,
     policy: DownloadPolicy,
+    scope: OperationScope,
   ): ResultAsync<DownloadStart, InfraError>;
 
   /**
@@ -129,13 +142,14 @@ export interface DownloadPort {
   abort(
     acquisitionId: string,
     candidate: Candidate,
+    scope: OperationScope,
   ): ResultAsync<readonly DownloadedFile[], InfraError>;
 }
 
 // --- AudioProbePort (first adapter: ffmpeg) ----------------------------------------------------
 
 export interface AudioProbePort {
-  probe(filePath: string): ResultAsync<ProbedAudio, InfraError>;
+  probe(filePath: string, scope: OperationScope): ResultAsync<ProbedAudio, InfraError>;
 }
 
 // --- LibraryPort (first adapter: filesystem) ---------------------------------------------------
@@ -145,11 +159,18 @@ export type ImportResult =
   | { readonly kind: 'conflict'; readonly location: string };
 
 export interface LibraryPort {
-  import(files: readonly DownloadedFile[], target: Target): ResultAsync<ImportResult, InfraError>;
+  import(
+    files: readonly DownloadedFile[],
+    target: Target,
+    scope: OperationScope,
+  ): ResultAsync<ImportResult, InfraError>;
   /**
    * Remove the given staged files so only valid music reaches the library (D13), and prune their
    * now-emptied staging directory. The files are the source-reported staged locations, carried on
    * the cleanup-triggering event (D3), so cleanup never recomputes a path from candidate identity.
    */
-  discardStaging(files: readonly DownloadedFile[]): ResultAsync<void, InfraError>;
+  discardStaging(
+    files: readonly DownloadedFile[],
+    scope: OperationScope,
+  ): ResultAsync<void, InfraError>;
 }
