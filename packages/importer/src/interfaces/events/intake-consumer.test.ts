@@ -448,6 +448,13 @@ describe('intake consumer — crossing the seam', () => {
     })(event);
 
     expect(warned.some((entry) => entry.message.includes('cannot read'))).toBe(true);
+    // Which delivery drifted: an alert that cannot be traced back to a producer event and the
+    // envelope it sent is one an operator can only shrug at.
+    expect(warned[0]?.context).toMatchObject({ acquisitionId: 'acq-1', globalSeq: 1 });
+    // And which FIELD drifted — the detail is the parse error, and naming the offending field is
+    // the whole of its value to the reader. Asserting only that it is a string would be satisfied
+    // by the empty one.
+    expect(warned[0]?.context.detail).toContain('correlationId');
   });
 
   it('stays quiet when a producer simply sends no envelope — permanent and expected', async () => {
@@ -459,6 +466,22 @@ describe('intake consumer — crossing the seam', () => {
     })(fulfilledEvent());
 
     expect(warned).toEqual([]);
+  });
+
+  it('reads an explicitly null envelope as no envelope at all — also quiet', async () => {
+    // A producer that serializes an absent block as `null` has sent no block, not a broken one:
+    // announcing it would blunt the one warning that means a LIVE producer has drifted.
+    const warned: { context: Record<string, unknown>; message: string }[] = [];
+    const wiring = testWiring();
+    const event: SeamEvent = { ...fulfilledEvent(), metadata: null };
+
+    const outcome = await consumer(wiring, {
+      warn: (context, message) => void warned.push({ context, message }),
+    })(event);
+
+    expect(outcome.isOk()).toBe(true);
+    expect(warned).toEqual([]);
+    expect(wiring.store.all()[0]!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it('mints fresh rather than trusting a malformed metadata block', async () => {

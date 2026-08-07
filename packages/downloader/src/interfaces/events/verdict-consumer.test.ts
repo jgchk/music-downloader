@@ -1,6 +1,6 @@
 import { fixedClock } from '../../application/__fixtures__/fakes.js';
 import { appendMetadata } from '../../application/__fixtures__/correlation.js';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
 import {
   fulfilledHistory,
@@ -10,11 +10,22 @@ import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { verdictEventConsumer } from './verdict-consumer.js';
 
-/** Captures the one thing this consumer can silently get wrong: an unreadable envelope. */
+/**
+ * Captures the one thing this consumer can silently get wrong: an unreadable envelope.
+ *
+ * Module-scope and therefore shared, so it is emptied before EVERY scenario rather than by hand in
+ * the ones that happen to assert on it. Resetting per test was the previous arrangement and it is
+ * the erratic-test shape: a scenario that forgot the reset read another scenario's warnings, and a
+ * scenario that expected silence passed only because whoever ran before it happened to be quiet.
+ */
 const unreadable: { context: Record<string, unknown>; message: string }[] = [];
 const warned = (context: Record<string, unknown>, message: string): void => {
   unreadable.push({ context, message });
 };
+
+beforeEach(() => {
+  unreadable.length = 0;
+});
 
 const a = matchingCandidate('a');
 const b = matchingCandidate('b');
@@ -156,22 +167,42 @@ describe('verdict consumer — crossing the seam', () => {
 
   it('announces an envelope it cannot read — that is producer drift, not history', async () => {
     const wiring = await fulfilledWiring();
-    unreadable.length = 0;
     const event: SeamEvent = { ...verdictEvent(), metadata: { correlationId: 'not-a-trace-id' } };
 
     await verdictEventConsumer(wiring.deps, { warn: warned })(event);
 
     expect(unreadable).toHaveLength(1);
     expect(unreadable[0]!.message).toContain('cannot read');
+    // Which delivery drifted: an alert that cannot be traced back to a producer event and the
+    // envelope it sent is one an operator can only shrug at.
+    expect(unreadable[0]!.context).toMatchObject({ acquisitionId: 'acq-9', globalSeq: 1 });
+    // And which FIELD drifted — the detail is the parse error, and naming the offending field is
+    // the whole of its value to the reader. Asserting only that it is a string would be satisfied
+    // by the empty one.
+    expect(unreadable[0]!.context.detail).toContain('correlationId');
   });
 
   it('stays quiet when a producer simply sends no envelope — permanent and expected', async () => {
     const wiring = await fulfilledWiring();
-    unreadable.length = 0;
 
     await verdictEventConsumer(wiring.deps, { warn: warned })(verdictEvent());
 
     expect(unreadable).toEqual([]);
+  });
+
+  it('reads an explicitly null envelope as no envelope at all — also quiet', async () => {
+    // A producer that serializes an absent block as `null` has sent no block, not a broken one:
+    // announcing it would blunt the one warning that means a LIVE producer has drifted.
+    const wiring = await fulfilledWiring();
+    const before = wiring.store.all().length;
+    const event: SeamEvent = { ...verdictEvent(), metadata: null };
+
+    const outcome = await verdictEventConsumer(wiring.deps, { warn: warned })(event);
+
+    expect(outcome.isOk()).toBe(true);
+    expect(unreadable).toEqual([]);
+    const appended = wiring.store.all().find((entry) => entry.globalSeq > before);
+    expect(appended?.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it('mints fresh rather than trusting a malformed metadata block', async () => {
