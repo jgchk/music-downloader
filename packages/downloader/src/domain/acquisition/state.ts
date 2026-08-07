@@ -327,12 +327,14 @@ export function evolve(state: AcquisitionState, event: AcquisitionEvent): Acquis
       // ladder as if its candidate had just failed validation; the co-emitted rejection/selection
       // events then fold through the existing cases. Nothing is staged any more (the files were
       // imported), so the transient Validating state carries no downloaded files.
-      // Stryker disable next-line ConditionalExpression: the `state.phase !== 'Fulfilled'` operand
-      // is equivalent when forced false — `resume` is declared on `FulfilledState` alone and no
-      // fold path carries it onto another phase (the revival below builds its `Validating` state
-      // field by field, dropping it), so on every other phase the second operand reads `undefined`
-      // and the guard returns `state` either way. The operand is the narrowing `state.resume`
-      // needs, not a decision. The retained-context half IS behaviour, and stays pinned by
+      // RECORDED SURVIVOR, waiver withheld: the `state.phase !== 'Fulfilled'` operand is equivalent
+      // when forced false — `resume` is declared on `FulfilledState` alone and no fold path carries
+      // it onto another phase (the revival below builds its `Validating` state field by field,
+      // dropping it), so on every other phase the second operand reads `undefined` and the guard
+      // returns `state` either way. The operand is the narrowing `state.resume` needs, not a
+      // decision. No waiver: this line also carries the whole guard forced true (no revival ever)
+      // and the `state.resume === undefined` operand forced false (a legacy fulfilment revived
+      // without retained context) — both killable, the second by
       // `ignores FulfillmentRejected on a legacy fulfilment with no retained context`.
       if (state.phase !== 'Fulfilled' || state.resume === undefined) return state;
       const resume = state.resume;

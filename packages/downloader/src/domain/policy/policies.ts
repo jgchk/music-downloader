@@ -58,12 +58,14 @@ export interface RetryPolicyInput {
 export function createRetryPolicy(input: RetryPolicyInput): Result<RetryPolicy, RetryPolicyError> {
   if (input.maxSearchRounds < 1) return err({ kind: 'NonPositiveSearchRounds' });
   if (input.maxTotalAttempts < 1) return err({ kind: 'NonPositiveTotalAttempts' });
-  // Stryker disable next-line ConditionalExpression: the `timeBudgetMs !== undefined` operand is
-  // equivalent when forced true — an omitted budget then reaches `undefined <= 0`, which is a
-  // NaN comparison and therefore false, so the conjunction is false either way and the policy is
-  // still accepted. The operand is the narrowing that lets the comparison type-check (the field is
-  // `number | undefined`), not a second decision. The bound itself is behaviour, not narrowing,
-  // and stays pinned by the `NonPositiveTimeBudget` case in `policies.test.ts`.
+  // RECORDED SURVIVOR, waiver withheld: the `timeBudgetMs !== undefined` operand is equivalent when
+  // forced true — an omitted budget then reaches `undefined <= 0`, which is a NaN comparison and
+  // therefore false, so the conjunction is false either way and the policy is still accepted. The
+  // operand is the narrowing that lets the comparison type-check (the field is `number |
+  // undefined`), not a second decision. It cannot be waived here without also silencing the three
+  // killable `ConditionalExpression` mutants this line carries — the whole condition forced true
+  // (every policy rejected), forced false (the bound gone, which is what the
+  // `NonPositiveTimeBudget` case catches), and the `<= 0` operand forced true.
   if (input.timeBudgetMs !== undefined && input.timeBudgetMs <= 0) {
     return err({ kind: 'NonPositiveTimeBudget' });
   }

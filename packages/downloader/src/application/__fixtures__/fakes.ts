@@ -35,6 +35,8 @@ export class FakeEventStore implements EventStorePort {
   public conflictNextAppends = 0;
   /** Throw (not err) from readAll — for specs that pin bug-backstop behavior. */
   public throwOnReadAll = false;
+  /** Catch-up reads served, so a spec can pin how many passes ran without spying on the fake. */
+  public readAllCount = 0;
 
   append(
     streamId: string,
@@ -93,6 +95,7 @@ export class FakeEventStore implements EventStorePort {
   }
 
   readAll(fromGlobalSeq: number, limit?: number): ResultAsync<readonly StoredEvent[], InfraError> {
+    this.readAllCount += 1;
     if (this.throwOnReadAll) throw new Error('boom');
     if (this.failReadAll) return errAsync(infraError('readAll', 'boom'));
     const rows = this.events.filter((entry) => entry.globalSeq > fromGlobalSeq);

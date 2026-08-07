@@ -1,5 +1,6 @@
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { REACTOR_CONSUMER, Reactor } from './reactor.js';
 import type { ReactorDependencies } from './reactor.js';
 import type { EffectPorts, InterpreterDependencies } from './interpreter.js';
@@ -14,6 +15,7 @@ import {
 } from '../__fixtures__/fakes.js';
 import type { SettableClock } from '../__fixtures__/fakes.js';
 import { createLogger } from '../logging/logger.js';
+import type { Logger } from '../logging/logger.js';
 import {
   OTHER_STORY,
   STORY,
@@ -103,6 +105,15 @@ function reactor(ports: EffectPorts, overrides: ReactorOverrides = {}): Reactor 
     pollIntervalMs: overrides.pollIntervalMs,
   };
   return new Reactor(dependencies);
+}
+
+/**
+ * Nothing reached the containment catch. A fault the pass handles is a value it names and carries
+ * on from; "reactor pass failed unexpectedly" means a defect in OUR code, and an operator triaging
+ * one is hunting a bug — so a spec that pins a handled fault also pins that it stayed handled.
+ */
+function expectNoEscapedDefect(errorSpy: MockInstance<Logger['error']>): void {
+  expect(errorSpy).not.toHaveBeenCalledWith(expect.anything(), 'reactor pass failed unexpectedly');
 }
 
 async function seed(history: readonly AcquisitionEvent[], streamId = 'acq-1'): Promise<void> {
@@ -245,12 +256,7 @@ describe('Reactor.start', () => {
       { err: infraError('readAll', 'boom') },
       'reactor catch-up failed',
     );
-    // A store fault is a value the pass handles and names, never a defect escaping into the
-    // containment catch — an operator triaging "reactor pass failed unexpectedly" hunts our bug.
-    expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.anything(),
-      'reactor pass failed unexpectedly',
-    );
+    expectNoEscapedDefect(errorSpy);
     r.stop();
   });
 
@@ -393,7 +399,6 @@ describe('Reactor.process', () => {
     // one whole catch-up pass per event on the dispatch mutex — a stampede over the store that
     // grows with the batch. The wakeups that land while a pass is running fold into one more pass.
     await seed(requestedHistory());
-    const readAll = vi.spyOn(store, 'readAll');
     const wakeups: Promise<void>[] = [];
     const holder: { r?: Reactor } = {};
     const resolve = vi.fn(() => {
@@ -409,7 +414,7 @@ describe('Reactor.process', () => {
     await r.drain();
     await Promise.all(wakeups);
 
-    expect(readAll).toHaveBeenCalledTimes(2); // the pass that was running, plus exactly one more
+    expect(store.readAllCount).toBe(2); // the pass that was running, plus exactly one more
     r.stop();
   });
 
@@ -830,10 +835,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
       { acquisitionId: 'acq-1', err: infraError('readStream', 'boom') },
       'parked-effect retry could not read the stream',
     );
-    expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.anything(),
-      'reactor pass failed unexpectedly',
-    );
+    expectNoEscapedDefect(errorSpy);
     r.stop();
   });
 
@@ -853,11 +855,7 @@ describe('Reactor — retry scheduler (reactor-durability D2)', () => {
       { err: infraError('parked-effects.due', 'boom') },
       'parked-effect due listing failed',
     );
-    // A store fault the pass handles, not a defect escaping into the containment catch.
-    expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.anything(),
-      'reactor pass failed unexpectedly',
-    );
+    expectNoEscapedDefect(errorSpy);
 
     parked.failDue = false;
     await r.drain();

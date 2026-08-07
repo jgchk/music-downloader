@@ -24,6 +24,7 @@ import {
 import { asDistance } from '../shared/__fixtures__/distance.js';
 import { toAcquisitionId } from '../shared/acquisition-id.js';
 import type { ImportCommand } from './commands.js';
+import type { DomainError } from './decide.js';
 import type { CandidateReference, ImportEvent, Resolution, ResolutionKind } from './events.js';
 import { Import } from './import.js';
 
@@ -32,6 +33,14 @@ const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'gone', filesDel
 
 function given(events: readonly ImportEvent[]): Import {
   return Import.fromHistory(events);
+}
+
+/** The detail a refusal names — fails loudly if the refusal is not the variant that carries one. */
+function detailOf(error: DomainError): string {
+  if (error.kind !== 'InvalidResolution') {
+    throw new Error(`expected an InvalidResolution error, got ${JSON.stringify(error)}`);
+  }
+  return error.detail;
 }
 
 describe('submission', () => {
@@ -496,7 +505,7 @@ describe('resolving a review', () => {
       expect(error.kind).toBe('InvalidResolution');
       // The detail is the only thing separating this refusal from its mirror image below, so it
       // has to identify both sides: what was asked, and the review that cannot take it.
-      const detail = 'detail' in error ? error.detail : '';
+      const detail = detailOf(error);
       expect(detail).toContain(kind);
       expect(detail).toContain('match-review');
     },
@@ -613,7 +622,7 @@ describe('resolving a review', () => {
     expect(error.kind).toBe('InvalidResolution');
     // The mirror of the refusal above, and told apart from it only by this detail: it names the
     // verb that was offered and the two this review does take.
-    const detail = 'detail' in error ? error.detail : '';
+    const detail = detailOf(error);
     expect(detail).toContain('import-as-is');
     expect(detail).toContain('accept');
     expect(detail).toContain('retry-enrichment');

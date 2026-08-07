@@ -167,7 +167,12 @@ export class Import {
     return {
       phase: state.phase,
       directory: 'directory' in state ? state.directory : undefined,
-      location: state.phase === 'applied' ? state.location : undefined,
+      // Presence, not phase, for the same reason as `directory` above: `location` is declared on
+      // `AppliedState` alone, so the two tests are the same question — and `in` says so without a
+      // second spelling of the phase name. It also leaves no equivalent mutant behind: a phase
+      // comparison here carries a `ConditionalExpression` mutant that no test can distinguish
+      // (the unguarded read is `undefined` on every other phase), which is not true of `in`.
+      location: 'location' in state ? state.location : undefined,
       openReview: openReviewOf(state),
       rejection:
         state.phase === 'rejected'

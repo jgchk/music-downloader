@@ -63,8 +63,13 @@ export interface RequestedState extends Requested {
   readonly phase: 'requested';
   readonly candidates: readonly ProposedCandidate[];
   /**
-   * Never pinned, for the same reason and in the same shape as {@link EmptyState.seamWatermark}: a
-   * pin can only arrive on the `supply-id` that moves the import to `proposing`.
+   * Never pinned: a pin can only arrive on the `supply-id` that moves the import to `proposing`.
+   *
+   * Same declared-absent idiom as {@link EmptyState.seamWatermark}, but a NARROWER claim — do not
+   * read it as making `pinnedId` readable across the whole union. `seamWatermark` is declared on
+   * every member; this one only makes the pair `requested | proposing` uniform, which is exactly
+   * the pair `decideProposal` has already narrowed to before it reads the field. The other five
+   * phases stay silent about pins because `requestedOf` drops the field when it rebuilds them.
    */
   readonly pinnedId?: undefined;
 }
@@ -123,19 +128,29 @@ export function isTerminal(state: ImportState): boolean {
   return state.phase === 'applied' || state.phase === 'rejected';
 }
 
-/** An applied import that is actually carrying a remediation review. */
-export type RemediatingState = AppliedState & { readonly remediation: RemediationState };
+/** An applied import carrying a remediation review that is in `S`. */
+export type RemediatingState<S extends RemediationState['status'] = RemediationState['status']> =
+  AppliedState & { readonly remediation: RemediationState & { readonly status: S } };
 
 /**
  * Is this import's remediation review in `status`? Stated once, because `remediation` is declared on
  * {@link AppliedState} alone: every question about it is also a question about the phase, and four
  * callers were spelling that pairing out for themselves.
+ *
+ * The predicate narrows to the status it was asked about, not merely to "a remediation is present" —
+ * so `hasRemediation(s, 'open')` and `hasRemediation(s, 'retrying')` yield different types, as the
+ * signature implies. Worth stating narrowly from the start: this is exported surface, and tightening
+ * a public predicate later is a breaking change.
  */
-export function hasRemediation(
+export function hasRemediation<S extends RemediationState['status']>(
   state: ImportState,
-  status: RemediationState['status'],
-): state is RemediatingState {
-  return state.phase === 'applied' && state.remediation?.status === status;
+  status: S,
+): state is RemediatingState<S> {
+  // Presence, not phase: `remediation` is declared on `AppliedState` alone, so `in` asks the same
+  // question in one operand rather than two — and unlike a phase comparison it leaves behind no
+  // mutant no test can distinguish (an unguarded `state.remediation` reads `undefined` on every
+  // other phase, so forcing a phase operand true would change nothing anywhere).
+  return 'remediation' in state && state.remediation?.status === status;
 }
 
 function requestedOf(state: Exclude<ImportState, EmptyState>): Requested {

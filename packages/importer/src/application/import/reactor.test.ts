@@ -9,6 +9,7 @@ import {
 import { toCorrelationId } from '../correlation/correlation-id.js';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { isRetryable } from './reactor.js';
 import { Import } from '../../domain/import/import.js';
 import {
@@ -99,6 +100,15 @@ function seedLegacy(history: readonly ImportEvent[]): void {
   store.bus = undefined;
   store.seedLegacy('imp-1', 0, history, legacyMetadata('imp-1', fixedClock()));
   store.bus = bus;
+}
+
+/**
+ * Nothing reached the containment catch. A fault the pass handles is a value it names and carries
+ * on from; "reactor pass failed unexpectedly" means a defect in OUR code, and an operator triaging
+ * one is hunting a bug — so a spec that pins a handled fault also pins that it stayed handled.
+ */
+function expectNoEscapedDefect(errorSpy: MockInstance<Logger['error']>): void {
+  expect(errorSpy).not.toHaveBeenCalledWith(expect.anything(), 'reactor pass failed unexpectedly');
 }
 
 /** Seed history without publishing: detach the bus for the append, as a pre-start backlog. */
@@ -256,10 +266,7 @@ describe('Reactor', () => {
       { importId: 'imp-1', err: infraError('readStream', 'boom') },
       'reactor stream read failed',
     );
-    expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.anything(),
-      'reactor pass failed unexpectedly',
-    );
+    expectNoEscapedDefect(errorSpy);
   });
 
   it('reports a failed backlog read as a handled catch-up fault and carries on', async () => {
@@ -275,12 +282,7 @@ describe('Reactor', () => {
       { err: infraError('readAll', 'boom') },
       'reactor catch-up failed',
     );
-    // A store fault is a value the pass handles, never a defect escaping into the containment
-    // catch — an operator triaging "reactor pass failed unexpectedly" is hunting a bug in our code.
-    expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.anything(),
-      'reactor pass failed unexpectedly',
-    );
+    expectNoEscapedDefect(errorSpy);
     r.stop();
   });
 
@@ -576,9 +578,15 @@ describe('Reactor', () => {
     expect(deadLetters.letters).toHaveLength(1);
     // No operation/message pair to render for a non-infrastructure error, so the whole value is
     // serialized rather than lost — the conflicting stream and version stay legible to the operator.
-    expect(deadLetters.letters[0]?.error).toBe(
-      'Propose: {"kind":"ConcurrencyConflict","streamId":"imp-1","expectedVersion":0}',
-    );
+    // Read back as the effect name plus the parsed value: which fields survive is the contract,
+    // the order JSON.stringify emits them in is not.
+    const rendered = deadLetters.letters[0]!.error;
+    expect(rendered).toMatch(/^Propose: /);
+    expect(JSON.parse(rendered.slice('Propose: '.length)) as unknown).toEqual({
+      kind: 'ConcurrencyConflict',
+      streamId: 'imp-1',
+      expectedVersion: 0,
+    });
     expect(checkpoints.peek(REACTOR_CONSUMER)).toBe(1);
   });
 

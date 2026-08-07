@@ -124,23 +124,51 @@ interface Suppression {
 }
 
 /**
- * Only `disable` directives are waivers. `// Stryker restore all` ends a disabled region and takes
- * no `: reason` clause, so demanding a justification from one would report a legitimate comment as
- * a defect.
+ * Only `disable` directives are waivers. `// Stryker restore all` closes a block-scope disable and
+ * takes no `: reason` clause, so demanding a justification from one would report a legitimate
+ * comment as a defect — and the block form is forbidden outright below anyway.
+ *
+ * The comment opener is part of the pattern, because Stryker's own bookkeeper only reads a
+ * directive that *begins* a comment. Without it, prose that merely mentions `Stryker disable` — the
+ * paragraph in `downloader/composition/runtime.ts` explaining what those waivers are and are not —
+ * is scanned as an unjustified waiver, and the only way to satisfy the scan is to stop writing
+ * about waivers in English.
  */
-const SUPPRESSION_PATTERN = /Stryker\s+disable\b[^\n]*/g;
+const SUPPRESSION_PATTERN = /(?:\/\/|\/\*)\s*(Stryker\s+disable\b[^\n]*)/g;
 
-function suppressions(): Suppression[] {
+/** A block disable is closed by a `restore`; with the block form banned, none may exist. */
+const RESTORE_PATTERN = /(?:\/\/|\/\*)\s*Stryker\s+restore\b[^\n]*/g;
+
+/**
+ * A waiver must name the single line it covers. The block form (`// Stryker disable <mutators>`,
+ * closed by `// Stryker restore all`) is banned here, and not for style: Stryker's
+ * `DirectiveBookkeeper` reads a node's LEADING comments only, so a `restore` written as the last
+ * comment inside a block — after the final statement of the last `case`, say — attaches to no node
+ * and is never seen. A block disable whose restore never fires has no end line, and Stryker's
+ * line match then succeeds for every line after it: the waiver silences its mutators to the end of
+ * the file. That is exactly what two directives in this repo did, hiding 53 and 32 mutants
+ * respectively behind an argument written about one `switch` arm, while both files reported a
+ * perfect score. `next-line` cannot fail that way.
+ */
+function isLineScoped(text: string): boolean {
+  return /Stryker\s+disable\s+next-line\b/.test(text);
+}
+
+function scan(pattern: RegExp): Suppression[] {
   const found: Suppression[] = [];
   for (const file of MUTATED) {
     const lines = readFileSync(path.join(REPO_ROOT, file), 'utf8').split('\n');
     for (const [index, line] of lines.entries()) {
-      for (const [text] of line.matchAll(SUPPRESSION_PATTERN)) {
-        found.push({ location: `${file}:${index + 1}`, text });
+      for (const [whole, captured] of line.matchAll(pattern)) {
+        found.push({ location: `${file}:${index + 1}`, text: captured ?? whole });
       }
     }
   }
   return found;
+}
+
+function suppressions(): Suppression[] {
+  return scan(SUPPRESSION_PATTERN);
 }
 
 /**
@@ -302,6 +330,37 @@ describe('mutation waivers', () => {
     const unjustified = suppressions().filter((entry) => !isJustified(entry.text));
 
     expect(unjustified.map((entry) => `${entry.location} ${entry.text}`)).toEqual([]);
+  });
+
+  it('scopes every suppression to one line — a block disable can silently never end', () => {
+    const blockScoped = suppressions().filter((entry) => !isLineScoped(entry.text));
+
+    expect(blockScoped.map((entry) => `${entry.location} ${entry.text}`)).toEqual([]);
+  });
+
+  it('holds the suppression count to a ceiling — a rising one is the signal', () => {
+    // design.md: "a rising suppression count is the signal that the rule failed admission and
+    // nobody noticed". Nothing measured it, so a waiver could be added per PR forever without any
+    // check going red. This number is a CEILING TO DRIVE DOWN, never a budget to spend: lowering it
+    // when waivers are retired is the point, raising it is a decision that belongs in a review.
+    const CEILING = 58;
+
+    expect(suppressions().length).toBeLessThanOrEqual(CEILING);
+  });
+
+  it('leaves no `Stryker restore` behind — the only thing one can close is a block disable', () => {
+    // The second half of the same rule, and the cheaper half to check: a `restore` in the tree
+    // means a block disable is (or was) open. Scanned separately because a restore takes no reason
+    // and would be reported as an unjustified waiver by the scenario above.
+    expect(scan(RESTORE_PATTERN).map((entry) => entry.location)).toEqual([]);
+  });
+
+  it('reads a block-scope suppression as unscoped, however it is spelled', () => {
+    // The guard's own failure mode, as above: a vacuous scope check would pass over every block
+    // disable in the tree.
+    expect(isLineScoped('Stryker disable next-line StringLiteral: a compile-time pin')).toBe(true);
+    expect(isLineScoped('Stryker disable StringLiteral: a compile-time pin')).toBe(false);
+    expect(isLineScoped('Stryker disable all')).toBe(false);
   });
 
   it('reads a suppression that has no reason as unjustified', () => {

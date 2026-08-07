@@ -172,11 +172,13 @@ export class ImportStatusProjection {
     const list = this.streams.get(importId) ?? [];
     list.push(stored);
     this.streams.set(importId, list);
-    // Stryker disable next-line ConditionalExpression: forcing the type operand true is
-    // equivalent. `source` is declared on `ImportRequested` alone, so on every other event type the
-    // second operand reads `undefined` and the conjunction is false either way. The operand is the
-    // narrowing that lets `stored.event.source` be read at all, not a decision. (Forcing the whole
-    // condition true is a real finding and stays observed: it would index sourceless streams.)
+    // RECORDED SURVIVOR, waiver withheld: forcing the TYPE operand true is equivalent. `source` is
+    // declared on `ImportRequested` alone, so on every other event type the second operand reads
+    // `undefined` and the conjunction is false either way. The operand is the narrowing that lets
+    // `stored.event.source` be read at all, not a decision. The other three `ConditionalExpression`
+    // mutants on this line are real findings — the whole condition forced true indexes sourceless
+    // streams, forced false indexes nothing, and the `source !== undefined` operand forced true
+    // indexes an event carrying no source — so the line takes no waiver at all.
     if (stored.event.type === 'ImportRequested' && stored.event.source !== undefined) {
       this.acquisitions.set(stored.event.source.acquisitionId, importId);
     }
@@ -202,12 +204,14 @@ export class ImportStatusProjection {
   /** Every import currently awaiting a human: typed review items with their carried context. */
   pendingReviews(): readonly PendingReviewView[] {
     return this.list().flatMap((view) =>
-      // Stryker disable next-line ConditionalExpression: forcing the `directory` operand false is
-      // equivalent. An open review exists only on the `awaiting-review` and applied-remediation
-      // phases, and every phase past `empty` carries a `directory` — so no view can reach this
-      // operand with a review open and no directory. It is the narrowing that turns the view's
-      // `string | undefined` into the item's required `string`, not a filter. (Forcing the whole
-      // condition either way is a real finding and stays observed.)
+      // RECORDED SURVIVOR, waiver withheld: forcing the `directory` operand false is equivalent.
+      // An open review exists only on the `awaiting-review` and applied-remediation phases, and
+      // every phase past `empty` carries a `directory` — so no view can reach this operand with a
+      // review open and no directory. It is the narrowing that turns the view's `string |
+      // undefined` into the item's required `string`, not a filter. The line's three other
+      // `ConditionalExpression` mutants are real findings — the whole condition forced true lists
+      // no reviews, forced false lists every import as one, and the `openReview === undefined`
+      // operand forced false does the same — so it takes no waiver.
       view.openReview === undefined || view.directory === undefined
         ? []
         : [{ importId: view.importId, directory: view.directory, review: view.openReview }],
@@ -266,11 +270,13 @@ export async function seedStalledReadModel(
     return;
   }
   for (const letter of letters.value) {
-    // Stryker disable next-line ConditionalExpression: forcing this guard true is unobservable.
-    // Marking a streamless (seam) letter would add `undefined` to the set, and the model's only
-    // reader is `isStalled(importId: string)` — no string argument can equal `undefined`, so no
-    // query could ever see it. The guard is the narrowing `mark(string)` needs, and what it states
-    // — a seam letter stalls no import — no reader of this model can be made to contradict.
+    // RECORDED SURVIVOR, waiver withheld: forcing this guard true is unobservable. Marking a
+    // streamless (seam) letter would add `undefined` to the set, and the model's only reader is
+    // `isStalled(importId: string)` — no string argument can equal `undefined`, so no query could
+    // ever see it. The guard is the narrowing `mark(string)` needs, and what it states — a seam
+    // letter stalls no import — no reader of this model can be made to contradict. Forcing it
+    // FALSE marks nothing stalled at boot, a real finding on the same line under the same mutator,
+    // so the line takes no waiver.
     if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }

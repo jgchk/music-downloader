@@ -56,20 +56,28 @@ function degradeCommand(effect: Effect): AcquisitionCommand | undefined {
         candidate: effect.candidate.identity,
       };
     }
-    // Stryker disable StringLiteral,ConditionalExpression,BlockStatement: equivalent — every mutant
-    // of this arm still yields `undefined`. There is no `default`, so an effect whose label was
-    // emptied matches nothing and falls out of the switch to the function's implicit tail return,
-    // which is the same `undefined` the shared body returns; dropping the body falls out the same
-    // way. Callers branch on `command !== undefined` alone, so none can tell the two apart. The
-    // labels are the compile-time exhaustiveness pin described above, not a runtime branch.
+    // The no-modeled-failure arm. Every mutant these four labels carry still yields `undefined`:
+    // there is no `default`, so an effect whose label was emptied matches nothing and falls out of
+    // the switch to the function's implicit tail return — the same `undefined` the shared body
+    // returns — and emptying the body returns `undefined` the same way. Callers branch on
+    // `command !== undefined` alone, so none can tell any of them apart. The labels are the
+    // compile-time exhaustiveness pin described above, not a runtime branch.
+    //
+    // Waived per label rather than with a block `disable` / `restore all` pair. A `restore` written
+    // as the last comment inside a block is not a LEADING comment of any node, and Stryker's
+    // directive bookkeeper reads leading comments only — so the block form never ended, and these
+    // three mutators were silenced for the whole rest of the file, `land()` included.
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'Search':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'Validate':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'Import':
+    // Stryker disable next-line StringLiteral,ConditionalExpression,BlockStatement: still undefined
     case 'Cleanup': {
       // No modeled failure to degrade to — dead-letter and expose the acquisition as stalled.
       return undefined;
     }
-    // Stryker restore all
   }
 }
 

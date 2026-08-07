@@ -179,22 +179,33 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     // Every other event contributes no history entry. Enumerated exhaustively (no `default`) so a
     // newly-added event variant is a compile error here — forcing a decision on whether it surfaces
     // in the timeline — rather than silently defaulting to invisible.
-    // Stryker disable StringLiteral,ConditionalExpression,BlockStatement: equivalent — every mutant
-    // of this arm still yields `undefined`. There is no `default`, so an event whose label was
-    // emptied matches nothing and falls out of the switch to the function's implicit tail return,
-    // which is the same `undefined` the shared body returns; dropping the body falls out the same
-    // way. No caller can tell the two apart. The labels exist as the compile-time exhaustiveness
-    // pin described above, not as a runtime branch, so there is nothing here to delete either.
+    // Every mutant these seven labels carry still yields `undefined`: there is no `default`, so an
+    // event whose label was emptied matches nothing and falls out of the switch to the function's
+    // implicit tail return — the same `undefined` the shared body returns — and emptying the body
+    // returns `undefined` the same way. No caller can tell them apart. The labels exist as the
+    // compile-time exhaustiveness pin described above, not as a runtime branch, so there is
+    // nothing here to delete either.
+    //
+    // Waived per label rather than with a block `disable` / `restore all` pair. A `restore` written
+    // as the last comment inside a block is not a LEADING comment of any node, and Stryker's
+    // directive bookkeeper reads leading comments only — so the block form never ended, and these
+    // three mutators were silenced for the whole rest of the file, `projectStatus` included.
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'EditionSelected':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'ManualSelectionRequested':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'SearchCompleted':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'CandidatesRanked':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'CandidateRejected':
+    // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'DownloadCompleted':
+    // Stryker disable next-line StringLiteral,ConditionalExpression,BlockStatement: still undefined
     case 'ValidationPassed': {
       return undefined;
     }
-    // Stryker restore all
   }
 }
 
@@ -308,11 +319,13 @@ export async function seedStalledReadModel(
     return;
   }
   for (const letter of letters.value) {
-    // Stryker disable next-line ConditionalExpression: equivalent — this guard is the type
-    // narrowing `mark(acquisitionId: string)` needs for an optional `streamId` (a subscription
-    // letter carries none), not a decision. Forcing it true adds `undefined` to a `Set<string>`
-    // that is only ever queried by `isStalled(id: string)`, so no query any caller can make
-    // changes its answer. The guard cannot be deleted: without it the call does not typecheck.
+    // RECORDED SURVIVOR, waiver withheld: this guard is the type narrowing
+    // `mark(acquisitionId: string)` needs for an optional `streamId` (a subscription letter carries
+    // none), not a decision. Forcing it true adds `undefined` to a `Set<string>` that is only ever
+    // queried by `isStalled(id: string)`, so no query any caller can make changes its answer. The
+    // guard cannot be deleted: without it the call does not typecheck. Forcing it FALSE marks
+    // nothing stalled at boot, which is a real finding on the same line under the same mutator —
+    // so no waiver.
     if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }

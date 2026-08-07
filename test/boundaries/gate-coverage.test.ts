@@ -365,6 +365,12 @@ describe('gate coverage', () => {
     expect(strays.map((file) => repoRelative(file))).toEqual([]);
   });
 
+  // Explicit timeout, well above the default: this resolves the flat config once per first-party
+  // source, so its cost grows with the repo, and it is the one scenario here whose runtime is a
+  // function of how many files exist rather than of what the guard checks. It began timing out at
+  // the 5s default on a 4-core CI runner — never locally — when a change added ~50 test files: a
+  // slower machine plus a bigger repo, not a regression in the assertion. Raising the bound is the
+  // honest fix; narrowing what it lints would hand the guard back its own blind spot.
   it('lints every first-party source — none is excluded by the eslint ignores', async () => {
     const eslint = new ESLint({ cwd: REPO_ROOT });
     const sources = firstPartySources();
@@ -374,7 +380,7 @@ describe('gate coverage', () => {
     );
 
     expect(ignored.filter((file) => file !== null).map((file) => repoRelative(file))).toEqual([]);
-  });
+  }, 60_000);
 });
 
 describe('gate coverage: the guard itself', () => {

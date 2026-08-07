@@ -37,6 +37,12 @@ function stateOf(transfer: SlskdTransfer): string {
   // the failure haystack, which is matched against the FAILURE_VOCABULARY spellings. Stryker's
   // replacement text contains none of them, so every caller reads it exactly as it reads '' — the
   // mutant has no observable difference.
+  //
+  // That equivalence is CONTINGENT on the fallback staying meaningless, and this single waiver now
+  // stands in for five former call sites — all upstream of decisions that matter: the failure
+  // classification in `reasonFromTransfer` and the `isTransferComplete`/`isTransferSucceeded`
+  // teardown guards. Give the fallback a meaning any caller matches on and the argument lapses for
+  // all five at once, silently. Delete this waiver in the same change that does so.
   return transfer.state ?? '';
 }
 
@@ -183,11 +189,10 @@ function classify(text: string): TextDerivedReason {
 function redactPeer(body: string, username: string): string {
   if (username === '') return body;
   const peer = new RegExp(escapeRegExp(username), 'gi');
-  // Stryker disable next-line StringLiteral: the placeholder is never read — the redacted text
-  // feeds only substring matching against the vocabulary, and no spelling contains it. Emptying it
-  // (deleting the name instead of replacing it) reads identically for every text slskd is recorded
-  // as writing, because slskd embeds the name at phrase boundaries, never inside a spelling. The
-  // non-empty sentinel is defence in depth against a splice, not a behavior a recorded text shows.
+  // The placeholder has to be non-empty. Deleting the name instead of replacing it would let a peer
+  // whose name sits INSIDE a vocabulary spelling splice the two halves back together and choose the
+  // verdict — `tiXmed out` with the peer named `X` reads as `timed out`. Pinned by `reads past a
+  // peer whose name splices itself into a failure phrase`.
   return body.replaceAll(peer, '<peer>');
 }
 
