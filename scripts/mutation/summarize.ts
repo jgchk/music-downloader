@@ -11,8 +11,9 @@ import {
 /**
  * Renders the mutation run's findings for a CI job summary (change: mutation-gate).
  *
- * Pass/fail is Stryker's, not this file's: the run breaks on its own threshold, so a defect here
- * costs a worse explanation, never a wrong verdict. What it owes the reader is the Google recipe's
+ * Pass/fail is `verdict.ts`'s, not this file's — and it is decided over a NARROWER scope than this
+ * file reports over: the changed lines, where this reports the changed files. A defect here costs a
+ * worse explanation, never a wrong verdict. What it owes the reader is the Google recipe's
  * surfacing rule — **at most one mutant per line**. One weak assertion routinely spawns a dozen
  * mutants on the same line; printing all twelve turns one thing to do into a wall to scroll past,
  * and a finding people scroll past counts as false under the admission contract

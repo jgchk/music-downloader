@@ -18,7 +18,7 @@ cannot reach the metric's ceiling — Google (*"Only lines affected by the diff 
 that are covered and are not arid are mutated"*), arcmutate, Mull and Cosmic Ray in mutation
 testing; Sonar, Codecov, golangci-lint and diff-cover in the adjacent coverage problem. Where
 granularity is stated anywhere, **line is the default and file is the deliberate widening** —
-the reverse of what shipped here. Under line scope the seventeen recorded equivalents stop
+the reverse of what shipped here. Under line scope the twenty-seven recorded equivalents stop
 blocking without being suppressed, and a mutant on a line no PR touched cannot fail that PR.
 
 This change moves the failure scope and ships the verdict in **shadow mode**, because
@@ -66,7 +66,7 @@ the same method `result-lint-and-tier-enforcement.md` used before adopting a lin
 - **Documentation drift is fixed** (research §10): the job comment arguing from the retracted
   "464 → 6 (99.89%)" figure, the stale timeout comment, `design.md` task 3.3's unrepresentative
   2m31s, and `mutation-gate`'s task 4.1 — whose exit criterion ("split the four
-  narrowing-operand lines") is **unreachable as written**: there are seventeen, and `design.md`
+  narrowing-operand lines") is **unreachable as written**: there are twenty-seven, and `design.md`
   proves splitting cannot work for that mutator family. 4.1 is restated onto this change's
   premise, and task 2.1's "main becomes mutant-clean" framing is corrected.
 - **`test/boundaries/mutation-scope.test.ts` is updated with the job.** It pins the command
@@ -77,14 +77,19 @@ the same method `result-lint-and-tier-enforcement.md` used before adopting a lin
 
 **Explicitly out of scope**, recorded here so neither is mistaken for an omission:
 
-- The **`ignore-unions` ignorer plugin**. It is the right durable fix for the two structural
-  equivalent families, and the research says so — but it is a rule-pack decision with its own
-  false-negative cost (it would also hide a genuinely wrong `case` grouping), so it gets its
-  own change and its own grilling.
-- The **two MusicBrainz album-title survivors**. They are a real domain bug — an absent title
-  carried as `''` rather than `undefined`, letting punctuation-titled albums (`÷`, `+`, `?`)
-  bypass the ambiguity guard — not a mutant to suppress. Waiving them would be the fiction
-  `testing.md` forbids.
+- The **`ignore-unions` ignorer plugin**. The research called it the right durable fix for the two
+  structural equivalent families — but it is a rule-pack decision with its own false-negative cost
+  (it would also hide a genuinely wrong `case` grouping), so it gets its own change and its own
+  grilling. `mutation-gate`'s own measurement has since made the case *against* building it: an
+  ignorer is consulted per AST **node**, before mutants exist, and 38 of the 64 survivors then on
+  main sat on a node that also carries a **killed** mutant — 17 of 17 of this family — so running
+  one took a file from 96.67% to a false 100.00% by hiding three real kills. Whatever that change
+  concludes, it starts from that number rather than from the recommendation.
+- The **two MusicBrainz album-title survivors** are **already fixed**, in v3.18.1, and are recorded
+  here only so nobody goes looking for them. They were a real domain bug — an absent title carried
+  as `''` rather than `undefined`, letting punctuation-titled albums (`÷`, `+`, `?`) bypass the
+  ambiguity guard — and were fixed rather than waived, which retired those two survivors by removing
+  the sentinel they lived on. Waiving them would have been the fiction `testing.md` forbids.
 
 ## Capabilities
 

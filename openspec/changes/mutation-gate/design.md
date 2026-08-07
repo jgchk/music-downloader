@@ -1031,10 +1031,27 @@ alternatives, so that grilling can start from evidence.
   them remain `--concurrency` (D4) first, then narrowing `mutate` to changed line ranges rather than
   changed files — which is now the adopted direction rather than a lever.
 
+  **The other two runs, recorded here rather than only by reference.** Both are PRs that changed
+  real production code, which is exactly the re-measurement the last paragraph of this note used to
+  ask for; it has now happened twice.
+
+  | PR                    | changed prod files | Stryker step | whole job  |
+  | --------------------- | ------------------ | ------------ | ---------- |
+  | this change's (#161)  | 2                  | 1m43s        | 2m32s      |
+  | the v3.18.0 rebase    | 53                 | 8m54s        | 9m37s      |
+  | the v3.18.0 burn-down | 36                 | **13m16s**   | **13m58s** |
+
+  Cost is **mutants × tests per mutant**, not file count: the burn-down's 36 densely-covered domain
+  files cost half again what the correlation change's 53 did. 13m16s is 66% of the old 20-minute
+  budget, which is why `mutation-gate-diff-scope` task 3.4 raises it to 30 — a blocking job that
+  times out is a red required check on a correct branch, and that is what teaches a loop to treat a
+  check as flaky.
+
   Two things that run confirmed beyond the timing. The scope resolution picked out exactly the two
   changed production files and nothing else. And the job **passed while Stryker exited 1** — the
   `continue-on-error` arrangement behaves as designed: the findings are reported in the step summary
   and the check stays green. (That observation stands; "until task 4.1 flips both together" no longer
   does — see "Why the gate still stays inert".) `decide.ts`'s 13 survivors in CI
-  match the 13 measured locally, which is a second confirmation that scoped and full runs agree. Re-measure on the first PR
-  that actually changes production code.
+  match the 13 measured locally, which is a second confirmation that scoped and full runs agree.
+  (The re-measurement this note used to ask for has since happened twice; both runs are in the table
+  above, so nothing further is outstanding here.)
