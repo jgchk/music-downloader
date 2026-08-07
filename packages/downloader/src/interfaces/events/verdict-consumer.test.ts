@@ -103,3 +103,60 @@ describe('the verdict event consumer', () => {
     expect(outcome._unsafeUnwrapErr().kind).toBe('Transient');
   });
 });
+
+describe('verdict consumer — crossing the seam', () => {
+  const IMPORTER_STORY = '00112233445566778899aabbccddeeff';
+
+  it('adopts the producer story and points causation at the consumed event', async () => {
+    const wiring = await fulfilledWiring();
+    const before = wiring.store.all().length;
+    const event: SeamEvent = {
+      ...verdictEvent(),
+      metadata: {
+        correlationId: IMPORTER_STORY,
+        causation: { kind: 'event', context: 'importer', streamId: 'imp-7', version: 4 },
+      },
+    };
+
+    const outcome = await verdictEventConsumer(wiring.deps)(event);
+
+    expect(outcome.isOk()).toBe(true);
+    const appended = wiring.store.all().filter((entry) => entry.globalSeq > before);
+    expect(appended.length).toBeGreaterThan(0);
+    for (const entry of appended) {
+      // Verbatim: re-minting here would defeat the one promise this capability exists to keep.
+      expect(entry.metadata.correlationId).toBe(IMPORTER_STORY);
+      expect(entry.metadata.causation).toEqual({
+        kind: 'event',
+        context: 'importer',
+        streamId: 'imp-7',
+        version: 4,
+      });
+    }
+  });
+
+  it('consumes an event with no metadata block unchanged, on a freshly minted story', async () => {
+    const wiring = await fulfilledWiring();
+    const before = wiring.store.all().length;
+
+    const outcome = await verdictEventConsumer(wiring.deps)(verdictEvent());
+
+    expect(outcome.isOk()).toBe(true); // absence degrades the trace, never the work
+    const appended = wiring.store.all().filter((entry) => entry.globalSeq > before);
+    expect(appended.length).toBeGreaterThan(0);
+    expect(appended[0]!.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
+    expect(appended[0]!.metadata.correlationId).not.toBe(IMPORTER_STORY);
+  });
+
+  it('mints fresh rather than trusting a malformed metadata block', async () => {
+    const wiring = await fulfilledWiring();
+    const before = wiring.store.all().length;
+    const event: SeamEvent = { ...verdictEvent(), metadata: { correlationId: 'not-a-trace-id' } };
+
+    const outcome = await verdictEventConsumer(wiring.deps)(event);
+
+    expect(outcome.isOk()).toBe(true);
+    const appended = wiring.store.all().find((entry) => entry.globalSeq > before);
+    expect(appended?.metadata.correlationId).toMatch(/^[0-9a-f]{32}$/);
+  });
+});

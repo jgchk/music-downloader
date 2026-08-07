@@ -28,3 +28,28 @@ export const externalVerdictDeliverySchema = z.object({
 });
 
 export type ExternalVerdictDelivery = z.infer<typeof externalVerdictDeliverySchema>;
+
+/**
+ * The producer's operation-correlation envelope, read tolerantly (change: end-to-end-correlation).
+ *
+ * Consumer-owned, like every other schema here: nothing is imported from the sender. The block is
+ * absent for a producer that predates the capability, and a parse failure is treated exactly like
+ * absence by the only caller — see `contextForDelivery`. Correlation is diagnostics: it must never
+ * be able to fail a delivery.
+ *
+ * `causation` is the CONSUMED event's coordinates in the PRODUCER's store, which is exactly what
+ * this context records as the causal parent of the work the consumption triggers. `context` is
+ * read as a free string, not pinned to a literal: it namespaces coordinates that belong to another
+ * store, and pinning it here would make this reader break the day a third producer appears.
+ */
+export const inboundCorrelationSchema = z.object({
+  correlationId: z.string().regex(/^[0-9a-f]{32}$/),
+  causation: z.object({
+    kind: z.literal('event'),
+    context: z.string().min(1),
+    streamId: z.string().min(1),
+    version: z.number().int().nonnegative(),
+  }),
+});
+
+export type InboundCorrelation = z.infer<typeof inboundCorrelationSchema>;

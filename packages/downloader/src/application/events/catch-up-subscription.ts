@@ -31,6 +31,12 @@ export interface SeamEvent {
   readonly type: string;
   readonly timestamp: string;
   readonly data: unknown;
+  /**
+   * The producer's optional operation-correlation envelope, read tolerantly by the consumer's own
+   * schema. Absent when the producer predates the capability — consumption is unaffected; only the
+   * trace degrades.
+   */
+  readonly metadata?: unknown;
 }
 
 export interface SeamFeedBatch {

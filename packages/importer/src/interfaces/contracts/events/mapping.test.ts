@@ -8,18 +8,23 @@ import {
   resolved,
 } from '../../../domain/import/__fixtures__/import-fixtures.js';
 import { toAcquisitionId } from '../../../domain/shared/acquisition-id.js';
+import { OTHER_STORY, STORY } from '../../../application/__fixtures__/correlation.js';
 import { publishedEventMapping } from './mapping.js';
 
 const OCCURRED_AT = '2026-07-18T12:00:00.000Z';
 
-function stored(events: readonly ImportEvent[], streamId = 'imp-1'): StoredEvent[] {
+function stored(
+  events: readonly ImportEvent[],
+  streamId = 'imp-1',
+  storyOf: (event: ImportEvent, index: number) => string | undefined = () => STORY,
+): StoredEvent[] {
   return events.map((event, index) => ({
     globalSeq: index + 1,
     streamId,
     version: index,
     type: event.type,
     event,
-    metadata: { importId: streamId, occurredAt: OCCURRED_AT },
+    metadata: { importId: streamId, occurredAt: OCCURRED_AT, correlationId: storyOf(event, index) },
   }));
 }
 
@@ -87,5 +92,80 @@ describe('publishedEventMapping.render — release.verdict', () => {
     )._unsafeUnwrapErr();
     expect(error.kind).toBe('RenderError');
     expect(error.message).toContain('schema');
+  });
+});
+
+describe('published correlation metadata', () => {
+  const SECOND_DELIVERY_STORY = 'ffffffffffffffffffffffffffffffff';
+
+  it('publishes under the cycle story, not the story of the request that resolved the review', () => {
+    // The human resolution is its own trigger with its own story; the verdict is a fact about the
+    // import cycle, so it must go out under the story that crossed the seam inbound.
+    const events = verdictHistory();
+    const prefix = stored(events, 'imp-1', (event) =>
+      event.type === 'ImportRequested' ? STORY : OTHER_STORY,
+    );
+
+    const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
+
+    expect(rendered.metadata).toEqual({
+      correlationId: STORY,
+      causation: {
+        kind: 'event',
+        context: 'importer',
+        streamId: 'imp-1',
+        version: prefix.at(-1)!.version,
+      },
+    });
+  });
+
+  it('publishes a revived cycle under ITS delivery story, not the original delivery story', () => {
+    // The revival loop reopens the same stream with a fresh adopted story. Walking back to the
+    // stream's FIRST event instead of the cycle's would file the second verdict under the first
+    // delivery's story and cross two unrelated operations.
+    const firstCycle = verdictHistory();
+    const events = [...firstCycle, ...verdictHistory()];
+    let seenRequests = 0;
+    const prefix = stored(events, 'imp-1', (event) => {
+      if (event.type !== 'ImportRequested') return;
+      seenRequests += 1;
+      return seenRequests === 1 ? STORY : SECOND_DELIVERY_STORY;
+    });
+
+    const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
+
+    expect(rendered.metadata).toMatchObject({ correlationId: SECOND_DELIVERY_STORY });
+  });
+
+  it('omits the block when the prefix carries no cycle start to take a story from', () => {
+    // Defensive, not decorative: the story is a property of the CYCLE, so with no cycle in the
+    // prefix there is no story to publish — and inventing one is exactly what is forbidden.
+    const events = verdictHistory().filter((event) => event.type !== 'ImportRequested');
+    const prefix = stored(events);
+
+    const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
+
+    expect(rendered.metadata).toBeUndefined();
+  });
+
+  it('omits the block when the cycle story is present but malformed', () => {
+    const prefix = stored(verdictHistory(), 'imp-1', (event) =>
+      event.type === 'ImportRequested' ? 'not-a-trace-id' : STORY,
+    );
+
+    const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
+
+    expect(rendered.metadata).toBeUndefined();
+  });
+
+  it('omits the block entirely for a cycle stored before correlation existed', () => {
+    const prefix = stored(verdictHistory(), 'imp-1', () => {
+      return;
+    });
+
+    const rendered = publishedEventMapping.render(prefix.at(-1)!, prefix)._unsafeUnwrap();
+
+    expect(rendered.metadata).toBeUndefined();
+    expect(rendered.data).toBeDefined(); // the payload is unaffected by the envelope's absence
   });
 });

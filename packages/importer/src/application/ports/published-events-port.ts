@@ -15,6 +15,12 @@ export interface PublishedEvent {
   readonly type: string; // e.g. 'release.verdict'; a breaking change is a NEW type, never a mutation
   readonly timestamp: string; // ISO-8601 — when the domain event occurred (stable across redeliveries)
   readonly data: unknown; // schema-validated payload in the producer's own language
+  /**
+   * The optional operation-correlation envelope (see the outbound schema). Absent for events
+   * stored before the capability existed — permanently, by design. Kept OUTSIDE `data` because it
+   * is an observability identity, not this context's business vocabulary.
+   */
+  readonly metadata?: unknown;
 }
 
 /** A payload-rendering defect: deterministic, so the event is never served on the feed (errors are values). */

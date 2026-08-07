@@ -34,10 +34,43 @@ export const releaseVerdictDataSchema = z.object({
 });
 
 /** The Standard Webhooks body: `{type, timestamp, data}`. */
+
+/**
+ * The operation-correlation envelope (change: end-to-end-correlation) — OPTIONAL, additive, and
+ * deliberately NOT part of `data`.
+ *
+ * `correlationId` is the STORY: the id this operation has carried since its outermost trigger —
+ * which, for a verdict on a downloader-delivered import, is the id that ALREADY crossed the seam
+ * inbound, so the full downloader → importer → verdict → downloader round trip shares one id. It
+ * is an opaque observability identity, not producer vocabulary — the anti-corruption layer
+ * translates the MODEL (`data`), never this envelope.
+ *
+ * `causation` is THIS event's own coordinates in the producer's store, namespaced by context: the
+ * reference a consumer should record as the causal parent of the work it does on receipt. The
+ * producer's own internal causation chain is deliberately NOT published — it is provenance the
+ * consumer has no use for, and shipping it would leak the producer's stream graph across the seam.
+ *
+ * The whole block is absent for events stored before this capability existed. That absence is
+ * permanent and normal: nothing is backfilled and no upcaster fabricates a story, so a consumer
+ * must treat it as optional forever and mint fresh when it is missing.
+ */
+export const publishedCorrelationSchema = z.object({
+  correlationId: z.string().regex(/^[0-9a-f]{32}$/),
+  causation: z.object({
+    kind: z.literal('event'),
+    context: z.literal('importer'),
+    streamId: z.string().min(1),
+    version: z.number().int().nonnegative(),
+  }),
+});
+
+export type PublishedCorrelation = z.infer<typeof publishedCorrelationSchema>;
+
 export const releaseVerdictEventSchema = z.object({
   type: z.literal(RELEASE_VERDICT_TYPE),
   timestamp: z.iso.datetime(), // when the verdict was recorded (stable across redeliveries)
   data: releaseVerdictDataSchema,
+  metadata: publishedCorrelationSchema.optional(),
 });
 
 export type ReleaseVerdictData = z.infer<typeof releaseVerdictDataSchema>;

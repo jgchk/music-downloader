@@ -28,6 +28,8 @@ export interface OutboundFeedEvent {
   readonly type: string;
   readonly timestamp: string; // ISO-8601 — when the domain event occurred (stable across reads)
   readonly data: unknown;
+  /** The optional operation-correlation envelope; absent for pre-capability history. */
+  readonly metadata?: unknown;
 }
 
 export interface OutboundFeedBatch {
@@ -70,6 +72,7 @@ export class OutboundFeed {
         type: rendered.value.type,
         timestamp: rendered.value.timestamp,
         data: rendered.value.data,
+        metadata: rendered.value.metadata,
       });
     }
     return ok({ events, scannedTo });

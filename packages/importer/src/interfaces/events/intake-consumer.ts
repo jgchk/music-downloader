@@ -2,8 +2,11 @@ import { err, ok } from 'neverthrow';
 import { getImportForAcquisition, submitImport } from '../../application/import/use-cases.js';
 import type { UseCaseDependencies } from '../../application/import/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
-import { newOperation } from '../../application/correlation/context.js';
-import { fulfilledToSubmission, rerootLocation } from '../contracts/intake/mapping.js';
+import {
+  contextForDelivery,
+  fulfilledToSubmission,
+  rerootLocation,
+} from '../contracts/intake/mapping.js';
 import { acquisitionFulfilledSchema } from '../contracts/intake/schemas.js';
 
 /**
@@ -124,7 +127,7 @@ export function intakeEventConsumer(
     const submitted = await submitImport(
       dependencies,
       { directory, hints, source: { acquisitionId, candidate, feedPosition: event.globalSeq } },
-      newOperation(dependencies.correlation),
+      contextForDelivery(event.metadata, dependencies.correlation),
     );
     return submitted.match(
       () => ok(undefined),

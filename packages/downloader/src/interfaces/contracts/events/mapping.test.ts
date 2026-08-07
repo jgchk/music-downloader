@@ -10,20 +10,35 @@ import {
 import { asMbid } from '../../../domain/shared/__fixtures__/mbid.js';
 import { createTarget } from '../../../domain/target/target.js';
 import type { Target } from '../../../domain/target/target.js';
+import { STORY } from '../../../application/__fixtures__/correlation.js';
 import { publishedEventMapping } from './mapping.js';
 
 const OCCURRED_AT = '2026-07-03T12:00:00.000Z';
 const LOCATION = '/library/Radiohead/Kid A (2000)';
 
-function stored(events: readonly AcquisitionEvent[], streamId = 'acq-1'): StoredEvent[] {
+function stored(
+  events: readonly AcquisitionEvent[],
+  streamId = 'acq-1',
+  metadata: (id: string) => StoredEvent['metadata'] = (id) => ({
+    acquisitionId: id,
+    occurredAt: OCCURRED_AT,
+    correlationId: STORY,
+    causation: { kind: 'command', commandId: 'command-1' },
+  }),
+): StoredEvent[] {
   return events.map((event, index) => ({
     globalSeq: index + 1,
     streamId,
     version: index,
     type: event.type,
     event,
-    metadata: { acquisitionId: streamId, occurredAt: OCCURRED_AT },
+    metadata: metadata(streamId),
   }));
+}
+
+/** A stream whose rows predate correlation metadata entirely — real, permanent history. */
+function legacyStored(events: readonly AcquisitionEvent[]): StoredEvent[] {
+  return stored(events, 'acq-1', (id) => ({ acquisitionId: id, occurredAt: OCCURRED_AT }));
 }
 
 const candidate = matchingCandidate('peer');
@@ -126,5 +141,48 @@ describe('publishedEventMapping.render — acquisition.fulfilled', () => {
     const error = renderLast(history)._unsafeUnwrapErr();
     expect(error.kind).toBe('RenderError');
     expect(error.message).toContain('schema');
+  });
+});
+
+describe('published correlation metadata', () => {
+  it('renders the story and this event coordinates so a consumer can adopt them', () => {
+    const stream = stored(fulfilledHistory());
+    const last = stream.at(-1)!;
+
+    const rendered = publishedEventMapping.render(last, stream)._unsafeUnwrap();
+
+    expect(rendered.metadata).toEqual({
+      correlationId: STORY,
+      causation: {
+        kind: 'event',
+        context: 'downloader',
+        streamId: last.streamId,
+        version: last.version,
+      },
+    });
+  });
+
+  it('omits the block when the stored story is present but malformed', () => {
+    // Never publish a story a consumer cannot use: adopting a malformed id would spread it.
+    const stream = stored(fulfilledHistory(), 'acq-1', (id) => ({
+      acquisitionId: id,
+      occurredAt: OCCURRED_AT,
+      correlationId: 'not-a-trace-id',
+    }));
+
+    const rendered = publishedEventMapping.render(stream.at(-1)!, stream)._unsafeUnwrap();
+
+    expect(rendered.metadata).toBeUndefined();
+  });
+
+  it('omits the block entirely for an event stored before correlation existed', () => {
+    // Pre-change history still renders onto the feed. Fabricating a story here would invent
+    // provenance that never happened, so the block is simply absent — the consumer mints fresh.
+    const stream = legacyStored(fulfilledHistory());
+
+    const rendered = publishedEventMapping.render(stream.at(-1)!, stream)._unsafeUnwrap();
+
+    expect(rendered.metadata).toBeUndefined();
+    expect(rendered.data).toBeDefined(); // the payload is unaffected by the envelope's absence
   });
 });
