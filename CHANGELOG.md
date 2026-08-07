@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.17.4](https://github.com/jgchk/music-downloader/compare/v3.17.3...v3.17.4) (2026-08-07)
+
+### Bug Fixes
+
+* **events:** halt the downloader seam on a render defect, and drain before stop ([855c181](https://github.com/jgchk/music-downloader/commit/855c18159c371117f1e8f09f4f62e6fb5638f1d1))
+* **events:** never infer a checkpoint position, and keep reset's promise honest ([023d3dc](https://github.com/jgchk/music-downloader/commit/023d3dc03fb3ceec39ee2ed55cc0f1b1b4cdcddf))
+* **events:** report a failed checkpoint reset instead of claiming the replay was armed ([bb50207](https://github.com/jgchk/music-downloader/commit/bb502070633478a8a783bab74d7f475edaeaccca))
+* **events:** serialize resets as a queue, and stop laundering rejections as Results ([9232b94](https://github.com/jgchk/music-downloader/commit/9232b948e5c6e3fb7064a2d1223dde1a5e510aa7))
+* **lint:** correct the must-use-result blind spots and re-arm it for recorders ([1eee981](https://github.com/jgchk/music-downloader/commit/1eee981867f446f3e546bb13745de5e35d7f0d5d))
+* **lint:** make "never ignore a Result" a real lint rule ([36b3854](https://github.com/jgchk/music-downloader/commit/36b385478483175670382c02cd8841c5458d61e7))
+* **release:** stop a failed VCS read from truncating the changelog ([aeeeb9b](https://github.com/jgchk/music-downloader/commit/aeeeb9b278fabe2f93f8e85595d81ddc83739edf))
+* **release:** validate the changelog preset shape instead of asserting it ([5262952](https://github.com/jgchk/music-downloader/commit/5262952989129b0778da5224a8d910ce533aca50))
 ## [3.17.3](https://github.com/jgchk/music-downloader/compare/v3.17.2...v3.17.3) (2026-08-06)
 
 ### Bug Fixes
