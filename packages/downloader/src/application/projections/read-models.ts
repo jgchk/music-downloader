@@ -88,6 +88,12 @@ export interface AcquisitionStatusView {
    * acquisition whose metadata never resolved (where `target` stays absent) by what was asked for.
    */
   readonly requestedTarget?: AcquisitionRequest;
+  /**
+   * When the acquisition was requested — the occurrence time of its first recorded event. The
+   * stated fact a consumer orders by recency on, rather than deriving one from storage or replay
+   * order. Additive on the status contract, like the decided lifecycle flags below.
+   */
+  readonly requestedAt?: string;
   readonly currentCandidate?: CandidateIdentity;
   readonly attempts: number;
   readonly rejectedCount: number;
@@ -239,6 +245,7 @@ export function projectStatus(
     transferStarted: snapshot.transferStarted,
     target,
     requestedTarget,
+    requestedAt: stored[0]?.metadata.occurredAt,
     currentCandidate: snapshot.currentCandidate,
     attempts: snapshot.attempts,
     rejectedCount: snapshot.rejectedCount,

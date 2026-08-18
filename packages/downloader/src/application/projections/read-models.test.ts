@@ -273,6 +273,43 @@ describe('projectStatus — requested target exposure', () => {
   });
 });
 
+describe('projectStatus — when the acquisition was requested', () => {
+  // Built inline rather than via `stored` so the events carry distinct occurrence times: the
+  // point of these cases is which one requestedAt takes.
+  function storedAt(events: readonly AcquisitionEvent[]): readonly StoredEvent[] {
+    return events.map((event, index) => ({
+      globalSeq: index + 1,
+      streamId: 'acq-1',
+      version: index + 1,
+      type: event.type,
+      event,
+      metadata: { acquisitionId: 'acq-1', occurredAt: `2026-01-01T00:00:0${index}Z` },
+    }));
+  }
+
+  it('reports the time the request was recorded', () => {
+    const view = projectStatus(
+      'acq-1',
+      storedAt([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+      ]),
+    );
+    expect(view.requestedAt).toBe('2026-01-01T00:00:00Z');
+  });
+
+  it('keeps reporting the original request time as the acquisition progresses', () => {
+    const view = projectStatus(
+      'acq-1',
+      storedAt([
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'TargetResolved', target: sampleTarget },
+        { type: 'CandidateSelected', candidate: a },
+      ]),
+    );
+    expect(view.requestedAt).toBe('2026-01-01T00:00:00Z');
+  });
+});
+
 describe('projectStatus — target description', () => {
   it('is absent before any target is known for a musicbrainz request', () => {
     const view = projectStatus(

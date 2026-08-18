@@ -252,6 +252,9 @@ export const acquisitionStatusResponseSchema = z.object({
   // The request as the user gave it (additive echo): lets a consumer describe an acquisition whose
   // metadata never resolved — where `target` stays absent — by what was asked for.
   requestedTarget: requestedTargetEchoSchema.optional(),
+  // When the request was recorded (additive): the stated fact a consumer orders acquisitions by
+  // recency on, rather than inferring one from the order this list happens to arrive in.
+  requestedAt: z.iso.datetime().optional(),
   // Present only while a candidate is in flight (Selecting through Importing); absent once terminal.
   currentCandidate: candidateIdentitySchema.optional(),
   attempts: z.number(),

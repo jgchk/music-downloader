@@ -160,6 +160,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
     transferStarted: view.transferStarted,
     target: view.target ? { ...view.target } : undefined,
     requestedTarget: view.requestedTarget ? requestToWire(view.requestedTarget) : undefined,
+    requestedAt: view.requestedAt,
     currentCandidate: view.currentCandidate ? { ...view.currentCandidate } : undefined,
     attempts: view.attempts,
     rejectedCount: view.rejectedCount,
