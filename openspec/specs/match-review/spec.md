@@ -7,31 +7,31 @@ Expose uncertain imports as a typed review queue with kind-specific context, res
 ## Requirements
 ### Requirement: Uncertain imports wait in a typed review queue
 
-Adopted from the music-importer repo (capability of the importer module); the queue and its resolutions are exposed through the importer module's facade, driven by any interface — currently the web UI. The system SHALL expose every import awaiting human action as a review item of an explicit kind — `match-review` (weak or hint-contradicted match, carrying the candidate list with distances and per-penalty detail), `no-match` (beets found no candidates), `duplicate-review` (the album already exists in the library), or `remediation-review` (post-move enrichment failed) — with enough carried context to decide without SSH or the beets CLI.
+Adopted from the music-importer repo (capability of the importer module); the queue and its resolutions are exposed through the importer module's facade, driven by any interface — currently the web UI. The system SHALL expose every import awaiting human action as a review item of an explicit kind — `match-review` (weak or hint-contradicted match, carrying the metadata-match list with distances and per-penalty detail), `no-match` (beets found no matches), `duplicate-review` (the album already exists in the library), or `remediation-review` (post-move enrichment failed) — with enough carried context to decide without SSH or the beets CLI.
 
-A `match-review` item SHALL additionally carry, for each candidate, the actual field-level differences between the downloaded files and that candidate: per mapped track, the file's current tags beside the candidate's proposed tags and that track's distance; the downloaded files that matched no candidate track; the candidate tracks that no file matched; and the candidate's album-level fields. It SHALL also carry the pinned/hinted release id when one was in play, so a consumer can state truthfully whether the hint was honored: the item SHALL distinguish "the pinned release was not the best match" (the best candidate's release id differs from the pinned id) from "the pinned release matched but confidence was low" (the best candidate is the pinned release), and SHALL claim the hint was contradicted only in the former case. These carried fields are additive; a review recorded before this capability existed SHALL still be readable, carrying the distance and penalty detail without the field-level diff.
+A `match-review` item SHALL additionally carry, for each metadata match, the actual field-level differences between the downloaded files and that match: per mapped track, the file's current tags beside the match's proposed tags and that track's distance; the downloaded files that matched no track of the match; the match's tracks that no file supplied; and the match's album-level fields. It SHALL also carry the pinned/hinted release id when one was in play, so a consumer can state truthfully whether the hint was honored: the item SHALL distinguish "the pinned release was not the best match" (the best match's release id differs from the pinned id) from "the pinned release matched, but weakly" (the best match is the pinned release, at a failing distance), and SHALL claim the hint was contradicted only in the former case. These carried fields are additive; a review recorded before this capability existed SHALL still be readable, carrying the distance and penalty detail without the field-level diff.
 
 #### Scenario: The pending queue is listable with actionable context
 
 - **GIVEN** imports awaiting review of different kinds
 - **WHEN** the pending reviews are listed through the facade
-- **THEN** each item carries its kind, the submitted directory, and kind-specific context (candidates with distances, the duplicate's incumbent, or the failed enrichment step)
+- **THEN** each item carries its kind, the submitted directory, and kind-specific context (matches with distances, the duplicate's incumbent, or the failed enrichment step)
 
 #### Scenario: No-match is distinguished from low confidence
 
-- **GIVEN** a directory for which beets returns zero candidates
+- **GIVEN** a directory for which beets returns zero matches
 - **WHEN** its review item is read
-- **THEN** its kind states that no candidates were found, not that confidence was low
+- **THEN** its kind states that no matches were found, not that the best match was weak
 
-#### Scenario: A match-review carries the concrete differences per candidate
+#### Scenario: A match-review carries the concrete differences per match
 
-- **GIVEN** a match-review whose best candidate retags a track, leaves a downloaded file unmatched, and expects a track no file supplies
+- **GIVEN** a match-review whose best match retags a track, leaves a downloaded file unmatched, and expects a track no file supplies
 - **WHEN** the review item is read
-- **THEN** the candidate carries the per-track current-vs-proposed tags, the unmatched file, the missing track, and the candidate's album-level fields, alongside the existing distance and penalties
+- **THEN** the match carries the per-track current-vs-proposed tags, the unmatched file, the missing track, and the match's album-level fields, alongside the existing distance and penalties
 
 #### Scenario: A weak match on the pinned release is not reported as contradicted
 
-- **GIVEN** a match-review reached with a pinned release id whose best candidate is that same release, only with low confidence
+- **GIVEN** a match-review reached with a pinned release id whose best match is that same release, only at a failing distance
 - **WHEN** the review item is read
 - **THEN** it indicates the pinned release matched but confidence was low, not that the hint was contradicted
 
@@ -43,15 +43,15 @@ A `match-review` item SHALL additionally carry, for each candidate, the actual f
 
 ### Requirement: Reviews resolve through explicit verbs, and rejection cleans intake
 
-The system SHALL resolve review items through explicit verbs on the importer module's facade: apply a listed candidate, supply a release ID for a pinned re-propose (accepting any identifier a loaded beets source can resolve, not MusicBrainz alone), refresh the candidate list, apply a full manual tag payload (per-track fields with an explicit track mapping; beets applies them with autotagging bypassed, plugins still firing), import as-is, reject, and reject-unusable-delivery. The two reject verbs express the importer's own intent: reject is "wrong thing to have"; reject-unusable-delivery is "right thing, bad copy". Rejecting SHALL delete the release's files from the intake directory. Reject-unusable-delivery SHALL do everything reject does and SHALL additionally record a release verdict — the fact that the delivered copy was rejected as unusable — carrying the originating acquisition id, the delivered candidate's identity, and the reviewer's reasons as opaque provenance the importer echoes back without interpreting; it SHALL be available only for imports that retain a delivered candidate's identity, and SHALL otherwise be refused with an error naming the missing precondition while plain reject remains available. Resolving an already-settled review SHALL be a tolerated no-op. A review recorded under the module's earlier verb name SHALL read, settle, and project identically to one recorded under the current name, so no historical import is broken by the rename.
+The system SHALL resolve review items through explicit verbs on the importer module's facade: apply a listed match, supply a release ID for a pinned re-propose (accepting any identifier a loaded beets source can resolve, not MusicBrainz alone — the wire field name `mbReleaseId` is a legacy misnomer retained for compatibility), refresh the match list, apply a full manual tag payload (per-track fields with an explicit track mapping; beets applies them with autotagging bypassed, plugins still firing), import as-is, reject, and reject-unusable-delivery. The two reject verbs express the importer's own intent: reject is "wrong thing to have"; reject-unusable-delivery is "right thing, bad copy". Rejecting SHALL delete the release's files from the intake directory. Reject-unusable-delivery SHALL do everything reject does and SHALL additionally record a release verdict — the fact that the delivered copy was rejected as unusable — carrying the originating acquisition id, the delivered copy's identity, and the reviewer's reasons as opaque provenance the importer echoes back without interpreting; it SHALL be available only for imports that retain a delivered copy's identity, and SHALL otherwise be refused with an error naming the missing precondition while plain reject remains available. Resolving an already-settled review SHALL be a tolerated no-op. A review recorded under the module's earlier verb name SHALL read, settle, and project identically to one recorded under the current name, so no historical import is broken by the rename.
 
-The module SHALL additionally expose, for each pending review, the set of resolution verbs permitted for that review — its **available actions** — as part of the pending-review item. This set SHALL be the module's own determination, computed from the review kind, whether the review carries candidates, and whether a delivered candidate is retained (the reject-unusable-delivery precondition), and SHALL never include a verb the resolve decision would refuse for that review. A consumer SHALL therefore be able to offer exactly the legal verbs from this set rather than re-deriving per-kind legality itself. The available-action set SHALL be additive on the pending-review contract (absent-tolerant).
+The module SHALL additionally expose, for each pending review, the set of resolution verbs permitted for that review — its **available actions** — as part of the pending-review item. This set SHALL be the module's own determination, computed from the review kind, whether the review carries matches, and whether a delivered copy is retained (the reject-unusable-delivery precondition), and SHALL never include a verb the resolve decision would refuse for that review. A consumer SHALL therefore be able to offer exactly the legal verbs from this set rather than re-deriving per-kind legality itself. The available-action set SHALL be additive on the pending-review contract (absent-tolerant).
 
 #### Scenario: Supplying an ID re-proposes pinned to that release
 
-- **GIVEN** a match-review whose candidates are all wrong
+- **GIVEN** a match-review whose matches are all wrong
 - **WHEN** the user supplies a release ID
-- **THEN** the system re-proposes pinned to that ID and the review updates with the resulting candidate
+- **THEN** the system re-proposes pinned to that ID and the review updates with the resulting matches
 
 #### Scenario: Manual tags import without autotagging
 
@@ -67,15 +67,15 @@ The module SHALL additionally expose, for each pending review, the set of resolu
 
 #### Scenario: Reject-unusable-delivery records the verdict beside the rejection
 
-- **GIVEN** a review for an import that arrived from the downloader with a retained candidate
+- **GIVEN** a review for an import that arrived from the downloader with a retained delivered copy
 - **WHEN** the user resolves it with reject-unusable-delivery and reasons
-- **THEN** the files are removed from intake, the import is terminal `rejected`, and a release verdict is recorded carrying the acquisition id, the retained candidate identity, and the reasons
+- **THEN** the files are removed from intake, the import is terminal `rejected`, and a release verdict is recorded carrying the acquisition id, the retained delivered copy, and the reasons
 
-#### Scenario: The unusable-delivery verb is refused without a retained candidate
+#### Scenario: The unusable-delivery verb is refused without a retained delivered copy
 
-- **GIVEN** a review for a manually submitted import, or one recorded before candidate retention existed
+- **GIVEN** a review for a manually submitted import, or one recorded before delivered-copy retention existed
 - **WHEN** reject-unusable-delivery is attempted
-- **THEN** it is refused with an error naming the missing retained candidate
+- **THEN** it is refused with an error naming the missing retained delivered copy
 - **AND** plain reject still resolves the review normally
 
 #### Scenario: A redelivered resolution converges
@@ -96,9 +96,9 @@ The module SHALL additionally expose, for each pending review, the set of resolu
 - **WHEN** it is read from the pending-review queue
 - **THEN** it carries the set of resolution verbs permitted for it, and that set includes no verb the resolve decision would refuse for that review
 
-#### Scenario: A review without a retained candidate omits the retry verb from its permitted set
+#### Scenario: A review without a retained delivered copy omits the retry verb from its permitted set
 
-- **GIVEN** a pending review for an import that retains no delivered candidate
+- **GIVEN** a pending review for an import that retains no delivered copy
 - **WHEN** its permitted verb set is read
 - **THEN** the set excludes reject-unusable-delivery while still including plain reject
 

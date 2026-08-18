@@ -1,6 +1,6 @@
 # music-downloader
 
-An extensible, event-sourced music downloader. Given a musical intent and a quality policy, it
+An extensible, event-sourced music downloader. Given a download request and a quality policy, it
 finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release
 across pluggable sources, exposed over HTTP and MCP.
 

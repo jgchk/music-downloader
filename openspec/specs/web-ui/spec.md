@@ -59,7 +59,7 @@ Failure reasons SHALL be surfaced through already-visible outcome text — the o
 
 The web UI SHALL let the user resolve a pending import review (matching the importer facade's resolve contract), at parity with the retired `resolve_review` MCP tool. Pending reviews SHALL be listed by the attention queue (see "The attention queue unifies work awaiting a human") rather than by an importer-only listing.
 
-**Titling.** The review detail page SHALL be titled by the musical intent — the request phrase of the acquisition the import arrived from, the same identity the acquisition detail page renders for the same story — composed by the web layer from existing facade reads without any new cross-module contract. When the import carries no acquisition correlation, or a composing read fails, the title SHALL degrade to the staged directory's basename, then to a neutral awaiting-review phrase. The staged path SHALL render as labeled supporting detail, never as the title.
+**Titling.** The review detail page SHALL be titled by the download request — the request phrase of the acquisition the import arrived from, the same identity the acquisition detail page renders for the same story — composed by the web layer from existing facade reads without any new cross-module contract. When the import carries no acquisition correlation, or a composing read fails, the title SHALL degrade to the delivered directory's basename, then to a neutral awaiting-review phrase. The delivered path SHALL render as labeled supporting detail, never as the title.
 
 **Resolution affordances.** Resolution actions SHALL be labeled as imperative, verb-led, sentence-case fragments; an action's label SHALL name its object where the verb alone is ambiguous, and a destructive action SHALL name what it deletes. Consequence copy SHALL follow the label after an em-dash or sit in adjacent supporting text, and SHALL NOT be a parenthesized aside. Consequence copy SHALL state the composed system's actual contract: deterministic outcomes are stated plainly — rejecting a delivery as unusable resumes the search for a replacement; a plain rejection ends the story with nothing more tried — and hedged wording is reserved for genuine nondeterminism. An affordance that opens further input rather than committing SHALL carry a trailing ellipsis. The narration register's ban on internal vocabulary applies to affordance copy in full.
 
@@ -85,13 +85,13 @@ The web UI SHALL word the hint outcome truthfully: it SHALL state that the pinne
 
 - **GIVEN** a pending review whose import arrived from an acquisition
 - **WHEN** the user opens the review
-- **THEN** the page is titled by the acquisition's request phrase — the same identity the acquisition detail page shows — and the staged path appears only as labeled supporting detail
+- **THEN** the page is titled by the acquisition's request phrase — the same identity the acquisition detail page shows — and the delivered path appears only as labeled supporting detail
 
 #### Scenario: The title degrades without an acquisition correlation
 
 - **GIVEN** a pending review whose import carries no acquisition correlation
 - **WHEN** the user opens the review
-- **THEN** the page is titled by the staged directory's basename, and by a neutral awaiting-review phrase if no path is available
+- **THEN** the page is titled by the delivered directory's basename, and by a neutral awaiting-review phrase if no path is available
 
 #### Scenario: A destructive resolution confirms in-page with outcome-named choices
 
@@ -242,7 +242,7 @@ The web UI SHALL surface acquisitions that are awaiting manual edition selection
 
 ### Requirement: The attention queue unifies work awaiting a human
 
-The web UI SHALL present a single attention queue that lists every item across modules currently waiting on a human decision — at minimum the importer's pending match reviews and the downloader's acquisitions awaiting manual edition selection — as one list ordered longest-waiting first. Each item SHALL name **the ask** — the decision waiting on the user — in plain, action-oriented language, SHALL be titled by its musical intent where the correlation is available (degrading as the review titling requirement specifies), and SHALL link to the surface where the decision is made. Visible queue text SHALL NOT name the owning module or any architecture noun; a machine-readable module attribute MAY remain on the row for styling and tests. The queue SHALL be composed by the web layer from the module facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts. When one module's read fails, the queue SHALL render the other module's items alongside a modeled error for the failed section, not fail as a whole. Any capability that adds a new human-decision pause SHALL surface its pending items in this queue.
+The web UI SHALL present a single attention queue that lists every item across modules currently waiting on a human decision — at minimum the importer's pending match reviews and the downloader's acquisitions awaiting manual edition selection — as one list ordered longest-waiting first. Each item SHALL name **the ask** — the decision waiting on the user — in plain, action-oriented language, SHALL be titled by its download request where the correlation is available (degrading as the review titling requirement specifies), and SHALL link to the surface where the decision is made. Visible queue text SHALL NOT name the owning module or any architecture noun; a machine-readable module attribute MAY remain on the row for styling and tests. The queue SHALL be composed by the web layer from the module facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts. When one module's read fails, the queue SHALL render the other module's items alongside a modeled error for the failed section, not fail as a whole. Any capability that adds a new human-decision pause SHALL surface its pending items in this queue.
 
 #### Scenario: Items from both modules appear as one queue
 

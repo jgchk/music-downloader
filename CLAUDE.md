@@ -4,7 +4,7 @@ This file orients anyone — human or AI — working in this repository. Read th
 
 ## Project
 
-An extensible, event-sourced music downloader and importer — one product, built as a modular monolith. Given a musical intent and a quality policy, the **downloader** module finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release across pluggable sources; the **importer** module proposes beets-powered metadata matches for the staged files, auto-imports confident ones into the library, and queues uncertain ones for human review. The two bounded contexts each own their SQLite event store and integrate only through durable in-process catch-up subscriptions over each other's events (producer-owned schemas, tolerant readers behind an anti-corruption layer). Beets remains the library's system of record.
+An extensible, event-sourced music downloader and importer — one product, built as a modular monolith. Given a download request and a quality policy, the **downloader** module finds, downloads, validates, and (on failure) retries the best-matching, highest-quality release across pluggable sources, depositing it for hand-off; the **importer** module proposes beets-powered metadata matches for each deposited directory, auto-imports confident ones into the library, and queues uncertain ones for human review. The two bounded contexts each own their SQLite event store and integrate only through durable in-process catch-up subscriptions over each other's events (producer-owned schemas, tolerant readers behind an anti-corruption layer). Beets remains the library's system of record.
 
 Design, capability specs, and task breakdowns live under `openspec/changes/` (active) and `openspec/changes/archive/` (shipped) — the source of truth for _what_ we build. The docs below are the source of truth for _how_ we build.
 
@@ -71,6 +71,7 @@ Node · TypeScript (strict) · pnpm workspace · neverthrow · zod · pino · vi
 
 ## Where things live
 
+- `CONTEXT-MAP.md` + `packages/*/CONTEXT.md` — the ubiquitous-language glossaries: canonical terms per context, words to avoid, and the cross-context homonym table. Consult them when naming anything; update them the moment a term is resolved or challenged.
 - `openspec/` — change design, capability specs, and tasks (_what_ we're building). Adopted importer capabilities note their provenance.
 - `docs/development/` — the constitution (_how_ we build).
 - `packages/downloader`, `packages/importer` — the bounded-context packages, each with `src/{domain,application,adapters,interfaces,composition}` layers, its own event store file, and its own contract tier (`test/contract`).
