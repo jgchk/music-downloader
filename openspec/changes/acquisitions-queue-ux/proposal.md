@@ -6,7 +6,7 @@ On a small screen, the acquisitions master-detail shell stacks its two panes —
 
 - **Small screens show one pane, not a stack.** Below the existing collapse breakpoint (960px), the child routes `/acquisitions/new` and `/acquisitions/[id]` hide the queue (master) pane and show only the form/detail, with a "Back to queue" link at the top of the pane. This is the unanimously attested "list-detail" single-pane collapse (Material 3, Microsoft list/details, Apple HIG, SAP Fiori — see `docs/research/responsive-master-detail-ux.md`). The bare `/acquisitions` index keeps its current behavior at all widths; desktop behavior is unchanged everywhere. DOM order stays list-then-detail (no CSS reordering — the hidden pane is `display: none`, out of the accessibility tree and tab order), so `web-ui-presentation`'s meaningful-sequence requirement is honored, not amended.
 - **The queue lists newest first.** The acquisitions queue orders entries newest-requested first, sorted in the web layer (the attention-queue precedent) on an explicit requested-at fact. The attention queue is untouched — it stays longest-waiting first.
-- **The status view states when the acquisition was requested.** `AcquisitionStatusView` (and the facade's status DTO) gain an additive `requestedAt` field, sourced from the stream's first event, so ordering is keyed on a stated fact rather than map-insertion accident.
+- **The status view states when the acquisition was requested.** `AcquisitionStatusView` (and the facade's status DTO) gain an additive `requestedAt` field, taken from the `AcquisitionRequested` event's own occurrence time, so ordering is keyed on a stated fact rather than on map-insertion accident or on which event happens to be stored first.
 
 ## Capabilities
 

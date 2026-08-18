@@ -318,7 +318,8 @@ tbody tr[aria-current='true'] td {
    — the list-detail collapse every platform's small-screen guidance converges
    on (docs/research/responsive-master-detail-ux.md). The index route is
    deliberately untouched: there both panes still stack, queue first, with the
-   placeholder below it (a documented deferral — see the change's proposal).
+   placeholder below it — a deliberate deferral: the queue is what that route
+   is for, so nothing is buried there.
    The hidden pane is `display: none`, which takes it out of the tab order and
    the accessibility tree too; the panes are never reordered, so document order
    stays the reading order with CSS off and under every skin. */

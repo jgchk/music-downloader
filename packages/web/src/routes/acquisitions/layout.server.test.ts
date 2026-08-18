@@ -3,8 +3,8 @@ import type { Logger } from 'pino';
 import type { DownloaderFacade } from '@music/downloader';
 import { load } from './+layout.server.js';
 
-function event(over: { listAcquisitions?: () => unknown; id?: string; pathname?: string }): {
-  event: { locals: App.Locals; params: { id?: string }; url: URL };
+function event(over: { listAcquisitions?: () => unknown; id?: string; routeId?: string }): {
+  event: { locals: App.Locals; params: { id?: string }; route: { id: string } };
   warnings: unknown[];
 } {
   const warnings: unknown[] = [];
@@ -12,7 +12,7 @@ function event(over: { listAcquisitions?: () => unknown; id?: string; pathname?:
     warnings,
     event: {
       params: { id: over.id },
-      url: new URL(`http://localhost${over.pathname ?? '/acquisitions'}`),
+      route: { id: over.routeId ?? '/acquisitions' },
       locals: {
         facades: {
           downloader: {
@@ -47,9 +47,9 @@ describe('acquisitions layout load', () => {
   it.each([
     ['/acquisitions', false],
     ['/acquisitions/new', true],
-    ['/acquisitions/acq-1', true],
-  ])('reports %s as detail-active: %s', (pathname, expected) => {
-    const { event: requestEvent } = event({ pathname });
+    ['/acquisitions/[id]', true],
+  ])('reports the %s route as detail-active: %s', (routeId, expected) => {
+    const { event: requestEvent } = event({ routeId });
     expect((load(requestEvent as never) as { detailActive: boolean }).detailActive).toBe(expected);
   });
 
@@ -66,6 +66,29 @@ describe('acquisitions layout load', () => {
       acquisitions: { acquisitionId: string }[];
     };
     expect(acquisitions.map((entry) => entry.acquisitionId)).toEqual(['newer', 'older']);
+  });
+
+  it('logs the acquisitions that state no request time, naming them', () => {
+    const { event: requestEvent, warnings } = event({
+      listAcquisitions: () => ({
+        acquisitions: [
+          { acquisitionId: 'dated', requestedAt: '2026-01-01T00:00:00Z' },
+          { acquisitionId: 'undated' },
+        ],
+      }),
+    });
+    expect(load(requestEvent as never)).toBeDefined();
+    expect(warnings).toEqual([{ module: 'downloader', acquisitionIds: ['undated'] }]);
+  });
+
+  it('says nothing when every acquisition states its request time', () => {
+    const { event: requestEvent, warnings } = event({
+      listAcquisitions: () => ({
+        acquisitions: [{ acquisitionId: 'dated', requestedAt: '2026-01-01T00:00:00Z' }],
+      }),
+    });
+    expect(load(requestEvent as never)).toBeDefined();
+    expect(warnings).toEqual([]);
   });
 
   it('degrades to an empty, flagged list and logs when the downloader read throws', () => {

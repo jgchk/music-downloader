@@ -93,8 +93,8 @@ export interface AcquisitionStatusView {
    * itself. The stated fact a consumer orders by recency on, rather than deriving one from
    * storage or replay order. Optional only because a stream that carries no request event has no
    * request time to state; every acquisition the decider can produce opens with one, so an absent
-   * value here means a defect (or a hand-repaired stream), NOT an older producer. The wire schema
-   * relaxes it separately, for tolerant readers.
+   * value here means a defect (or a hand-repaired stream), NOT an older producer. The wire field is
+   * optional for its own, different reason — a tolerant reader of an older producer (facade/schemas).
    */
   readonly requestedAt?: string;
   readonly currentCandidate?: CandidateIdentity;
