@@ -17,6 +17,7 @@ describe('acquisition detail page (SSR)', () => {
           acquisitions: [],
           listFailed: false,
           selectedId: 'acq-1',
+          detailActive: true,
           acquisition: {
             acquisitionId: 'acq-1',
             status: 'Searching',

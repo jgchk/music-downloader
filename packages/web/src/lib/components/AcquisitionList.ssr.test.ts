@@ -80,6 +80,20 @@ describe('AcquisitionList (SSR)', () => {
     expect(body).toContain('aria-current="true"');
   });
 
+  it('renders the rows in the order it is given, so the queue reads newest first', () => {
+    // The order is decided in the layout's load (orderByNewestRequest); the list must not
+    // re-sort or reverse it on the way to the DOM, or the read order stops matching the decision.
+    const { body } = render(AcquisitionList, {
+      props: {
+        acquisitions: [
+          acquisition({ acquisitionId: 'acq-newer', target: { artist: 'N', title: 'Newer' } }),
+          acquisition({ acquisitionId: 'acq-older', target: { artist: 'O', title: 'Older' } }),
+        ],
+      },
+    });
+    expect(body.indexOf('N — Newer')).toBeLessThan(body.indexOf('O — Older'));
+  });
+
   it('presents an awaiting-selection row as action-needed while a searching row stays generic', () => {
     const { body } = render(AcquisitionList, {
       props: {

@@ -313,7 +313,13 @@ tbody tr[aria-current='true'] td {
 /* -- Master-detail: a compact list pane beside the wider detail pane ------
    (acquisitions). The master is a FIXED width holding a compact summary list —
    not a table — so the detail is the wider pane (Apple HIG); below ~960px the
-   two panes stack so nothing overflows on narrow viewports. */
+   panes no longer fit side by side, so the view shows ONE of them: the queue on
+   its own route, the detail or the new-request form on theirs (the list-detail
+   collapse every platform's small-screen guidance converges on — see
+   docs/research/responsive-master-detail-ux.md). The hidden pane is `display:
+   none`, which takes it out of the tab order and the accessibility tree too;
+   the panes are never reordered, so document order stays the reading order
+   with CSS off and under every skin. */
 .master-detail {
   display: grid;
   gap: var(--region-gap);
@@ -329,9 +335,21 @@ tbody tr[aria-current='true'] td {
   flex-direction: column;
   gap: var(--stack-gap);
 }
+/* The way back to the queue: redundant while the queue is on screen beside the
+   detail, so it earns its place only at the widths where the queue is hidden. */
+.master-detail .back-to-queue {
+  display: none;
+}
 @media (max-width: 960px) {
   .master-detail {
     grid-template-columns: 1fr;
+  }
+  .master-detail.detail-active .master {
+    display: none;
+  }
+  .master-detail.detail-active .back-to-queue {
+    display: inline-block;
+    align-self: start;
   }
 }
 
