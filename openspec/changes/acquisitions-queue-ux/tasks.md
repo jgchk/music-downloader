@@ -1,13 +1,13 @@
 ## 1. Downloader: the status view states its requested-at fact
 
-- [x] 1.1 Red: read-model tests — a fresh request's status view carries `requestedAt` equal to the first event's `occurredAt`; later events leave it unchanged (spec: acquisition-lifecycle "requested" scenarios). Green: record the first event's `occurredAt` per stream in the projection and expose it on `AcquisitionStatusView`.
+- [x] 1.1 Red: read-model tests — a status view carries `requestedAt` equal to the `AcquisitionRequested` event's own `occurredAt`, unchanged by later events, taken from that event even when it is not the first one stored, and absent when the stream records no request (spec: acquisition-lifecycle "requested" scenarios). Green: read the stamp in the pass that already locates that event in `projectStatus`, and expose it on `AcquisitionStatusView`.
 - [x] 1.2 Red: facade tests — the status DTO exposes `requestedAt` (ISO-8601) on list and single-status responses. Green: map the view field through the facade DTO (additive; no existing field or consumer changes).
 
 ## 2. Web: the queue reads newest first
 
-- [x] 2.1 Red: unit test for a newest-first ordering function (descending `requestedAt`, tie-break `acquisitionId`) in `packages/web/src/lib`. Green: implement it beside the attention-queue precedent.
+- [x] 2.1 Red: unit tests for a newest-first ordering function (descending `requestedAt`, tie-break `acquisitionId`, undated last, input unmutated) in `packages/web/src/lib`. Green: implement it beside the attention-queue precedent.
 - [x] 2.2 Red: layout server-load test — acquisitions arrive at the page newest-requested first (spec: "Newest request appears at the top"). Green: apply the ordering in the acquisitions layout's server load.
-- [x] 2.3 Red: `AcquisitionList` SSR test asserting rendered row order (first-requested renders below later-requested — position, not just presence). Green with no component change expected; this pins the order the load supplies.
+- [x] 2.3 Red: `AcquisitionList` SSR test asserting that the component renders rows in the order it is handed, without re-sorting (position, not just presence — and presence asserted first, since `indexOf` returns -1 for a missing row). Green with no component change expected; recency is decided in the load, so what the component owes is not to disturb it.
 
 ## 3. Web: single-pane collapse on child routes
 

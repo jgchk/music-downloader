@@ -109,7 +109,7 @@ export function parseAcquisitionView(acquisition: AcquisitionStatusResponseDto):
   return { kind: 'editions', candidates: acquisition.candidates };
 }
 
-/** Lexicographic three-way compare — the shared arms of the queue's primary key and its tie-break. */
+/** Three-way string compare (UTF-16 order), used for both the recency key and the id tie-break. */
 function compareText(x: string, y: string): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
@@ -122,7 +122,9 @@ function compareText(x: string, y: string): number {
 export function orderByNewestRequest(
   acquisitions: readonly AcquisitionStatusResponseDto[],
 ): AcquisitionStatusResponseDto[] {
-  // ISO instants in one uniform format compare lexicographically (as in attention.ts, whose
+  // ISO instants in one uniform format (UTC `Z`, FIXED precision — the assumption is on the
+  // producers' clock, not on the schema, which would accept mixed precision and mis-order it)
+  // compare lexicographically (as in attention.ts, whose
   // sentinel differs because its sort runs the other way: '\u{FFFF}' sinks an undated item in an
   // ASCENDING sort, '' sinks one here in a DESCENDING sort — flip the direction without flipping
   // the sentinel and undated rows float to the top). An absent stamp sorts last rather than

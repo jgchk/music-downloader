@@ -6,17 +6,17 @@ import { describe, expect, it } from 'vitest';
  * The acquisitions master-detail collapse, pinned across the seam it is implemented over
  * (web-ui: "Small screens present one acquisitions pane at a time").
  *
- * The whole behaviour is a bare string agreement between two files: the layout emits the class
- * names, the stylesheet gives them meaning. Nothing type-checks that join and no rendering test
- * can see it — SSR renders markup without applying CSS, and jsdom evaluates no media query. So a
- * rename on either side leaves every unit, SSR and e2e test green while the collapse silently
- * stops happening: on a phone the queue comes back on top of the request form, which is the exact
+ * The whole behaviour is a bare string agreement: the layout emits class names, the stylesheet
+ * gives them meaning. Nothing type-checks that join, and no test in the suite today looks at it —
+ * SSR renders markup without applying CSS, jsdom evaluates no media query, and the browser tier
+ * that COULD see it defers per-skin layout invariants by policy (packages/web/tests/parity.spec.ts).
+ * So a rename on either side would leave every unit, SSR and e2e test green while the collapse
+ * silently stopped: on a phone the queue would come back on top of the request form, the exact
  * regression this change exists to fix. That is a gate going quiet, which is what this tier holds.
  *
  * What is deliberately NOT claimed here: that `display: none` wins the cascade at 959px under
- * every skin. That needs a real browser at a real viewport and belongs to the deferred
- * a11y/layout parity suite (see packages/web/tests/parity.spec.ts, which defers exactly that and
- * asks for no new heavy specs in the meantime). This pins the join, not the rendering.
+ * every skin, and that focus cannot enter the hidden pane. Both need a real browser at a real
+ * viewport and belong to the deferred a11y/layout parity suite.
  */
 
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -26,24 +26,48 @@ const read = (relative: string): string =>
 const LAYOUT = read('packages/web/src/routes/acquisitions/+layout.svelte');
 const BASE_CSS = read('packages/web/src/lib/styles/base.css');
 
+/** The `@media (max-width: 960px)` block alone — brace-matched, so "inside it" means inside it. */
+function narrowViewportBlock(css: string): string {
+  const start = css.indexOf('@media (max-width: 960px) {');
+  expect(start, 'the collapse breakpoint block should exist').toBeGreaterThanOrEqual(0);
+  let depth = 0;
+  for (let index = css.indexOf('{', start); index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    if (css[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return css.slice(start, index + 1);
+    }
+  }
+  throw new Error('unterminated @media block in base.css');
+}
+
 describe('the acquisitions collapse is joined up across markup and stylesheet', () => {
-  it('the layout emits the two hooks the stylesheet keys the collapse on', () => {
-    expect(LAYOUT).toContain('class:detail-active={data.detailActive}');
+  it('the layout emits every class the collapse rule keys on', () => {
+    // `.master-detail.detail-active .master` names three; `.detail` and the back link complete the
+    // set the stylesheet targets. Each is an untyped string on the markup side, so each is pinned.
+    expect(LAYOUT).toContain('class="master-detail"');
+    expect(LAYOUT).toContain('class:detail-active=');
+    expect(LAYOUT).toContain('class="master panel"');
+    expect(LAYOUT).toContain('class="detail"');
     expect(LAYOUT).toContain('class="back-to-queue"');
   });
 
   it('the stylesheet hides the queue on a detail-active shell, out of the a11y tree', () => {
     // `display: none` specifically: a visual-only hiding would leave the queue in the tab order,
-    // and the spec requires focus never to enter the hidden pane.
-    expect(BASE_CSS).toContain('.master-detail.detail-active .master { display: none; }');
+    // and the spec requires that focus never enter the hidden pane.
+    // Matched on the declaration, not the whole rule body: adding another declaration to the rule
+    // is a refactor, not a regression, and should not fail this pin.
+    expect(narrowViewportBlock(BASE_CSS)).toMatch(
+      /\.master-detail\.detail-active \.master \{[^}]*display: none;/u,
+    );
   });
 
-  it('the collapse and the back link are scoped to narrow viewports', () => {
-    // Both rules live under the same max-width query — the desktop two-pane presentation is
-    // untouched, and the back link does not appear beside a queue that is already on screen.
-    const narrow = BASE_CSS.slice(BASE_CSS.indexOf('@media (max-width: 960px)'));
+  it('the collapse and the back link apply only below the breakpoint', () => {
+    // Inside the block: the desktop two-pane presentation is untouched by both rules…
+    const narrow = narrowViewportBlock(BASE_CSS);
     expect(narrow).toContain('.master-detail.detail-active .master');
     expect(narrow).toContain('.master-detail.detail-active .back-to-queue');
+    // …and the back link is hidden by default, so it never appears beside a visible queue.
     expect(BASE_CSS).toContain('.master-detail .back-to-queue { display: none; }');
   });
 });

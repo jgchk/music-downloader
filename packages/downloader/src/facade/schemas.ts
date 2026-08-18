@@ -255,7 +255,8 @@ export const acquisitionStatusResponseSchema = z.object({
   // When the request was recorded — the stated fact a consumer orders acquisitions by recency on,
   // rather than inferring one from the order they happen to arrive in. Present for every
   // acquisition whose stream records its request, which is every acquisition the downloader can
-  // produce; optional only so a consumer reading an older producer that omits it still parses.
+  // produce; optional so a consumer reading an older producer that omits it still parses, and
+  // because a stream recording no request at all states no time.
   requestedAt: z.iso.datetime().optional(),
   // Present only while a candidate is in flight (Selecting through Importing); absent once terminal.
   currentCandidate: candidateIdentitySchema.optional(),

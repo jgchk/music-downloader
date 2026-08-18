@@ -163,8 +163,10 @@ describe('acquisitionStatusResponseSchema', () => {
   });
 
   it('rejects a requestedAt that is not an instant', () => {
-    // The field is an ISO-8601 instant, not free text: consumers order the queue by comparing
-    // these strings, which is only chronological while the format holds.
+    // The field is an ISO-8601 instant, not free text. This pins the refusal of free text; the
+    // stricter property an ordering consumer needs — uniform fractional precision — comes from
+    // every stamp being minted by one clock (`toISOString`), not from this schema, which would
+    // accept mixed precision.
     const base = {
       acquisitionId: 'acq-1',
       status: 'Pending',

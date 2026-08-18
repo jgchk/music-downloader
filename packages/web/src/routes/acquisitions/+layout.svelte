@@ -5,7 +5,7 @@
   // Master-detail: the list is the persistent master pane; the child route ([id] detail,
   // the new-request form, or the index placeholder) renders in the detail pane and owns the
   // page's single <h1>. The `.master-detail` grid (base.css) lays the two panes out
-  // side-by-side; narrow screens show one pane at a time instead — on a child route the master
+  // side-by-side; narrow screens show one pane at a time on a child route instead — there the master
   // is hidden (the list-detail collapse, docs/research/responsive-master-detail-ux.md), so the
   // form or detail the user asked for is not buried under the whole queue. `detail-active` marks
   // that a child route is open; the panes never swap places, so document order stays reading order.
