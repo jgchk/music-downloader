@@ -109,6 +109,11 @@ export function parseAcquisitionView(acquisition: AcquisitionStatusResponseDto):
   return { kind: 'editions', candidates: acquisition.candidates };
 }
 
+/** Lexicographic three-way compare — the shared arms of the queue's primary key and its tie-break. */
+function compareText(x: string, y: string): number {
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /**
  * Newest-requested first (web-ui: the acquisitions queue reads newest first) — the order the queue
  * is read in, decided here at the presentation edge like the attention queue's own longest-waiting
@@ -117,12 +122,16 @@ export function parseAcquisitionView(acquisition: AcquisitionStatusResponseDto):
 export function orderByNewestRequest(
   acquisitions: readonly AcquisitionStatusResponseDto[],
 ): AcquisitionStatusResponseDto[] {
-  // ISO instants in one uniform format compare lexicographically (as in attention.ts) — reversed
-  // here, newest first. An absent stamp (an older producer) sorts last under the empty string
-  // rather than claiming a recency the producer never stated. The sort is stable, so acquisitions
-  // requested at the same instant keep the order the downloader gave them.
+  // ISO instants in one uniform format compare lexicographically (as in attention.ts, whose
+  // sentinel differs because its sort runs the other way: '\u{FFFF}' sinks an undated item in an
+  // ASCENDING sort, '' sinks one here in a DESCENDING sort — flip the direction without flipping
+  // the sentinel and undated rows float to the top). An absent stamp sorts last rather than
+  // claiming a recency the producer never stated. Ties break on the id so the read order is the
+  // list's own, not one borrowed from whatever order the downloader happened to hand over.
   const key = (entry: AcquisitionStatusResponseDto): string => entry.requestedAt ?? '';
-  return acquisitions.toSorted((a, b) => (key(a) < key(b) ? 1 : key(a) > key(b) ? -1 : 0));
+  return acquisitions.toSorted(
+    (a, b) => compareText(key(b), key(a)) || compareText(a.acquisitionId, b.acquisitionId),
+  );
 }
 
 export function formatBytes(bytes: number): string {

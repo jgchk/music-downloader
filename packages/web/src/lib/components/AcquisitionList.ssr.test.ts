@@ -80,18 +80,22 @@ describe('AcquisitionList (SSR)', () => {
     expect(body).toContain('aria-current="true"');
   });
 
-  it('renders the rows in the order it is given, so the queue reads newest first', () => {
-    // The order is decided in the layout's load (orderByNewestRequest); the list must not
-    // re-sort or reverse it on the way to the DOM, or the read order stops matching the decision.
+  it('renders the rows in the order it is given, without re-sorting them', () => {
+    // Recency is decided upstream, in the layout's load (orderByNewestRequest) — this component
+    // knows nothing about it and must simply not disturb the order on the way to the DOM. Both
+    // rows are asserted present first: `indexOf` returns -1 for a missing one, so comparing
+    // positions alone would pass vacuously if a row were dropped.
     const { body } = render(AcquisitionList, {
       props: {
         acquisitions: [
-          acquisition({ acquisitionId: 'acq-newer', target: { artist: 'N', title: 'Newer' } }),
-          acquisition({ acquisitionId: 'acq-older', target: { artist: 'O', title: 'Older' } }),
+          acquisition({ acquisitionId: 'acq-first', target: { artist: 'F', title: 'First' } }),
+          acquisition({ acquisitionId: 'acq-second', target: { artist: 'S', title: 'Second' } }),
         ],
       },
     });
-    expect(body.indexOf('N — Newer')).toBeLessThan(body.indexOf('O — Older'));
+    expect(body).toContain('F — First');
+    expect(body).toContain('S — Second');
+    expect(body.indexOf('F — First')).toBeLessThan(body.indexOf('S — Second'));
   });
 
   it('presents an awaiting-selection row as action-needed while a searching row stays generic', () => {

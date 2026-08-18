@@ -89,9 +89,12 @@ export interface AcquisitionStatusView {
    */
   readonly requestedTarget?: AcquisitionRequest;
   /**
-   * When the acquisition was requested — the occurrence time of its first recorded event. The
-   * stated fact a consumer orders by recency on, rather than deriving one from storage or replay
-   * order. Additive on the status contract, like the decided lifecycle flags below.
+   * When the acquisition was requested — the occurrence time of the `AcquisitionRequested` event
+   * itself. The stated fact a consumer orders by recency on, rather than deriving one from
+   * storage or replay order. Optional only because a stream that carries no request event has no
+   * request time to state; every acquisition the decider can produce opens with one, so an absent
+   * value here means a defect (or a hand-repaired stream), NOT an older producer. The wire schema
+   * relaxes it separately, for tolerant readers.
    */
   readonly requestedAt?: string;
   readonly currentCandidate?: CandidateIdentity;
@@ -225,18 +228,22 @@ export function projectStatus(
   const history: StatusHistoryEntry[] = [];
   let target: { artist: string; title: string } | undefined;
   let requestedTarget: AcquisitionRequest | undefined;
-  for (const event of events) {
+  let requestedAt: string | undefined;
+  for (const entry of stored) {
+    const event = entry.event;
     if (event.type === 'AcquisitionRequested') {
       requestedTarget = event.request;
+      // The request's own occurrence time, read from the event that states it. Deliberately NOT
+      // the first stored entry's: position is bookkeeping, and a stream that ever opened with
+      // something else (an upcast marker, a repair entry) would silently retime the acquisition.
+      requestedAt = entry.metadata.occurredAt;
       if (event.request.kind === 'descriptor') {
         target = { artist: event.request.artist, title: event.request.title };
       }
     } else if (event.type === 'TargetResolved') {
       target = { artist: event.target.artist, title: event.target.title };
     }
-  }
-  for (const entry of stored) {
-    const payload = historyPayloadOf(entry.event);
+    const payload = historyPayloadOf(event);
     if (payload !== undefined) history.push({ ...payload, at: entry.metadata.occurredAt });
   }
   return {
@@ -245,7 +252,7 @@ export function projectStatus(
     transferStarted: snapshot.transferStarted,
     target,
     requestedTarget,
-    requestedAt: stored[0]?.metadata.occurredAt,
+    requestedAt,
     currentCandidate: snapshot.currentCandidate,
     attempts: snapshot.attempts,
     rejectedCount: snapshot.rejectedCount,
