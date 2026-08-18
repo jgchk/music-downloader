@@ -5,6 +5,7 @@ import {
   isCancellable,
   isTransferStarted,
   isTerminal,
+  orderByNewestRequest,
   parseAcquisitionView,
   statusTone,
   targetDescription,
@@ -193,5 +194,39 @@ describe('formatBytes', () => {
     [1024 ** 4, '1024.0 GiB'],
   ])('%d -> %s', (bytes, label) => {
     expect(formatBytes(bytes)).toBe(label);
+  });
+});
+
+describe('orderByNewestRequest', () => {
+  const at = (id: string, requestedAt?: string) => acquisition({ acquisitionId: id, requestedAt });
+
+  it('puts the most recently requested acquisition first', () => {
+    const ordered = orderByNewestRequest([
+      at('oldest', '2026-01-01T00:00:00Z'),
+      at('newest', '2026-03-01T00:00:00Z'),
+      at('middle', '2026-02-01T00:00:00Z'),
+    ]);
+    expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['newest', 'middle', 'oldest']);
+  });
+
+  it('leaves same-instant requests in the order the downloader gave them', () => {
+    // Stable, like the attention queue's own order: equal instants are not reshuffled, so the
+    // queue reads the same way twice running without inventing a tie-break the data can't justify.
+    const ordered = orderByNewestRequest([
+      at('acq-b', '2026-01-01T00:00:00Z'),
+      at('acq-a', '2026-01-01T00:00:00Z'),
+    ]);
+    expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['acq-b', 'acq-a']);
+  });
+
+  it('sinks acquisitions whose request time an older producer never stated', () => {
+    const ordered = orderByNewestRequest([at('undated'), at('dated', '2026-01-01T00:00:00Z')]);
+    expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['dated', 'undated']);
+  });
+
+  it('leaves the given list untouched', () => {
+    const given = [at('a', '2026-01-01T00:00:00Z'), at('b', '2026-02-01T00:00:00Z')];
+    orderByNewestRequest(given);
+    expect(given.map((entry) => entry.acquisitionId)).toEqual(['a', 'b']);
   });
 });

@@ -109,6 +109,22 @@ export function parseAcquisitionView(acquisition: AcquisitionStatusResponseDto):
   return { kind: 'editions', candidates: acquisition.candidates };
 }
 
+/**
+ * Newest-requested first (web-ui: the acquisitions queue reads newest first) — the order the queue
+ * is read in, decided here at the presentation edge like the attention queue's own longest-waiting
+ * order, not in the downloader, which merely states each acquisition's `requestedAt`.
+ */
+export function orderByNewestRequest(
+  acquisitions: readonly AcquisitionStatusResponseDto[],
+): AcquisitionStatusResponseDto[] {
+  // ISO instants in one uniform format compare lexicographically (as in attention.ts) — reversed
+  // here, newest first. An absent stamp (an older producer) sorts last under the empty string
+  // rather than claiming a recency the producer never stated. The sort is stable, so acquisitions
+  // requested at the same instant keep the order the downloader gave them.
+  const key = (entry: AcquisitionStatusResponseDto): string => entry.requestedAt ?? '';
+  return acquisitions.toSorted((a, b) => (key(a) < key(b) ? 1 : key(a) > key(b) ? -1 : 0));
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ['KiB', 'MiB', 'GiB'];

@@ -3,8 +3,8 @@ import type { Logger } from 'pino';
 import type { DownloaderFacade } from '@music/downloader';
 import { load } from './+layout.server.js';
 
-function event(over: { listAcquisitions?: () => unknown; id?: string }): {
-  event: { locals: App.Locals; params: { id?: string } };
+function event(over: { listAcquisitions?: () => unknown; id?: string; pathname?: string }): {
+  event: { locals: App.Locals; params: { id?: string }; url: URL };
   warnings: unknown[];
 } {
   const warnings: unknown[] = [];
@@ -12,6 +12,7 @@ function event(over: { listAcquisitions?: () => unknown; id?: string }): {
     warnings,
     event: {
       params: { id: over.id },
+      url: new URL(`http://localhost${over.pathname ?? '/acquisitions'}`),
       locals: {
         facades: {
           downloader: {
@@ -32,6 +33,7 @@ describe('acquisitions layout load', () => {
       acquisitions: [{ acquisitionId: 'acq-1' }],
       listFailed: false,
       selectedId: undefined,
+      detailActive: false,
     });
   });
 
@@ -40,6 +42,30 @@ describe('acquisitions layout load', () => {
     expect((load(requestEvent as never) as { selectedId: string | undefined }).selectedId).toBe(
       'acq-1',
     );
+  });
+
+  it.each([
+    ['/acquisitions', false],
+    ['/acquisitions/new', true],
+    ['/acquisitions/acq-1', true],
+  ])('reports %s as detail-active: %s', (pathname, expected) => {
+    const { event: requestEvent } = event({ pathname });
+    expect((load(requestEvent as never) as { detailActive: boolean }).detailActive).toBe(expected);
+  });
+
+  it('hands the queue to the page newest-requested first', () => {
+    const { event: requestEvent } = event({
+      listAcquisitions: () => ({
+        acquisitions: [
+          { acquisitionId: 'older', requestedAt: '2026-01-01T00:00:00Z' },
+          { acquisitionId: 'newer', requestedAt: '2026-02-01T00:00:00Z' },
+        ],
+      }),
+    });
+    const { acquisitions } = load(requestEvent as never) as {
+      acquisitions: { acquisitionId: string }[];
+    };
+    expect(acquisitions.map((entry) => entry.acquisitionId)).toEqual(['newer', 'older']);
   });
 
   it('degrades to an empty, flagged list and logs when the downloader read throws', () => {
@@ -53,6 +79,7 @@ describe('acquisitions layout load', () => {
       acquisitions: [],
       listFailed: true,
       selectedId: undefined,
+      detailActive: false,
     });
     expect(warnings).toEqual([{ err: fault, module: 'downloader' }]);
   });
