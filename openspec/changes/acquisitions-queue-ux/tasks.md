@@ -1,7 +1,7 @@
 ## 1. Downloader: the status view states its requested-at fact
 
-- [ ] 1.1 Red: read-model tests — a fresh request's status view carries `requestedAt` equal to the first event's `occurredAt`; later events leave it unchanged (spec: acquisition-lifecycle "requested" scenarios). Green: record the first event's `occurredAt` per stream in the projection and expose it on `AcquisitionStatusView`.
-- [ ] 1.2 Red: facade tests — the status DTO exposes `requestedAt` (ISO-8601) on list and single-status responses. Green: map the view field through the facade DTO (additive; no existing field or consumer changes).
+- [x] 1.1 Red: read-model tests — a fresh request's status view carries `requestedAt` equal to the first event's `occurredAt`; later events leave it unchanged (spec: acquisition-lifecycle "requested" scenarios). Green: record the first event's `occurredAt` per stream in the projection and expose it on `AcquisitionStatusView`.
+- [x] 1.2 Red: facade tests — the status DTO exposes `requestedAt` (ISO-8601) on list and single-status responses. Green: map the view field through the facade DTO (additive; no existing field or consumer changes).
 
 ## 2. Web: the queue reads newest first
 

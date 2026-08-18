@@ -163,6 +163,15 @@ describe('statusViewToDto', () => {
     ]);
   });
 
+  it('carries when the acquisition was requested onto the wire', () => {
+    const view: AcquisitionStatusView = {
+      ...unresolvedView({ kind: 'musicbrainz', mbid: asMbid(MBID), targetType: 'album' }),
+      requestedAt: '2026-01-01T00:00:00Z',
+    };
+
+    expect(statusViewToDto(view).requestedAt).toBe('2026-01-01T00:00:00Z');
+  });
+
   it('echoes the requested target onto the wire under the kind that was asked for', () => {
     // A release, a release group and a free-text descriptor are three different asks, and a
     // consumer describes them differently — the echoed kind must survive the crossing intact.

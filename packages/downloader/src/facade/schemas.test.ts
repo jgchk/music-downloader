@@ -146,6 +146,22 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(parsed.requestedTarget).toMatchObject({ kind: 'descriptor', artist: 'A' });
   });
 
+  it('accepts the additive requestedAt stamp and its absence', () => {
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'Pending',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    expect(acquisitionStatusResponseSchema.parse(base).requestedAt).toBeUndefined();
+    const parsed = acquisitionStatusResponseSchema.parse({
+      ...base,
+      requestedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(parsed.requestedAt).toBe('2026-01-01T00:00:00Z');
+  });
+
   it('accepts the additive stalled flag and its absence (reactor-durability D2)', () => {
     const base = {
       acquisitionId: 'acq-1',
