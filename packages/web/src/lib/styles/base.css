@@ -313,13 +313,15 @@ tbody tr[aria-current='true'] td {
 /* -- Master-detail: a compact list pane beside the wider detail pane ------
    (acquisitions). The master is a FIXED width holding a compact summary list —
    not a table — so the detail is the wider pane (Apple HIG); below ~960px the
-   panes no longer fit side by side, so the view shows ONE of them: the queue on
-   its own route, the detail or the new-request form on theirs (the list-detail
-   collapse every platform's small-screen guidance converges on — see
-   docs/research/responsive-master-detail-ux.md). The hidden pane is `display:
-   none`, which takes it out of the tab order and the accessibility tree too;
-   the panes are never reordered, so document order stays the reading order
-   with CSS off and under every skin. */
+   panes no longer fit side by side, so on a CHILD route (a detail or the
+   new-request form) the queue is hidden and that pane has the screen to itself
+   — the list-detail collapse every platform's small-screen guidance converges
+   on (docs/research/responsive-master-detail-ux.md). The index route is
+   deliberately untouched: there both panes still stack, queue first, with the
+   placeholder below it (a documented deferral — see the change's proposal).
+   The hidden pane is `display: none`, which takes it out of the tab order and
+   the accessibility tree too; the panes are never reordered, so document order
+   stays the reading order with CSS off and under every skin. */
 .master-detail {
   display: grid;
   gap: var(--region-gap);

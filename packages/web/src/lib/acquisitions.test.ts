@@ -209,14 +209,14 @@ describe('orderByNewestRequest', () => {
     expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['newest', 'middle', 'oldest']);
   });
 
-  it('leaves same-instant requests in the order the downloader gave them', () => {
-    // Stable, like the attention queue's own order: equal instants are not reshuffled, so the
-    // queue reads the same way twice running without inventing a tie-break the data can't justify.
+  it('breaks a same-instant tie on the id, so the queue reads the same way twice running', () => {
+    // Given in reverse, so relying on the downloader's order alone would fail here: the read
+    // order is the list's own property, not one inherited from however the producer listed them.
     const ordered = orderByNewestRequest([
       at('acq-b', '2026-01-01T00:00:00Z'),
       at('acq-a', '2026-01-01T00:00:00Z'),
     ]);
-    expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['acq-b', 'acq-a']);
+    expect(ordered.map((entry) => entry.acquisitionId)).toEqual(['acq-a', 'acq-b']);
   });
 
   it('sinks acquisitions whose request time an older producer never stated', () => {

@@ -162,6 +162,21 @@ describe('acquisitionStatusResponseSchema', () => {
     expect(parsed.requestedAt).toBe('2026-01-01T00:00:00Z');
   });
 
+  it('rejects a requestedAt that is not an instant', () => {
+    // The field is an ISO-8601 instant, not free text: consumers order the queue by comparing
+    // these strings, which is only chronological while the format holds.
+    const base = {
+      acquisitionId: 'acq-1',
+      status: 'Pending',
+      attempts: 0,
+      rejectedCount: 0,
+      history: [],
+    };
+    expect(
+      acquisitionStatusResponseSchema.safeParse({ ...base, requestedAt: 'yesterday' }).success,
+    ).toBe(false);
+  });
+
   it('accepts the additive stalled flag and its absence (reactor-durability D2)', () => {
     const base = {
       acquisitionId: 'acq-1',

@@ -24,8 +24,10 @@
   </section>
   <div class="detail">
     {#if data.detailActive}
-      <!-- Shown only where the queue itself is hidden (base.css): the way back to the list when
-           it is off-screen. Browser back covers the same ground, but users mid-task distrust it. -->
+      <!-- Shown only where the queue itself is hidden (base.css): the way back to the list when it
+           is off screen. Browser back covers an in-app hop (every pane state is a real URL) but not
+           a deep link, where there is no in-app history to return to — and users mid-task distrust
+           it either way (research doc §3, GOV.UK). -->
       <a class="back-to-queue" href="/acquisitions" data-testid="back-to-queue">Back to queue</a>
     {/if}
     {@render children()}

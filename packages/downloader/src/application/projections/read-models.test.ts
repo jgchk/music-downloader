@@ -62,16 +62,23 @@ const history: AcquisitionEvent[] = [
 
 // StoredEvent rows built directly — the earlier fake-store detour discarded append's
 // ResultAsync and worked only because the fake mutates synchronously (S3 review sweep).
-function stored(events: readonly AcquisitionEvent[]): readonly StoredEvent[] {
+function stored(
+  events: readonly AcquisitionEvent[],
+  occurredAt: (index: number) => string = () => 't',
+): readonly StoredEvent[] {
   return events.map((event, index) => ({
     globalSeq: index + 1,
     streamId: 'acq-1',
     version: index + 1,
     type: event.type,
     event,
-    metadata: { acquisitionId: 'acq-1', occurredAt: 't' },
+    metadata: { acquisitionId: 'acq-1', occurredAt: occurredAt(index) },
   }));
 }
+
+/** Successive whole minutes, in the millisecond precision `Date.toISOString()` actually emits. */
+const minuteApart = (index: number): string =>
+  new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString();
 
 describe('projectStatus', () => {
   it('summarizes state and attempt history from the log', () => {
@@ -274,18 +281,9 @@ describe('projectStatus — requested target exposure', () => {
 });
 
 describe('projectStatus — when the acquisition was requested', () => {
-  // Built inline rather than via `stored` so the events carry distinct occurrence times: the
-  // point of these cases is which one requestedAt takes.
-  function storedAt(events: readonly AcquisitionEvent[]): readonly StoredEvent[] {
-    return events.map((event, index) => ({
-      globalSeq: index + 1,
-      streamId: 'acq-1',
-      version: index + 1,
-      type: event.type,
-      event,
-      metadata: { acquisitionId: 'acq-1', occurredAt: `2026-01-01T00:00:0${index}Z` },
-    }));
-  }
+  // Distinct per-event times, so these cases can say WHICH event's time is taken — the shared
+  // `stored` builder stamps every entry with the same 't' and cannot express the distinction.
+  const storedAt = (events: readonly AcquisitionEvent[]) => stored(events, minuteApart);
 
   it('reports the time the request was recorded', () => {
     const view = projectStatus(
@@ -294,7 +292,7 @@ describe('projectStatus — when the acquisition was requested', () => {
         { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
       ]),
     );
-    expect(view.requestedAt).toBe('2026-01-01T00:00:00Z');
+    expect(view.requestedAt).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('keeps reporting the original request time as the acquisition progresses', () => {
@@ -306,7 +304,25 @@ describe('projectStatus — when the acquisition was requested', () => {
         { type: 'CandidateSelected', candidate: a },
       ]),
     );
-    expect(view.requestedAt).toBe('2026-01-01T00:00:00Z');
+    expect(view.requestedAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it("takes the request event's own time, not whichever event happens to be stored first", () => {
+    // A stream whose head is something other than the request — what a repaired or upcast stream
+    // could look like. Reading position instead of the event would report the wrong instant.
+    const view = projectStatus(
+      'acq-1',
+      storedAt([
+        { type: 'TargetResolved', target: sampleTarget },
+        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+      ]),
+    );
+    expect(view.requestedAt).toBe('2026-01-01T00:01:00.000Z');
+  });
+
+  it('states no request time for a stream that records no request', () => {
+    const view = projectStatus('acq-1', storedAt([{ type: 'CandidateSelected', candidate: a }]));
+    expect(view.requestedAt).toBeUndefined();
   });
 });
 
