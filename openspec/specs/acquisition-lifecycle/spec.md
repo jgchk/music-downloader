@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Govern the autonomous lifecycle of an acquisition: from accepting a musical intent, through the strictly sequential "next best version" walk over ranked candidates, bounded re-search, and terminal outcomes (fulfilled, exhausted, cancelled). Ensures processing is durable across restarts and rejects stale external outcomes.
+Govern the autonomous lifecycle of an acquisition (the domain calls the whole saga a download — see `CONTEXT-MAP.md`; "acquisition" is retained here as the code and wire name): from accepting a download request, through the strictly sequential next-best-candidate walk over ranked candidates, bounded re-search, and terminal outcomes (fulfilled, exhausted, cancelled). Ensures processing is durable across restarts and rejects stale external outcomes.
 ## Requirements
-### Requirement: Submitting a musical intent starts an acquisition
+### Requirement: Submitting a download request starts an acquisition
 The system SHALL accept a musical request together with optional quality, match, retry, and download policies, and SHALL begin an autonomous acquisition that runs to a terminal outcome without further user interaction.
 
 #### Scenario: A new request is accepted
@@ -14,7 +14,7 @@ The system SHALL accept a musical request together with optional quality, match,
 - **AND** unspecified policies fall back to configured defaults
 
 ### Requirement: Candidates are attempted one at a time
-The system SHALL attempt at most one candidate download at a time for a given acquisition, in ranked order, so that "next best version" is a strict sequential walk.
+The system SHALL attempt at most one candidate download at a time for a given acquisition, in ranked order, so that the next-best-candidate walk is strictly sequential.
 
 #### Scenario: Only one download is in flight
 - **GIVEN** an acquisition with a ranked list of candidates
@@ -45,7 +45,7 @@ The system SHALL, when no candidates remain and the retry policy budget is not s
 
 ### Requirement: An acquisition is exhausted when options and budget run out
 
-The system SHALL mark an acquisition as exhausted only when the working set is empty and the retry policy budget is spent — no search rounds remain, or the total-attempt budget is consumed. A search round that yields no usable candidates SHALL NOT by itself exhaust the acquisition while search rounds remain: it spends its round and triggers a fresh search round, including when it is the first round.
+The system SHALL mark an acquisition as exhausted when the total-attempt budget is consumed (regardless of any candidates remaining in the working set), or when the working set is empty and no search rounds remain. A search round that yields no usable candidates SHALL NOT by itself exhaust the acquisition while search rounds remain: it spends its round and triggers a fresh search round, including when it is the first round.
 
 #### Scenario: An empty first round triggers a re-search, not exhaustion
 

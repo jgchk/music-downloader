@@ -11,20 +11,20 @@ Adopted from the music-importer repo (capability of the importer module). The sy
 
 #### Scenario: A confident match imports without human action
 
-- **GIVEN** a directory of files whose best candidate scores a strong match
+- **GIVEN** a directory of files whose best metadata match scores strongly
 - **WHEN** the import is submitted
-- **THEN** the candidate is applied through beets and the import reaches `applied` with no human involvement
-- **AND** the event history records the proposal, the winning candidate, and the applied outcome
+- **THEN** the match is applied through beets and the import reaches `applied` with no human involvement
+- **AND** the event history records the proposal, the selected match, and the applied outcome
 
 #### Scenario: History explains a human decision
 
-- **GIVEN** an import that required review and was resolved by choosing a candidate
+- **GIVEN** an import that required review and was resolved by choosing a match
 - **WHEN** the import's history is read
 - **THEN** it shows why review was required (the kind and carried detail) and which resolution the user chose
 
 ### Requirement: Submission is idempotent and hints aid matching without overriding it
 
-The system SHALL accept an import submission as a directory path plus optional hints (a MusicBrainz release ID, artist/album strings). Resubmitting the same directory while its import is live SHALL NOT create a second import. Hints SHALL pin the candidate search, but match confidence SHALL still govern the verdict: a hinted candidate with a failing distance routes to review carrying the specific mismatch rather than auto-applying.
+The system SHALL accept an import submission as a directory path plus optional hints (a MusicBrainz release ID, artist/album strings). Resubmitting the same directory while its import is live SHALL NOT create a second import. Hints SHALL pin the metadata search, but distance SHALL still govern the verdict: a hinted match with a failing distance routes to review carrying the specific mismatch rather than auto-applying.
 
 #### Scenario: A duplicate submission converges
 
@@ -36,7 +36,7 @@ The system SHALL accept an import submission as a directory path plus optional h
 
 - **GIVEN** a submission hinted with a MusicBrainz release ID whose files are missing a track
 - **WHEN** the proposal completes
-- **THEN** the import lands in review with the hinted candidate's penalty detail (the missing track) attached
+- **THEN** the import lands in review with the hinted match's penalty detail (the missing track) attached
 - **AND** the user may apply it anyway or reject it
 
 ### Requirement: A partial apply failure lands applied with remediation, never failed
@@ -52,7 +52,7 @@ When beets has moved files into the library but a post-move step (plugin enrichm
 
 ### Requirement: A fulfilled acquisition submits an import idempotently through the native path
 
-The system SHALL translate each `acquisition.fulfilled` event consumed from the downloader module's stream (via the cross-module subscription seam) into the same native submission the manual path uses: the sender-namespaced `location` re-rooted from the configured source root (`INTAKE_SOURCE_ROOT`) onto the intake root, with the event's MusicBrainz release id (when present) passed as the pinning hint and the target's artist/title as auxiliary hints. The event SHALL be read tolerantly through the importer's own consumer-owned schema and translated through an anti-corruption layer into the native command. The acquisition id SHALL be recorded on the resulting `ImportRequested` event, together with the delivered candidate's identity when the event carries one — read tolerantly, so a delivery without a usable candidate still submits normally and simply yields an import that cannot emit a release verdict.
+The system SHALL translate each `acquisition.fulfilled` event consumed from the downloader module's stream (via the cross-module subscription seam) into the same native submission the manual path uses: the sender-namespaced `location` re-rooted from the configured source root (`INTAKE_SOURCE_ROOT`) onto the intake root, with the event's MusicBrainz release id (when present) passed as the pinning hint and the target's artist/title as auxiliary hints. The event SHALL be read tolerantly through the importer's own consumer-owned schema and translated through an anti-corruption layer into the native command. The acquisition id SHALL be recorded on the resulting `ImportRequested` event, together with the delivered copy's identity when the event carries one — read tolerantly, so a delivery without a usable copy still submits normally and simply yields an import that cannot emit a release verdict.
 
 Convergence SHALL key on the delivery's position in the seam feed, recorded on each seam-driven cycle and folded into a stream-level watermark (the highest position any cycle ever recorded, surviving manual resubmissions of the same directory): a delivery at or before the watermark is a redelivery and SHALL converge as an acknowledged no-op — durably, across restarts, so a full feed replay creates no duplicate import — while a delivery past the watermark is a genuinely new delivery (the revival loop's replacement after a rejected delivery) and SHALL submit a fresh import cycle. A new delivery that arrives while the stream's current cycle has not yet settled SHALL be held as a retryable failure (never acknowledged), so redelivery lands it once the cycle settles; the domain decider SHALL itself refuse (as a modeled error) a new delivery against an in-flight cycle and converge stale positions on settled terminals, so no caller can duplicate or drop a delivery around the consumer. For a stream whose seam-sourced history predates the watermark the consumer SHALL converge deliveries as before — announcing the convergence in an operator-visible log naming the acquisition and the remediation, since it is the one path that can drop a genuine replacement.
 
@@ -65,17 +65,17 @@ An event whose location falls outside the source root SHALL be rejected; an even
 - **THEN** an import is submitted for the re-rooted directory with the event's MusicBrainz release id as the search hint
 - **AND** the import proceeds through the normal propose → auto-apply/review lifecycle
 
-#### Scenario: The delivered candidate's identity is retained
+#### Scenario: The delivered copy's identity is retained
 
-- **GIVEN** an `acquisition.fulfilled` event whose payload carries the winning candidate's identity
+- **GIVEN** an `acquisition.fulfilled` event whose payload carries the delivered copy's identity (the payload's `candidate`)
 - **WHEN** the import is submitted
-- **THEN** the candidate identity is recorded beside the acquisition id, available to a later release verdict
+- **THEN** the delivered copy is recorded beside the acquisition id, available to a later release verdict
 
-#### Scenario: A candidate-less delivery still imports
+#### Scenario: A delivery without a copy identity still imports
 
-- **GIVEN** an event whose payload lacks a readable candidate
+- **GIVEN** an event whose payload lacks a readable `candidate` (the delivered copy)
 - **WHEN** the import is submitted
-- **THEN** submission proceeds normally without a retained candidate
+- **THEN** submission proceeds normally without a retained delivered copy
 
 #### Scenario: Redelivery converges without a duplicate import — even after the import applied
 
@@ -182,5 +182,5 @@ conservatively to unsettled.
 
 #### Scenario: An in-flight import reports itself unsettled
 
-- **WHEN** the status of an import that is matching, awaiting review, or applying is read
+- **WHEN** the status of an import that is proposing, awaiting review, or applying is read
 - **THEN** the view carries `settled: false`

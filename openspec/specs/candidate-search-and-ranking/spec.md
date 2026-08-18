@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define how configured sources are searched for a target, how candidates are scored for match confidence, gated by quality and match policy, ranked lexicographically, and how fresh search rounds merge with untried candidates while excluding rejected ones.
+Define how configured sources are searched for a target, how candidates are scored for match confidence, gated by quality and match policy, ranked lexicographically, and how fresh search rounds admit candidates while excluding rejected ones.
 
 ## Requirements
 
@@ -56,8 +56,8 @@ The system SHALL rank the candidates that pass both gates by quality bucket firs
 - **WHEN** they are ranked
 - **THEN** the candidate from the faster, more-available source ranks higher
 
-### Requirement: Re-search merges fresh candidates with untried ones
-The system SHALL, on a fresh search round, merge newly-found candidates with any untried candidates from prior rounds, exclude previously-rejected candidates by stable identity, and re-rank the union.
+### Requirement: Re-search admits fresh candidates and excludes rejected ones
+A fresh search round fires only once the working set is empty, so its results are the whole working picture. The system SHALL, on a fresh search round, dedupe the incoming candidates by stable identity, exclude previously-rejected candidates by stable identity, and rank the remainder.
 
 #### Scenario: A newly-online peer is incorporated
 - **GIVEN** an acquisition that re-searches after exhausting its earlier candidates
