@@ -48,12 +48,12 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
   if (size === undefined || !isEntity(entity) || !isMbidShaped(mbid)) {
     // A failed cover now renders as its placeholder rather than the browser's broken-image mark,
     // so a refusal is invisible to the person looking at the page and this line is the only sign
-    // of it left. Which line depends on who could have built the URL: an identifier the catalog
-    // would recognise, refused over its kind or its size, is a URL only this application
-    // constructs — a first-party defect, and `warn`, because `debug` is off in production and
-    // that is exactly where every cover silently blanking would go unnoticed. Anything else is
-    // someone poking at the address bar, which must not be able to fill the warn stream. Both
-    // echo the path fields clipped, since the values came from outside.
+    // of it left. `warn`, not `debug`, because debug is off in production and that is exactly
+    // where every cover silently blanking would go unnoticed — but only for a request that at
+    // least LOOKS like one this application builds. An identifier of no known shape is somebody
+    // at the address bar; that goes to debug, so the cheapest junk cannot bury the signal. This
+    // is a shape check, not a catalog lookup: a well-formed identifier for nothing in particular
+    // still reaches the warn line. Both echo the path fields clipped, the values being foreign.
     const refused = {
       entity: clipped(entity),
       mbid: clipped(mbid),

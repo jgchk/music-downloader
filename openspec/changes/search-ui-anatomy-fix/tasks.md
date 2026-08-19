@@ -8,16 +8,21 @@ regression lives in.
 
 - [x] 1.1 Browser-mode geometry tests (red first), parameterized over every shipped skin hook:
       the album card's artwork slot is square and non-zero before any image loads; a
-      long-titled card's title box does not exceed its card; a track row's thumb, text, and
-      request action lay out horizontally; `.linkish` computes without background, border, or
-      shadow; the detail view's side-panel width lands within the 340px floor and its ceiling
+      long-titled card clips its title rather than painting it across its neighbours; a track
+      row's thumb, text, and request action lay out horizontally; `.linkish` and the tracklist
+      disclosure compute as the skin's accent link; the artist bubble keeps its own centred
+      footprint; the detail view's side-panel width holds its 340px floor and the share of the
+      window it is allowed — the last two proven against a stand-in skin that would otherwise
+      break them, since at the shipped widths neither bound can bind
 
 ## 2. The chrome inversion
 
 - [x] 2.1 Demote bare `button` to a minimal reset in `base.css` (font/color inherit, no chrome,
       cursor, focus outline untouched — never `all: unset`); move all widget chrome to `.btn`
-- [x] 2.2 Sweep every real push button in `packages/web/src` onto `.btn` (most already carry it);
-      the SSR/browser suites re-run green with buttons still styled
+- [x] 2.2 Sweep every real push button in `packages/web/src` onto `.btn` (most already carry it),
+      and pin the sweep: a markup scan asserts every `<button>` declares its kind — the widget
+      class or one of the named plain kinds — because since the inversion a forgotten `.btn`
+      ships as unstyled text and nothing else would notice
 - [x] 2.3 Declare `@layer reset, base, theme` at the head of EVERY stylesheet, not once: layer
       order is fixed by first appearance, so one declaration would silently make the layout's
       import order load-bearing. Move the base and token rules into their layers; wrap each skin

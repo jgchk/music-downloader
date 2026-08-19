@@ -37,11 +37,21 @@ const SKIN_ROWS: [label: string, skin: string | undefined][] = [
 /** How much of its card the artwork must fill before the slot counts as collapsed. */
 const ART_FILLS_ITS_CARD = 0.8;
 /** How much of the panel's width the detail cover must fill before it counts as collapsed. */
-const ART_FILLS_THE_PANEL = 0.5;
+const ART_FILLS_THE_PANEL = 0.75;
 /** How tall a track row may get, in thumbnails, before it has plainly stacked into a column. */
 const ROW_IS_STACKED_ABOVE = 3;
 /** The share of a window the panel may take. */
 const PANEL_WINDOW_SHARE = 0.75;
+/** What the active skin paints a link in — resolved from the token, not restated per skin. */
+function accentColour(): string {
+  const probe = document.createElement('span');
+  probe.style.color = 'var(--accent)';
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).color;
+  probe.remove();
+
+  return colour;
+}
 /** The width token's floor, restated from `tokens.css` so a drift reads as one. */
 const READABLE_FLOOR_PX = 340;
 /** The token's preferred width, in rem — what the panel gets when the window has room for it. */
@@ -185,17 +195,26 @@ describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) =>
     expect(Math.abs(art.height - art.width)).toBeLessThanOrEqual(1);
   });
 
-  it('keeps a long title inside the card it belongs to', async () => {
+  it('clips a long title rather than painting it across its neighbours', async () => {
     wearing(skin);
     await wideViewport();
     await render(CatalogResults, resultProps());
 
-    const card = boxOf('.art-grid > .result');
-    const title = boxOf('.art-grid .result-title');
+    const title = document.querySelector('.art-grid .result-title');
+    if (title === null) {
+      throw new Error('no result title rendered');
+    }
 
-    // Unclipped, the title paints across its neighbours — the card is what bounds it.
-    expect(title.width).toBeLessThanOrEqual(card.width);
-    expect(title.right).toBeLessThanOrEqual(card.right + 1);
+    // Measured, not inferred: a box cannot see overflowing INK. The title's rect is stretched to
+    // its card whether or not it clips, so the fact worth asserting is that there is more text
+    // than fits AND that the surplus is cut off rather than painted over the next card.
+    expect(title.scrollWidth).toBeGreaterThan(title.clientWidth);
+    const style = getComputedStyle(title);
+    expect(style.overflow).toBe('hidden');
+    expect(style.textOverflow).toBe('ellipsis');
+    expect(boxOf('.art-grid .result-title').right).toBeLessThanOrEqual(
+      boxOf('.art-grid > .result').right + 1,
+    );
   });
 
   it('lays a track row out as a row', async () => {
@@ -217,6 +236,27 @@ describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) =>
     expect(row.height).toBeLessThan(thumb.height * ROW_IS_STACKED_ABOVE);
   });
 
+  it('gives the artist result a round bubble rather than a card-wide square', async () => {
+    wearing(skin);
+    await wideViewport();
+    await render(CatalogResults, resultProps());
+
+    const bubble = document.querySelector('.artist-row .art');
+    if (bubble === null) {
+      throw new Error('no artist result rendered');
+    }
+
+    const box = bubble.getBoundingClientRect();
+    const card = boxOf('.artist-row > .result');
+
+    // The footprint is how an artist is told from an album at a glance: a centred bubble rather
+    // than the card-wide square an album wears. Roundness is left to each skin — the forum skin
+    // squares it deliberately, and that is a look, not a break.
+    expect(box.width).toBeLessThan(card.width);
+    expect(Math.abs(box.height - box.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(box.left - card.left - (card.right - box.right))).toBeLessThanOrEqual(1);
+  });
+
   it('renders a link-affordance as a link, not as a raised button', async () => {
     wearing(skin);
     await wideViewport();
@@ -235,8 +275,26 @@ describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) =>
     expect(style.borderTopWidth).toBe('0px');
     expect(style.boxShadow).toBe('none');
     expect(style.cursor).toBe('pointer');
-    // It has to read as a link: the surrounding prose colour would make it invisible as one.
-    expect(style.color).not.toBe(getComputedStyle(document.body).color);
+    // Positively the accent, not merely "different from the body": the paragraph around it is
+    // already muted, so comparing against body text passes with `.linkish` styled by nothing.
+    expect(style.color).toBe(accentColour());
+    expect(style.color).not.toBe(getComputedStyle(link.parentElement ?? link).color);
+  });
+
+  it('renders the tracklist disclosure as a link too', async () => {
+    wearing(skin);
+    await wideViewport();
+    await render(CatalogDetail, detailProps(albumDetail()));
+
+    const disclosure = document.querySelector('.tracklist-open');
+    if (disclosure === null) {
+      throw new Error('the tracklist disclosure did not render');
+    }
+
+    const style = getComputedStyle(disclosure);
+    expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(style.borderTopWidth).toBe('0px');
+    expect(style.color).toBe(accentColour());
   });
 
   it('opens the detail view at a readable width', async () => {
