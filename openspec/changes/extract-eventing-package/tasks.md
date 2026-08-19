@@ -30,16 +30,16 @@ Two-commit shape (design D7): groups 1–5 are commit 1 (`checkpointedDrain`), g
 
 ## 6. Correlation mechanics, test-first (commit 2)
 
-- [ ] 6.1 Port the correlation suites (context, correlation-id, envelope attach/parse) into `packages/eventing` as one suite over `createCorrelation({contextName})`
-- [ ] 6.2 Implement the shared correlation module: mint, adopt-vs-mint, causation chaining, branded `CorrelationId`, envelope schema — no module name in source, identity as an opaque parameter
+- [x] 6.1 Port the correlation suites (context, correlation-id, envelope attach/parse) into `packages/eventing` as one suite over `createCorrelation({contextName})`
+- [x] 6.2 Implement the shared correlation module: mint, adopt-vs-mint, causation chaining, branded `CorrelationId`, envelope schema — no module name in source, identity as an opaque parameter
 
 ## 7. Contexts consume correlation
 
-- [ ] 7.1 Switch both contexts' `application/correlation/*` and their fixtures to the shared module; facades keep taking plain `StoryId` strings
-- [ ] 7.2 Delete the string-equality describe block in `test/boundaries/correlation.test.ts` and the per-context correlation duplicates it pinned
+- [x] 7.1 Switch both contexts' `application/correlation/*` and their fixtures to the shared module; facades keep taking plain `StoryId` strings
+- [x] 7.2 Delete the string-equality describe block in `test/boundaries/correlation.test.ts` and the per-context correlation duplicates it pinned
 
 ## 8. Docs and close-out
 
-- [ ] 8.1 Update `CONTEXT-MAP.md`: seam vocabulary gains **checkpointed drain**, poison policy reads halt-only, the no-shared-kernel sentence becomes no-shared-model with a pointer to `packages/eventing`
-- [ ] 8.2 Annotate the archived decisions — merge-modular-monolith D1/D7 (incl. the drifted Marten citation) and end-to-end-correlation D13 — pointing at this change's design; cross-link `docs/research/poison-event-halt-vs-park.md`
-- [ ] 8.3 File the D8 drift issues (4 reactor items + the `stalled-work-recovery` D1 parity assumption), full gate green, commit 2, then validate and ready the change for archive
+- [x] 8.1 Update `CONTEXT-MAP.md`: seam vocabulary gains **checkpointed drain**, poison policy reads halt-only, the no-shared-kernel sentence becomes no-shared-model with a pointer to `packages/eventing`
+- [x] 8.2 Annotate the archived decisions — merge-modular-monolith D1/D7 (incl. the drifted Marten citation) and end-to-end-correlation D13 — pointing at this change's design; cross-link `docs/research/poison-event-halt-vs-park.md`
+- [x] 8.3 File the D8 drift issues (filed as #190-#194), full gate green, commit 2, then validate and ready the change for archive

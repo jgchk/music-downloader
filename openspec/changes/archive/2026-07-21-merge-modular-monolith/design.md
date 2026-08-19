@@ -25,6 +25,11 @@ Two sibling event-sourced services share one constitution, one machine, and a tw
 
 ### D1 — Workspace shape: two context packages, interface packages above, no shared kernel
 
+> **Amended by `extract-eventing-package` (2026-08-18).** The rule now reads "no shared MODEL". This
+> decision's reasoning — every shared *type* is a coupling point that makes extraction
+> non-mechanical — stands and is unchanged. What it never covered is generic mechanism carrying no
+> context's language, which now lives in `packages/eventing` as a lint-guarded leaf.
+
 pnpm workspace: `packages/downloader` and `packages/importer` (each with its own `domain/application/adapters` layers and its own SQLite store), `packages/web` (SvelteKit BFF), and a composition entry that wires everything. No shared package; small types are duplicated rather than coupled. *Alternative considered:* a `shared-kernel` package for IDs/paths — rejected; every shared type is a coupling point that makes extraction non-mechanical, and the duplication cost observed at the current seam is near zero.
 
 ### D2 — Module facades are wire-shaped and are the only legal import from interfaces
@@ -48,6 +53,14 @@ After the producer's transaction commits, it fires an in-process wakeup (EventEm
 Cross-SQLite-file atomicity is impossible under WAL (per SQLite's own ATTACH docs), so no design step may require it. Discipline: producer commits to file A; consumer later commits effects+checkpoint to file B; the checkpoint is the only cross-file coordination and it always lags, never leads — worst case is redelivery, absorbed by the idempotent deciders. Never ATTACH the two files into one connection. Connection settings on both: WAL, `busy_timeout` 5–10s, `synchronous=NORMAL`, short transactions, one connection per purpose.
 
 ### D7 — Poison events: bounded retries, then per-subscription park-or-halt
+
+> **Superseded by `extract-eventing-package` D4 (2026-08-18): halt only.** `park` never had a
+> production caller. Two corrections to the record below. (1) The Marten precedent has drifted —
+> Marten has since deleted the configurable policy palette this decision mirrored, in favour of a
+> much smaller surface, so the citation now argues for consolidating the policy set, not keeping it.
+> (2) The field sorts by consumer profile, not taste: park-by-default systems are rebuildable-
+> projection or order-disclaimed consumers, which this seam is not. Evidence and the non-adopted
+> per-stream-park upgrade path: `docs/research/poison-event-halt-vs-park.md`.
 
 Bounded in-place retries with backoff; on exhaustion, the subscription's declared policy decides: **halt** (stop that subscription, alert — correct where order is workflow-critical, e.g. verdict intake) or **park** (dead-letter row in the consumer's file with position + error, advance past — progress over order). Policy is explicit configuration per subscription, mirroring Marten's configurable error handling rather than an implicit default.
 
