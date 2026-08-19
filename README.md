@@ -6,7 +6,7 @@ across pluggable sources, exposed over HTTP and MCP.
 
 The architecture, principles, and rationale live in [`CLAUDE.md`](CLAUDE.md) and
 [`docs/development/`](docs/development); the capability specs and design decisions live in
-[`openspec/changes/bootstrap-acquisition-core/`](openspec/changes/bootstrap-acquisition-core).
+[`openspec/specs/`](openspec/specs).
 
 ## How it works
 
@@ -134,7 +134,7 @@ Both surfaces map onto the same application use-cases and derive from one shared
 **MCP** — tools `submit_acquisition` / `cancel_acquisition`; resources `md://acquisitions`,
 `md://acquisitions/{id}`, `md://acquisitions/{id}/progress`. Served over the **streamable HTTP**
 transport by the same server at `POST /mcp` (i.e. `http://<HTTP_HOST>:<HTTP_PORT>/mcp`), so HTTP and
-MCP clients share one process and one set of acquisitions. Point an MCP client at that URL:
+MCP clients share one process and one set of downloads. Point an MCP client at that URL:
 
 ```jsonc
 { "mcpServers": { "music-downloader": { "url": "http://localhost:3000/mcp" } } }
