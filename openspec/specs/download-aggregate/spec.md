@@ -1,36 +1,36 @@
-# acquisition-aggregate Specification
+# download-aggregate Specification
 
 ## Purpose
 
-Define the encapsulation boundary of the acquisition domain: its decision logic (the functional decide/evolve/react decider and the folded state) is a private engine wrapped behind a single pure, immutable `Acquisition` aggregate facade. Every other layer interacts with acquisition behavior only through that facade, while commands, events, domain errors, effects, and phase remain the public contract.
+Define the encapsulation boundary of the download domain: its decision logic (the functional decide/evolve/react decider and the folded state) is a private engine wrapped behind a single pure, immutable `Download` aggregate facade. Every other layer interacts with download behavior only through that facade, while commands, events, domain errors, effects, and phase remain the public contract.
 ## Requirements
-### Requirement: The Acquisition aggregate is the sole entry point to acquisition decision logic
-The domain SHALL expose acquisition decision logic exclusively through an `Acquisition` aggregate facade providing rehydration from history, command execution, and event reaction. Code outside the domain's acquisition module MUST NOT be able to import the decider internals (the state shape, initial state, fold, decision function, or reaction function); such an import SHALL fail the lint gate and therefore CI.
+### Requirement: The Download aggregate is the sole entry point to download decision logic
+The domain SHALL expose download decision logic exclusively through an `Download` aggregate facade providing rehydration from history, command execution, and event reaction. Code outside the domain's download module MUST NOT be able to import the decider internals (the state shape, initial state, fold, decision function, or reaction function); such an import SHALL fail the lint gate and therefore CI.
 
 #### Scenario: Application code rehydrates and executes through the aggregate
-- **WHEN** the command handler processes a command for an acquisition with a stored event history
+- **WHEN** the command handler processes a command for a download with a stored event history
 - **THEN** it rehydrates via the aggregate's from-history constructor and obtains resulting events (or a domain error) from the aggregate's execute method, without touching the fold or decision functions directly
 
 #### Scenario: The reactor obtains effects through the aggregate
-- **WHEN** the reactor processes a stored event for an acquisition
+- **WHEN** the reactor processes a stored event for a download
 - **THEN** it obtains the event's effects from the aggregate's react method, without folding state or calling the reaction function directly
 
 #### Scenario: An out-of-boundary import of decider internals is rejected
-- **WHEN** a module outside the domain's acquisition module imports the state module or the decision function
+- **WHEN** a module outside the domain's download module imports the state module or the decision function
 - **THEN** the lint gate fails the build
 
 ### Requirement: The aggregate is pure and immutable
-The `Acquisition` aggregate SHALL perform no I/O, no logging, and no observable mutation: executing a command SHALL return the resulting events as a value (or a domain error as a value) and SHALL NOT change the aggregate instance.
+The `Download` aggregate SHALL perform no I/O, no logging, and no observable mutation: executing a command SHALL return the resulting events as a value (or a domain error as a value) and SHALL NOT change the aggregate instance.
 
 #### Scenario: Execute is repeatable on the same instance
 - **WHEN** the same command is executed twice on the same rehydrated aggregate instance
 - **THEN** both calls return the same result and the aggregate's observable properties are unchanged
 
 ### Requirement: Commands, events, domain errors, effects, and phase remain the public contract
-The domain SHALL keep acquisition commands, acquisition events, domain errors, effect descriptions, and the acquisition phase publicly importable, and the aggregate SHALL expose the current phase and whether the acquisition is terminal.
+The domain SHALL keep download commands, download events, domain errors, effect descriptions, and the download phase publicly importable, and the aggregate SHALL expose the current phase and whether the download is terminal.
 
 #### Scenario: A projection derives the phase through the aggregate
-- **WHEN** a read model needs an acquisition's current phase for a status view
+- **WHEN** a read model needs a download's current phase for a status view
 - **THEN** it rehydrates the aggregate from the event history and reads the phase property, without access to the rest of the internal state
 
 ### Requirement: Aggregate behavior is identical to the wrapped decider
@@ -45,7 +45,7 @@ Rehydration SHALL be the existing fold over events, execution SHALL be the exist
 - **THEN** all scenarios pass without modification to their assertions
 
 ### Requirement: Rehydration is a total, tolerant fold
-Rehydrating an acquisition from its event history SHALL be a total fold: it SHALL never throw and SHALL never produce a state whose data is inconsistent with its phase. An event that does not fit the phase the history has reached (possible only for corrupted or externally edited histories, since the decision function is the sole event producer) SHALL be ignored — the fold returns the prior state unchanged — so that the stream remains foldable and a compensating event can still take effect. Protocol violations SHALL surface as typed domain errors on the next command executed against the folded state, not during rehydration.
+Rehydrating a download from its event history SHALL be a total fold: it SHALL never throw and SHALL never produce a state whose data is inconsistent with its phase. An event that does not fit the phase the history has reached (possible only for corrupted or externally edited histories, since the decision function is the sole event producer) SHALL be ignored — the fold returns the prior state unchanged — so that the stream remains foldable and a compensating event can still take effect. Protocol violations SHALL surface as typed domain errors on the next command executed against the folded state, not during rehydration.
 
 #### Scenario: An out-of-protocol event is ignored during replay
 - **WHEN** a history containing an event that is illegal for the phase reached at that point (for example, a download completion before any candidate was selected) is folded
@@ -56,11 +56,11 @@ Rehydrating an acquisition from its event history SHALL be a total fold: it SHAL
 - **THEN** execution returns an illegal-transition domain error as a value
 
 #### Scenario: Every event type is ignored by every non-matching phase
-- **WHEN** each acquisition event type is applied, in isolation, to a state in each phase that is not a legal source phase for that event
+- **WHEN** each download event type is applied, in isolation, to a state in each phase that is not a legal source phase for that event
 - **THEN** the fold returns the input state unchanged in every combination
 
 ### Requirement: Reactions are computed against the state as of the event
-When the system reacts to a stored event, the effects SHALL be computed against the acquisition state folded from the stream prefix up to and including that event — never from events recorded after it. Reaction is therefore a deterministic function of the stream prefix: reacting to the same event of the same stream SHALL yield the same effects at first delivery, at redelivery, and during replay, regardless of how far the stream has since advanced.
+When the system reacts to a stored event, the effects SHALL be computed against the download state folded from the stream prefix up to and including that event — never from events recorded after it. Reaction is therefore a deterministic function of the stream prefix: reacting to the same event of the same stream SHALL yield the same effects at first delivery, at redelivery, and during replay, regardless of how far the stream has since advanced.
 
 #### Scenario: A non-final co-emitted event reacts against its own post-state
 - **WHEN** a decision co-emits an import event together with its fulfilment event, and the reactor reacts to the import event

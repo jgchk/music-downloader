@@ -28,7 +28,7 @@ export class UpcasterRegistry {
   /** Register the upcaster that lifts `type` events from `fromVersion` to the next version. */
   /** The stored tokens this registry has steps for — the seam's tests assert they are real. */
   registeredTypes(): readonly string[] {
-    return [...this.upcasters.keys()];
+    return this.upcasters.keys().toArray();
   }
 
   register(type: string, fromVersion: number, upcaster: Upcaster): this {

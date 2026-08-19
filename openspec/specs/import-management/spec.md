@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Govern the event-sourced import lifecycle of the importer module: submitted directories move through propose, auto-apply or review, to applied or rejected, driven by beets, with fulfilled acquisitions entering idempotently over the cross-module subscription seam. Adopted from the music-importer repo at the modular-monolith merge.
+Govern the event-sourced import lifecycle of the importer module: submitted directories move through propose, auto-apply or review, to applied or rejected, driven by beets, with fulfilled downloads entering idempotently over the cross-module subscription seam. Adopted from the music-importer repo at the modular-monolith merge.
 
 ## Requirements
 ### Requirement: An import is an event-sourced process over a submitted directory
@@ -50,11 +50,11 @@ When beets has moved files into the library but a post-move step (plugin enrichm
 - **THEN** the import is `applied` and a remediation item carries the failed step
 - **AND** resolving the item as accepted closes it without touching the library
 
-### Requirement: A fulfilled acquisition submits an import idempotently through the native path
+### Requirement: A fulfilled download submits an import idempotently through the native path
 
-The system SHALL translate each `acquisition.fulfilled` event consumed from the downloader module's stream (via the cross-module subscription seam) into the same native submission the manual path uses: the sender-namespaced `location` re-rooted from the configured source root (`INTAKE_SOURCE_ROOT`) onto the intake root, with the event's MusicBrainz release id (when present) passed as the pinning hint and the target's artist/title as auxiliary hints. The event SHALL be read tolerantly through the importer's own consumer-owned schema and translated through an anti-corruption layer into the native command. The acquisition id SHALL be recorded on the resulting `ImportRequested` event, together with the delivered copy's identity when the event carries one — read tolerantly, so a delivery without a usable copy still submits normally and simply yields an import that cannot emit a release verdict.
+The system SHALL translate each `acquisition.fulfilled` event consumed from the downloader module's stream (via the cross-module subscription seam) into the same native submission the manual path uses: the sender-namespaced `location` re-rooted from the configured source root (`INTAKE_SOURCE_ROOT`) onto the intake root, with the event's MusicBrainz release id (when present) passed as the pinning hint and the target's artist/title as auxiliary hints. The event SHALL be read tolerantly through the importer's own consumer-owned schema and translated through an anti-corruption layer into the native command. The download id SHALL be recorded on the resulting `ImportRequested` event, together with the delivered copy's identity when the event carries one — read tolerantly, so a delivery without a usable copy still submits normally and simply yields an import that cannot emit a release verdict.
 
-Convergence SHALL key on the delivery's position in the seam feed, recorded on each seam-driven cycle and folded into a stream-level watermark (the highest position any cycle ever recorded, surviving manual resubmissions of the same directory): a delivery at or before the watermark is a redelivery and SHALL converge as an acknowledged no-op — durably, across restarts, so a full feed replay creates no duplicate import — while a delivery past the watermark is a genuinely new delivery (the revival loop's replacement after a rejected delivery) and SHALL submit a fresh import cycle. A new delivery that arrives while the stream's current cycle has not yet settled SHALL be held as a retryable failure (never acknowledged), so redelivery lands it once the cycle settles; the domain decider SHALL itself refuse (as a modeled error) a new delivery against an in-flight cycle and converge stale positions on settled terminals, so no caller can duplicate or drop a delivery around the consumer. For a stream whose seam-sourced history predates the watermark the consumer SHALL converge deliveries as before — announcing the convergence in an operator-visible log naming the acquisition and the remediation, since it is the one path that can drop a genuine replacement.
+Convergence SHALL key on the delivery's position in the seam feed, recorded on each seam-driven cycle and folded into a stream-level watermark (the highest position any cycle ever recorded, surviving manual resubmissions of the same directory): a delivery at or before the watermark is a redelivery and SHALL converge as an acknowledged no-op — durably, across restarts, so a full feed replay creates no duplicate import — while a delivery past the watermark is a genuinely new delivery (the revival loop's replacement after a rejected delivery) and SHALL submit a fresh import cycle. A new delivery that arrives while the stream's current cycle has not yet settled SHALL be held as a retryable failure (never acknowledged), so redelivery lands it once the cycle settles; the domain decider SHALL itself refuse (as a modeled error) a new delivery against an in-flight cycle and converge stale positions on settled terminals, so no caller can duplicate or drop a delivery around the consumer. For a stream whose seam-sourced history predates the watermark the consumer SHALL converge deliveries as before — announcing the convergence in an operator-visible log naming the download and the remediation, since it is the one path that can drop a genuine replacement.
 
 An event whose location falls outside the source root SHALL be rejected; an event whose re-rooted directory does not exist SHALL surface as a retryable failure (never a silent acknowledgement), so the seam's at-least-once redelivery retries it once the files are visible.
 
@@ -69,7 +69,7 @@ An event whose location falls outside the source root SHALL be rejected; an even
 
 - **GIVEN** an `acquisition.fulfilled` event whose payload carries the delivered copy's identity (the payload's `candidate`)
 - **WHEN** the import is submitted
-- **THEN** the delivered copy is recorded beside the acquisition id, available to a later release verdict
+- **THEN** the delivered copy is recorded beside the download id, available to a later release verdict
 
 #### Scenario: A delivery without a copy identity still imports
 
@@ -79,14 +79,14 @@ An event whose location falls outside the source root SHALL be rejected; an even
 
 #### Scenario: Redelivery converges without a duplicate import — even after the import applied
 
-- **GIVEN** an acquisition whose earlier delivery already submitted an import that has since applied (the intake directory is gone)
+- **GIVEN** a download whose earlier delivery already submitted an import that has since applied (the intake directory is gone)
 - **WHEN** the same event is redelivered after a service restart
 - **THEN** the delivery is acknowledged as a converged no-op
 - **AND** no second import exists
 
 #### Scenario: A replacement delivery after a rejected import starts a fresh cycle
 
-- **GIVEN** an acquisition whose import settled `rejected` via the unusable-delivery verdict, reviving the hunt
+- **GIVEN** a download whose import settled `rejected` via the unusable-delivery verdict, reviving the hunt
 - **WHEN** the replacement delivery's `acquisition.fulfilled` event (a later feed position) is consumed
 - **THEN** a fresh import cycle is submitted for the re-deposited directory
 - **AND** a redelivery of the original delivery still converges as a no-op
@@ -110,19 +110,19 @@ An event whose location falls outside the source root SHALL be rejected; an even
 - **WHEN** the event is processed
 - **THEN** it surfaces as a retryable failure so the subscription redelivers it later
 
-### Requirement: An import is retrievable by its originating acquisition id
+### Requirement: An import is retrievable by its originating download id
 
-The importer's reads SHALL expose an import by the acquisition id it was submitted from, returning the same import status view as a lookup by import id, or a modeled not-found when no import exists for that acquisition. The import status view SHALL carry its originating acquisition id when the import arrived from an acquisition, so a consumer holding only an acquisition id can retrieve and identify the corresponding import without knowing the importer's own content-addressed id. This lookup SHALL be served from the reverse index the intake seam already maintains and SHALL NOT require scanning all imports.
+The importer's reads SHALL expose an import by the download id it was submitted from, returning the same import status view as a lookup by import id, or a modeled not-found when no import exists for that download. The import status view SHALL carry its originating download id when the import arrived from a download, so a consumer holding only a download id can retrieve and identify the corresponding import without knowing the importer's own content-addressed id. This lookup SHALL be served from the reverse index the intake seam already maintains and SHALL NOT require scanning all imports.
 
-#### Scenario: Lookup by acquisition id returns the corresponding import
+#### Scenario: Lookup by download id returns the corresponding import
 
-- **GIVEN** an acquisition that was handed off and submitted as an import
-- **WHEN** the import is read by that acquisition id
-- **THEN** the same import status view is returned, carrying that acquisition id
+- **GIVEN** a download that was handed off and submitted as an import
+- **WHEN** the import is read by that download id
+- **THEN** the same import status view is returned, carrying that download id
 
-#### Scenario: Lookup for an acquisition with no import is a modeled not-found
+#### Scenario: Lookup for a download with no import is a modeled not-found
 
-- **WHEN** an import is read by an acquisition id that has no submitted import
+- **WHEN** an import is read by a download id that has no submitted import
 - **THEN** the read returns the modeled not-found value, not an error or a crash
 
 ### Requirement: Import history entries carry their occurrence time

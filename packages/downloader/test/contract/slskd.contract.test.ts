@@ -5,10 +5,7 @@ import { FakeResourceLedger, silentLogger } from '../../src/application/__fixtur
 import { SlskdClient } from '../../src/adapters/slskd/client.js';
 import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
-import type {
-  TransferProgress,
-  TryResult,
-} from '../../src/application/ports/outbound-ports.js';
+import type { TransferProgress, TryResult } from '../../src/application/ports/outbound-ports.js';
 import { baseName } from '../../src/adapters/slskd/mapping.js';
 import {
   slskdDownloadFileCompleteSchema,

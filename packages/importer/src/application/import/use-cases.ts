@@ -108,7 +108,9 @@ export function getImportForAcquisition(
   dependencies: UseCaseDependencies,
   acquisitionId: string,
 ): ImportStatusView | undefined {
-  const importId = dependencies.status.importIdForAcquisition(toOriginatingDownloadId(acquisitionId));
+  const importId = dependencies.status.importIdForAcquisition(
+    toOriginatingDownloadId(acquisitionId),
+  );
   // RECORDED SURVIVOR, waiver withheld: forcing this ternary's condition false is equivalent. With
   // nothing indexed, `getImport` would look the missing id up in the projection's map, miss, and
   // answer `undefined` anyway. The guard states the absence rather than round-tripping a missing

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Publish the downloader module's relevant facts — starting with fulfilled acquisitions — on a durable outbound feed without knowing any consumer: the event store acts as the outbox, consuming modules tail it in-process through checkpointed catch-up subscriptions, and the outbound contract is producer-owned, additive-only, and published as versioned artifacts (generated JSON Schema + frozen fixtures) that consumers contract-test against in the same repository.
+Publish the downloader module's relevant facts — starting with fulfilled downloads — on a durable outbound feed without knowing any consumer: the event store acts as the outbox, consuming modules tail it in-process through checkpointed catch-up subscriptions, and the outbound contract is producer-owned, additive-only, and published as versioned artifacts (generated JSON Schema + frozen fixtures) that consumers contract-test against in the same repository.
 
 ## Requirements
 ### Requirement: Delivery is durable, ordered, and at-least-once
@@ -10,7 +10,7 @@ Publish the downloader module's relevant facts — starting with fulfilled acqui
 The system SHALL deliver published events through a durable checkpointed catch-up subscription over the producer's event store: the consumer tails events by global position, each subscription owns a named checkpoint persisted in the consumer's own store, the checkpoint advances only in the same transaction as the consumer's effects, undelivered events survive restarts and redeliver from the checkpoint, and each subscription receives events in global-position order (per-stream order preserved). Subscriptions SHALL be isolated: one halted or lagging subscription does not affect delivery to another. Each delivered event SHALL carry a stable identity (its global position and event id) so redeliveries are detectable by the receiver.
 
 #### Scenario: A crash between append and consumption loses nothing
-- **GIVEN** an acquisition fulfilled moments before a process crash
+- **GIVEN** a download fulfilled moments before a process crash
 - **WHEN** the system restarts
 - **THEN** the subscription resumes from its checkpoint and the event is consumed as if the crash had not happened
 
@@ -42,16 +42,16 @@ The outbound event schemas SHALL live with the producing module as the single co
 - **WHEN** the test suite runs
 - **THEN** the importer's tolerant reader parses the downloader's frozen `acquisition.fulfilled` fixtures successfully, in the same gate that blocks the merge
 
-### Requirement: Fulfilled acquisitions are published on the module's outbound event feed
-The system SHALL expose an `acquisition.fulfilled` event on the downloader module's outbound feed when an acquisition reaches fulfilment, carrying a self-contained payload — the acquisition id, the resolved target including its MusicBrainz release id, the fulfilled candidate's identity, and the deposited location with its files — so a consuming module can act without calling back into the producer. The feed SHALL be consumed in-process by tolerant readers behind each consumer's anti-corruption layer; the producer SHALL NOT know its consumers.
+### Requirement: Fulfilled downloads are published on the module's outbound event feed
+The system SHALL expose an `acquisition.fulfilled` event on the downloader module's outbound feed when a download reaches fulfilment, carrying a self-contained payload — the download id, the resolved target including its MusicBrainz release id, the fulfilled candidate's identity, and the deposited location with its files — so a consuming module can act without calling back into the producer. The feed SHALL be consumed in-process by tolerant readers behind each consumer's anti-corruption layer; the producer SHALL NOT know its consumers.
 
 #### Scenario: A fulfilment is available to the importer
-- **WHEN** an acquisition is fulfilled
+- **WHEN** a download is fulfilled
 - **THEN** the outbound feed carries an `acquisition.fulfilled` payload naming the deposited location, the target's MusicBrainz release id, and the files, and the importer's subscription observes it
 
 #### Scenario: No consumers changes nothing
 - **GIVEN** no subscription is registered against the feed
-- **WHEN** acquisitions run to fulfilment
+- **WHEN** downloads run to fulfilment
 - **THEN** the producer's behavior is unchanged and events remain durably stored for any future subscriber
 
 ### Requirement: Published events carry optional correlation metadata
@@ -59,7 +59,7 @@ The system SHALL expose an `acquisition.fulfilled` event on the downloader modul
 The downloader's published events SHALL carry an optional metadata block with the operation's correlation id and a causation reference (see `operation-correlation`), rendered by the producer alongside the payload and validated by the outbound schema. The block SHALL be additive under the existing contract gate: prior fixtures without it remain valid, and consumers reading through tolerant schemas are unaffected when it is absent.
 
 #### Scenario: A published event carries its story
-- **GIVEN** an acquisition operation carrying correlation metadata
+- **GIVEN** a download operation carrying correlation metadata
 - **WHEN** its fulfilment event is rendered onto the outbound feed
 - **THEN** the published event includes the metadata block with the operation's correlation id
 

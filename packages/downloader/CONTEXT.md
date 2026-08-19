@@ -4,6 +4,8 @@ Given a download request and a quality policy, finds, downloads, validates, depo
 
 ## Language
 
+Three altitudes, three words, and the code obeys them: a **download** is the whole saga, a **try** is one attempt at one candidate, and a **transfer** is one file moving from a peer. Verb forms stay verbs — a download is _downloading_, files are _downloaded_ — because only the noun is reserved.
+
 ### Intent & targeting
 
 **Download**:
@@ -112,8 +114,9 @@ A single threshold used for both the search-time ranking gate and the post-downl
 The ladder's termination bounds: max search rounds, max total tries, optional time budget. What guarantees the ladder terminates.
 _Avoid_: conflating with the application-layer parked-effect backoff policy (an unrelated mechanism that shares the name in code)
 
-**Download policy**:
-Per-transfer patience: the stall timeout and the max queue wait. Exceeding either abandons the transfer as failed.
+**Try policy**:
+A try's patience budget: the stall timeout and the max queue wait. Exceeding either abandons the try as failed.
+_Avoid_: download policy (the saga owns that noun, and this bounds one try)
 
 ### Lifecycle & the ladder
 
@@ -146,7 +149,7 @@ This context's own move of validated staged files to their organized deposited l
 _Avoid_: import (cross-context prose), hand-off, library placement
 
 **Deposited location**:
-The absolute directory the fulfilled release was deposited at — the namespace the importer's intake reads. (The env var is still `LIBRARY_ROOT`, a fossil from this context's standalone days; the real library is wherever beets moves the files.)
+The absolute directory the fulfilled release was deposited at — the namespace the importer's intake reads. (Configured as `DEPOSIT_ROOT`; the former `LIBRARY_ROOT` is still honoured with a deprecation warning. The real library is wherever beets moves the files.)
 _Avoid_: library location (the actual library is beets'), destination, deposit path
 
 **Import conflict**:
@@ -175,7 +178,7 @@ _Avoid_: download (the saga's noun — a transfer is one file of one try)
 **Doomed candidate**:
 One whose transfer has terminally failed; remaining transfers are cancelled and the candidate settles with the original failure's reason.
 
-**Download supervisor**:
+**Transfer supervisor**:
 The storeless, level-triggered watch over an in-flight try: samples the source, judges the stall and queue-wait budgets, and delivers one candidate-level outcome without blocking other downloads.
 _Avoid_: poller, watcher thread
 

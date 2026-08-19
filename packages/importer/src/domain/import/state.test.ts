@@ -30,9 +30,7 @@ const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'no good', files
 
 describe('matchReferenceKey', () => {
   it('keys a candidate by its (data_source, album_id) pair', () => {
-    expect(matchReferenceKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe(
-      'MusicBrainz:a1',
-    );
+    expect(matchReferenceKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe('MusicBrainz:a1');
   });
 });
 

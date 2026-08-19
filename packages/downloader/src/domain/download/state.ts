@@ -3,12 +3,7 @@ import type { Candidate } from '../candidate/candidate.js';
 import type { DownloadPolicies } from '../policy/policies.js';
 import type { RankedCandidate } from '../ranking/ranking.js';
 import type { Target } from '../target/target.js';
-import type {
-  DownloadEvent,
-  DownloadRequest,
-  DownloadedFile,
-  EditionCandidate,
-} from './events.js';
+import type { DownloadEvent, DownloadRequest, DownloadedFile, EditionCandidate } from './events.js';
 
 /**
  * The folded state of one download (the sole aggregate, D1), modelled as a discriminated union

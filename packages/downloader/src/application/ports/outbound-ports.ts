@@ -81,8 +81,7 @@ export type TryResult =
 
 /** Start's synchronous answer: the source accepted the enqueue, or refused THIS candidate. */
 export type TryStart =
-  | { readonly kind: 'started' }
-  | { readonly kind: 'rejected'; readonly reason: TryFailureReason };
+  { readonly kind: 'started' } | { readonly kind: 'rejected'; readonly reason: TryFailureReason };
 
 /**
  * The application-owned face the download supervisor reports through

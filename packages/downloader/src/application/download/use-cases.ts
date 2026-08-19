@@ -122,9 +122,7 @@ export function getAcquisition(
   return view === undefined ? undefined : withStalled(dependencies, view);
 }
 
-export function listAcquisitions(
-  dependencies: UseCaseDependencies,
-): readonly DownloadStatusView[] {
+export function listAcquisitions(dependencies: UseCaseDependencies): readonly DownloadStatusView[] {
   return dependencies.status.list().map((view) => withStalled(dependencies, view));
 }
 

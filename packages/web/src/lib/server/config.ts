@@ -107,7 +107,11 @@ export function loadComposedConfig(
   if (depositRoot === undefined) {
     return err('invalid configuration — DEPOSIT_ROOT: required');
   }
-  if (v.DEPOSIT_ROOT !== undefined && v.LIBRARY_ROOT !== undefined && v.DEPOSIT_ROOT !== v.LIBRARY_ROOT) {
+  if (
+    v.DEPOSIT_ROOT !== undefined &&
+    v.LIBRARY_ROOT !== undefined &&
+    v.DEPOSIT_ROOT !== v.LIBRARY_ROOT
+  ) {
     return err(
       'invalid configuration — DEPOSIT_ROOT and LIBRARY_ROOT are both set to different paths; ' +
         'remove LIBRARY_ROOT, which is the former name of the same setting',

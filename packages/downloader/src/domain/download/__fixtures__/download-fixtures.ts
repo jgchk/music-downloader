@@ -82,9 +82,7 @@ export function rankedOf(
   return rankCandidates(candidates, sampleTarget, policies.quality, policies.match);
 }
 
-export function requestedHistory(
-  policies: DownloadPolicies = defaultPolicies(),
-): DownloadEvent[] {
+export function requestedHistory(policies: DownloadPolicies = defaultPolicies()): DownloadEvent[] {
   return [{ type: 'DownloadRequested', request: sampleRequest, policies }];
 }
 
@@ -117,9 +115,7 @@ export function awaitingSelectionHistory(
   ];
 }
 
-export function resolvedHistory(
-  policies: DownloadPolicies = defaultPolicies(),
-): DownloadEvent[] {
+export function resolvedHistory(policies: DownloadPolicies = defaultPolicies()): DownloadEvent[] {
   return [...requestedHistory(policies), { type: 'TargetResolved', target: sampleTarget }];
 }
 

@@ -60,7 +60,7 @@ The system SHALL rank the candidates that pass both gates by quality bucket firs
 A fresh search round fires only once the working set is empty, so its results are the whole working picture. The system SHALL, on a fresh search round, dedupe the incoming candidates by stable identity, exclude previously-rejected candidates by stable identity, and rank the remainder.
 
 #### Scenario: A newly-online peer is incorporated
-- **GIVEN** an acquisition that re-searches after exhausting its earlier candidates
+- **GIVEN** a download that re-searches after exhausting its earlier candidates
 - **WHEN** a new candidate is found that was not seen before
 - **THEN** it is ranked alongside any untried candidates and the rejected ones are omitted
 

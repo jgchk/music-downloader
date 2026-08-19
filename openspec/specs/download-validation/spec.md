@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define how a downloaded release is validated for playability (full decode) and structural identity (track count and per-track durations) against the target, how validators combine into a single confidence verdict, and how that verdict is judged against the acquisition's match policy.
+Define how a downloaded release is validated for playability (full decode) and structural identity (track count and per-track durations) against the target, how validators combine into a single confidence verdict, and how that verdict is judged against the download's match policy.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ The system SHALL confirm that the download's track count and per-track durations
 - **THEN** validation fails with a duration-mismatch reason
 
 ### Requirement: Validators combine into a single confidence verdict
-The system SHALL run its validators as a pipeline that produces one combined verdict carrying a confidence score and any failure reasons, and SHALL allow further validators to be added without changing the acquisition logic that consumes the verdict.
+The system SHALL run its validators as a pipeline that produces one combined verdict carrying a confidence score and any failure reasons, and SHALL allow further validators to be added without changing the download logic that consumes the verdict.
 
 #### Scenario: Combined verdict is produced
 - **GIVEN** a download and a target
@@ -41,7 +41,7 @@ The system SHALL run its validators as a pipeline that produces one combined ver
 - **THEN** a single verdict with a confidence score and reasons is produced
 
 ### Requirement: Validation passes only when confidence meets policy
-The system SHALL treat a download as valid only when the verdict's confidence meets or exceeds the acquisition's match policy threshold; otherwise the download is rejected.
+The system SHALL treat a download as valid only when the verdict's confidence meets or exceeds the download's match policy threshold; otherwise the download is rejected.
 
 #### Scenario: Confidence clears a lenient policy
 - **GIVEN** a lenient match policy

@@ -101,9 +101,7 @@ export interface TryPolicyInput {
   readonly maxQueueWaitMs: number;
 }
 
-export function createDownloadPolicy(
-  input: TryPolicyInput,
-): Result<TryPolicy, TryPolicyError> {
+export function createDownloadPolicy(input: TryPolicyInput): Result<TryPolicy, TryPolicyError> {
   if (input.stallTimeoutMs <= 0) return err({ kind: 'NonPositiveStallTimeout' });
   if (input.maxQueueWaitMs <= 0) return err({ kind: 'NonPositiveQueueWait' });
   return ok(
