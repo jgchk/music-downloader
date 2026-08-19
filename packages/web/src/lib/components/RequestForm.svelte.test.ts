@@ -1,6 +1,6 @@
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { answerWith, holdSubmissions, resetAnswer } from '../../../test/stubs/app-forms.js';
 import RequestForm from './RequestForm.svelte';
 
@@ -95,16 +95,34 @@ describe('RequestForm', () => {
     expect(document.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('ignores an answer whose shape it does not recognise', async () => {
+  it('does not claim a request failed when the answer says it succeeded', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
     answerWith({ type: 'success', data: { requested: { acquisitionId: '' } } });
     onTestFinished(resetAnswer);
     await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
 
     await page.getByRole('button', { name: 'Request' }).click();
 
-    // Better to say the request did not land than to link someone to /acquisitions/undefined.
+    // The download was made; "try again" would have someone ask for it twice. And no
+    // confirmation either, because linking to /acquisitions/undefined is no confirmation.
     expect(document.querySelector('[role="status"]')).toBeNull();
-    await expect.element(page.getByRole('alert')).toBeVisible();
+    await expect.element(page.getByRole('alert')).toHaveTextContent('may have gone through');
+    expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('tells someone whose session expired what would actually help', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    // A gated POST answers 403 with a plain-text body, which the framework cannot deserialize —
+    // and this page is designed to be left open long enough for that to happen.
+    answerWith({ type: 'error' });
+    onTestFinished(resetAnswer);
+    await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
+
+    await page.getByRole('button', { name: 'Request' }).click();
+
+    await expect.element(page.getByRole('alert')).toHaveTextContent('sign in again');
   });
 
   it('goes busy while its own request is in flight', async () => {

@@ -25,7 +25,11 @@ function respond(result: FacadeResult, read: string, locals: App.Locals): Respon
   // or nowhere: without it an operator finds the request under its correlation id and no record
   // that anything went wrong — no way to tell a rate-limited catalog from a drifted one.
   if (status >= 500) locals.logger.warn({ read, error: result.error }, 'catalog read failed');
-  return json({ message: messageOf(result.error) }, { status });
+  // The module's own word for what went wrong travels with the refusal. Without it the page has
+  // only a status, and would have to infer a diagnosis from one — which is how a fault nobody
+  // classified ends up described to a person as a specific bug.
+  const reason = result.error.kind === 'InfraError' ? result.error.reason : undefined;
+  return json({ message: messageOf(result.error), reason }, { status });
 }
 
 export const GET: RequestHandler = async ({ params, url, locals }) => {

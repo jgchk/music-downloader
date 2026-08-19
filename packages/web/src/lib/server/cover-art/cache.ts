@@ -126,16 +126,15 @@ export function cachingCoverArt(
       };
 
       const entry = entries.get(key);
-      if (entry !== undefined) {
-        // A stale entry is kept while the archive is down: dropping the only copy at the moment
-        // it cannot be replaced turns a passing outage into a cover that is gone for good.
-        if (now() - entry.at <= ttlMs || isArchiveDown()) {
-          entries.delete(key);
-          entries.set(key, entry);
-          return okAsync(entry.answer);
-        }
-        forget(key);
+      if (entry !== undefined && (now() - entry.at <= ttlMs || isArchiveDown())) {
+        entries.delete(key);
+        entries.set(key, entry);
+        return okAsync(entry.answer);
       }
+      // A stale entry is NOT dropped here. The read that discovers an outage is usually the first
+      // one past the TTL, and forgetting its bytes before asking would throw away the only copy
+      // at the exact moment it cannot be replaced — after an overnight outage, that empties the
+      // whole cache. `remember` replaces it when a real answer arrives.
 
       const existing = inFlight.get(key);
       // Derived from the shared read rather than re-issued: `map` returns a new ResultAsync over

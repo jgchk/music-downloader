@@ -260,6 +260,47 @@ describe('CoverArtArchive.front', () => {
     expect(failure.kind).toBe('cover-art-unavailable');
   });
 
+  it.each([
+    ['a manifest listing a front cover with no image', 'record'],
+    ['a manifest naming an image somewhere we will not fetch from', 'record'],
+  ])('files %s as being about the record', async (_case, scope) => {
+    const stub = fetchStub(
+      Response.json({
+        images:
+          scope === 'record' && _case.includes('no image')
+            ? [{ front: true }]
+            : [{ front: true, thumbnails: { '250': 'https://elsewhere.invalid/x.jpg' } }],
+      }),
+    );
+
+    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    // One odd record. Treating it as an outage blanks every other cover on the page.
+    expect(failure.scope).toBe('record');
+  });
+
+  it.each([
+    ['answered with something that is not JSON', new Response('nope', { status: 200 })],
+    ['answered a shape we cannot read', Response.json({ images: 'not-a-list' })],
+  ])('files an archive that %s as being about the archive', async (_case, response) => {
+    const failure = await unwrapError(
+      archive(fetchStub(response)).front('release-group', RELEASE_GROUP, 250),
+    );
+
+    // Drift is archive-wide by nature: the next record will answer the same way.
+    expect(failure.scope).toBe('archive');
+  });
+
+  it.each([429, 408, 403])('files a %d as the archive talking about itself', async (status) => {
+    const stub = fetchStub(new Response('no', { status }));
+
+    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    // Asking for less, asking for the same again, or refusing us outright — hammering through
+    // any of those with 25 more requests makes it worse for every tile.
+    expect(failure.scope).toBe('archive');
+  });
+
   it('reports an archive that errors as the archive being unavailable', async () => {
     const stub = fetchStub(new Response('boom', { status: 503 }));
 

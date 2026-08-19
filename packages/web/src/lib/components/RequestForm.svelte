@@ -67,12 +67,27 @@
           requested = answered.data;
           return;
         }
-        const said = result.type === 'failure' ? refusalSchema.safeParse(result.data) : undefined;
-        // The action's own words when it gave any; otherwise the fact that it did not land.
-        refused =
-          said?.success === true
+        if (result.type === 'success') {
+          // Success, in a shape this page does not know: the download WAS made, so telling
+          // someone to try again would have them ask for it twice. The server logged nothing —
+          // to it the request succeeded — so the console is the only place the evidence can live.
+          console.error('the request action answered in an unexpected shape', answered?.error);
+          refused =
+            'That request may have gone through — check your downloads before asking again.';
+          return;
+        }
+        if (result.type === 'failure') {
+          const said = refusalSchema.safeParse(result.data);
+          // The action's own words when it gave any; otherwise the fact that it did not land.
+          refused = said.success
             ? said.data.message
             : 'That request did not go through. Try again.';
+          return;
+        }
+        // Not an answer this page can read at all — most often a session that expired while it
+        // sat open, which is exactly what this action is designed to let happen.
+        console.error('the request submission did not complete', result);
+        refused = 'That answer could not be read. Reload the page, and sign in again if asked.';
       } finally {
         // In a `finally` because a stuck "Requesting…" that never comes back is the least
         // debuggable way for a bug here to surface, and the button is the only way out.
