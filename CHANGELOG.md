@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.21.0](https://github.com/jgchk/music-downloader/compare/v3.20.1...v3.21.0) (2026-08-19)
+
+### Features
+
+* **downloader:** add the catalog-search port and its MusicBrainz adapter ([9c50d16](https://github.com/jgchk/music-downloader/commit/9c50d16df913101dda908ea0fdf0db4e7e805ed0))
+* **downloader:** expose the catalog reads on the facade ([f025593](https://github.com/jgchk/music-downloader/commit/f025593546bad91559b9a619ea2de111b974b1b1))
+* **web:** make the request page a search over the catalog ([2b891fd](https://github.com/jgchk/music-downloader/commit/2b891fd69de05aba9bc2a9a27b9886bcebf324e0))
+* **web:** serve catalog cover art through a cached archive port ([450fca5](https://github.com/jgchk/music-downloader/commit/450fca5165997ee38257c82c07ddd54ddced2d0f))
+
+### Bug Fixes
+
+* **downloader,web:** make the catalog's failures visible and its answers honest ([8c89a22](https://github.com/jgchk/music-downloader/commit/8c89a2202033f5e50257517e76da44ba65ba972e))
+* **downloader,web:** stop the catalog preferring the edition it knows least about ([0e054b1](https://github.com/jgchk/music-downloader/commit/0e054b12cefb3dfb459a9be5902a170a305765fb))
+* **web,downloader:** close the four findings the review cycles had deferred ([68caa9c](https://github.com/jgchk/music-downloader/commit/68caa9cb1a646462a83d7bcdbadd58d486e627a0))
+* **web,downloader:** make the degraded paths tell the truth about themselves ([edbee6e](https://github.com/jgchk/music-downloader/commit/edbee6e0b34a5ef878580a292275d7e73fdaa68b))
+* **web:** close the review's behavioural and coverage holes ([88adaf8](https://github.com/jgchk/music-downloader/commit/88adaf8e654220dc81551c2f4814a245189d7318))
 ## [3.20.1](https://github.com/jgchk/music-downloader/compare/v3.20.0...v3.20.1) (2026-08-19)
 
 ### Bug Fixes
