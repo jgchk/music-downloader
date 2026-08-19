@@ -19,4 +19,4 @@
 
 - [x] 4.1 Audit `test/e2e` and `packages/web/tests/parity.spec.ts` against the new order and collapse (both believed order-insensitive/detail-routed — confirm, fix if not).
 - [x] 4.2 Manual verify via the running app at a narrow viewport: `/acquisitions/new` shows the form immediately with the back link; a detail deep-link stands alone; the queue lists newest first; desktop unchanged.
-- [ ] 4.3 `pnpm check` green; `pnpm version:prep` minor bump (`feat`).
+- [x] 4.3 `pnpm check` green (12/12 lanes); `pnpm version:prep` minor bump (`feat`) applied in the release commit that follows.
