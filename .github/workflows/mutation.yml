@@ -34,8 +34,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # No ffmpeg install — see the `test` job in pipeline.yml. No test in the mutated tiers spawns
+      # a real audio binary; the audio-probe adapter is driven through a fake `CommandRunner`, and
+      # its mutants die there.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
