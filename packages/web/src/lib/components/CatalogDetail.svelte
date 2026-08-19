@@ -9,7 +9,6 @@
     narrowedToFormat,
     groupHeading,
     pickedMbid,
-    releaseLine,
     trackTime,
   } from '$lib/search/detail.js';
   import { artUrl, initialsOf } from '$lib/search/view.js';
@@ -266,33 +265,6 @@
           {chosenHere === undefined ? 'Request download' : 'Request this edition'}
         </button>
       </form>
-    {:else if detail.kind === 'artist'}
-      <h3>Releases</h3>
-      {#if detail.discography.releaseGroups.length === 0}
-        <p class="detail-status" data-testid="discography-empty">
-          The catalog lists no releases under this artist.
-        </p>
-      {/if}
-      <ul class="discography">
-        {#each detail.discography.releaseGroups as group (group.mbid)}
-          <li>
-            <span class="result-title">{group.title}</span>
-            <span class="result-detail">{releaseLine(group)}</span>
-            <form
-              method="POST"
-              action="/acquisitions/new"
-              use:enhance={oneAtATime}
-              class="request-form"
-            >
-              <input type="hidden" name="kind" value="release-group" />
-              <input type="hidden" name="mbid" value={group.mbid} />
-              <button type="submit" class="btn primary request" disabled={requesting > 0}>
-                Request
-              </button>
-            </form>
-          </li>
-        {/each}
-      </ul>
     {:else if detail.kind === 'recording'}
       <!-- Bound once: read straight off `detail` in the markup, each access compiles to its own
            defensive check for a value this branch has already established. -->

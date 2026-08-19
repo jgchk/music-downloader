@@ -4,6 +4,7 @@ import {
   albumDetail,
   alternativeLabel,
   artUrl,
+  asBrowsedResults,
   countOf,
   emptyLead,
   initialsOf,
@@ -223,5 +224,26 @@ describe('initialsOf', () => {
   it('still says something for a record whose title is blank', () => {
     // An empty placeholder is the empty grey box the placeholder exists to replace.
     expect(initialsOf(' '.repeat(3))).toBe('♪');
+  });
+});
+
+describe('asBrowsedResults', () => {
+  it('presents a discography as the album results it is', () => {
+    const browsed = asBrowsedResults({
+      releaseGroups: [
+        { mbid: MBID, title: 'Graceland', artistCredit: 'Paul Simon', secondaryTypes: [] },
+      ],
+    });
+
+    // The same shape the grid already renders — an artist's albums ARE albums, and giving them
+    // their own presentation would be a second way to show the same thing.
+    expect(browsed.leading).toBe('release-group');
+    expect(browsed.releaseGroups).toHaveLength(1);
+    expect(browsed.artists).toEqual([]);
+    expect(browsed.recordings).toEqual([]);
+  });
+
+  it('carries an empty discography as empty, not as something else', () => {
+    expect(asBrowsedResults({ releaseGroups: [] }).releaseGroups).toEqual([]);
   });
 });

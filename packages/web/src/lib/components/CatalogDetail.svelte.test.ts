@@ -340,60 +340,6 @@ describe('CatalogDetail', () => {
     await expect.element(page.getByText('Could not read the tracklist.')).toBeVisible();
   });
 
-  it('offers an artist’s releases to request one by one', async () => {
-    await render(
-      CatalogDetail,
-      props({
-        kind: 'artist',
-        mbid: RG,
-        title: 'Paul Simon',
-        discography: {
-          releaseGroups: [
-            {
-              mbid: PICK,
-              title: 'Graceland',
-              artistCredit: 'Paul Simon',
-              year: 1986,
-              primaryType: 'Album',
-              secondaryTypes: [],
-            },
-          ],
-        },
-      }),
-    );
-
-    await expect.element(page.getByText('Graceland')).toBeVisible();
-    await expect.element(page.getByText('1986 · Album')).toBeVisible();
-    const form = document.querySelector<HTMLFormElement>('.discography .request-form')!;
-    expect(new FormData(form).get('kind')).toBe('release-group');
-    expect(new FormData(form).get('mbid')).toBe(PICK);
-  });
-
-  it('renders a release the catalog has not dated or typed', async () => {
-    await render(
-      CatalogDetail,
-      props({
-        kind: 'artist',
-        mbid: RG,
-        title: 'Paul Simon',
-        discography: {
-          releaseGroups: [
-            {
-              mbid: PICK,
-              title: 'Undated',
-              artistCredit: 'Paul Simon',
-              year: undefined,
-              primaryType: undefined,
-              secondaryTypes: [],
-            },
-          ],
-        },
-      }),
-    );
-
-    await expect.element(page.getByText('Undated')).toBeVisible();
-  });
-
   it('requests a track as a track, with a quality floor to raise', async () => {
     await render(
       CatalogDetail,

@@ -4,14 +4,16 @@
   import RequestPolicies from './RequestPolicies.svelte';
   import { enhance } from '$app/forms';
   import { UNEXPECTED, httpCatalog } from '$lib/search/client.js';
-  import { openDetail, readTracklist, runSearch } from '$lib/search/session.js';
+  import { browseArtist, openDetail, readTracklist, runSearch } from '$lib/search/session.js';
   import type { SearchOutcome } from '$lib/search/session.js';
   import { searchTyping, startTyping } from '$lib/search/typing.js';
+  import { asBrowsedResults } from '$lib/search/view.js';
   import type { CatalogClient } from '$lib/search/client.js';
   import type {
+    BrowseState,
+    ChosenEdition,
     DetailContext,
     DetailState,
-    ChosenEdition,
     TracklistState,
   } from '$lib/search/detail.js';
   import type { TypingDriver } from '$lib/search/typing.js';
@@ -93,6 +95,9 @@
     const controller = new AbortController();
     inFlight = controller;
     failure = undefined;
+    // Searching is asking a new question, however it was asked — typed, or pressed. An artist's
+    // releases left on screen over the answer would be answering the old one.
+    browse = undefined;
     void attempt(
       runSearch(catalog, text, controller.signal, {
         onSearching: (value) => (searching = value),
@@ -114,7 +119,41 @@
    * Open a result, and let the read know whether it is still the one being waited for: opening a
    * second result, or closing the surface, must not be undone by the first read arriving late.
    */
+  /** The artist whose releases have taken over the results area, when one has. */
+  let browse = $state<BrowseState | undefined>();
+
+  /** Back to the results that were held all along — no second search, and the same scroll. */
+  const backToResults = (): void => (browse = undefined);
+
+  /**
+   * Filtering is about the held results, so it is also the way out of an artist's releases: a tab
+   * that narrowed something nobody is looking at would be dead. One function, so the page's tabs
+   * and any filter link inside the results cannot disagree about that.
+   */
+  function filterResults(next: EntityFilter): void {
+    backToResults();
+    filter = next;
+  }
+
+  function browseArtistFor(mbid: string, name: string): void {
+    detail = undefined;
+    void attempt(
+      browseArtist(
+        catalog,
+        mbid,
+        name,
+        (opened) => (browse = opened),
+        () => browse?.mbid === mbid,
+      ),
+      () => (browse = { kind: 'failed', mbid, name, message: UNEXPECTED }),
+    );
+  }
+
   function openDetailFor(kind: EntityKind, mbid: string, context: DetailContext): void {
+    if (kind === 'artist') {
+      browseArtistFor(mbid, context.title);
+      return;
+    }
     tracklists = {};
     // What is open IS what was last asked for — `detail` is set synchronously to `loading` before
     // any read starts — so the view is asked rather than tracked a second time alongside it.
@@ -186,7 +225,7 @@
         type="button"
         class="btn"
         aria-pressed={filter === option.value}
-        onclick={() => (filter = option.value)}
+        onclick={() => filterResults(option.value)}
       >
         {option.label}
       </button>
@@ -200,13 +239,39 @@
       No release, artist, or track in the catalog carries that MusicBrainz ID. Check that it was
       copied whole, or search for the record by name instead.
     </p>
+  {:else if browse !== undefined}
+    <div class="browse-head">
+      <h2>Albums by {browse.name}</h2>
+      <!-- The results were held all along, so going back is not a second search. -->
+      <button type="button" class="linkish" data-testid="back-to-results" onclick={backToResults}>
+        Back to results
+      </button>
+    </div>
+    {#if browse.kind === 'loading'}
+      <p class="detail-status" data-testid="browse-loading">Reading the catalog…</p>
+    {:else if browse.kind === 'failed'}
+      <p class="error" role="alert" data-testid="browse-error">{browse.message}</p>
+    {:else if browse.discography.releaseGroups.length === 0}
+      <p class="empty-results" data-testid="discography-empty">
+        The catalog lists no releases under this artist.
+      </p>
+    {:else}
+      <!-- The same grid the search results use: an artist's albums ARE albums, so they get the
+           artwork, the one-click request, and the click through to an album's editions. -->
+      <CatalogResults
+        results={asBrowsedResults(browse.discography)}
+        filter="release-group"
+        onOpen={openDetailFor}
+        onFilter={filterResults}
+      />
+    {/if}
   {:else if outcome?.kind === 'results'}
     <CatalogResults
       results={outcome.results}
       {filter}
       {query}
       onOpen={openDetailFor}
-      onFilter={(next) => (filter = next)}
+      onFilter={filterResults}
     />
   {:else if !searching}
     <p class="search-hint" data-testid="search-hint">

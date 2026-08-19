@@ -1,6 +1,9 @@
 import { isMbidShaped } from '@music/downloader/catalog-dto';
 import type { qualityBucketSchema } from '@music/downloader';
-import type { CatalogSearchResultDto } from '@music/downloader/catalog-dto';
+import type {
+  CatalogDiscographyResultDto,
+  CatalogSearchResultDto,
+} from '@music/downloader/catalog-dto';
 import type { z } from 'zod';
 
 /**
@@ -77,6 +80,22 @@ export function trimmedCount(matched: number, shown: number): ShownCount {
     shown,
     matched,
     label: isTrimmed ? `${shown} of ${matched}` : String(matched),
+  };
+}
+
+/**
+ * An artist's releases, as the album results they are. The discography read answers a list of
+ * release groups, and the grid already knows how to present those — including their artwork,
+ * their request action, and the click through to an album's editions. Giving a discography a
+ * presentation of its own would be a second way to show the same thing, and the panel that used
+ * to do it could not show artwork at all.
+ */
+export function asBrowsedResults(discography: CatalogDiscographyResultDto): CatalogSearchResultDto {
+  return {
+    leading: 'release-group',
+    releaseGroups: discography.releaseGroups,
+    artists: [],
+    recordings: [],
   };
 }
 

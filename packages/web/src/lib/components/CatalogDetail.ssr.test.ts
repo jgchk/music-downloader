@@ -250,58 +250,12 @@ describe('CatalogDetail (SSR)', () => {
     expect(failed).toContain('Could not read the tracklist.');
   });
 
-  it('renders an artist’s releases with a request each, and what the catalog knows of them', () => {
-    const html = body({
-      kind: 'artist',
-      mbid: RG,
-      title: 'Paul Simon',
-      discography: {
-        releaseGroups: [
-          {
-            mbid: PICK,
-            title: 'Graceland',
-            artistCredit: 'Paul Simon',
-            year: 1986,
-            primaryType: 'Album',
-            secondaryTypes: [],
-          },
-          {
-            mbid: RG,
-            title: 'Undated',
-            artistCredit: 'Paul Simon',
-            year: undefined,
-            primaryType: undefined,
-            secondaryTypes: [],
-          },
-        ],
-      },
-    });
-
-    expect(html).toContain('Graceland');
-    expect(html).toContain('1986 · Album');
-    expect(html).toContain('Undated');
-    expect(html).toContain('class="request-form"');
-  });
-
   it('renders a track’s own request, as a track', () => {
     const html = body({ kind: 'recording', mbid: PICK, title: 'The Boy in the Bubble' });
 
     expect(html).toContain('value="track"');
     expect(html).toContain('Request this track');
     expect(html).toContain('Quality floor');
-  });
-
-  it('says an artist has no releases listed, rather than heading an empty list', () => {
-    // The album arm says so; the artist arm rendered "Releases" over nothing at all, which reads
-    // as a page that failed rather than a catalog that knows of none.
-    const html = body({
-      kind: 'artist',
-      mbid: RG,
-      title: 'Paul Simon',
-      discography: { releaseGroups: [] },
-    });
-
-    expect(html).toContain('lists no releases under this artist');
   });
 
   it('says the catalog listed no pressings, rather than offering a choice of none', () => {

@@ -54,13 +54,13 @@ creates and extends its layout tests).
 
 ## 5. Artist discography view (web)
 
-- [ ] 5.1 Page-level browse state (red first): selecting an artist renders the discography
+- [x] 5.1 Page-level browse state (red first): selecting an artist renders the discography
       through the release-group grid presentation — "Albums by <name>" heading, back crumb
       re-rendering the held results without a new search; typing exits the browse; a filter tab
       exits it and applies the filter; the `artist` arm leaves `DetailState`
-- [ ] 5.2 Discography entries behave like album results (red first): one-click Request and
+- [x] 5.2 Discography entries behave like album results (red first): one-click Request and
       click-through to the standard release-group detail view, artwork via the cover-art endpoint
-- [ ] 5.3 Remove the panel discography rendering and its styles; SSR + browser tests updated for
+- [x] 5.3 Remove the panel discography rendering and its styles; SSR + browser tests updated for
       the takeover, crumb, and empty-discography state
 
 ## 6. Requesting stays on the page (web)
