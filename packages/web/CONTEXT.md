@@ -48,6 +48,12 @@ A guarded facade read's result for one half of a page: the data, or an unavailab
 **Freshness**:
 The web-owned refresh seam deciding when a rendered view is re-read from the facades.
 
+### The request page
+
+**Detail view**:
+The overlay a selected catalog result opens — a side panel at wide viewports, a bottom sheet at narrow ones — where an album's editions or a track's request live.
+_Avoid_: drawer, detail surface, modal (as a name; modality is a property, not the thing)
+
 ### Access control
 
 **Session**:
