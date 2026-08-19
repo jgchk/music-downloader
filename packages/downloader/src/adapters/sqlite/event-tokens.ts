@@ -61,6 +61,8 @@ export const MODEL_TYPE_BY_TOKEN: Record<string, DownloadEventType> = Object.ass
  * the dead-letter that was always coming.
  */
 export class UnmappedEventType extends Error {
+  override readonly name = 'UnmappedEventType';
+
   constructor(readonly eventType: string) {
     super(`no stored token for event type ${eventType}`);
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { foldEvents, initialState } from './state.js';
-import { requestedHistory } from './__fixtures__/download-fixtures.js';
+import { resolvedHistory } from './__fixtures__/download-fixtures.js';
 import { react } from './react.js';
 import type { DownloadEvent } from './events.js';
 
@@ -25,7 +25,7 @@ describe('an event type this build does not know', () => {
   it('is transparent to the events around it', () => {
     // The real hazard: an unknown tag mid-stream used to make `evolve` return undefined, and the
     // NEXT event dereferenced it. Folding with the intruder must equal folding without it.
-    const known = requestedHistory();
+    const known = resolvedHistory();
     expect(foldEvents([known[0]!, FROM_A_NEWER_BUILD, ...known.slice(1)])).toEqual(
       foldEvents(known),
     );

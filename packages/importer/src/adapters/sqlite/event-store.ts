@@ -16,7 +16,7 @@ import type {
 } from '../../application/ports/event-store-port.js';
 import type { EventDatabase } from './schema.js';
 import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION } from './upcaster.js';
-import { toModelType, toStoredToken } from './event-tokens.js';
+import { toModelType, toStoredToken, UnmappedEventType } from './event-tokens.js';
 import type { UpcasterRegistry } from './upcaster.js';
 
 /**
@@ -124,6 +124,12 @@ export class SqliteEventStore implements EventStorePort {
     try {
       stored = this.runAppend(streamId, expectedVersion, events, metadata);
     } catch (error) {
+      if (error instanceof UnmappedEventType) {
+        // Permanent in nature; this module's InfraError cannot say so, so it lands via the retry
+        // budget instead of at once. Caught by type anyway, so the intent survives the day the
+        // flag arrives.
+        return errAsync(infraError('event-store.append', String(error), error));
+      }
       if (error instanceof ConcurrencyBreak || isUniqueViolation(error)) {
         return errAsync<readonly StoredEvent[], AppendError>({
           kind: 'ConcurrencyConflict',

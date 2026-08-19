@@ -42,13 +42,15 @@ export const MODEL_TYPE_BY_TOKEN: Record<string, ImportEventType> = Object.assig
 );
 
 /**
- * A model event type with no stored token. Named so the store can classify it as permanent: no
- * amount of retrying invents a token, and spending the effect's whole budget on it only delays
- * the dead-letter that was always coming. This module's InfraError carries no permanent flag, so
- * the importer currently retries it to exhaustion before dead-lettering — noisier than the
- * downloader, same destination.
+ * A model event type with no stored token — definitionally permanent, since no amount of retrying
+ * invents a token. This module's InfraError carries no permanent flag, so the importer cannot say
+ * so: the effect retries to exhaustion first, and because a retrying effect holds the single
+ * global checkpoint at the failing head, every other import queues behind it for the whole budget
+ * before it dead-letters. The downloader classifies the same fault permanent and lands it at once.
  */
 export class UnmappedEventType extends Error {
+  override readonly name = 'UnmappedEventType';
+
   constructor(readonly eventType: string) {
     super(`no stored token for event type ${eventType}`);
   }

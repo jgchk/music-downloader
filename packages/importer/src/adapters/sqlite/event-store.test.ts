@@ -184,6 +184,18 @@ describe('SqliteEventStore', () => {
     expect(row.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
+  it('refuses an event type it has no stored token for', async () => {
+    const store = new SqliteEventStore(freshDatabase());
+    // Reachable only across the serialization boundary; binding `undefined` into SQLite and
+    // writing a blob with no type would be strictly worse than a named refusal.
+    const unnameable = { type: 'SomethingNobodyKnows' } as unknown as ImportEvent;
+
+    const result = await store.append('imp-1', 0, [unnameable], META);
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).toContain('SomethingNobodyKnows');
+  });
+
   it('writes the frozen storage token to both the type column and the data blob', async () => {
     const database = freshDatabase();
     const store = new SqliteEventStore(database);
