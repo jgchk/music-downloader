@@ -22,6 +22,7 @@ Requesting a download today means picking a request mode (MusicBrainz release ID
 
 ### Modified Capabilities
 
+- `web-ui-presentation`: adds a catalog-search surface anatomy requirement — the search field, filter control, per-entity result layouts, artwork frame, and detail surface (side panel / bottom sheet) are structural once and deliberately themed in every shipped skin, alongside the existing timeline and decision-surface anatomies.
 - `web-ui`: the "Acquisition submission and cancellation" requirement changes from a mode-select form to the search-first flow — search-as-you-type with filters and intent ordering, one-click request with defaults, detail drawer with edition/quality selection at request time, MBID paste, and the researched empty/zero-result states. Progressive enhancement is preserved: without JavaScript the page degrades to a native form submission.
 
 ## Impact

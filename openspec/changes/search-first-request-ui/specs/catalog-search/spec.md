@@ -103,9 +103,21 @@ The edition listing SHALL include which edition the acquisition pipeline's own s
 
 ### Requirement: Upstream stewardship
 
-Catalog reads SHALL respect the upstream source's client obligations: requests are identified as this application, request rates honor the source's published limits, and repeated identical reads within a short window are served from a server-side cache rather than re-querying upstream.
+Catalog reads SHALL respect the upstream source's client obligations: every request identifies this application to the source; a repeated identical read within a short window is served from a server-side cache rather than re-queried; concurrent identical reads share one upstream request rather than racing; and a search SHALL cost a fixed, small number of upstream requests regardless of how many results it returns — never one per result.
 
-#### Scenario: Typing does not hammer the upstream
+Pacing is deliberately achieved by asking less rather than by queueing: a minimum-interval queue in front of a user-facing search would serialize a search's entity queries into multi-second waits, so the obligation is met by the cache, by sharing in-flight reads, and by the client's own debounce, with tracklists fetched only when a person asks for one.
+
+#### Scenario: Typing does not re-query the upstream
 
 - **WHEN** a user's typing produces repeated searches for the same query within the cache window
 - **THEN** at most one upstream query per entity type is made for that query and the rest are served from cache
+
+#### Scenario: Concurrent identical searches share one upstream read
+
+- **WHEN** two searches for the same query are in flight at once
+- **THEN** they share a single upstream request per entity type rather than issuing one each
+
+#### Scenario: Result count never multiplies upstream requests
+
+- **WHEN** a search returns many results of every kind
+- **THEN** the number of upstream requests it made does not depend on how many results were returned
