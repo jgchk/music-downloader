@@ -47,7 +47,7 @@ export interface MutationReport {
  * exactly what would happen otherwise: the fixtures are built from *our* type, so they could never
  * notice the vendor moving.
  */
-export type VendorReportStaysAssignable = schema.MutationTestResult extends MutationReport
+export type IsVendorReportAssignable = schema.MutationTestResult extends MutationReport
   ? true
   : never;
 
@@ -57,8 +57,8 @@ export type VendorReportStaysAssignable = schema.MutationTestResult extends Muta
  * exactly nothing and the comment above it would be a promise the compiler never made. Assigning
  * `true` to it is what turns vendor drift into the build break this file claims.
  */
-const VENDOR_REPORT_STAYS_ASSIGNABLE: VendorReportStaysAssignable = true;
-void VENDOR_REPORT_STAYS_ASSIGNABLE;
+const IS_VENDOR_REPORT_ASSIGNABLE: IsVendorReportAssignable = true;
+void IS_VENDOR_REPORT_ASSIGNABLE;
 
 /**
  * `status` stays an open `string` on the interface — a tolerant reader must not fail to *parse* a

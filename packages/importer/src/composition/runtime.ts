@@ -124,7 +124,7 @@ function isDirectoryAbsent(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
-async function realDirectoryExists(directory: string): Promise<boolean> {
+async function isRealDirectory(directory: string): Promise<boolean> {
   try {
     const statResult = await stat(directory);
     return statResult.isDirectory();
@@ -274,7 +274,7 @@ export async function createImporterRuntime(
         handler: intakeEventConsumer(dependencies, {
           sourceRoot: options.sourceRoot,
           intakeRoot: config.intakeRoot,
-          directoryExists: overrides.directoryExists ?? realDirectoryExists,
+          directoryExists: overrides.directoryExists ?? isRealDirectory,
           warn: logger.warn.bind(logger),
         }),
         logger,

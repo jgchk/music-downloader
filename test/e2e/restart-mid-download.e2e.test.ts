@@ -86,10 +86,10 @@ const HOLD_MAPPING = {
   },
 };
 
-async function pollUntil(check: () => Promise<boolean>, what: string): Promise<void> {
+async function pollUntil(isSatisfied: () => Promise<boolean>, what: string): Promise<void> {
   const deadline = Date.now() + 60_000;
   for (;;) {
-    if (await check()) return;
+    if (await isSatisfied()) return;
     if (Date.now() >= deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((resolve) => setTimeout(resolve, 500));
   }

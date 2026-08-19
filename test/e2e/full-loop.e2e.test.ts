@@ -15,7 +15,7 @@ import {
   eventTypes,
   pollForEvent,
   pollUntilTerminal,
-  reviewQueueEmpty,
+  isReviewQueueEmpty,
   seedStagedFixture,
   submitAcquisition,
   waitForOk,
@@ -92,7 +92,7 @@ describe('out-of-process full loop (web interface, real socket)', () => {
 
     // Terminal outcome observable over the interface: the acquisition reports Fulfilled and the
     // review queue's explicit empty marker proves nothing waits on a human.
-    expect(await reviewQueueEmpty()).toBe(true);
+    expect(await isReviewQueueEmpty()).toBe(true);
 
     // The stores are durable files, not :memory: — both modules' events are on disk, and the
     // whole flow recorded exactly one import for the one acquisition.

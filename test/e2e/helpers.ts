@@ -216,7 +216,7 @@ export const DELIVERED_NARRATION: ReadonlySet<string> = new Set([
 ]);
 
 /** True when the review queue page shows its explicit empty marker. */
-export async function reviewQueueEmpty(): Promise<boolean> {
+export async function isReviewQueueEmpty(): Promise<boolean> {
   const res = await fetch(`${BASE_URL}/reviews`, {
     signal: AbortSignal.timeout(3000),
     headers: { Cookie: sessionCookieHeader() },

@@ -13,7 +13,7 @@ import {
   pollForEvent,
   pollForStatus,
   pollUntilTerminal,
-  reviewQueueEmpty,
+  isReviewQueueEmpty,
   seedStagedFixture,
   submitAcquisition,
   waitForOk,
@@ -69,6 +69,6 @@ describe('restart resilience (durable stores + subscription checkpoint)', () => 
 
     // And the interface still tells the same story after the restart.
     expect(await pollUntilTerminal(acquisitionId)).toBe(IMPORT_VOICE_PHRASE.applied);
-    expect(await reviewQueueEmpty()).toBe(true);
+    expect(await isReviewQueueEmpty()).toBe(true);
   });
 });
