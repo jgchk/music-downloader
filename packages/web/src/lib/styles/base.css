@@ -2,11 +2,22 @@
    Base — semantic HTML styled through tokens, carrying no skin knowledge.
 
    Colours and skinnable dimensions read from tokens (a few fixed structural
-   values are inlined); no theme colour is hardcoded here. Everything targets
-   bare elements + the stable hooks the components already emit
-   (.badge[data-phase], .chip[data-kind], role="alert"). Skins never need the
-   components to change; they remap tokens and reach these same hooks.
+   values are inlined); no theme colour is hardcoded here. Rules target the
+   stable hooks the components emit (.btn, .badge[data-phase], .chip[data-kind],
+   role="alert") and semantic elements — with one standing exception: widget
+   chrome is opt-in through `.btn` and never rides a bare `button`, which is
+   what the reset layer below exists to say. Skins never need the components to
+   change; they remap tokens and reach these same hooks.
    ============================================================================ */
+
+/* The cascade's order, repeated at the head of EVERY stylesheet in this system. Layer order is
+   fixed by first appearance, so a single declaration would make the app's import order
+   load-bearing — reorder the layout's imports and a skin's `theme` would register first and then
+   lose to the base for the rest of time. Restating it is idempotent and order-independent, so no
+   import order can invert it. `theme` sits LAST on purpose: a skin overriding the base is the
+   skin system's whole contract. What that deliberately does not buy — protection from a skin
+   re-chroming bare buttons — is held by the convention test beside these files instead. */
+@layer reset, base, theme;
 
 @layer reset {
   *,
@@ -155,7 +166,9 @@
 
   /* -- Push buttons + button-styled links -----------------------------------
      `.btn` is the whole of it: what wears this class is a widget, and what does
-     not is a surface or a link. Element selectors are the reset's business. */
+     not is a surface or a link. UNSCOPED element selectors are the reset's
+     business; a `button` scoped inside a named widget (see .segmented) is fine
+     — it is the global reach that leaked. */
   .btn {
     --btn-bg: var(--surface-2);
     --btn-fg: var(--text);
@@ -845,8 +858,9 @@
      Structural once, themed per skin (web-ui-presentation). Meaning-based hooks
      only: what a thing IS (a result, an edition, the artwork slot), never how it
      should look. The artwork slot reserves its space before an image arrives, so
-     a grid does not reflow as covers load, and a cover that never arrives simply
-     leaves the placeholder it was drawn over. */
+     a grid does not reflow as covers load; a cover that never arrives leaves the
+     placeholder it was drawn over, and one that FAILS is dropped from the render
+     entirely (CoverArt does that — CSS cannot select an errored image). */
   .request-search {
     display: flex;
     flex-direction: column;
@@ -968,8 +982,9 @@
     flex-direction: column;
     gap: var(--step-0);
   }
-  /* min-width lets these clip: without it a flex item's floor is its content, so a long title
-     grows its card instead of ellipsing inside it. */
+  /* min-width lets these clip along a row: a flex item's floor is its content on the main axis,
+     so in a track row a long title would push the row wider instead of ellipsing inside it. In
+     the column cards the stretch already bounds them, and this is simply harmless there. */
   .result-title {
     font-weight: var(--fw-head);
     min-width: 0;
@@ -1045,16 +1060,17 @@
     color: var(--text-muted);
   }
 
-  /* The catalog detail surface: a side panel where there is room, a bottom sheet where there is not.
-     Same DOM either way — only the CSS changes. Named `catalog-detail` rather than `detail`, which
-     the acquisitions master-detail layout already owns: a `position: fixed` rule under that name
-     would have collapsed that pane into a drawer on every route it lays out. */
+  /* The catalog detail view: a side panel where there is room, a bottom sheet where there is not.
+     Same DOM either way — only the CSS changes. The CLASS is `catalog-detail` rather than
+     `detail`, which the acquisitions master-detail layout already owns: a `position: fixed` rule
+     under that name would have flattened that pane into an overlay on every route it lays out. */
   .catalog-detail {
     position: fixed;
     inset: 0 0 0 auto;
-    /* The token carries the readable band; the viewport shares keep the panel from taking a small
-       window over, whatever a skin remaps the token to. */
-    width: min(var(--detail-size), 75vw, 100vw);
+    /* The token carries the readable band; the viewport share keeps the panel from taking a
+       middling window over, whatever a skin remaps the token to. (Below 40rem there is no panel
+       to bound — the media query below hands the whole width to a bottom sheet.) */
+    width: min(var(--detail-size), 75vw);
     overflow-y: auto;
     background: var(--surface);
     border-left: var(--border-width) solid var(--border);

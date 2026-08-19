@@ -104,7 +104,7 @@ export async function runSearch(
 }
 
 /**
- * Open a result's detail surface. A track needs nothing more read about it — everything shown is
+ * Open a result's detail view. A track needs nothing more read about it — everything shown is
  * already in hand — while an album and an artist each need one read, and either can fail.
  */
 export async function openDetail(

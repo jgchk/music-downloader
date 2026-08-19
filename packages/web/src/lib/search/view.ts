@@ -108,11 +108,15 @@ export function otherMatches(
  * missing looks the same wherever it goes missing.
  */
 export function initialsOf(title: string): string {
-  return title
+  const initials = title
     .split(/\s+/)
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
     .join('');
+
+  // A title of nothing but spaces would otherwise render the empty grey box the placeholder
+  // exists to prevent — so the slot falls back to saying "some record", not nothing.
+  return initials === '' ? '♪' : initials;
 }
 
 /**

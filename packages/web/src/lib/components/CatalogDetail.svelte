@@ -84,7 +84,7 @@
       <CoverArt
         src={artUrl('release-group', detail.mbid, 500)}
         initials={initialsOf(detail.title)}
-        shape="art-detail"
+        shape="detail"
       />
 
       <h3>Edition</h3>

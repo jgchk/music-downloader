@@ -51,7 +51,7 @@ The web-owned refresh seam deciding when a rendered view is re-read from the fac
 ### The request page
 
 **Detail view**:
-The overlay a selected catalog result opens — a side panel at wide viewports, a bottom sheet at narrow ones — where an album's editions or a track's request live.
+The overlay a selected catalog result opens — a side panel at wide viewports, a bottom sheet at narrow ones — where an album's editions or a track's request live. Say _catalog_ detail view wherever the acquisitions master-detail pane is also in view; the CSS carries `catalog-detail` for that same reason.
 _Avoid_: drawer, detail surface, modal (as a name; modality is a property, not the thing)
 
 ### Access control

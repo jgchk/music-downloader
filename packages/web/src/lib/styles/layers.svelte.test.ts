@@ -1,21 +1,31 @@
 import { describe, expect, it } from 'vitest';
+import { SKINS } from '$lib/skins.js';
 import baseCss from '$lib/styles/base.css?inline';
 import tokensCss from '$lib/styles/tokens.css?inline';
-import forumCss from '$lib/styles/skins/forum.css?inline';
-import glassCss from '$lib/styles/skins/glass.css?inline';
-import terminalCss from '$lib/styles/skins/terminal.css?inline';
 
 /**
  * The convention that keeps the chrome inversion from being undone. Cascade layers order the
  * stylesheets, but layers alone cannot stop a future skin from re-chroming every bare `button` —
  * the skin layer is deliberately the last one, because overriding the base is what a skin is for.
- * So the guard is this scan: outside the reset, nobody styles a globally-scoped bare `button`.
+ * So the guard is this scan: outside the reset, nobody styles a `button` that no class has
+ * claimed.
  *
- * The stylesheets are parsed by the browser that ships them rather than by a regex over their
- * text, so what is asserted is what the cascade actually sees.
+ * The browser parses the sheets, so the layer structure and the selector text asserted here are
+ * the real ones rather than a regex's guess at them; the subject rule below is then applied to
+ * those normalised selectors. What this does NOT reach: Svelte component `<style>` blocks (none
+ * style buttons today) and any stylesheet not collected here — which is why the skins are globbed
+ * rather than listed, so a new skin file is scanned the day it lands.
  */
 
-const SKINS = { forum: forumCss, glass: glassCss, terminal: terminalCss } as const;
+/** Every skin stylesheet, found rather than enumerated. */
+const SKIN_CSS: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('./skins/*.css', { query: '?inline', import: 'default', eager: true }),
+  ).map(([path, css]) => [path.replace(/^.*\/(.*)\.css$/, '$1'), css as string]),
+);
+
+const SHEETS: Record<string, string> = { tokens: tokensCss, base: baseCss, ...SKIN_CSS };
+const EVERY_SHEET = Object.entries(SHEETS);
 
 interface LayeredRule {
   /** The rule's own selector list, as the parser normalised it. */
@@ -24,95 +34,162 @@ interface LayeredRule {
   readonly layers: readonly string[];
 }
 
-/** A `@layer name { … }` block: a grouping rule that also carries the layer's name. */
-const isLayerBlock = (rule: CSSRule): rule is CSSGroupingRule & { readonly name: string } =>
-  'cssRules' in rule && 'name' in rule;
-
-/** A `@layer a, b, c;` statement, which names an order without styling anything. */
-const isLayerStatement = (
-  rule: CSSRule,
-): rule is CSSRule & { readonly nameList: readonly string[] } => 'nameList' in rule;
-
-const isStyleRule = (rule: CSSRule): rule is CSSStyleRule => 'selectorText' in rule;
-
 function parse(css: string): CSSStyleSheet {
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css);
   return sheet;
 }
 
-/** Every style rule in a sheet, each tagged with the layers it sits inside. */
+/**
+ * Every style rule in a sheet, each tagged with the layers it sits inside. The variants are
+ * discriminated by their actual CSSOM class rather than by which properties they happen to carry:
+ * `@keyframes` also has a name and child rules, and a style rule may itself nest others.
+ */
 function styleRules(rules: CSSRuleList, layers: readonly string[] = []): LayeredRule[] {
   return [...rules].flatMap((rule) => {
-    if (isLayerBlock(rule)) {
+    if (rule instanceof CSSLayerBlockRule) {
       return styleRules(rule.cssRules, [...layers, rule.name]);
     }
-    if (isStyleRule(rule)) {
-      return [{ selector: rule.selectorText, layers }];
+    if (rule instanceof CSSStyleRule) {
+      // A style rule can nest, so it is emitted AND descended into.
+      return [{ selector: rule.selectorText, layers }, ...styleRules(rule.cssRules, layers)];
     }
-    if ('cssRules' in rule) {
-      return styleRules((rule as CSSGroupingRule).cssRules, layers);
+    if (rule instanceof CSSGroupingRule) {
+      return styleRules(rule.cssRules, layers);
     }
 
     return [];
   });
 }
 
-/** The scopes a rule can hang off and still reach every button in the document. */
-const GLOBAL_SCOPE = /^(:root(\[[^\]]*])?|html(\[[^\]]*])?|body|>|\+|~)$/;
-/** A `button` subject wearing no class, id, or attribute of its own — the thing that leaked. */
-const BARE_BUTTON = /^button(::?[a-z-]+(\([^)]*\))?)*$/;
+/** A `button` subject wearing no class or id of its own — attributes and pseudos do not claim it. */
+const BARE_BUTTON_SUBJECT = /^button(\[[^\]]*])*(::?[a-z-]+)*$/;
 
-function isReachingEveryButton(selector: string): boolean {
-  const parts = selector.trim().split(/\s+/);
-  const subject = parts.at(-1);
-  if (subject === undefined || !BARE_BUTTON.test(subject)) {
-    return false;
-  }
+/**
+ * Whether a selector can reach a button no class has claimed. Restrictive by default, which is
+ * the only safe direction for a guard: the selector counts as narrowed ONLY if a class or an id
+ * appears somewhere in it. Functional pseudo-class arguments are emptied first, so
+ * `:is(html, body) button` is seen for the global rule it is, and `button:not(.btn)` is not
+ * excused by the class inside its own guard — decision 1 rejected `:not()` opt-outs, so flagging
+ * them is the intent, not a false positive.
+ */
+function isReachingUnclaimedButtons(selector: string): boolean {
+  const flattened = emptyEveryGroup(selector);
+  const subject = flattened.trim().split(/\s+/).at(-1);
 
-  return parts.slice(0, -1).every((part) => GLOBAL_SCOPE.test(part));
+  return (
+    subject !== undefined &&
+    BARE_BUTTON_SUBJECT.test(subject.replaceAll('()', '')) &&
+    !/[#.]/.test(flattened)
+  );
 }
 
-function globalButtonRules(css: string): LayeredRule[] {
+/** Replaces every `(...)` — however nested — with an empty pair, leaving the structure around it. */
+function emptyEveryGroup(selector: string): string {
+  let flattened = selector;
+  let previous = '';
+  while (flattened !== previous) {
+    previous = flattened;
+    flattened = flattened.replaceAll(/\([^()]*\)/g, '()');
+  }
+
+  return flattened;
+}
+
+/** The selector list's own commas — the ones inside `:is(...)` separate arguments, not selectors. */
+function selectorsOf(selectorText: string): string[] {
+  const selectors: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const character of selectorText) {
+    if (character === '(') depth += 1;
+    else if (character === ')') depth -= 1;
+    if (character === ',' && depth === 0) {
+      selectors.push(current);
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+
+  return [...selectors, current];
+}
+
+function unclaimedButtonRules(css: string): LayeredRule[] {
   return styleRules(parse(css).cssRules).filter((rule) =>
-    rule.selector.split(',').some((one) => isReachingEveryButton(one)),
+    selectorsOf(rule.selector).some((one) => isReachingUnclaimedButtons(one)),
   );
 }
 
 describe('the stylesheets’ layering', () => {
-  it('names the layer order before anything uses one', () => {
-    const [first] = [...parse(tokensCss).cssRules];
+  it('scans a stylesheet for every shipped skin', () => {
+    // The skins are globbed so a skin nobody remembered to add to a list is still scanned; this
+    // assertion exists to catch the glob silently matching nothing.
+    const byName = (a: string, b: string) => a.localeCompare(b);
+    expect(Object.keys(SKIN_CSS).toSorted(byName)).toEqual([...SKINS].toSorted(byName));
+  });
 
-    if (first === undefined || !isLayerStatement(first)) {
-      throw new Error('the first stylesheet loaded does not open by naming the layer order');
+  it.each(EVERY_SHEET)('names the layer order at the head of %s', (_name, css) => {
+    const [first] = [...parse(css).cssRules];
+
+    if (first === undefined || !(first instanceof CSSLayerStatementRule)) {
+      throw new Error('this stylesheet does not open by naming the layer order');
     }
-    // Theme last: a skin overriding the base is the skin system's whole contract.
+    // Every sheet restates it, so no import order can decide it. Theme last: a skin overriding
+    // the base is the skin system's whole contract.
     expect([...first.nameList]).toEqual(['reset', 'base', 'theme']);
   });
 
-  it.each([
-    ['tokens', tokensCss],
-    ['base', baseCss],
-  ])('leaves no %s rule outside a layer', (_name, css) => {
+  it.each(EVERY_SHEET)('leaves no rule in %s outside a layer', (_name, css) => {
     const unlayered = styleRules(parse(css).cssRules).filter((rule) => rule.layers.length === 0);
 
     // An unlayered rule outranks every layer, skins included — it would silently win.
     expect(unlayered.map((rule) => rule.selector)).toEqual([]);
   });
 
-  it.each(Object.entries(SKINS))('keeps the %s skin inside the theme layer', (_name, css) => {
+  it.each(Object.entries(SKIN_CSS))('keeps the %s skin inside the theme layer', (_name, css) => {
     const stray = styleRules(parse(css).cssRules).filter((rule) => rule.layers[0] !== 'theme');
 
     expect(stray.map((rule) => rule.selector)).toEqual([]);
   });
 
-  it.each([['base', baseCss], ['tokens', tokensCss], ...Object.entries(SKINS)])(
-    'styles a globally-scoped bare button in %s only from the reset',
-    (_name, css) => {
-      const outsideTheReset = globalButtonRules(css).filter((rule) => rule.layers[0] !== 'reset');
+  it.each(EVERY_SHEET)('styles an unclaimed button in %s only from the reset', (_name, css) => {
+    const outsideTheReset = unclaimedButtonRules(css).filter((rule) => rule.layers[0] !== 'reset');
 
-      // Widget chrome is opt-in via `.btn`. A rule here is how the anatomy broke the first time.
-      expect(outsideTheReset.map((rule) => rule.selector)).toEqual([]);
-    },
-  );
+    // Widget chrome is opt-in via `.btn`. A rule here is how the anatomy broke the first time.
+    expect(outsideTheReset.map((rule) => rule.selector)).toEqual([]);
+  });
+});
+
+describe('what counts as reaching an unclaimed button', () => {
+  // A guard is worth exactly what its subject rule is worth, so the rule is specified directly.
+  // Every row below is a way someone could re-chrome the app's buttons without meaning to.
+  it.each([
+    'button',
+    'button:hover',
+    ':root button',
+    ':root[data-skin="forum"] button',
+    'html body button',
+    '* button',
+    'main button',
+    ':is(html, body) button',
+    ':where(:root) button',
+    'button[type="submit"]',
+    'button:not(.btn)',
+  ])('flags %s', (selector) => {
+    expect(isReachingUnclaimedButtons(selector)).toBe(true);
+  });
+
+  it.each([
+    '.btn',
+    '.btn:hover',
+    '.segmented button',
+    '.entity-filter button[aria-pressed="true"]',
+    ':root[data-skin="forum"] .segmented button',
+    '.result-open',
+    'a',
+    'input',
+  ])('leaves %s alone', (selector) => {
+    expect(isReachingUnclaimedButtons(selector)).toBe(false);
+  });
 });

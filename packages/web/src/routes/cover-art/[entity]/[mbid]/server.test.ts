@@ -51,7 +51,7 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
-  it('serves the larger size when the detail surface asks for it', async () => {
+  it('serves the larger size when the detail view asks for it', async () => {
     const art = port(foundAnswer);
 
     await GET(event(art, { entity: 'release-group', mbid: MBID }, '500'));
@@ -150,5 +150,23 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
 
     expect(response.status).toBe(400);
     expect(art.front).not.toHaveBeenCalled();
+  });
+
+  it('says out loud that it refused a URL this application emitted', async () => {
+    const warn = vi.fn();
+    const request = {
+      params: { entity: 'artist', mbid: MBID },
+      url: new URL('https://app.test/cover-art/x/y'),
+      locals: { coverArt: port(foundAnswer), logger: { warn, debug: vi.fn() } },
+    } as never;
+
+    await GET(request);
+
+    // A refused URL is a first-party defect, and the page now shows a placeholder rather than the
+    // browser's broken-image mark — so this line is the only sign left, and debug is off in prod.
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ entity: 'artist' }),
+      'cover art refused',
+    );
   });
 });
