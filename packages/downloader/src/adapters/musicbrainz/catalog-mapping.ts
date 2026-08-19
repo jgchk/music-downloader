@@ -88,9 +88,10 @@ export function toArtists(json: MbArtistSearch): readonly ScoredArtist[] {
     artists.push({
       mbid,
       name,
-      // The catalog's own tie-breaker when it has one, else what kind of act this is — both answer
-      // the same question a searcher is asking of two same-named artists.
-      disambiguation: nameOf(hit.disambiguation) ?? nameOf(hit.type),
+      // Both facts, each as itself. They answer the same question a searcher asks of two
+      // same-named artists, but which to show is the reader's call, not this read's.
+      disambiguation: nameOf(hit.disambiguation),
+      type: nameOf(hit.type),
       score: hit.score ?? 0,
     });
   }

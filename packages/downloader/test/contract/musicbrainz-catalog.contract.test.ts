@@ -96,6 +96,10 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
 
     expect(results.leading).toBe('artist');
     expect(results.artists[0]?.name).toBe('Paul Simon');
+    // Both facts, from one recorded answer: the catalog states this artist's kind AND its own
+    // tie-breaker, and a reader that wants either must be able to have it.
+    expect(results.artists[0]?.type).toBe('Person');
+    expect(results.artists[0]?.disambiguation).toBe('of Simon & Garfunkel');
   });
 
   it('asks each entity read with the parameters it was recorded with', async () => {
