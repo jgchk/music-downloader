@@ -51,3 +51,32 @@ The multi-agent review before merge found three behavioural bugs worth recording
 - The browser trusted any 2xx as a well-shaped answer. An expired session redirects to the sign-in page, which arrives as 200 HTML — reported as a successful search of nothing. The client now parses every answer against the facade's own exported schema.
 
 Two more were structural rather than behavioural: the detail surface claimed the `.detail` class the acquisitions master-detail layout already owns (renamed `catalog-detail`), and artist ranking matched names as bare substrings, so `Head` and `Rain` outranked `Radiohead` for "radiohead in rainbows" (now matched on whole words).
+
+## What the review cycles changed
+
+Three review cycles (and a fourth pass over what they had deferred) changed real
+behaviour, not just wording. Recorded here because the archived change is the record:
+
+- **An unstated track count is absent, not zero.** It had been both the grouping key and the
+  picker's input, and the picker breaks ties toward the lower count — so the pressing the catalog
+  says least about won the default. The count is `number | undefined` end to end now, and an
+  unstated one never stands for election.
+- **A search degrades to the kinds that answered.** One 503 out of three reads had discarded the
+  answers that arrived. The port and the wire now name the kinds that could not be read, and the
+  page says so where "nothing matched" would have been a lie.
+- **`id` is required in every catalog search schema.** A renamed identifier parsed clean under a
+  tolerant reader and emptied every block silently; it is a permanent drift fault now.
+- **Cover art is served only under a type this application is willing to serve** (the archive's
+  content is user-contributed, and `image/svg+xml` is a script-bearing document re-served from our
+  own origin), and an absence says how many images it saw while finding no front cover — so a
+  renamed `front` flag is diagnosable rather than a silent product-wide blank.
+- **The advanced request policies and track-by-descriptor requests are back.** They left the
+  product with the old form while the request contract still accepted them, which made the page
+  quietly narrower than the system.
+- **"Not booted" is a value, not five throws.** The web runtime has one accessor returning the
+  absence; the gate answers 503 and the health probe answers "not ready".
+
+Promotion candidates from the same cycles were filed as issues #202 (a vendor call handed to
+`fromPromise` as an argument), #203 (a sentinel where absence is the fact), and #204 (a log line
+that is the only evidence of a failure needs a test that observes it), with two more instances
+added to #196.
