@@ -66,7 +66,12 @@ describe('the acquisitions collapse is joined up across markup and stylesheet', 
     // Inside the block: the desktop two-pane presentation is untouched by both rules…
     const narrow = narrowViewportBlock(BASE_CSS);
     expect(narrow).toContain('.master-detail.detail-active .master');
-    expect(narrow).toContain('.master-detail.detail-active .back-to-queue');
+    // …and the back link is actually SHOWN here, not merely selected. Pinning the declaration is
+    // the other half of the collapse pair: with the queue hidden and the link left at its default
+    // `display: none`, a narrow-screen user on a child route has no in-app way back at all.
+    expect(narrow).toMatch(
+      /\.master-detail\.detail-active \.back-to-queue \{[^}]*display: inline-block;/u,
+    );
     // …and the back link is hidden by default, so it never appears beside a visible queue.
     expect(BASE_CSS).toContain('.master-detail .back-to-queue { display: none; }');
   });
