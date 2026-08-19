@@ -253,6 +253,14 @@ export default tseslint.config(
       // catch-up `drain`/`redrive` pair adjacent. Enforcing a strict accessibility order would
       // scatter those groups across a 500-line class, so the rule is off — grouping is the convention.
       'unicorn/consistent-class-member-order': 'off',
+      // The one-line doc comment (`/** What this is. */`) is this codebase's house form, used ~780
+      // times: a short "what it is" sits on one line, and only a comment with something more to say
+      // — a rationale, a list, a worked example — earns the three-line block. unicorn 73's new rule
+      // inverts that, expanding every one-liner to three lines. Adopting it would triple the
+      // vertical cost of the cheapest documentation we write, which is exactly the documentation we
+      // most want people to keep writing. Off — the multi-line block stays reserved for prose that
+      // needs it.
+      'unicorn/single-line-block-comment-style': 'off',
     },
   },
   {

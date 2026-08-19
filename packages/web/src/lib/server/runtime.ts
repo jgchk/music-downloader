@@ -94,7 +94,7 @@ export interface BootOverrides {
  * and one runtime's failed stop must never skip the other's (its pollers would keep the event
  * loop alive until SIGKILL). Returns whether every stop settled cleanly.
  */
-async function stopSettled(
+async function didStopsSettle(
   logger: Logger,
   message: string,
   stops: readonly Promise<void>[],
@@ -153,7 +153,7 @@ async function boot(
   );
   if (importerResult.isErr()) {
     // Settled, never bare-awaited: a failing downloader stop must not mask the startup error.
-    await stopSettled(logger, 'runtime stop failed during boot teardown', [downloader.stop()]);
+    await didStopsSettle(logger, 'runtime stop failed during boot teardown', [downloader.stop()]);
     throw new Error(`importer startup failed: ${importerResult.error.detail}`);
   }
   const importer: ImporterRuntime = importerResult.value;
@@ -170,10 +170,10 @@ async function boot(
   } catch (error) {
     // A subscription whose start throws must not strand two booted runtimes with live pollers
     // behind a rejected boot: stop everything already started, then surface the ORIGINAL fatal —
-    // cleanup rejections are logged by stopSettled, never thrown over it. The subscription stops
+    // cleanup rejections are logged by didStopsSettle, never thrown over it. The subscription stops
     // settle alongside the runtime stops: each runtime already awaits its own subscription before
     // closing its store, so these are the prompt detach, not the ordering guarantee.
-    await stopSettled(logger, 'runtime stop failed during boot teardown', [
+    await didStopsSettle(logger, 'runtime stop failed during boot teardown', [
       acquisitions.stop(),
       verdicts.stop(),
       downloader.stop(),
@@ -183,7 +183,7 @@ async function boot(
   }
 
   const shutdown = async (): Promise<void> => {
-    const isClean = await stopSettled(logger, 'runtime stop failed during shutdown', [
+    const isClean = await didStopsSettle(logger, 'runtime stop failed during shutdown', [
       acquisitions.stop(),
       verdicts.stop(),
       downloader.stop(),

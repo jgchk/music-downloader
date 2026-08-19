@@ -302,7 +302,7 @@ describe('bootRuntimes', () => {
   });
 
   it('a defect thrown inside shutdown itself is logged, never an unhandled rejection', async () => {
-    // stopSettled absorbs runtime-stop failures, but shutdown still calls the seam
+    // didStopsSettle absorbs runtime-stop failures, but shutdown still calls the seam
     // subscriptions' sync stop()s directly — a defect thrown there rejects the fire-and-forget
     // shutdown call, which has no awaiting caller. The last-resort catch must observe it.
     const log: string[] = [];
