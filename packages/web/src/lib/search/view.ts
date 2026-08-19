@@ -31,6 +31,55 @@ export function countOf(results: CatalogSearchResultDto, kind: EntityKind): numb
   }
 }
 
+/**
+ * How many of each kind the mixed view shows. A presentation number, and web's alone: the read
+ * keeps returning its full ranked lists, because the fetch depth is what gives the ranking
+ * something to rank. Sized for a person scanning — albums are what most searches are for, so they
+ * get the most room; artists and tracks are there to be recognized, not browsed.
+ */
+export const TOP_RESULTS: Record<EntityKind, number> = {
+  'release-group': 10,
+  artist: 6,
+  recording: 6,
+};
+
+/**
+ * What one kind's block actually lists. The mixed view shows the top results — past the head,
+ * ranking positions are token coincidence, and a wall of them buries the kinds below and costs an
+ * artwork request each. Filtering to a kind is asking to see that kind, so it shows all of it.
+ */
+export function topResults<T>(
+  entries: readonly T[],
+  kind: EntityKind,
+  filter: EntityFilter,
+): readonly T[] {
+  return filter === 'all' ? entries.slice(0, TOP_RESULTS[kind]) : entries;
+}
+
+/** What a section heading says about its own count — and whether it is holding anything back. */
+export interface ShownCount {
+  readonly isTrimmed: boolean;
+  readonly shown: number;
+  readonly matched: number;
+  /** "10 of 25" when trimmed, else the plain number. */
+  readonly label: string;
+}
+
+/**
+ * A count that tells the truth. A heading reading "25" above ten cards is a small lie that costs
+ * someone the other fifteen; saying "10 of 25" makes the rest one interaction away instead.
+ */
+export function trimmedCount(matched: number, shown: number): ShownCount {
+  const isTrimmed = shown < matched;
+
+  return {
+    isTrimmed,
+    shown,
+    matched,
+    label: isTrimmed ? `${shown} of ${matched}` : String(matched),
+  };
+}
+
 /** Whether the catalog could not be read for this kind at all — an empty block with a reason. */
 export function isUnavailable(results: CatalogSearchResultDto, kind: EntityKind): boolean {
   return (results.unavailable ?? []).some((one) => one.kind === kind);

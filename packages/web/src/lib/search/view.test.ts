@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TOP_RESULTS,
   albumDetail,
   alternativeLabel,
   artUrl,
@@ -9,7 +10,9 @@ import {
   isCatalogId,
   orderedKinds,
   otherMatches,
+  topResults,
   trackDetail,
+  trimmedCount,
 } from './view.js';
 import type { CatalogSearchResultDto } from '@music/downloader';
 
@@ -158,6 +161,52 @@ describe('artUrl', () => {
   it('asks this application for artwork, at the size being rendered', () => {
     expect(artUrl('release-group', 'rg-1', 250)).toBe('/cover-art/release-group/rg-1?size=250');
     expect(artUrl('release', 'rel-1', 500)).toBe('/cover-art/release/rel-1?size=500');
+  });
+});
+
+describe('topResults', () => {
+  const many = (count: number) =>
+    results({
+      releaseGroups: Array.from({ length: count }, (_unused, index) => ({
+        mbid: MBID,
+        title: `Album ${index}`,
+        artistCredit: 'Someone',
+        secondaryTypes: [],
+      })),
+    });
+
+  it('shows a person the leading slice rather than the whole ranked pool', () => {
+    // Past the head, ranking positions are token coincidence: a wall of them buries the other
+    // kinds and costs an artwork request each.
+    const shown = topResults(many(25).releaseGroups, 'release-group', 'all');
+
+    expect(shown).toHaveLength(TOP_RESULTS['release-group']);
+  });
+
+  it('shows everything of one kind once that kind is what is being looked at', () => {
+    const shown = topResults(many(25).releaseGroups, 'release-group', 'release-group');
+
+    expect(shown).toHaveLength(25);
+  });
+
+  it('does not trim what already fits', () => {
+    const shown = topResults(many(3).releaseGroups, 'release-group', 'all');
+
+    expect(shown).toHaveLength(3);
+  });
+});
+
+describe('trimmedCount', () => {
+  it('states the trim so the count on screen is not a lie', () => {
+    const shown = trimmedCount(25, 10);
+
+    expect(shown).toEqual({ isTrimmed: true, shown: 10, matched: 25, label: '10 of 25' });
+  });
+
+  it('says the plain number when nothing was held back', () => {
+    const shown = trimmedCount(6, 6);
+
+    expect(shown).toEqual({ isTrimmed: false, shown: 6, matched: 6, label: '6' });
   });
 });
 

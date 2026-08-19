@@ -10,7 +10,9 @@
     unavailableNotice,
     orderedKinds,
     otherMatches,
+    topResults,
     trackDetail,
+    trimmedCount,
   } from '$lib/search/view.js';
   import CoverArt from './CoverArt.svelte';
   import type { EntityFilter, EntityKind } from '$lib/search/view.js';
@@ -32,6 +34,21 @@
   let { results, filter, query, onOpen, onFilter }: Properties = $props();
 
   const kinds = $derived(orderedKinds(results, filter));
+  /**
+   * What each block lists — the top results in the mixed view, everything once a kind is what is
+   * being looked at — and what its heading may honestly claim about the rest.
+   */
+  const shownGroups = $derived(topResults(results.releaseGroups, 'release-group', filter));
+  const shownArtists = $derived(topResults(results.artists, 'artist', filter));
+  const shownRecordings = $derived(topResults(results.recordings, 'recording', filter));
+  const listedOf: Record<EntityKind, () => number> = {
+    'release-group': () => shownGroups.length,
+    artist: () => shownArtists.length,
+    recording: () => shownRecordings.length,
+  };
+  const shownCount = $derived((kind: EntityKind) =>
+    trimmedCount(countOf(results, kind), listedOf[kind]()),
+  );
   const notice = $derived(unavailableNotice(results));
   /** How many requests are in flight, so a submitted form cannot be submitted again. */
   let requesting = $state(0);
@@ -76,12 +93,24 @@
 {/if}
 
 {#each kinds as kind (kind)}
+  {@const count = shownCount(kind)}
   <section class="results" data-kind={kind}>
-    <h2><span>{HEADINGS[kind]}</span> <span class="count">{countOf(results, kind)}</span></h2>
+    <h2>
+      <span>{HEADINGS[kind]}</span>
+      {#if count.isTrimmed}
+        <!-- The rest are one interaction away, and the heading says so rather than implying the
+             block is everything that matched. -->
+        <button type="button" class="linkish count" onclick={() => onFilter(kind)}>
+          {count.label}
+        </button>
+      {:else}
+        <span class="count">{count.label}</span>
+      {/if}
+    </h2>
 
     {#if kind === 'release-group'}
       <ul class="art-grid">
-        {#each results.releaseGroups as group (group.mbid)}
+        {#each shownGroups as group (group.mbid)}
           <li class="result">
             <button
               type="button"
@@ -112,7 +141,7 @@
       </ul>
     {:else if kind === 'artist'}
       <ul class="artist-row">
-        {#each results.artists as artist (artist.mbid)}
+        {#each shownArtists as artist (artist.mbid)}
           <li class="result">
             <button
               type="button"
@@ -129,7 +158,7 @@
       </ul>
     {:else if kind === 'recording'}
       <ul class="track-rows">
-        {#each results.recordings as recording (recording.mbid)}
+        {#each shownRecordings as recording (recording.mbid)}
           <li class="result">
             <button
               type="button"
