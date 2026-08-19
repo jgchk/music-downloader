@@ -46,6 +46,14 @@ function hasZone(list: readonly Zone[], target: string, from: string): boolean {
 
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
+/**
+ * Words that belong to a consumer rather than to the mechanism: the two context names, plus nouns
+ * each `CONTEXT.md` claims. `seam`, `subscription`, `checkpoint` and `poison` are deliberately
+ * absent — CONTEXT-MAP names those as shared seam vocabulary, and the drain's log lines keep them.
+ */
+const CONSUMER_VOCABULARY =
+  /\b(downloader|importer|acquisition|beets|slskd|soulseek|candidate|album|intake|staging)\b/i;
+
 /** Production TypeScript under `directory`, repo-relative. */
 function productionSourcesUnder(directory: string): readonly string[] {
   return globSync(`${directory}/**/*.ts`, { cwd: REPO_ROOT }).filter(
@@ -118,14 +126,18 @@ describe('module boundary lint zones', () => {
     }
   });
 
-  it("keeps every context name out of the shared package's production source", () => {
-    // The leaf lint zones stop eventing IMPORTING a context. Nothing stops it naming one, and the
-    // name is how a mechanism package starts acquiring a model: a branch on a context, a default
-    // that suits one consumer, a message in one context's voice. That is the whole justification
-    // for amending "no shared kernel" to "no shared model", so it is pinned rather than asserted.
+  it("keeps both contexts' vocabulary out of the shared package's production source", () => {
+    // The leaf lint zones stop eventing IMPORTING a context; nothing stops it NAMING one, and a name
+    // is how a mechanism package starts acquiring a model — a branch on a context, a default that
+    // suits one consumer, a message in one context's voice. That is the whole justification for
+    // amending "no shared kernel" to "no shared model", so it is pinned rather than asserted.
+    //
+    // The pattern is the two context names plus the nouns each glossary claims. It cannot prove the
+    // absence of a consumer's VOICE, only of its words — the honest limit of a grep, and why the
+    // design records the seam log strings it deliberately keeps.
     const sources = productionSourcesUnder('packages/eventing/src');
     const offenders = sources.filter((file) =>
-      /\bdownloader\b|\bimporter\b/i.test(readFileSync(path.join(REPO_ROOT, file), 'utf8')),
+      CONSUMER_VOCABULARY.test(readFileSync(path.join(REPO_ROOT, file), 'utf8')),
     );
 
     expect(sources.length).toBeGreaterThan(0); // a discovery finding nothing would pass vacuously

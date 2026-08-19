@@ -54,8 +54,11 @@ class FakeCheckpointStore {
   public rejectSaves = false;
   /** Saves of exactly these positions fail; everything else succeeds. */
   public failSavesAt = new Set<number>();
-  /** Park every save behind this, so a test can hold one open across a barrier. */
-  public beforeSave: (() => Promise<void>) | undefined;
+  /**
+   * Park the NEXT save behind this (it clears itself), so a test can hold one open across a barrier.
+   * Outranks the failure flags while set — a save gated here succeeds.
+   */
+  public gateNextSave: (() => Promise<void>) | undefined;
 
   load(consumer: string): ResultAsync<number, StoreFault> {
     if (this.failLoads) return errAsync(storeFault('load failed'));
@@ -63,9 +66,9 @@ class FakeCheckpointStore {
   }
 
   save(consumer: string, position: number): ResultAsync<void, StoreFault> {
-    if (this.beforeSave !== undefined) {
-      const gate = this.beforeSave();
-      this.beforeSave = undefined;
+    if (this.gateNextSave !== undefined) {
+      const gate = this.gateNextSave();
+      this.gateNextSave = undefined;
       const save = async (): Promise<void> => {
         await gate;
         this.positions.set(consumer, position);
@@ -341,7 +344,7 @@ describe('CheckpointedDrain', () => {
       feed.failure = {
         kind: 'Permanent',
         reason: 'RenderError',
-        cause: { kind: 'RenderError', eventType: 'ReleaseVerdict', message: 'schema refused it' },
+        cause: { kind: 'RenderError', eventType: 'WidgetRendered', message: 'schema refused it' },
       };
       const subject = drain();
 
@@ -349,7 +352,7 @@ describe('CheckpointedDrain', () => {
 
       const halted = logged.find((line) => line.message.includes('render defect'));
       expect(halted?.payload).toMatchObject({
-        err: { cause: { eventType: 'ReleaseVerdict', message: 'schema refused it' } },
+        err: { cause: { eventType: 'WidgetRendered', message: 'schema refused it' } },
       });
       await subject.stop();
     });
@@ -468,6 +471,29 @@ describe('CheckpointedDrain', () => {
       expect(messages()).toContain(
         'poison event; subscription halted, checkpoint held (order over progress)',
       );
+      await subject.stop();
+    });
+
+    it("carries the step classifier's cause into the halt log", async () => {
+      // The feed path is pinned above. This is the other producer of a Permanent classification, and
+      // the one a consumer's own schema failure travels — so it is the line that has to name which
+      // field refused, not merely that something did.
+      feed.items = [item(1)];
+      failures.set(1, [
+        {
+          kind: 'Permanent',
+          reason: 'InvalidPayload',
+          cause: { field: 'verdict', issue: 'required' },
+        },
+      ]);
+      const subject = drain();
+
+      await subject.start();
+
+      const halted = logged.find((line) => line.message.includes('poison event'));
+      expect(halted?.payload).toMatchObject({
+        err: { reason: 'InvalidPayload', cause: { field: 'verdict' } },
+      });
       await subject.stop();
     });
 
@@ -874,7 +900,7 @@ describe('CheckpointedDrain', () => {
       // barrier that watched only the drain would resolve straight into a closed-handle write.
       const gate = Promise.withResolvers<void>();
       const slowSaves = new FakeCheckpointStore();
-      slowSaves.beforeSave = () => gate.promise;
+      slowSaves.gateNextSave = () => gate.promise;
       const subject = drain({ checkpoints: slowSaves });
 
       const resetting = subject.reset(0);

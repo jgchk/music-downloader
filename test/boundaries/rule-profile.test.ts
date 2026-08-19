@@ -61,7 +61,7 @@ const PRODUCTION_BASELINE = 'packages/downloader/src/application/events/catch-up
 
 /** Test code proper: the carve-out applies in full. */
 const TEST_FILES = [
-  'packages/downloader/src/application/acquisition/reactor.test.ts',
+  'packages/downloader/src/application/download/reactor.test.ts',
   'packages/downloader/test/contract/support/fixture.ts',
   'packages/web/tests/login.spec.ts',
   'test/boundaries/boundaries.test.ts',

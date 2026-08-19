@@ -212,7 +212,9 @@ describe('the intake event consumer', () => {
       fulfilledEvent({ candidate: { username: 'peer3', path: 'peer3/z', sizeBytes: 3000 } }, 3),
     );
 
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'CycleInFlight' });
+    const held = outcome._unsafeUnwrapErr();
+    expect(held).toMatchObject({ kind: 'Transient', reason: 'CycleInFlight' });
+    expect(held.cause).toMatchObject({ kind: 'CycleInFlight' });
     expect(wiring.store.all()).toHaveLength(before);
   });
 
@@ -313,7 +315,11 @@ describe('the intake event consumer', () => {
 
     const outcome = await consume(fulfilledEvent({ location: '' }));
 
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Permanent', reason: 'InvalidPayload' });
+    // The classification HALTS the seam, so the failure it returns is the operator's whole account
+    // of why: `InvalidPayload` alone names no field, and the zod issues are the only thing that does.
+    const failure = outcome._unsafeUnwrapErr();
+    expect(failure).toMatchObject({ kind: 'Permanent', reason: 'InvalidPayload' });
+    expect(failure.cause).toMatchObject({ eventType: 'acquisition.fulfilled', globalSeq: 1 });
   });
 
   it('a location outside the source root is a permanent rejection', async () => {
@@ -379,7 +385,11 @@ describe('the intake event consumer', () => {
     const outcome = await consume(fulfilledEvent());
 
     // The submission's sad path is an infra fault; its kind rides through as the transient reason.
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Transient', reason: 'InfraError' });
+    // The append fault itself rides along: 'InfraError' names the class, and the operator needs the
+    // operation and message behind it to tell a locked store from a disk-full one.
+    const failure = outcome._unsafeUnwrapErr();
+    expect(failure).toMatchObject({ kind: 'Transient', reason: 'InfraError' });
+    expect(failure.cause).toMatchObject({ kind: 'InfraError' });
   });
 
   it('an append race is transient too, passing the conflict kind through as the hold reason', async () => {
@@ -389,10 +399,9 @@ describe('the intake event consumer', () => {
 
     const outcome = await consume(fulfilledEvent());
 
-    expect(outcome._unsafeUnwrapErr()).toEqual({
-      kind: 'Transient',
-      reason: 'ConcurrencyConflict',
-    });
+    const held = outcome._unsafeUnwrapErr();
+    expect(held).toMatchObject({ kind: 'Transient', reason: 'ConcurrencyConflict' });
+    expect(held.cause).toMatchObject({ kind: 'ConcurrencyConflict' });
   });
 });
 

@@ -99,6 +99,23 @@ describe('createLogger', () => {
     }
   });
 
+  it("redacts one level below `err`, where the seam drain nests a producer's own error", () => {
+    // The drain classifies a failure and carries the consumer's error under `err.cause`. The
+    // wildcards above are single-level — `*.username` matches `err.username`, not
+    // `err.cause.username` — so without the deeper paths this nesting would be a hole that every
+    // other site is protected from.
+    const { stream, lines } = collectingDestination();
+    const logger = createLogger({ destination: stream });
+
+    logger.error(
+      { err: { kind: 'Transient', reason: 'InfraError', cause: { username: 'peer-42' } } },
+      'seam feed read failed; holding checkpoint',
+    );
+
+    expect(lines[0]).toContain('[REDACTED]');
+    expect(lines[0]).not.toContain('peer-42');
+  });
+
   it('honours custom redaction paths', () => {
     const { stream, lines } = collectingDestination();
     const logger = createLogger({ destination: stream, redactPaths: ['secretField'] });

@@ -51,6 +51,12 @@ export interface DrainBatch<TItem> {
  * the consumer names its own position field.
  */
 export interface DrainFeed<TItem> {
+  /**
+   * EXCLUSIVE of `from`, and strictly ascending in item position. Both are load-bearing rather than
+   * stylistic: the drain halts on an item position at or behind its cursor (see `advance`), and a
+   * checkpoint of `0` means "never checkpointed", so positions must start above zero or a fresh
+   * drain halts on its first item.
+   */
   read(from: number, limit: number): Promise<Result<DrainBatch<TItem>, DrainFailure>>;
   positionOf(item: TItem): number;
 }
@@ -127,13 +133,6 @@ export interface CheckpointedDrainDependencies<TItem, TError> {
 }
 
 /**
- * Mark a drain cycle as SETTLED for the stop and reset barriers without adopting its outcome. A
- * defect throw from the cycle stays the awaiting `poll` caller's to handle (it re-raises there);
- * this copy exists only so a barrier can tell when the drain has stopped touching the checkpoint,
- * and swallowing the rejection *here* is what keeps the barrier from surfacing as an unhandled
- * rejection of its own.
- */
-/**
  * The single place a classification decides the drain's behaviour. Exhaustive on purpose: D4 records
  * that a future per-stream `park` arm attaches here, and an `if (kind === 'Permanent')` would route
  * that new arm to hold-and-retry-forever in silence. Adding a variant breaks the build here instead.
@@ -152,6 +151,13 @@ function isPermanent(failure: DrainFailure): boolean {
   }
 }
 
+/**
+ * Mark a drain cycle as SETTLED for the stop and reset barriers without adopting its outcome. A
+ * defect throw from the cycle stays the awaiting `poll` caller's to handle (it re-raises there);
+ * this copy exists only so a barrier can tell when the drain has stopped touching the checkpoint,
+ * and swallowing the rejection *here* is what keeps the barrier from surfacing as an unhandled
+ * rejection of its own.
+ */
 const settled = async (work: Promise<unknown>): Promise<void> => {
   try {
     await work;
@@ -383,7 +389,7 @@ export class CheckpointedDrain<TItem, TError> {
       lastError = outcome.error;
       if (isPermanent(outcome.error)) {
         // Deterministic failures gain nothing from repetition — straight to the poison policy.
-        return this.poison(position, outcome.error.reason);
+        return this.poison(position, outcome.error);
       }
       this.dependencies.logger.warn(
         { subscription: this.dependencies.name, position, attempt, err: outcome.error },
@@ -406,10 +412,13 @@ export class CheckpointedDrain<TItem, TError> {
    * dead-letter-and-advance ("park") alternative is not offered, and what a per-stream variant
    * would have to attach to here.
    */
-  private poison(position: number, reason: string): boolean {
+  private poison(position: number, failure: DrainFailure): boolean {
     this.halted = true;
     this.dependencies.logger.error(
-      { subscription: this.dependencies.name, position, reason },
+      // The whole failure, not a field off it. This is the path that STOPS delivery until a human
+      // intervenes, so it is the last place that may log less than the transient paths beside it —
+      // and `cause` is where the consumer put the thing that names the actual defect.
+      { subscription: this.dependencies.name, position, err: failure },
       'poison event; subscription halted, checkpoint held (order over progress)',
     );
     return false;
@@ -417,10 +426,15 @@ export class CheckpointedDrain<TItem, TError> {
 
   /**
    * Persist the checkpoint; the cursor never advances past what the consumer has committed — and
-   * never moves BACKWARD. A feed whose positions are not strictly ascending would otherwise drive the
-   * durable checkpoint down and redeliver the same window forever, and `drain`'s `cursor === before`
-   * exit would not catch it, because the cursor did move. That is a producer defect no retry can
-   * fix, so it halts on the same terms as a poison item rather than quietly re-reading.
+   * never moves BACKWARD. A feed whose ITEM positions are not strictly ascending would otherwise
+   * drive the durable checkpoint down and redeliver the same window forever, and `drain`'s
+   * `cursor === before` exit would not catch it, because the cursor did move. That is a producer
+   * defect no retry can fix, so it halts on the same terms as a poison item.
+   *
+   * Scoped to item positions on purpose: a regressing `scannedTo` never reaches here, because
+   * `drain` calls this only when `scannedTo > cursor`. That pre-check is load-bearing — without it
+   * every fully-drained batch (where `scannedTo === cursor`) would halt — and the cost is that a
+   * backwards `scannedTo` reads as "fully drained" and holds quietly instead of halting.
    */
   private async advance(toPosition: number): Promise<boolean> {
     if (toPosition <= this.cursor) {
