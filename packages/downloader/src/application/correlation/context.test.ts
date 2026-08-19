@@ -28,8 +28,8 @@ const storedEvent = (metadata: StoredEvent['metadata']): StoredEvent =>
     globalSeq: 7,
     streamId: 'acq-1',
     version: 3,
-    type: 'AcquisitionSubmitted',
-    event: { type: 'AcquisitionSubmitted' },
+    type: 'DownloadSubmitted',
+    event: { type: 'DownloadSubmitted' },
     metadata,
   }) as unknown as StoredEvent;
 

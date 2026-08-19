@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { testScope } from '../../application/__fixtures__/correlation.js';
-import type { DownloadedFile } from '../../domain/acquisition/events.js';
+import type { DownloadedFile } from '../../domain/download/events.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
 import { FilesystemLibrary, nodeLibraryFileSystem } from './library.js';

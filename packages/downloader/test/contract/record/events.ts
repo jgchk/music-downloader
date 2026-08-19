@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { StoredEvent } from '../../../src/application/ports/event-store-port.js';
-import type { AcquisitionEvent } from '../../../src/domain/acquisition/events.js';
+import type { DownloadEvent } from '../../../src/domain/download/events.js';
 import {
   importingHistory,
   matchingCandidate,
   sampleFiles,
   sampleTarget,
-} from '../../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../../src/domain/download/__fixtures__/download-fixtures.js';
 import { publishedEventMapping } from '../../../src/interfaces/contracts/events/mapping.js';
 import { parseMbid } from '../../../src/domain/shared/mbid.js';
 import { createTarget } from '../../../src/domain/target/target.js';
@@ -48,12 +48,12 @@ const identifiedTarget = createTarget({
   mbid: parseMbid('6e335887-60ba-38f0-95af-fae8774d20fd')._unsafeUnwrap(),
 })._unsafeUnwrap();
 
-const history: readonly AcquisitionEvent[] = [
+const history: readonly DownloadEvent[] = [
   ...importingHistory([candidate]).map((event) =>
     event.type === 'TargetResolved' ? { ...event, target: identifiedTarget } : event,
   ),
   { type: 'Imported', candidate: candidate.identity, location: LOCATION, files: sampleFiles },
-  { type: 'AcquisitionFulfilled', location: LOCATION },
+  { type: 'DownloadFulfilled', location: LOCATION },
 ];
 
 const prefix: readonly StoredEvent[] = history.map((event, index) => ({

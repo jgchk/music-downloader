@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  AcquisitionStatusProjection,
+  DownloadStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
   StalledReadModel,
@@ -11,7 +11,7 @@ import { FakeDeadLetterStore, silentLogger } from '../__fixtures__/fakes.js';
 import { infraError } from '../ports/errors.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import { asUnit } from '../../domain/shared/__fixtures__/unit.js';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import {
   awaitingSelectionHistory,
@@ -27,22 +27,22 @@ import {
   selectedHistory,
   startedHistory,
   validatingHistory,
-} from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../domain/download/__fixtures__/download-fixtures.js';
 
 const a = matchingCandidate('a');
 const b = matchingCandidate('b');
 const c = matchingCandidate('c');
 
-const history: AcquisitionEvent[] = [
-  { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+const history: DownloadEvent[] = [
+  { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
   { type: 'TargetResolved', target: sampleTarget },
   { type: 'SearchCompleted', round: 1, candidates: [a, b, c] },
   { type: 'CandidatesRanked', ranked: rankedOf([a, b, c]) },
   { type: 'CandidateSelected', candidate: a },
-  { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+  { type: 'TryFailed', candidate: a.identity, reason: 'Stalled' },
   { type: 'CandidateRejected', candidate: a.identity },
   { type: 'CandidateSelected', candidate: b },
-  { type: 'DownloadCompleted', candidate: b.identity, files: [] },
+  { type: 'TryCompleted', candidate: b.identity, files: [] },
   {
     type: 'ValidationFailed',
     candidate: b.identity,
@@ -50,20 +50,20 @@ const history: AcquisitionEvent[] = [
   },
   { type: 'CandidateRejected', candidate: b.identity },
   { type: 'CandidateSelected', candidate: c },
-  { type: 'DownloadCompleted', candidate: c.identity, files: [] },
+  { type: 'TryCompleted', candidate: c.identity, files: [] },
   {
     type: 'ValidationPassed',
     candidate: c.identity,
     verdict: { confidence: asUnit(1), reasons: [] },
   },
   { type: 'Imported', candidate: c.identity, location: '/lib/c' },
-  { type: 'AcquisitionFulfilled', location: '/lib/c' },
+  { type: 'DownloadFulfilled', location: '/lib/c' },
 ];
 
 // StoredEvent rows built directly — the earlier fake-store detour discarded append's
 // ResultAsync and worked only because the fake mutates synchronously (S3 review sweep).
 function stored(
-  events: readonly AcquisitionEvent[],
+  events: readonly DownloadEvent[],
   occurredAt: (index: number) => string = () => 't',
 ): readonly StoredEvent[] {
   return events.map((event, index) => ({
@@ -88,7 +88,7 @@ describe('projectStatus', () => {
     expect(view.location).toBe('/lib/c');
     expect(view.attempts).toBe(3);
     expect(view.rejectedCount).toBe(2);
-    // A fulfilled acquisition has nothing in flight, so it reports no current candidate; the
+    // A fulfilled download has nothing in flight, so it reports no current candidate; the
     // candidate that succeeded is recorded in the history's 'imported' entry below.
     expect(view.currentCandidate).toBeUndefined();
     expect(view.history.map((entry) => entry.kind)).toEqual([
@@ -105,9 +105,9 @@ describe('projectStatus', () => {
   });
 
   it('stamps each history entry with its event occurrence time', () => {
-    const events: AcquisitionEvent[] = [
+    const events: DownloadEvent[] = [
       { type: 'CandidateSelected', candidate: a },
-      { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+      { type: 'TryFailed', candidate: a.identity, reason: 'Stalled' },
     ];
     const storedEvents: StoredEvent[] = events.map((event, index) => ({
       globalSeq: index + 1,
@@ -126,11 +126,11 @@ describe('projectStatus', () => {
 });
 
 describe('projectStatus — lifecycle history coverage', () => {
-  it('a fresh acquisition already has a requested entry carrying the request as given', () => {
+  it('a fresh download already has a requested entry carrying the request as given', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
       ]),
     );
     expect(view.history).toEqual([{ kind: 'requested', request: sampleRequest, at: 't' }]);
@@ -140,7 +140,7 @@ describe('projectStatus — lifecycle history coverage', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'TargetResolved', target: sampleTarget },
       ]),
     );
@@ -157,7 +157,7 @@ describe('projectStatus — lifecycle history coverage', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'TargetResolved', target: sampleTarget },
         { type: 'SearchRequested', round: 1 },
         { type: 'SearchCompleted', round: 1, candidates: [] },
@@ -179,11 +179,11 @@ describe('projectStatus — lifecycle history coverage', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'TargetResolved', target: sampleTarget },
         { type: 'SearchRequested', round: 1 },
         { type: 'SearchCompleted', round: 1, candidates: [] },
-        { type: 'AcquisitionExhausted' },
+        { type: 'DownloadExhausted' },
       ]),
     );
     expect(view.history.at(-1)).toEqual({ kind: 'exhausted', at: 't' });
@@ -193,7 +193,7 @@ describe('projectStatus — lifecycle history coverage', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'MetadataResolutionFailed' },
       ]),
     );
@@ -204,8 +204,8 @@ describe('projectStatus — lifecycle history coverage', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
-        { type: 'AcquisitionCancelled' },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadCancelled' },
       ]),
     );
     expect(view.history.at(-1)).toEqual({ kind: 'cancelled', at: 't' });
@@ -258,7 +258,7 @@ describe('projectStatus — the downloading phase is visible and narrated', () =
     ]);
   });
 
-  it('an acquisition recorded before the start fact existed folds without the entry', () => {
+  it('an download recorded before the start fact existed folds without the entry', () => {
     const view = projectStatus('acq-1', stored(selectedHistory([a])));
     expect(view.status).toBe('Downloading');
     expect(view.transferStarted).toBe(false);
@@ -271,7 +271,7 @@ describe('projectStatus — requested target exposure', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'MetadataResolutionFailed' },
       ]),
     );
@@ -280,26 +280,26 @@ describe('projectStatus — requested target exposure', () => {
   });
 });
 
-describe('projectStatus — when the acquisition was requested', () => {
+describe('projectStatus — when the download was requested', () => {
   // Distinct per-event times, so these cases can say WHICH event's time is taken — the shared
   // `stored` builder stamps every entry with the same 't' and cannot express the distinction.
-  const storedAt = (events: readonly AcquisitionEvent[]) => stored(events, minuteApart);
+  const storedAt = (events: readonly DownloadEvent[]) => stored(events, minuteApart);
 
   it('reports the time the request was recorded', () => {
     const view = projectStatus(
       'acq-1',
       storedAt([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
       ]),
     );
     expect(view.requestedAt).toBe('2026-01-01T00:00:00.000Z');
   });
 
-  it('keeps reporting the original request time as the acquisition progresses', () => {
+  it('keeps reporting the original request time as the download progresses', () => {
     const view = projectStatus(
       'acq-1',
       storedAt([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
         { type: 'TargetResolved', target: sampleTarget },
         { type: 'CandidateSelected', candidate: a },
       ]),
@@ -314,7 +314,7 @@ describe('projectStatus — when the acquisition was requested', () => {
       'acq-1',
       storedAt([
         { type: 'TargetResolved', target: sampleTarget },
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
       ]),
     );
     expect(view.requestedAt).toBe('2026-01-01T00:01:00.000Z');
@@ -331,7 +331,7 @@ describe('projectStatus — target description', () => {
     const view = projectStatus(
       'acq-1',
       stored([
-        { type: 'AcquisitionRequested', request: sampleRequest, policies: defaultPolicies() },
+        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
       ]),
     );
     expect(view.target).toBeUndefined();
@@ -342,7 +342,7 @@ describe('projectStatus — target description', () => {
       'acq-1',
       stored([
         {
-          type: 'AcquisitionRequested',
+          type: 'DownloadRequested',
           request: { kind: 'descriptor', targetType: 'album', artist: 'Artist', title: 'Album' },
           policies: defaultPolicies(),
         },
@@ -374,20 +374,20 @@ describe('projectStatus — awaiting manual edition selection', () => {
 
 describe('projectStatus — decided lifecycle flags', () => {
   // A Selecting state: a candidate ranked, none yet in flight (non-terminal, not awaiting).
-  const selectingHistory: AcquisitionEvent[] = [
+  const selectingHistory: DownloadEvent[] = [
     ...selectedHistory([a, b]),
-    { type: 'DownloadFailed', candidate: a.identity, reason: 'Stalled' },
+    { type: 'TryFailed', candidate: a.identity, reason: 'Stalled' },
     { type: 'CandidateRejected', candidate: a.identity },
   ];
 
   // One reachable history per terminal phase — the domain's own terminal set (state.ts TERMINAL_PHASES).
   const terminalHistories: Record<
     'Fulfilled' | 'Exhausted' | 'Cancelled' | 'MetadataFailed' | 'Conflicted',
-    AcquisitionEvent[]
+    DownloadEvent[]
   > = {
     Fulfilled: history,
-    Exhausted: [...selectingHistory, { type: 'AcquisitionExhausted' }],
-    Cancelled: [...selectedHistory([a]), { type: 'AcquisitionCancelled' }],
+    Exhausted: [...selectingHistory, { type: 'DownloadExhausted' }],
+    Cancelled: [...selectedHistory([a]), { type: 'DownloadCancelled' }],
     MetadataFailed: [...requestedHistory(), { type: 'MetadataResolutionFailed' }],
     Conflicted: [...importingHistory([a]), { type: 'ImportConflicted', location: '/x' }],
   };
@@ -396,7 +396,7 @@ describe('projectStatus — decided lifecycle flags', () => {
   // AwaitingManualSelection, which the awaiting-selection test below covers on its own.
   const nonTerminalHistories: Record<
     'Empty' | 'Pending' | 'Searching' | 'Selecting' | 'Downloading' | 'Validating' | 'Importing',
-    AcquisitionEvent[]
+    DownloadEvent[]
   > = {
     Empty: [],
     Pending: requestedHistory(),
@@ -427,7 +427,7 @@ describe('projectStatus — decided lifecycle flags', () => {
     },
   );
 
-  it('reports an awaiting-selection acquisition as awaiting selection and still cancellable', () => {
+  it('reports an awaiting-selection download as awaiting selection and still cancellable', () => {
     const awaiting = projectStatus('acq-1', stored(awaitingSelectionHistory()));
     expect(awaiting.status).toBe('AwaitingManualSelection');
     expect(awaiting.awaitingSelection).toBe(true);
@@ -453,27 +453,27 @@ describe('projectStatus — an external fulfilment rejection', () => {
   });
 });
 
-describe('AcquisitionStatusProjection', () => {
-  function applied(): AcquisitionStatusProjection {
-    const projection = new AcquisitionStatusProjection();
+describe('DownloadStatusProjection', () => {
+  function applied(): DownloadStatusProjection {
+    const projection = new DownloadStatusProjection();
     for (const entry of stored(history)) projection.apply(entry);
     return projection;
   }
 
-  it('reads back the view for an acquisition it has applied', () => {
+  it('reads back the view for an download it has applied', () => {
     expect(applied().get('acq-1')?.status).toBe('Fulfilled');
   });
 
-  it('reports nothing for an unknown acquisition id', () => {
+  it('reports nothing for an unknown download id', () => {
     expect(applied().get('missing')).toBeUndefined();
   });
 
-  it('lists one entry per applied acquisition', () => {
+  it('lists one entry per applied download', () => {
     expect(applied().list()).toHaveLength(1);
   });
 
   it('rebuilds its view from the log', () => {
-    const projection = new AcquisitionStatusProjection();
+    const projection = new DownloadStatusProjection();
     projection.rebuild(stored(history));
     expect(projection.get('acq-1')?.attempts).toBe(3);
   });
@@ -529,7 +529,7 @@ describe('StalledReadModel', () => {
     expect(model.isStalled('acq-1')).toBe(false);
   });
 
-  it('clearing an unknown acquisition is a no-op', () => {
+  it('clearing an unknown download is a no-op', () => {
     const model = new StalledReadModel();
     expect(() => {
       model.clear('never-marked');
@@ -582,7 +582,7 @@ describe('seedStalledReadModel', () => {
 
     await seedStalledReadModel(deadLetters, stalled, SUBSCRIPTION, HORIZON, logger);
 
-    // The letters are still in the store, so the aged acquisition stays exposed as stalled — the
+    // The letters are still in the store, so the aged download stays exposed as stalled — the
     // safe direction — and the reason it did is the one thing this boot has to say about it.
     expect(stalled.isStalled('acq-aged')).toBe(true);
     expect(stalled.isStalled('acq-recent')).toBe(true);

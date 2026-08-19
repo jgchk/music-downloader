@@ -39,7 +39,7 @@ describe('acquisitionFulfilledDataSchema', () => {
     expect(parsed.target.year).toBeNull();
   });
 
-  it('rejects a payload missing its acquisition id', () => {
+  it('rejects a payload missing its download id', () => {
     const { acquisitionId: _id, ...rest } = data;
     expect(acquisitionFulfilledDataSchema.safeParse(rest).success).toBe(false);
   });

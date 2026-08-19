@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 import type { AppendMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
 import { STORY, appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { toCorrelationId } from '../../application/correlation/correlation-id.js';
@@ -15,12 +15,12 @@ import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from 
 
 const META: AppendMetadata = appendMetadata('acq-1', '2026-07-03T12:00:00.000Z');
 
-const IMPORTED: AcquisitionEvent = {
+const IMPORTED: DownloadEvent = {
   type: 'Imported',
   candidate: asCandidateIdentity({ username: 'peer', path: '/incoming/album', sizeBytes: 1024 }),
   location: '/library/album',
 };
-const FULFILLED: AcquisitionEvent = { type: 'AcquisitionFulfilled', location: '/library/album' };
+const FULFILLED: DownloadEvent = { type: 'DownloadFulfilled', location: '/library/album' };
 
 const openDbs: EventDatabase[] = [];
 const temporaryDirectories: string[] = [];
@@ -46,7 +46,7 @@ describe('SqliteEventStore', () => {
 
     const appendResult = await store.append('acq-1', 0, [IMPORTED, FULFILLED], META);
     const appended = appendResult._unsafeUnwrap();
-    expect(appended.map((event) => event.type)).toEqual(['Imported', 'AcquisitionFulfilled']);
+    expect(appended.map((event) => event.type)).toEqual(['Imported', 'DownloadFulfilled']);
     expect(appended.map((event) => event.version)).toEqual([0, 1]);
     expect(appended.map((event) => event.globalSeq)).toEqual([1, 2]);
 
@@ -78,8 +78,8 @@ describe('SqliteEventStore', () => {
       `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    raw.run('acq-1', 0, 'AcquisitionExhausted', 1, '{"type":"AcquisitionExhausted"}', '{}');
-    raw.run('acq-1', 2, 'AcquisitionExhausted', 1, '{"type":"AcquisitionExhausted"}', '{}');
+    raw.run('acq-1', 0, 'DownloadExhausted', 1, '{"type":"DownloadExhausted"}', '{}');
+    raw.run('acq-1', 2, 'DownloadExhausted', 1, '{"type":"DownloadExhausted"}', '{}');
 
     const conflict = await store.append('acq-1', 2, [FULFILLED], META);
 
@@ -207,6 +207,8 @@ describe('SqliteEventStore', () => {
   });
 
   it('upcasts stored events on read', async () => {
+    // Registered under the STORED token, not the model's name for this event: upcasters run
+    // against the raw on-disk shape, before the token is translated into model vocabulary.
     const registry = new UpcasterRegistry().register(
       'AcquisitionFulfilled',
       CURRENT_SCHEMA_VERSION,
@@ -218,7 +220,7 @@ describe('SqliteEventStore', () => {
     const readStreamResult2 = await store.readStream('acq-1');
     const read = readStreamResult2._unsafeUnwrap();
 
-    expect(read[0]!.event).toEqual({ type: 'AcquisitionFulfilled', location: '/library/renamed' });
+    expect(read[0]!.event).toEqual({ type: 'DownloadFulfilled', location: '/library/renamed' });
   });
 
   it('surfaces an infrastructure fault from append', async () => {

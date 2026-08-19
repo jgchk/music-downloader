@@ -120,7 +120,7 @@ describe('StagedFileResolver', () => {
   });
 
   it('gives up after a bounded wait, saying how many files the log never reported', async () => {
-    // The lag window is not open-ended: the acquisition's own retry is the longer loop, so the
+    // The lag window is not open-ended: the download's own retry is the longer loop, so the
     // resolver reports what is missing rather than waiting for it forever.
     const { resolver, offsets } = resolverOver([page('01.flac'), page()]);
 

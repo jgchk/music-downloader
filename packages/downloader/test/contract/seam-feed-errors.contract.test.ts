@@ -14,7 +14,7 @@ import type { StoredEvent } from '../../src/application/ports/event-store-port.j
 import {
   importingHistory,
   matchingCandidate,
-} from '../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../src/domain/download/__fixtures__/download-fixtures.js';
 import { publishedEventMapping } from '../../src/interfaces/contracts/events/mapping.js';
 
 /**

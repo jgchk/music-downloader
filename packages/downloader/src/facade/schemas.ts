@@ -110,7 +110,7 @@ export const submitAcquisitionRequestSchema = z.object({
 /**
  * The request echoed on responses (status DTO + the `requested` history entry). A deliberate
  * response-side copy of the submit shape rather than a reuse of `acquisitionRequestSchema`: the
- * echo's contract is "whatever any historical AcquisitionRequested event carried" — a set that only
+ * echo's contract is "whatever any historical DownloadRequested event carried" — a set that only
  * grows and is replayed from the log — so it must not inherit inbound validation (`min(1)`) or the
  * inbound shape's freedom to tighten. Same fields, no input constraints.
  */
@@ -141,7 +141,7 @@ export const candidateIdentitySchema = z.object({
 });
 
 // Every entry carries `at`, the ISO-8601 occurrence time of the event it projects, so a consumer
-// can order this acquisition's history against another context's history in real time (additive).
+// can order this download's history against another context's history in real time (additive).
 // The lifecycle kinds (requested/resolved/search-started and the terminal outcomes) are additive
 // members (legible-acquisition-history). Evolution note: this discriminated union is CLOSED — its
 // single consumer (the in-process web BFF) compiles against it, so growing it is a compile-checked
@@ -233,7 +233,7 @@ export const acquisitionTargetSchema = z.object({
   title: z.string(),
 });
 
-/** One edition on offer while an acquisition awaits manual selection (wire copy of the domain value). */
+/** One edition on offer while an download awaits manual selection (wire copy of the domain value). */
 export const editionCandidateSchema = z.object({
   releaseMbid: z.string(),
   title: z.string().optional(),
@@ -249,12 +249,12 @@ export const acquisitionStatusResponseSchema = z.object({
   status: acquisitionStatusSchema,
   // Present once metadata has resolved the request into an artist/title (absent while Pending).
   target: acquisitionTargetSchema.optional(),
-  // The request as the user gave it (additive echo): lets a consumer describe an acquisition whose
+  // The request as the user gave it (additive echo): lets a consumer describe an download whose
   // metadata never resolved — where `target` stays absent — by what was asked for.
   requestedTarget: requestedTargetEchoSchema.optional(),
   // When the request was recorded — the stated fact a consumer orders acquisitions by recency on,
   // rather than inferring one from the order they happen to arrive in. Present for every
-  // acquisition whose stream records its request, which is every acquisition the downloader can
+  // download whose stream records its request, which is every download the downloader can
   // produce; optional so a consumer reading an older producer that omits it still parses, and
   // because a stream recording no request at all states no time.
   requestedAt: z.iso.datetime().optional(),
@@ -267,15 +267,15 @@ export const acquisitionStatusResponseSchema = z.object({
   history: z.array(historyEntrySchema),
   // Present only while status is AwaitingManualSelection (additive).
   candidates: z.array(editionCandidateSchema).optional(),
-  // The acquisition's decided lifecycle flags (additive/optional so an older producer omitting them,
+  // The download's decided lifecycle flags (additive/optional so an older producer omitting them,
   // and a legacy consumer ignoring them, both keep working): whether a cancel would still act
   // (`!isTerminal`) and whether it is paused for a human's edition choice.
-  // The current attempt's transfer is live at the source (decided by the acquisition's fold) —
+  // The current attempt's transfer is live at the source (decided by the download's fold) —
   // additive; a tolerant reader of an older producer degrades to "not yet live".
   transferStarted: z.boolean().optional(),
   cancellable: z.boolean().optional(),
   awaitingSelection: z.boolean().optional(),
-  // Present (true) only when the acquisition dead-lettered awaiting an operator (additive,
+  // Present (true) only when the download dead-lettered awaiting an operator (additive,
   // tag-or-omit: only ever `true` or absent — the producer joins it, never writes `false`).
   stalled: z.literal(true).optional(),
 });

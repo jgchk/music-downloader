@@ -1,14 +1,14 @@
 import type { CandidateIdentity } from '../../domain/candidate/candidate.js';
-import { Acquisition } from '../../domain/acquisition/acquisition.js';
-import type { AcquisitionPhase } from '../../domain/acquisition/acquisition.js';
+import { Download } from '../../domain/download/download.js';
+import type { DownloadPhase } from '../../domain/download/download.js';
 import type {
-  AcquisitionEvent,
-  AcquisitionRequest,
-  DownloadFailureReason,
+  DownloadEvent,
+  DownloadRequest,
+  TryFailureReason,
   EditionCandidate,
-} from '../../domain/acquisition/events.js';
+} from '../../domain/download/events.js';
 import type { ValidationReason } from '../../domain/validation/verdict.js';
-import type { DownloadProgress } from '../ports/outbound-ports.js';
+import type { TransferProgress } from '../ports/outbound-ports.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { Logger } from '../logging/logger.js';
@@ -19,14 +19,14 @@ import type { Logger } from '../logging/logger.js';
  * from events, so it is not replayable.
  */
 
-// --- Acquisition status ------------------------------------------------------------------------
+// --- Download status ------------------------------------------------------------------------
 
 /**
  * The kind-specific payload of a history entry. Each becomes a `StatusHistoryEntry` once tagged
  * with the occurrence time of the event it projects (see {@link StatusHistoryEntry}).
  */
 type HistoryPayload =
-  | { readonly kind: 'requested'; readonly request: AcquisitionRequest }
+  | { readonly kind: 'requested'; readonly request: DownloadRequest }
   | {
       readonly kind: 'resolved';
       readonly artist: string;
@@ -37,14 +37,14 @@ type HistoryPayload =
   | { readonly kind: 'selected'; readonly candidate: CandidateIdentity }
   | {
       // The source accepted the enqueue: the transfer is live. Distinguishes a transferring
-      // acquisition from one that merely selected a candidate (nonblocking-download-observation).
+      // download from one that merely selected a candidate (nonblocking-download-observation).
       readonly kind: 'download-started';
       readonly candidate: CandidateIdentity;
     }
   | {
       readonly kind: 'download-failed';
       readonly candidate: CandidateIdentity;
-      readonly reason: DownloadFailureReason;
+      readonly reason: TryFailureReason;
     }
   | {
       readonly kind: 'validation-failed';
@@ -54,7 +54,7 @@ type HistoryPayload =
   | { readonly kind: 'imported'; readonly candidate: CandidateIdentity; readonly location: string }
   | {
       // A delivered candidate judged unacceptable by validation outside the system: the fulfilment
-      // was rejected and the acquisition revived into the retry ladder.
+      // was rejected and the download revived into the retry ladder.
       readonly kind: 'fulfillment-rejected';
       readonly candidate: CandidateIdentity;
       readonly reasons: readonly string[];
@@ -67,14 +67,14 @@ type HistoryPayload =
 
 /**
  * A history entry: its kind-specific payload plus `at`, the ISO-8601 occurrence time of the
- * underlying event. `at` lets a consumer order this acquisition's history against another
+ * underlying event. `at` lets a consumer order this download's history against another
  * context's (the import timeline the web layer composes) in real time.
  */
 export type StatusHistoryEntry = HistoryPayload & { readonly at: string };
 
-export interface AcquisitionStatusView {
+export interface DownloadStatusView {
   readonly acquisitionId: string;
-  readonly status: AcquisitionPhase;
+  readonly status: DownloadPhase;
   /**
    * The current attempt's transfer is live at the source — the decided fact behind the UI's
    * "preparing vs downloading" split, read from the fold rather than re-derived from history
@@ -85,14 +85,14 @@ export interface AcquisitionStatusView {
   readonly target?: { readonly artist: string; readonly title: string };
   /**
    * The request as the user gave it, present from the first event on. Lets a consumer describe an
-   * acquisition whose metadata never resolved (where `target` stays absent) by what was asked for.
+   * download whose metadata never resolved (where `target` stays absent) by what was asked for.
    */
-  readonly requestedTarget?: AcquisitionRequest;
+  readonly requestedTarget?: DownloadRequest;
   /**
-   * When the acquisition was requested — the occurrence time of the `AcquisitionRequested` event
+   * When the download was requested — the occurrence time of the `DownloadRequested` event
    * itself. The stated fact a consumer orders by recency on, rather than deriving one from
    * storage or replay order. Optional only because a stream that carries no request event has no
-   * request time to state; every acquisition the decider can produce opens with one, so an absent
+   * request time to state; every download the decider can produce opens with one, so an absent
    * value here means a defect (or a hand-repaired stream), NOT an older producer. The wire field is
    * optional for its own, different reason — a tolerant reader of an older producer (facade/schemas).
    */
@@ -111,12 +111,12 @@ export interface AcquisitionStatusView {
    */
   readonly cancellable: boolean;
   /**
-   * Whether the acquisition is paused for a human's edition choice (the `AwaitingManualSelection`
+   * Whether the download is paused for a human's edition choice (the `AwaitingManualSelection`
    * phase). The decided human-pause a consumer's attention queue reads, distinct from the badge tone.
    */
   readonly awaitingSelection: boolean;
   /**
-   * Present (true) when the acquisition's current effect dead-lettered — its retry budget spent,
+   * Present (true) when the download's current effect dead-lettered — its retry budget spent,
    * or a permanent fault, with no modeled failure to degrade to — awaiting an operator
    * (reactor-durability D2). Tag-or-omit like the importer's: `true` or absent, never `false` —
    * the join in the use-cases layer only ever adds the tag.
@@ -132,9 +132,9 @@ export interface AcquisitionStatusView {
  * ranking, validation success, download completion, search results, edition selection — are
  * advancement mechanics or facts presented elsewhere, not milestones.
  */
-function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
+function historyPayloadOf(event: DownloadEvent): HistoryPayload | undefined {
   switch (event.type) {
-    case 'AcquisitionRequested': {
+    case 'DownloadRequested': {
       return { kind: 'requested', request: event.request };
     }
     case 'TargetResolved': {
@@ -148,10 +148,10 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     case 'SearchRequested': {
       return { kind: 'search-started', round: event.round };
     }
-    case 'AcquisitionFulfilled': {
+    case 'DownloadFulfilled': {
       return { kind: 'fulfilled', location: event.location };
     }
-    case 'AcquisitionExhausted': {
+    case 'DownloadExhausted': {
       return { kind: 'exhausted' };
     }
     case 'ImportConflicted': {
@@ -160,16 +160,16 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     case 'MetadataResolutionFailed': {
       return { kind: 'metadata-failed' };
     }
-    case 'AcquisitionCancelled': {
+    case 'DownloadCancelled': {
       return { kind: 'cancelled' };
     }
     case 'CandidateSelected': {
       return { kind: 'selected', candidate: event.candidate.identity };
     }
-    case 'DownloadStarted': {
+    case 'TryStarted': {
       return { kind: 'download-started', candidate: event.candidate };
     }
-    case 'DownloadFailed': {
+    case 'TryFailed': {
       return { kind: 'download-failed', candidate: event.candidate, reason: event.reason };
     }
     case 'ValidationFailed': {
@@ -210,7 +210,7 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
     // Stryker disable next-line StringLiteral: an emptied label still yields undefined
     case 'CandidateRejected':
     // Stryker disable next-line StringLiteral: an emptied label still yields undefined
-    case 'DownloadCompleted':
+    case 'TryCompleted':
     // Stryker disable next-line StringLiteral,ConditionalExpression,BlockStatement: still undefined
     case 'ValidationPassed': {
       return undefined;
@@ -221,21 +221,21 @@ function historyPayloadOf(event: AcquisitionEvent): HistoryPayload | undefined {
 export function projectStatus(
   acquisitionId: string,
   stored: readonly StoredEvent[],
-): AcquisitionStatusView {
+): DownloadStatusView {
   const events = stored.map((entry) => entry.event);
-  const acquisition = Acquisition.fromHistory(events);
-  const snapshot = acquisition.snapshot;
+  const download = Download.fromHistory(events);
+  const snapshot = download.snapshot;
   const history: StatusHistoryEntry[] = [];
   let target: { artist: string; title: string } | undefined;
-  let requestedTarget: AcquisitionRequest | undefined;
+  let requestedTarget: DownloadRequest | undefined;
   let requestedAt: string | undefined;
   for (const entry of stored) {
     const event = entry.event;
-    if (event.type === 'AcquisitionRequested') {
+    if (event.type === 'DownloadRequested') {
       requestedTarget = event.request;
       // The request's own occurrence time, read from the event that states it. Deliberately NOT
       // the first stored entry's: position is bookkeeping, and a stream that ever opened with
-      // something else (an upcast marker, a repair entry) would silently retime the acquisition.
+      // something else (an upcast marker, a repair entry) would silently retime the download.
       requestedAt = entry.metadata.occurredAt;
       if (event.request.kind === 'descriptor') {
         target = { artist: event.request.artist, title: event.request.title };
@@ -259,12 +259,12 @@ export function projectStatus(
     location: snapshot.location,
     history,
     candidates: snapshot.candidates,
-    cancellable: !acquisition.isTerminal,
+    cancellable: !download.isTerminal,
     awaitingSelection: snapshot.phase === 'AwaitingManualSelection',
   };
 }
 
-export class AcquisitionStatusProjection {
+export class DownloadStatusProjection {
   private readonly streams = new Map<string, StoredEvent[]>();
 
   apply(stored: StoredEvent): void {
@@ -273,12 +273,12 @@ export class AcquisitionStatusProjection {
     this.streams.set(stored.streamId, list);
   }
 
-  get(acquisitionId: string): AcquisitionStatusView | undefined {
+  get(acquisitionId: string): DownloadStatusView | undefined {
     const stored = this.streams.get(acquisitionId);
     return stored === undefined ? undefined : projectStatus(acquisitionId, stored);
   }
 
-  list(): readonly AcquisitionStatusView[] {
+  list(): readonly DownloadStatusView[] {
     return [...this.streams].map(([id, stored]) => projectStatus(id, stored));
   }
 
@@ -347,9 +347,9 @@ export async function seedStalledReadModel(
 // --- Download progress (ephemeral read model, D1) ----------------------------------------------
 
 export class ProgressReadModel {
-  private readonly progress = new Map<string, DownloadProgress>();
+  private readonly progress = new Map<string, TransferProgress>();
 
-  update(acquisitionId: string, progress: DownloadProgress): void {
+  update(acquisitionId: string, progress: TransferProgress): void {
     this.progress.set(acquisitionId, progress);
   }
 
@@ -358,7 +358,7 @@ export class ProgressReadModel {
     this.progress.delete(acquisitionId);
   }
 
-  get(acquisitionId: string): DownloadProgress | undefined {
+  get(acquisitionId: string): TransferProgress | undefined {
     return this.progress.get(acquisitionId);
   }
 }

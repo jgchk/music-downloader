@@ -2,7 +2,7 @@ import { parseMbid } from '../../domain/shared/mbid.js';
 import type { Mbid } from '../../domain/shared/mbid.js';
 import { createTarget } from '../../domain/target/target.js';
 import type { Target } from '../../domain/target/target.js';
-import type { EditionCandidate } from '../../domain/acquisition/events.js';
+import type { EditionCandidate } from '../../domain/download/events.js';
 import type {
   MbBrowseRelease,
   MbRecording,

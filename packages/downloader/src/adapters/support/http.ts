@@ -20,7 +20,7 @@ export interface HttpClient {
 }
 
 // Generous for slow providers, but finite: the reactor dispatches effects serially, so an
-// unbounded fetch that never settles freezes the whole drain — every acquisition behind it.
+// unbounded fetch that never settles freezes the whole drain — every download behind it.
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function createFetchHttpClient(timeoutMs = DEFAULT_TIMEOUT_MS): HttpClient {

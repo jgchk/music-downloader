@@ -1,6 +1,6 @@
 import { err, ok } from 'neverthrow';
-import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
-import { recordExternalValidationFailure } from '../../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../../application/download/use-cases.js';
+import { recordExternalValidationFailure } from '../../application/download/use-cases.js';
 import type { ConsumeHandler, SeamEvent } from '../../application/events/catch-up-subscription.js';
 import { contextForDelivery, verdictToFailureInput } from '../contracts/verdicts/mapping.js';
 import { externalVerdictDeliverySchema } from '../contracts/verdicts/schemas.js';

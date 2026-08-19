@@ -1,31 +1,31 @@
 import { FakeEventStore, fixedClock, sequentialIds } from '../../application/__fixtures__/fakes.js';
 import { fixedCorrelation } from '../../application/__fixtures__/correlation.js';
 import {
-  AcquisitionStatusProjection,
+  DownloadStatusProjection,
   ProgressReadModel,
   StalledReadModel,
 } from '../../application/projections/read-models.js';
-import type { UseCaseDependencies } from '../../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../../application/download/use-cases.js';
 import { createDownloaderFacade } from '../index.js';
 import type { DownloaderFacade } from '../index.js';
 
 /**
  * A minimal in-memory wiring of the use-case dependencies for interface tests. `sync()` pumps the
  * store into the status projection, standing in for the reactor/projection catch-up so a query
- * reflects a just-submitted acquisition.
+ * reflects a just-submitted download.
  */
 export interface TestWiring {
   readonly deps: UseCaseDependencies;
   readonly facade: DownloaderFacade;
   readonly store: FakeEventStore;
-  readonly status: AcquisitionStatusProjection;
+  readonly status: DownloadStatusProjection;
   readonly progress: ProgressReadModel;
   readonly sync: () => void;
 }
 
 export function testWiring(): TestWiring {
   const store = new FakeEventStore();
-  const status = new AcquisitionStatusProjection();
+  const status = new DownloadStatusProjection();
   const progress = new ProgressReadModel();
   const dependencies: UseCaseDependencies = {
     store,

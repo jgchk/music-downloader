@@ -44,12 +44,12 @@ describe('the property harness reports failures well enough to reproduce them', 
 
   it('carries the violated invariant into the thrown message, not only onto the error cause', () => {
     const named = fc.property(fc.constant(0), () => {
-      throw new Error('a settled acquisition re-entered an active phase');
+      throw new Error('a settled download re-entered an active phase');
     });
 
     expect(() => {
       assertProperty(named);
-    }).toThrow(/a settled acquisition re-entered an active phase/);
+    }).toThrow(/a settled download re-entered an active phase/);
   });
 
   it('fails an awaiting property just as loudly as a synchronous one', async () => {

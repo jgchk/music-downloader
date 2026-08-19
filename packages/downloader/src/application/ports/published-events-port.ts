@@ -1,5 +1,5 @@
 import type { Result } from 'neverthrow';
-import type { AcquisitionEventType } from '../../domain/acquisition/events.js';
+import type { DownloadEventType } from '../../domain/download/events.js';
 import type { StoredEvent } from './event-store-port.js';
 
 /**
@@ -36,6 +36,6 @@ export interface RenderError {
  * validated payload — deterministic and replay-safe, so redelivery reproduces the first delivery.
  */
 export interface PublishedEventMapping {
-  publishes(type: AcquisitionEventType): boolean;
+  publishes(type: DownloadEventType): boolean;
   render(stored: StoredEvent, prefix: readonly StoredEvent[]): Result<PublishedEvent, RenderError>;
 }

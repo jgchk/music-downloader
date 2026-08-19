@@ -648,7 +648,7 @@ async function stalled(): Promise<void> {
 /**
  * The absence signal. slskd 404s the downloads collection of a user it holds no transfers for, and
  * the adapter reads that as *state* ("nothing there, converge"), never as a fault to retry — the
- * distinction that wedged the reactor on a cancelled acquisition's abort in production.
+ * distinction that wedged the reactor on a cancelled download's abort in production.
  */
 async function absent(): Promise<void> {
   const write = createWriter('absent');

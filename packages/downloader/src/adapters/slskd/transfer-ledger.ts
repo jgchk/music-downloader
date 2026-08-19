@@ -39,7 +39,7 @@ export class TransferLedger {
   }
 
   /**
-   * The wanted filenames whose transfer rows are already live for this acquisition — evidence of
+   * The wanted filenames whose transfer rows are already live for this download — evidence of
    * a prior attempt whose poller died with the process (reactor-durability D3). Best-effort: a
    * ledger fault reports none, degrading reconciliation to a plain enqueue.
    */

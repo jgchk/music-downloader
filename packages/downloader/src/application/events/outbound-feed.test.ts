@@ -1,28 +1,28 @@
 import { STORY, appendMetadata } from '../__fixtures__/correlation.js';
 import { err, ok } from 'neverthrow';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 import {
   importingHistory,
   matchingCandidate,
   sampleFiles,
-} from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../domain/download/__fixtures__/download-fixtures.js';
 import { FakeEventStore } from '../__fixtures__/fakes.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { PublishedEventMapping } from '../ports/published-events-port.js';
 import { OutboundFeed } from './outbound-feed.js';
 
-function fulfilled(): AcquisitionEvent[] {
+function fulfilled(): DownloadEvent[] {
   const candidate = matchingCandidate('peer');
   return [
     ...importingHistory([candidate]),
     { type: 'Imported', candidate: candidate.identity, location: '/lib/kid-a', files: sampleFiles },
-    { type: 'AcquisitionFulfilled', location: '/lib/kid-a' },
+    { type: 'DownloadFulfilled', location: '/lib/kid-a' },
   ];
 }
 
 const mapping: PublishedEventMapping = {
-  publishes: (type) => type === 'AcquisitionFulfilled',
+  publishes: (type) => type === 'DownloadFulfilled',
   render: (stored: StoredEvent, prefix: readonly StoredEvent[]) =>
     ok({
       type: 'acquisition.fulfilled',

@@ -5,7 +5,7 @@ import type { SeamEvent } from '../../application/events/catch-up-subscription.j
 import {
   fulfilledHistory,
   matchingCandidate,
-} from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../domain/download/__fixtures__/download-fixtures.js';
 import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { verdictEventConsumer } from './verdict-consumer.js';
@@ -58,7 +58,7 @@ async function fulfilledWiring(): Promise<TestWiring> {
 }
 
 describe('the verdict event consumer', () => {
-  it('revives a fulfilled acquisition from a rejection verdict', async () => {
+  it('revives a fulfilled download from a rejection verdict', async () => {
     const wiring = await fulfilledWiring();
     const consume = verdictEventConsumer(wiring.deps, { warn: warned });
 

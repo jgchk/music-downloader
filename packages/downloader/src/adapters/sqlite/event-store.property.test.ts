@@ -3,8 +3,8 @@ import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
 import type { AppendMetadata, StoredEvent } from '../../application/ports/event-store-port.js';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
-import { arbEvent } from '../../domain/acquisition/__fixtures__/arbitraries.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
+import { arbEvent } from '../../domain/download/__fixtures__/arbitraries.js';
 import { SqliteEventStore } from './event-store.js';
 import { openEventDatabase } from './schema.js';
 
@@ -81,7 +81,7 @@ class AppendCommand implements fc.AsyncCommand<StoreModel, RealStore> {
   constructor(
     private readonly streamId: string,
     private readonly expectedVersion: number,
-    private readonly events: readonly AcquisitionEvent[],
+    private readonly events: readonly DownloadEvent[],
   ) {}
 
   check(): boolean {

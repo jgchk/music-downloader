@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CommandError } from '../application/acquisition/command-handler.js';
+import type { CommandError } from '../application/download/command-handler.js';
 import { adoptOrMint } from '../application/correlation/context.js';
 import type { CommandContext } from '../application/correlation/context.js';
 import { parseMbid } from '../domain/shared/mbid.js';
@@ -10,8 +10,8 @@ import {
   listAcquisitions as listAcquisitionsUseCase,
   selectEdition as selectEditionUseCase,
   submitAcquisition as submitAcquisitionUseCase,
-} from '../application/acquisition/use-cases.js';
-import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
+} from '../application/download/use-cases.js';
+import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 import { submitAcquisitionRequestSchema } from './schemas.js';
 import type {
@@ -101,7 +101,7 @@ export type StoryId = string;
 export interface DownloaderFacade {
   submitAcquisition(input: unknown, story: StoryId): Promise<FacadeResult<SubmitAcquisitionResult>>;
   cancelAcquisition(input: unknown, story: StoryId): Promise<FacadeResult<CancelAcquisitionResult>>;
-  /** Resume an awaiting-selection acquisition with the chosen edition (manual-edition-selection). */
+  /** Resume an awaiting-selection download with the chosen edition (manual-edition-selection). */
   selectEdition(input: unknown, story: StoryId): Promise<FacadeResult<SelectEditionResult>>;
   getAcquisition(input: unknown): FacadeResult<AcquisitionStatusResponseDto>;
   /** Infallible collection read: returns the DTO directly, no result envelope. */

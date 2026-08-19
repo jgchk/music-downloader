@@ -1,7 +1,7 @@
 import { testScope } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it, vi } from 'vitest';
 import { silentLogger } from '../../application/__fixtures__/fakes.js';
-import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
+import type { DownloadRequest } from '../../domain/download/events.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { MusicBrainzMetadata } from './metadata.js';
@@ -53,12 +53,12 @@ function resolver(routes: [string, HttpResponse][]): MusicBrainzMetadata {
   return new MusicBrainzMetadata(http(routes));
 }
 
-const albumById: AcquisitionRequest = {
+const albumById: DownloadRequest = {
   kind: 'musicbrainz',
   mbid: asMbid('rel-1'),
   targetType: 'album',
 };
-const trackById: AcquisitionRequest = {
+const trackById: DownloadRequest = {
   kind: 'musicbrainz',
   mbid: asMbid('rec-1'),
   targetType: 'track',
@@ -243,7 +243,7 @@ describe('MusicBrainzMetadata', () => {
     expect(result).toEqual({ kind: 'unresolved' });
   });
 
-  const byReleaseGroup = (mbid: string): AcquisitionRequest => ({
+  const byReleaseGroup = (mbid: string): DownloadRequest => ({
     kind: 'release-group',
     mbid: asMbid(mbid),
     targetType: 'album',

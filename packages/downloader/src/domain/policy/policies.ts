@@ -7,7 +7,7 @@ import type { Unit } from '../shared/unit.js';
 import type { QualityPolicy } from './quality-policy.js';
 
 /**
- * The three scalar per-acquisition policies (D5/D6/D10). Together with {@link QualityPolicy}
+ * The three scalar per-download policies (D5/D6/D10). Together with {@link QualityPolicy}
  * they form the whole configuration surface; each has a smart constructor so config loaded
  * from the environment fails fast (12-factor).
  */
@@ -83,47 +83,47 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = createRetryPolicy({
   maxTotalAttempts: 15,
 })._unsafeUnwrap();
 
-// --- DownloadPolicy: transfer timeout thresholds (D10) -----------------------------------------
+// --- TryPolicy: transfer timeout thresholds (D10) -----------------------------------------
 
-export type DownloadPolicy = Brand<
+export type TryPolicy = Brand<
   {
     readonly stallTimeoutMs: number;
     readonly maxQueueWaitMs: number;
   },
-  'DownloadPolicy'
+  'TryPolicy'
 >;
 
-export type DownloadPolicyError =
+export type TryPolicyError =
   { readonly kind: 'NonPositiveStallTimeout' } | { readonly kind: 'NonPositiveQueueWait' };
 
-export interface DownloadPolicyInput {
+export interface TryPolicyInput {
   readonly stallTimeoutMs: number;
   readonly maxQueueWaitMs: number;
 }
 
 export function createDownloadPolicy(
-  input: DownloadPolicyInput,
-): Result<DownloadPolicy, DownloadPolicyError> {
+  input: TryPolicyInput,
+): Result<TryPolicy, TryPolicyError> {
   if (input.stallTimeoutMs <= 0) return err({ kind: 'NonPositiveStallTimeout' });
   if (input.maxQueueWaitMs <= 0) return err({ kind: 'NonPositiveQueueWait' });
   return ok(
-    branded<DownloadPolicy>({
+    branded<TryPolicy>({
       stallTimeoutMs: input.stallTimeoutMs,
       maxQueueWaitMs: input.maxQueueWaitMs,
     }),
   );
 }
 
-export const DEFAULT_DOWNLOAD_POLICY: DownloadPolicy = createDownloadPolicy({
+export const DEFAULT_DOWNLOAD_POLICY: TryPolicy = createDownloadPolicy({
   stallTimeoutMs: 60_000,
   maxQueueWaitMs: 600_000,
 })._unsafeUnwrap();
 
-// --- The bundle carried on an acquisition ------------------------------------------------------
+// --- The bundle carried on an download ------------------------------------------------------
 
-export interface AcquisitionPolicies {
+export interface DownloadPolicies {
   readonly quality: QualityPolicy;
   readonly match: MatchPolicy;
   readonly retry: RetryPolicy;
-  readonly download: DownloadPolicy;
+  readonly download: TryPolicy;
 }

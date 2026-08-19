@@ -1,6 +1,6 @@
 import { errAsync, okAsync } from 'neverthrow';
 import type { ResultAsync } from 'neverthrow';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 import { createLogger } from '../logging/logger.js';
 import type { Logger } from '../logging/logger.js';
 import { infraError } from '../ports/errors.js';
@@ -41,7 +41,7 @@ export class FakeEventStore implements EventStorePort {
   append(
     streamId: string,
     expectedVersion: number,
-    events: readonly AcquisitionEvent[],
+    events: readonly DownloadEvent[],
     metadata: AppendMetadata,
   ): ResultAsync<readonly StoredEvent[], AppendError> {
     if (this.failAppends) return errAsync(infraError('event-store.append', 'boom'));
@@ -74,7 +74,7 @@ export class FakeEventStore implements EventStorePort {
   seedLegacy(
     streamId: string,
     expectedVersion: number,
-    events: readonly AcquisitionEvent[],
+    events: readonly DownloadEvent[],
     metadata: EventMetadata,
   ): readonly StoredEvent[] {
     const stored = events.map((event, index) => ({

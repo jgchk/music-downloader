@@ -41,7 +41,7 @@ describe('resolveStagedPaths', () => {
     const resolved = resolveStagedPaths(
       new Set(['t1']),
       [
-        { type: 'DownloadStarted', data: '{}' }, // a different event type — skipped
+        { type: 'TryStarted', data: '{}' }, // a different event type — skipped
         completeEvent('other', '/app/downloads/Someone Else/x.flac'), // not ours — skipped
         completeEvent('t1', '/app/downloads/Album/01.flac'),
       ],

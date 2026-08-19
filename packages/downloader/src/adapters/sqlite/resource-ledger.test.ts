@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe('SqliteResourceLedger', () => {
-  it('records a created resource and lists it as live for its acquisition', async () => {
+  it('records a created resource and lists it as live for its download', async () => {
     const { store } = ledger();
     const recordCreatedResult = await store.recordCreated(transfer);
     recordCreatedResult._unsafeUnwrap();
@@ -80,7 +80,7 @@ describe('SqliteResourceLedger', () => {
     expect(allLiveResult._unsafeUnwrap()).toEqual([]);
   });
 
-  it('scopes live queries by acquisition, and all-live across acquisitions', async () => {
+  it('scopes live queries by download, and all-live across acquisitions', async () => {
     const { store } = ledger();
     const other: SourceResource = { ...transfer, acquisitionId: 'acq-2', resourceKey: 'u2|x' };
     await store.recordCreated(transfer);
