@@ -44,6 +44,8 @@ regression lives in.
 ## 4. Gate and ship
 
 - [x] 4.1 Full gate (`pnpm check`) green; 100% coverage without new waivers
-- [ ] 4.2 Side-by-side against prototype D (`proto-d-hybrid.html`): art grid, track rows, and
-      detail view re-screenshotted; the audit's visual items confirmed closed
+- [x] 4.2 Side-by-side against prototype D (`proto-d-hybrid.html`): art grid, track rows, and
+      detail view re-screenshotted under forum and glass; the audit's visual items confirmed
+      closed. This is what caught the detail view's artwork collapsing in a scrolling column
+      (`flex: none`), which the first round of geometry tests had not reached
 - [ ] 4.3 `pnpm version:prep` patch bump (`fix`); one PR for this change

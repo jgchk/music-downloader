@@ -1081,9 +1081,12 @@
     gap: var(--inline-gap);
   }
   /* The same artwork slot the result grids use, at the panel's width — so a cover that never
-     arrives leaves the same placeholder here as it does there. */
+     arrives leaves the same placeholder here as it does there. `flex: none` because the panel is
+     a scrolling column: a slot that takes its height from its width and holds only positioned
+     children has nothing to stop the column shrinking it away. */
   .art-detail {
     width: 100%;
+    flex: none;
   }
   .detail-status {
     color: var(--text-muted);
