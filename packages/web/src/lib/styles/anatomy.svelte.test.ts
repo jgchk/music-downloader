@@ -7,13 +7,14 @@ import CatalogResults from '$lib/components/CatalogResults.svelte';
 import type { DetailState } from '$lib/search/detail.js';
 import type { CatalogSearchResultDto } from '@music/downloader';
 
-// The whole global cascade, in the order the layout imports it — these are assertions about what
-// the shipped stylesheets compute to, so nothing here may be stubbed or narrowed.
+// The whole global cascade — these are assertions about what the shipped stylesheets compute to,
+// so nothing here may be stubbed or narrowed. The skins are GLOBBED rather than listed for the
+// same reason they are parameterized from `SKINS` below: a hand-list would give a newly added
+// skin a green row measured against a stylesheet that was never loaded, which is worse than no
+// row at all. Import order does not matter — every sheet restates the layer order.
 import '$lib/styles/tokens.css';
 import '$lib/styles/base.css';
-import '$lib/styles/skins/glass.css';
-import '$lib/styles/skins/terminal.css';
-import '$lib/styles/skins/forum.css';
+const loadedSkins = import.meta.glob('$lib/styles/skins/*.css', { eager: true });
 
 /**
  * The request page's anatomy, measured rather than described: the register this regression
@@ -41,6 +42,10 @@ const ART_FILLS_THE_PANEL = 0.5;
 const ROW_IS_STACKED_ABOVE = 3;
 /** The share of a window the panel may take. */
 const PANEL_WINDOW_SHARE = 0.75;
+/** The width token's floor, restated from `tokens.css` so a drift reads as one. */
+const READABLE_FLOOR_PX = 340;
+/** The token's preferred width, in rem — what the panel gets when the window has room for it. */
+const READABLE_PREFERRED_REM = 26;
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const ARTIST = '4d5447d7-c61c-4120-ba1b-d7f471d385b9';
@@ -119,6 +124,14 @@ const detailProps = (detail: DetailState) => ({
   onClose: vi.fn(),
 });
 
+/** Stand in for a skin that remaps the width token, for the length of one test. */
+function askingForAWiderPanel(size: string): void {
+  document.documentElement.style.setProperty('--detail-size', size);
+  onTestFinished(() => {
+    document.documentElement.style.removeProperty('--detail-size');
+  });
+}
+
 /** Put the document in one skin for the length of a test, and take it off afterwards. */
 function wearing(skin: string | undefined): void {
   if (skin === undefined) {
@@ -144,6 +157,17 @@ function boxOf(selector: string): DOMRect {
 
   return element.getBoundingClientRect();
 }
+
+describe('the cascade these measurements are taken against', () => {
+  it('has a stylesheet loaded for every shipped skin', () => {
+    const loaded = Object.keys(loadedSkins).map((path) => path.replace(/^.*\/(.*)\.css$/, '$1'));
+    const byName = (a: string, b: string) => a.localeCompare(b);
+
+    // Without this, adding a skin adds a row below that measures the UNSKINNED page and calls it
+    // that skin — a green test asserting a fact it never took.
+    expect(loaded.toSorted(byName)).toEqual([...SKINS].toSorted(byName));
+  });
+});
 
 describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) => {
   it('reserves the artwork slot its full square before any cover arrives', async () => {
@@ -225,16 +249,21 @@ describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) =>
       getComputedStyle(document.documentElement).fontSize.replace('px', ''),
     );
 
-    // The floor is the industry band's minimum; no skin's type scale may crush it below that.
-    expect(panel.width).toBeGreaterThanOrEqual(340);
-    expect(panel.width).toBeLessThanOrEqual(Math.max(340, 30 * rootFontSize) + 1);
+    // The floor is the industry band's minimum; no skin's type scale may crush it below that,
+    // and above the floor the panel is the type scale's own 26rem rather than anything wider.
+    expect(panel.width).toBeGreaterThanOrEqual(READABLE_FLOOR_PX);
+    expect(panel.width).toBeLessThanOrEqual(
+      Math.max(READABLE_FLOOR_PX, READABLE_PREFERRED_REM * rootFontSize) + 1,
+    );
   });
 
-  it('leaves a middling window most of itself', async () => {
+  it('leaves a middling window most of itself even when a skin asks for more', async () => {
     wearing(skin);
-    // Wide enough to still be a side panel (the bottom sheet takes over below 40rem), narrow
-    // enough that the token, not the window, would otherwise decide — which is the case the
-    // viewport share exists for and the wide viewport above can never exercise.
+    // The token is a skin's to remap — which is exactly when the viewport share has something to
+    // do. At the shipped widths the token is always the smaller term, so asserting the share
+    // without remapping asserts nothing. The stand-in skin asks in px rather than rem, so the
+    // ask outgrows the window under every type scale rather than only the larger ones.
+    askingForAWiderPanel('900px');
     await page.viewport(760, 900);
     await render(CatalogDetail, detailProps(albumDetail()));
 

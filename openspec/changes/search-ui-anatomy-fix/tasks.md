@@ -18,10 +18,10 @@ regression lives in.
       cursor, focus outline untouched — never `all: unset`); move all widget chrome to `.btn`
 - [x] 2.2 Sweep every real push button in `packages/web/src` onto `.btn` (most already carry it);
       the SSR/browser suites re-run green with buttons still styled
-- [x] 2.3 Declare `@layer reset, base, theme` once — in `tokens.css`, not `base.css`, because
-      layer order is fixed by first appearance and the tokens are the first stylesheet the layout
-      loads; move the base and token rules into their layers; wrap each skin file's rules in
-      `@layer theme`; skins re-point their chrome from `button` to `.btn`. The
+- [x] 2.3 Declare `@layer reset, base, theme` at the head of EVERY stylesheet, not once: layer
+      order is fixed by first appearance, so one declaration would silently make the layout's
+      import order load-bearing. Move the base and token rules into their layers; wrap each skin
+      file's rules in `@layer theme`; skins re-point their chrome from `button` to `.btn`. The
       `:root[data-skin]` prefixes stay: they are each skin's activation condition, not
       specificity escalation, so layering makes none of them redundant
 - [x] 2.4 Stylesheet-scanning convention test (red first): in `lib/styles/`, no top-level rule
@@ -38,8 +38,9 @@ regression lives in.
 - [x] 3.3 Failed images hide themselves (on-error hook) leaving the placeholder; the detail
       view's artwork adopts the placeholder-under-image structure (red first: a failed detail
       cover renders initials, not a blank box or glyph)
-- [x] 3.4 `--detail-size: clamp(340px, 26rem, 30rem)` token with width
-      `min(var(--detail-size), 75vw, 100vw)` (turns 1.1's width assertion green)
+- [x] 3.4 `--detail-size: max(340px, 26rem)` token with width `min(var(--detail-size), 75vw)`
+      (turns 1.1's width assertion green). No rem ceiling and no `100vw` term: neither could ever
+      bind, and the viewport share is what actually stops the panel becoming the page
 
 ## 4. Gate and ship
 

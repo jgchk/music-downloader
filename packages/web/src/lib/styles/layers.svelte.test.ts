@@ -67,20 +67,28 @@ const BARE_BUTTON_SUBJECT = /^button(\[[^\]]*])*(::?[a-z-]+)*$/;
 
 /**
  * Whether a selector can reach a button no class has claimed. Restrictive by default, which is
- * the only safe direction for a guard: the selector counts as narrowed ONLY if a class or an id
- * appears somewhere in it. Functional pseudo-class arguments are emptied first, so
- * `:is(html, body) button` is seen for the global rule it is, and `button:not(.btn)` is not
- * excused by the class inside its own guard — decision 1 rejected `:not()` opt-outs, so flagging
- * them is the intent, not a false positive.
+ * the only safe direction for a guard.
+ *
+ * The rule is a character test, not a structural one: after every functional pseudo-class's
+ * argument and every attribute's value are emptied, a selector counts as narrowed only if a `.`
+ * or `#` survives somewhere in what is left. Two consequences are deliberate rather than
+ * accidental. `button:not(.btn)` is flagged — decision 1 rejected `:not()` opt-outs, so an
+ * escape hatch written that way should fail this. And `:is(.card, .row) button` is flagged too:
+ * classes inside a functional pseudo do not count as narrowing, because chrome applied across
+ * two named surfaces is still chrome no button opted into. Both are in the table below, so
+ * whoever meets one reads a decision rather than guessing at a bug.
  */
 function isReachingUnclaimedButtons(selector: string): boolean {
   const flattened = emptyEveryGroup(selector);
   const subject = flattened.trim().split(/\s+/).at(-1);
+  // Attribute VALUES are emptied before the probe: a dot or a hash inside one is somebody's URL
+  // fragment or test id, not a class narrowing the rule.
+  const narrowing = flattened.replaceAll(/\[[^\]]*]/g, '[]');
 
   return (
     subject !== undefined &&
     BARE_BUTTON_SUBJECT.test(subject.replaceAll('()', '')) &&
-    !/[#.]/.test(flattened)
+    !/[#.]/.test(narrowing)
   );
 }
 
@@ -176,6 +184,10 @@ describe('what counts as reaching an unclaimed button', () => {
     ':where(:root) button',
     'button[type="submit"]',
     'button:not(.btn)',
+    '[href="#top"] button',
+    // Strict on purpose: a rule chroming buttons across two named surfaces is still chrome that
+    // no button opted into. Recorded here so it reads as the decision it is, not as a hole.
+    ':is(.card, .row) button',
   ])('flags %s', (selector) => {
     expect(isReachingUnclaimedButtons(selector)).toBe(true);
   });

@@ -19,7 +19,7 @@ import type { ResultAsync } from 'neverthrow';
 /** Which catalog entity the art belongs to; both are addressable in the archive. */
 export type CoverArtEntity = 'release-group' | 'release';
 
-/** The sizes the request page asks for: a grid thumbnail and a detail-surface image. */
+/** The sizes the request page asks for: a grid thumbnail and a detail-view image. */
 export type CoverArtSize = 250 | 500;
 
 /**
