@@ -43,7 +43,8 @@ import {
   seedStalledReadModel,
 } from '../application/projections/read-models.js';
 import { REACTOR_CONSUMER } from '../application/download/reactor.js';
-import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
+import { catchUpSubscription } from '../application/events/catch-up-subscription.js';
+import type { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
@@ -363,22 +364,12 @@ export async function createDownloaderRuntime(
     feed,
     wakeups,
     connectVerdictFeed(verdictFeed, verdictWakeups) {
-      verdicts = new CatchUpSubscription({
+      verdicts = catchUpSubscription({
         name: 'seam:verdicts',
         feed: verdictFeed,
         checkpoints,
-        deadLetters,
         handler: verdictEventConsumer(dependencies, { warn: logger.warn.bind(logger) }),
-        policy: 'halt',
         logger,
-        clock,
-        retry: { attempts: 3, baseDelayMs: 250 },
-        batchSize: 100,
-        pollIntervalMs: 5000,
-        // The subscription only `await`s this value (retry backoff, and the yield between
-        // batches), so the delay is elapsed wall-clock and nothing else: same attempts, same order,
-        // same checkpoint advances, same hold/halt decisions. {@link delay} carries the waiver.
-        sleep: delay,
         wakeups: verdictWakeups,
       });
       return verdicts;

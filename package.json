@@ -2,15 +2,15 @@
   "name": "music-downloader",
   "version": "3.20.0",
   "private": true,
-  "description": "An extensible, event-sourced music downloader and importer — a modular monolith.",
+  "description": "An extensible, event-sourced music downloader and importer \u2014 a modular monolith.",
   "type": "module",
   "packageManager": "pnpm@11.16.0",
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc --noCheck -p packages/downloader/tsconfig.build.json && tsc --noCheck -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
-    "typecheck": "tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json && pnpm --dir packages/web run check:svelte && pnpm run typecheck:tiers",
+    "build": "tsc --noCheck -p packages/eventing/tsconfig.build.json && tsc --noCheck -p packages/downloader/tsconfig.build.json && tsc --noCheck -p packages/importer/tsconfig.build.json && pnpm --dir packages/web run build",
+    "typecheck": "tsc --noEmit -p packages/eventing/tsconfig.json && tsc --noEmit -p packages/downloader/tsconfig.json && tsc --noEmit -p packages/importer/tsconfig.json && pnpm --dir packages/web run check:svelte && pnpm run typecheck:tiers",
     "typecheck:tiers": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p test/boundaries/tsconfig.json && tsc --noEmit -p test/e2e/tsconfig.json && tsc --noEmit -p packages/downloader/scripts/tsconfig.json && tsc --noEmit -p packages/downloader/test/contract/tsconfig.json && tsc --noEmit -p packages/importer/scripts/tsconfig.json && tsc --noEmit -p packages/importer/test/contract/tsconfig.json",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint/ --cache-strategy content .",
     "format": "prettier --check --cache .",

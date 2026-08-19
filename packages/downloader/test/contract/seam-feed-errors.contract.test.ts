@@ -2,14 +2,12 @@ import { readFileSync } from 'node:fs';
 import { err } from 'neverthrow';
 import type { Result } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
-import {
-  FakeCheckpointStore,
-  FakeDeadLetterStore,
-  fixedClock,
-  silentLogger,
-} from '../../src/application/__fixtures__/fakes.js';
-import { CatchUpSubscription } from '../../src/application/events/catch-up-subscription.js';
-import type { SeamFeedBatch } from '../../src/application/events/catch-up-subscription.js';
+import { FakeCheckpointStore, silentLogger } from '../../src/application/__fixtures__/fakes.js';
+import { catchUpSubscription } from '../../src/application/events/catch-up-subscription.js';
+import type {
+  CatchUpSubscription,
+  SeamFeedBatch,
+} from '../../src/application/events/catch-up-subscription.js';
 import type { StoredEvent } from '../../src/application/ports/event-store-port.js';
 import {
   importingHistory,
@@ -48,24 +46,21 @@ const PRODUCER = seamContractOf('importer');
 
 /** A subscription whose feed only ever fails, with the given kind. */
 function subscriptionOverFailingFeed(kind: string): CatchUpSubscription {
-  return new CatchUpSubscription({
-    name: 'seam:verdicts',
+  return catchUpSubscription({
+    name: 'seam:test',
     feed: {
       read: (): Promise<Result<SeamFeedBatch, { kind: string }>> => Promise.resolve(err({ kind })),
     },
     checkpoints: new FakeCheckpointStore(),
-    deadLetters: new FakeDeadLetterStore(),
     handler: () => {
       throw new Error('the feed never yields an event to deliver');
     },
-    policy: 'halt',
     logger: silentLogger(),
-    clock: fixedClock(),
-    retry: { attempts: 1, baseDelayMs: 0 },
-    batchSize: 10,
-    pollIntervalMs: 5000,
-    sleep: () => Promise.resolve(),
-    interval: () => () => {},
+    tuning: {
+      retry: { attempts: 1, baseDelayMs: 0 },
+      sleep: () => Promise.resolve(),
+      interval: () => () => {},
+    },
   });
 }
 

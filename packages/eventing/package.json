@@ -1,0 +1,12 @@
+{
+  "name": "@music/eventing",
+  "private": true,
+  "description": "Generic event-delivery mechanism shared by the bounded contexts: the checkpointed drain and the correlation envelope. Domain-blind by rule — it knows nothing about any context.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "neverthrow": "^8.2.0"
+  }
+}

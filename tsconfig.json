@@ -13,6 +13,7 @@
     "vitest.config.ts",
     "vitest.mutation.config.ts",
     "packages/downloader/vitest.config.ts",
+    "packages/eventing/vitest.config.ts",
     "packages/importer/vitest.config.ts",
     "packages/web/playwright.config.ts",
     "packages/web/svelte.config.js",
