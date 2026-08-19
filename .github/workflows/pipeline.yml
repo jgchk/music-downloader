@@ -63,15 +63,23 @@ jobs:
 
   # Test pyramid — every workspace package in one merged 100% coverage run (node + SSR + Chromium
   # browser-mode projects), plus the frozen-fixture contract tiers (incl. the cross-module seam
-  # fixtures) and the repo-tooling unit tests. ffmpeg is a real dependency of the audio-probe
-  # adapter tests; Chromium is the browser-mode runner for the web client project.
+  # fixtures) and the repo-tooling unit tests. Chromium is the browser-mode runner for the web
+  # client project.
+  #
+  # NO ffmpeg HERE, deliberately. Nothing in this job spawns a real audio binary: the audio-probe
+  # adapter's tests inject a fake `CommandRunner`, `runner.test.ts` exercises the spawn wiring
+  # against `process.execPath`, and the ffprobe contract tier REPLAYS recorded stdout through that
+  # same fake. The only code that touches a real binary is the recorder
+  # (packages/downloader/test/contract/record/ffprobe.ts), which is a developer-run script, and the
+  # e2e tier, which runs inside the image where ffmpeg is installed (Dockerfile). Verified by
+  # running all four tiers with ffmpeg/ffprobe shimmed to `exit 127`: 3300+ tests green, zero
+  # invocations. The step it replaces was not merely idle — `apt-get update` intermittently wedges
+  # on the Ubuntu mirrors, and has been measured at 11m08s here against a 20-35s norm.
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 # observed ~100s; Chromium + apt installs dominate on a cold cache
+    timeout-minutes: 15 # observed ~100s; Chromium install dominates on a cold cache
     steps:
       - uses: actions/checkout@v7
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -135,10 +143,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # the merge-base diff needs real history
-      # The audio-probe adapter's tests shell out to a real ffmpeg, and they are the tests that kill
-      # that adapter's mutants — without it those mutants read as survivors.
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # No ffmpeg install — see the `test` job. This job drives the same vitest tiers through
+      # Stryker, so it inherits the same answer: no test spawns a real audio binary, and the
+      # audio-probe mutants are killed by the fake-runner tests. Removing it also protects the
+      # timeout budget below, which an apt stall has eaten 12m45s of.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
