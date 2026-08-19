@@ -115,8 +115,7 @@ describe('cachingHttpClient', () => {
     expect(inner.calls()).toBe(3);
   });
 
-  it('keeps its own time when none is given, so answers still go stale in production', async () => {
-    // Constructed the way composition does — no injected clock — and still answers from memory.
+  it('answers from memory when constructed the way composition does, with no clock given', async () => {
     const inner = client({ status: 200, body: 'first' });
     const cached = cachingHttpClient(inner);
 
@@ -124,6 +123,48 @@ describe('cachingHttpClient', () => {
     await cached.send({ url: URL_A });
 
     expect(inner.calls()).toBe(1);
+  });
+
+  it('does not answer one caller’s request with what another caller was told', async () => {
+    // The other adapter on this seam sends an API key. A URL-only key would let its answer be
+    // served to a request that identified itself differently — or the reverse.
+    const inner = client({ status: 200, body: 'for A' }, { status: 200, body: 'for B' });
+    const cached = cachingHttpClient(inner, {}, clock());
+
+    const first = await cached.send({ url: URL_A, headers: { 'User-Agent': 'A' } });
+    const second = await cached.send({ url: URL_A, headers: { 'User-Agent': 'B' } });
+
+    expect([first.body, second.body]).toEqual(['for A', 'for B']);
+  });
+
+  it('holds an answer for exactly as long as it says it will', async () => {
+    const inner = client({ status: 200, body: 'first' }, { status: 200, body: 'second' });
+    const time = clock();
+    const cached = cachingHttpClient(inner, { ttlMs: 1000 }, time);
+
+    await cached.send({ url: URL_A });
+    time.advance(1000);
+
+    const again = await cached.send({ url: URL_A });
+
+    expect(again.body).toBe('first');
+  });
+
+  it('lets a read both callers were waiting on be tried again after it fails', async () => {
+    // Two tiles asking for one cover; the read fails. A shared entry left behind would make that
+    // one failure the answer for the life of the process.
+    const inner = client(new Error('reset'), { status: 200, body: 'back' });
+    const cached = cachingHttpClient(inner, {}, clock());
+
+    const settled = await Promise.allSettled([
+      cached.send({ url: URL_A }),
+      cached.send({ url: URL_A }),
+    ]);
+    expect(settled.map((one) => one.status)).toEqual(['rejected', 'rejected']);
+
+    const retried = await cached.send({ url: URL_A });
+
+    expect(retried.body).toBe('back');
   });
 
   it('passes a write straight through, remembering nothing about it', async () => {

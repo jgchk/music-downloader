@@ -6,7 +6,7 @@
   },
   "request": {
     "method": "GET",
-    "path": "/release/1eaac429-02a7-48c7-b328-d1247f4d93a4",
+    "path": "/release/723ba05c-98c9-4366-ae79-3c89f8a370ca",
     "query": {
       "inc": "recordings",
       "fmt": "json"
@@ -15,223 +15,208 @@
   "response": {
     "status": 200,
     "body": {
-      "date": "2006-08-31",
       "cover-art-archive": {
-        "darkened": false,
-        "front": true,
+        "count": 5,
+        "artwork": true,
         "back": true,
-        "count": 2,
-        "artwork": true
+        "front": true,
+        "darkened": false
       },
-      "id": "1eaac429-02a7-48c7-b328-d1247f4d93a4",
+      "id": "723ba05c-98c9-4366-ae79-3c89f8a370ca",
+      "date": "1992",
+      "disambiguation": "",
       "media": [
         {
-          "position": 1,
-          "track-count": 11,
-          "id": "884dd49a-b6b9-3bfe-aea2-ffe689456215",
-          "format": "CD",
-          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "track-offset": 0,
+          "format-id": null,
           "tracks": [
             {
-              "id": "4dadaea0-1da8-3797-a834-568810af2765",
-              "title": "Silence Is Golden",
-              "recording": {
-                "id": "40b7fb66-4e1e-460b-9e9c-a803f8de7025",
-                "first-release-date": "2006-08-31",
-                "title": "Silence Is Golden",
-                "video": false,
-                "length": 140666,
-                "disambiguation": ""
-              },
+              "position": 1,
+              "length": 186066,
               "number": "1",
-              "length": 140666,
-              "position": 1
+              "recording": {
+                "disambiguation": "live",
+                "video": false,
+                "length": 184586,
+                "title": "Mrs. Robinson",
+                "first-release-date": "1992",
+                "id": "2a98a05f-e9dc-4092-ae57-ff2eb6377dc8"
+              },
+              "title": "Mrs. Robinson",
+              "id": "8b2b8828-3837-3a40-b68f-821994fd5f32"
             },
             {
-              "title": "Club Oslo",
-              "id": "1069048e-0c4f-3c2f-9bc9-ca970d44f61f",
+              "number": "2",
+              "length": 205293,
+              "position": 2,
+              "id": "a3033032-3f93-3ef4-9fbd-d4e8df98feb4",
+              "title": "Me and Julio Down by the Schoolyard",
               "recording": {
-                "length": 176560,
+                "id": "9913d10b-d9f1-4e58-87e9-e9c09c594d65",
+                "first-release-date": "1992",
+                "title": "Me and Julio Down by the Schoolyard",
+                "video": false,
+                "length": 205293,
+                "disambiguation": ""
+              }
+            },
+            {
+              "position": 3,
+              "number": "3",
+              "length": 302200,
+              "recording": {
+                "first-release-date": "1992",
+                "id": "5beac32a-9460-43a7-aac2-dc4c60f00e20",
+                "length": 302200,
                 "video": false,
                 "disambiguation": "",
-                "title": "Club Oslo",
-                "first-release-date": "2006-08-31",
-                "id": "1423c7cb-b171-4236-b920-cb9b5a1b931c"
+                "title": "Born at the Right Time"
               },
-              "length": 176560,
-              "number": "2",
-              "position": 2
-            },
-            {
-              "id": "c64755c7-6197-38c3-8993-9b3294a71b3f",
-              "title": "Spectacula",
-              "recording": {
-                "id": "21424b90-0c55-430f-91bb-2983e4bd9492",
-                "first-release-date": "2006-08-31",
-                "title": "Spectacula",
-                "length": 210933,
-                "video": false,
-                "disambiguation": ""
-              },
-              "length": 210933,
-              "number": "3",
-              "position": 3
+              "title": "Born at the Right Time",
+              "id": "374c4cd5-805b-3dff-91a8-5d94012c4f62"
             },
             {
               "position": 4,
-              "length": 262213,
+              "length": 269933,
               "number": "4",
               "recording": {
-                "title": "Cast Out Devils",
-                "length": 262213,
-                "video": false,
                 "disambiguation": "",
-                "id": "0a182bff-847b-44fa-a983-ebffaee1d54f",
-                "first-release-date": "2006-08-31"
+                "length": 269933,
+                "video": false,
+                "title": "Bridge Over Troubled Water",
+                "first-release-date": "1992",
+                "id": "1c117c23-9890-4bb3-86e7-2b727949053c"
               },
-              "id": "de806feb-0759-39f4-b514-49f830cb9c6b",
-              "title": "Cast Out Devils"
+              "id": "37c44fe9-7f12-3bf5-873a-d2316a6e20c1",
+              "title": "Bridge Over Troubled Water"
             },
             {
-              "id": "5ffbd094-c252-3011-9475-0a0080cde486",
-              "title": "Chapel of Love",
+              "title": "Graceland",
+              "id": "07484271-22d8-30c5-8624-22213dde7518",
               "recording": {
+                "id": "267e810d-c4c7-48b0-9bda-b8631c1e0df3",
+                "first-release-date": "1992",
+                "title": "Graceland",
+                "length": 452973,
                 "video": false,
-                "length": 209680,
-                "disambiguation": "",
-                "title": "Chapel of Love",
-                "first-release-date": "2006-08-31",
-                "id": "b43444b2-2294-401d-9024-4a03b99faba5"
+                "disambiguation": ""
               },
-              "length": 209680,
               "number": "5",
+              "length": 452973,
               "position": 5
             },
             {
               "position": 6,
-              "length": 172346,
               "number": "6",
+              "length": 233533,
               "recording": {
-                "id": "4b884a4d-d3b1-43c2-aef4-6c0d0877654c",
-                "first-release-date": "2006-08-31",
-                "title": "Utopiathon",
+                "first-release-date": "1992",
+                "id": "1bba75db-a5c4-40ec-b2ce-bec0a8924bd0",
                 "disambiguation": "",
                 "video": false,
-                "length": 172346
+                "length": 233533,
+                "title": "Something So Right"
               },
-              "id": "0bdf6739-9d40-32a8-99ae-50dc9720d808",
-              "title": "Utopiathon"
+              "id": "112b2f5e-ff99-3109-ae70-c9b188f5fcca",
+              "title": "Something So Right"
             },
             {
+              "length": 381626,
               "number": "7",
-              "length": 260986,
               "position": 7,
-              "id": "4c9c25ef-e5d1-3f4b-9fdf-faf2937181b5",
-              "title": "Boy in the Bubble",
+              "title": "Late in the Evening",
+              "id": "1fd61faa-7693-330b-9cf7-f93ab2178d39",
               "recording": {
-                "title": "Boy in the Bubble",
-                "length": 260986,
+                "title": "Late in the Evening",
                 "video": false,
+                "length": 381626,
                 "disambiguation": "",
-                "id": "dc116aff-899f-4c39-b9a9-043fc3319138",
-                "first-release-date": "2006-08-31"
+                "id": "e71da7cb-45fc-4e41-8d04-ea9a5a299241",
+                "first-release-date": "1992"
               }
             },
             {
-              "position": 8,
-              "length": 241146,
-              "number": "8",
+              "title": "Still Crazy After All This Years",
+              "id": "a7a14d44-284a-33ae-8e3c-eb275b68c33a",
               "recording": {
-                "title": "Behold the Man",
+                "id": "ce66138a-f6a2-4c11-af5d-0a80c30a94f3",
+                "first-release-date": "1992",
+                "title": "Still Crazy After All This Years",
                 "disambiguation": "",
-                "length": 241146,
                 "video": false,
-                "id": "d54433d9-af85-4288-849f-bde38f3b7596",
-                "first-release-date": "2006-08-31"
+                "length": 205000
               },
-              "id": "6c846bd3-7d67-35f3-914c-d5b34c1e6c92",
-              "title": "Behold the Man"
+              "length": 205000,
+              "number": "8",
+              "position": 8
             },
             {
               "position": 9,
-              "length": 308746,
+              "length": 139640,
               "number": "9",
               "recording": {
-                "title": "Psychotherapy",
                 "video": false,
-                "length": 308746,
+                "length": 139640,
                 "disambiguation": "",
-                "id": "0ce517b6-a8c4-4176-b1e9-576abc19a38e",
-                "first-release-date": "2006-08-31"
+                "title": "Homeward Bound",
+                "first-release-date": "1992",
+                "id": "28c7b424-d7b9-4142-9183-fe95feec3756"
               },
-              "id": "c958d9ac-9a3b-3b67-8cdf-cf0bcdc87d16",
-              "title": "Psychotherapy"
+              "title": "Homeward Bound",
+              "id": "6dd30cdf-07ce-37c4-83e3-8264138ca121"
             },
             {
               "recording": {
-                "title": "IMA Believer",
-                "video": false,
-                "length": 169320,
+                "id": "65602437-2058-45a2-ba0b-ab4976013e3b",
+                "first-release-date": "1992",
+                "title": "Boy in the Bubble",
                 "disambiguation": "",
-                "id": "fd7b6643-0bd8-458d-b036-9b19d6173596",
-                "first-release-date": "2006-08-31"
+                "video": false,
+                "length": 333734
               },
-              "title": "IMA Believer",
-              "id": "afc67cf5-6003-3f10-a1d2-556c6c26aa9b",
+              "id": "a4896e67-97f8-39a6-8f49-5076c220eb40",
+              "title": "Boy in the Bubble",
               "position": 10,
-              "length": 169320,
+              "length": 333734,
               "number": "10"
-            },
-            {
-              "id": "fc5cb2f9-cbe4-356a-af60-6f9cc696cd9c",
-              "title": "Smellovision",
-              "recording": {
-                "id": "4b498d39-13a7-402a-8ad6-b84cde86c498",
-                "first-release-date": "2006-08-31",
-                "title": "Smellovision",
-                "length": 224693,
-                "video": false,
-                "disambiguation": ""
-              },
-              "number": "11",
-              "length": 224693,
-              "position": 11
             }
           ],
-          "track-offset": 0,
-          "title": ""
+          "format": null,
+          "title": "",
+          "position": 1,
+          "id": "350bde28-0fe2-31e4-88bd-c43b017f1028",
+          "track-count": 10
         }
       ],
-      "disambiguation": "",
-      "title": "Cast Out Devils",
-      "country": "US",
-      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "MTV Unplugged",
       "barcode": null,
-      "status": "Official",
-      "asin": null,
+      "status": "Bootleg",
+      "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+      "country": "US",
+      "packaging": null,
       "release-events": [
         {
-          "date": "2006-08-31",
           "area": {
             "type": null,
             "type-id": null,
             "disambiguation": "",
             "name": "United States",
-            "id": "489ce91b-6658-3307-9877-795b68554c98",
             "iso-3166-1-codes": [
               "US"
             ],
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
             "sort-name": "United States"
-          }
+          },
+          "date": "1992"
         }
       ],
-      "packaging": "Jewel Case",
+      "asin": null,
       "quality": "normal",
-      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
       "text-representation": {
         "script": "Latn",
         "language": "eng"
-      }
+      },
+      "packaging-id": null
     }
   }
 }

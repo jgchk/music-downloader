@@ -229,7 +229,7 @@ describe('cancel action', () => {
       data: { message: string };
     };
     expect(result.status).toBe(500);
-    expect(result.data.message).toContain('store');
+    expect(result.data.message).toBe('Something went wrong. Try again.');
   });
 });
 

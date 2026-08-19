@@ -16,7 +16,7 @@
   "response": {
     "status": 200,
     "body": {
-      "created": "2026-08-19T01:06:51.716Z",
+      "created": "2026-08-19T04:42:58.078Z",
       "count": 22058,
       "offset": 0,
       "artists": [
@@ -277,34 +277,6 @@
           }
         },
         {
-          "id": "d3aa0259-fdc3-4c48-96f0-e093b023b8e6",
-          "type": "Person",
-          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 77,
-          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
-          "name": "Simon Paul",
-          "sort-name": "Paul, Simon",
-          "gender": "male",
-          "disambiguation": "art director and designer",
-          "life-span": {
-            "ended": null
-          }
-        },
-        {
-          "id": "f4515af3-52a4-48dc-b0e0-0edb907c1258",
-          "type": "Person",
-          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 77,
-          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
-          "name": "Simon Paul",
-          "sort-name": "Paul, Simon",
-          "gender": "male",
-          "disambiguation": "songwriter",
-          "life-span": {
-            "ended": null
-          }
-        },
-        {
           "id": "5d02f264-e225-41ff-83f7-d9b1f0b1874a",
           "type": "Group",
           "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
@@ -483,10 +455,38 @@
           ]
         },
         {
+          "id": "d3aa0259-fdc3-4c48-96f0-e093b023b8e6",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 77,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "gender": "male",
+          "disambiguation": "art director and designer",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "f4515af3-52a4-48dc-b0e0-0edb907c1258",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 77,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "gender": "male",
+          "disambiguation": "songwriter",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
           "id": "fe3c7cec-3aad-4505-b5c2-ad72a3a98279",
           "type": "Person",
           "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 75,
+          "score": 76,
           "name": "Paul Gendler",
           "sort-name": "Gendler, Paul",
           "life-span": {
@@ -509,7 +509,7 @@
           "id": "13da19c5-b82d-44dd-a0a9-edfcc64885a8",
           "type": "Person",
           "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 74,
+          "score": 75,
           "name": "Paul Elliott",
           "sort-name": "Elliott, Paul",
           "country": "GB",
@@ -618,7 +618,7 @@
           "id": "6d1c39d3-75c2-4985-8f16-ee774714f12a",
           "type": "Person",
           "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 67,
+          "score": 68,
           "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
           "name": "Gendler",
           "sort-name": "Gendler",
@@ -759,7 +759,7 @@
           "id": "6df8e517-ab03-4997-9cd2-1f6fe0c1d164",
           "type": "Person",
           "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "score": 57,
+          "score": 58,
           "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
           "name": "Simon Wadmore",
           "sort-name": "Wadmore, Simon",

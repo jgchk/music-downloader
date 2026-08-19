@@ -134,18 +134,21 @@ export function alternativeLabel(other: OtherMatch): string {
 
 /**
  * Every quality floor a request may name, keyed by the wire union so a new tier is a build error
- * here. The options themselves are written out in `QualityFloorSelect.svelte` (the compiler emits
+ * here — MINUS `UNKNOWN`, which is what the classifier emits when it cannot tell what a file is,
+ * not a standard anyone would ask a download to meet. The options themselves are written out in `QualityFloorSelect.svelte` (the compiler emits
  * an unreachable nullish guard around an interpolated `<option>`), and the two are held together
  * by a test that asserts the rendered values are exactly these keys — which is what stops a tier
  * from quietly missing from the form, the way `LOSSY_LOW` once did.
  */
-export const QUALITY_FLOORS: Record<z.infer<typeof qualityBucketSchema>, string> = {
+export const QUALITY_FLOORS: Record<
+  Exclude<z.infer<typeof qualityBucketSchema>, 'UNKNOWN'>,
+  string
+> = {
   LOSSLESS_HIRES: 'Hi-res lossless',
   LOSSLESS: 'Lossless',
   LOSSY_HIGH: 'High quality lossy',
   LOSSY_STANDARD: 'Standard lossy',
   LOSSY_LOW: 'Low quality lossy',
-  UNKNOWN: 'Unknown',
 };
 
 /** Whether what was typed is a catalog identifier rather than something to search for. */

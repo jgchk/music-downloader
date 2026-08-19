@@ -15,29 +15,29 @@
   "response": {
     "status": 200,
     "body": {
-      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
-      "primary-type": "Album",
       "secondary-types": [],
       "title": "Paul Simon's Graceland: Solo Marimba",
       "disambiguation": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "primary-type": "Album",
+      "secondary-type-ids": [],
       "artist-credit": [
         {
-          "joinphrase": "",
+          "name": "Arthur Lipner",
           "artist": {
-            "id": "ab65d513-ae49-4d53-b7eb-7af187f2cbd3",
-            "sort-name": "Lipner, Arthur",
-            "name": "Arthur Lipner",
             "country": "US",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
             "disambiguation": "",
             "type": "Person",
-            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+            "id": "ab65d513-ae49-4d53-b7eb-7af187f2cbd3",
+            "sort-name": "Lipner, Arthur",
+            "name": "Arthur Lipner"
           },
-          "name": "Arthur Lipner"
+          "joinphrase": ""
         }
       ],
       "first-release-date": "2017-03-24",
-      "id": "cc779b67-8eda-41cb-a792-973bbd89d505",
-      "secondary-type-ids": []
+      "id": "cc779b67-8eda-41cb-a792-973bbd89d505"
     }
   }
 }

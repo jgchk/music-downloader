@@ -48,19 +48,29 @@ const IMAGE_HOSTS = new Set(['coverartarchive.org', 'archive.org']);
  * a script-bearing document served from our own origin. Anything else — including an SVG, and
  * including a type the archive invents — is served as the default rather than echoed.
  */
-const SERVABLE_IMAGE_TYPES = new Set<string>([
+const SERVABLE_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
-]);
+] as const satisfies readonly ServableImageType[]);
 
 /** The declared type if we are willing to serve it under our own origin, else the default. */
 function servableType(declared: string): ServableImageType {
   // The parameters (`; charset=…`) are the archive's to send and not ours to echo.
   const media = declared.replace(/;.*$/, '').trim().toLowerCase();
-  return SERVABLE_IMAGE_TYPES.has(media) ? (media as ServableImageType) : DEFAULT_CONTENT_TYPE;
+  // `has` narrows against the set's own element type, so nothing is asserted back into the union.
+  return SERVABLE_IMAGE_TYPES.has(media as ServableImageType)
+    ? (media as ServableImageType)
+    : DEFAULT_CONTENT_TYPE;
 }
+
+/**
+ * Which thumbnail key each size we serve is named by in the manifest. A map rather than a cast of
+ * the number: growing {@link CoverArtSize} then fails to compile here instead of silently falling
+ * through to the full-size image.
+ */
+const THUMBNAIL_KEYS: Record<CoverArtSize, '250' | '500'> = { 250: '250', 500: '500' };
 
 function unavailable(detail: string): CoverArtUnavailable {
   return { kind: 'cover-art-unavailable', detail };
@@ -107,11 +117,17 @@ export class CoverArtArchive implements CoverArtPort {
     size: CoverArtSize,
   ): ResultAsync<CoverArtAnswer, CoverArtUnavailable> {
     return this.manifest(entity, mbid).andThen((answer) => {
-      if (answer.kind === 'absent') return okAsync<CoverArtAnswer>({ kind: 'absent' });
-      const front = (answer.manifest.images ?? []).find((image) => image.front === true);
-      // Art that exists but has no front cover is, for a picker, no art at all.
-      if (front === undefined) return okAsync<CoverArtAnswer>({ kind: 'absent' });
-      const source = front.thumbnails?.[String(size) as '250' | '500'] ?? front.image;
+      if (answer.kind === 'absent')
+        return okAsync<CoverArtAnswer>({ kind: 'absent', listedImages: 0 });
+      const images = answer.manifest.images ?? [];
+      const front = images.find((image) => image.front === true);
+      // Art that exists but has no front cover is, for a picker, no art at all — said WITH how
+      // many images were listed, because "back-only scans" and "the `front` flag was renamed"
+      // look identical here and only the count can tell them apart later.
+      if (front === undefined) {
+        return okAsync<CoverArtAnswer>({ kind: 'absent', listedImages: images.length });
+      }
+      const source = front.thumbnails?.[THUMBNAIL_KEYS[size]] ?? front.image;
       if (source === undefined) {
         // A front cover that names no image at all is the archive off-contract — a renamed field,
         // most likely. Reported as absence it would be remembered for a day and served to the

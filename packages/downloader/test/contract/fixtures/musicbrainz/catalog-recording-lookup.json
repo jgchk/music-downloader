@@ -6,7 +6,7 @@
   },
   "request": {
     "method": "GET",
-    "path": "/recording/dc116aff-899f-4c39-b9a9-043fc3319138",
+    "path": "/recording/65602437-2058-45a2-ba0b-ab4976013e3b",
     "query": {
       "inc": "artist-credits releases",
       "fmt": "json"
@@ -15,77 +15,77 @@
   "response": {
     "status": 200,
     "body": {
-      "first-release-date": "2006-08-31",
+      "title": "Boy in the Bubble",
+      "disambiguation": "",
+      "length": 333734,
+      "video": false,
+      "id": "65602437-2058-45a2-ba0b-ab4976013e3b",
       "releases": [
         {
-          "packaging": "Jewel Case",
-          "id": "1eaac429-02a7-48c7-b328-d1247f4d93a4",
+          "quality": "normal",
+          "packaging-id": null,
+          "text-representation": {
+            "language": "eng",
+            "script": "Latn"
+          },
+          "country": "US",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
           "artist-credit": [
             {
-              "artist": {
-                "country": "US",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "disambiguation": "",
-                "type": "Group",
-                "sort-name": "Detholz!, The",
-                "id": "7a6288ca-c654-442e-a745-2148159217ec",
-                "name": "The Detholz!"
-              },
+              "name": "Paul Simon",
               "joinphrase": "",
-              "name": "The Detholz!"
-            }
-          ],
-          "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
-          "barcode": null,
-          "text-representation": {
-            "script": "Latn",
-            "language": "eng"
-          },
-          "date": "2006-08-31",
-          "status": "Official",
-          "release-events": [
-            {
-              "date": "2006-08-31",
-              "area": {
-                "type-id": null,
-                "disambiguation": "",
-                "type": null,
-                "sort-name": "United States",
-                "id": "489ce91b-6658-3307-9877-795b68554c98",
-                "name": "United States",
-                "iso-3166-1-codes": [
-                  "US"
-                ]
+              "artist": {
+                "sort-name": "Simon, Paul",
+                "country": "US",
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "disambiguation": "of Simon & Garfunkel",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "type": "Person"
               }
             }
           ],
-          "quality": "normal",
-          "country": "US",
-          "title": "Cast Out Devils",
+          "barcode": null,
+          "status": "Bootleg",
+          "release-events": [
+            {
+              "area": {
+                "disambiguation": "",
+                "type": null,
+                "type-id": null,
+                "sort-name": "United States",
+                "name": "United States",
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "iso-3166-1-codes": [
+                  "US"
+                ]
+              },
+              "date": "1992"
+            }
+          ],
+          "packaging": null,
           "disambiguation": "",
-          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe"
+          "title": "MTV Unplugged",
+          "date": "1992",
+          "id": "723ba05c-98c9-4366-ae79-3c89f8a370ca"
         }
       ],
-      "id": "dc116aff-899f-4c39-b9a9-043fc3319138",
+      "first-release-date": "1992",
       "artist-credit": [
         {
           "joinphrase": "",
+          "name": "Paul Simon",
           "artist": {
-            "name": "The Detholz!",
-            "id": "7a6288ca-c654-442e-a745-2148159217ec",
-            "sort-name": "Detholz!, The",
-            "disambiguation": "",
-            "type": "Group",
-            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "of Simon & Garfunkel",
+            "name": "Paul Simon",
+            "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+            "sort-name": "Simon, Paul",
             "country": "US"
-          },
-          "name": "The Detholz!"
+          }
         }
-      ],
-      "length": 260986,
-      "title": "Boy in the Bubble",
-      "disambiguation": "",
-      "video": false
+      ]
     }
   }
 }

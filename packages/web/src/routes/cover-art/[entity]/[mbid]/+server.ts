@@ -52,23 +52,37 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
   const answer = await locals.coverArt.front(entity, mbid, size);
 
   return answer.match(
-    (found) =>
-      found.kind === 'found'
-        ? new Response(found.image.bytes as unknown as BodyInit, {
-            status: 200,
-            headers: {
-              'Content-Type': found.image.contentType,
-              // `private`: the response is served from behind the access gate, so a shared cache
-              // has no business holding it even though a cover is not itself a secret.
-              'Cache-Control': `private, max-age=${ART_MAX_AGE_SECONDS}`,
-              // Serving third-party bytes from our own origin: the declared type is the only type.
-              'X-Content-Type-Options': 'nosniff',
-            },
-          })
-        : new Response(undefined, {
-            status: 404,
-            headers: { 'Cache-Control': `private, max-age=${ABSENCE_MAX_AGE_SECONDS}` },
-          }),
+    (found) => {
+      if (found.kind === 'found') {
+        // Double assertion, deliberately: `BodyInit` is typed over `Uint8Array<ArrayBufferLike>`
+        // in this lib target while ours is `Uint8Array<ArrayBuffer>` — a lib mismatch, not a
+        // mismatch of ours, and the bytes are handed on untouched.
+        return new Response(found.image.bytes as unknown as BodyInit, {
+          status: 200,
+          headers: {
+            'Content-Type': found.image.contentType,
+            // `private`: the response is served from behind the access gate, so a shared cache
+            // has no business holding it even though a cover is not itself a secret.
+            'Cache-Control': `private, max-age=${ART_MAX_AGE_SECONDS}`,
+            // Serving third-party bytes from our own origin: the declared type is the only type.
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      }
+      // The archive listed art and none of it was a front cover: either a back-only scan, or its
+      // `front` flag renamed. Indistinguishable per request, greppable in aggregate — and a rename
+      // would blank every cover in the product at once while every request still answered 404.
+      if (found.listedImages > 0) {
+        locals.logger.debug(
+          { entity, mbid, listedImages: found.listedImages },
+          'cover art manifest names no front cover',
+        );
+      }
+      return new Response(undefined, {
+        status: 404,
+        headers: { 'Cache-Control': `private, max-age=${ABSENCE_MAX_AGE_SECONDS}` },
+      });
+    },
     (failure) => {
       // The one place that knows WHY the archive failed. Unlogged, an operator sees a grid of
       // placeholders and cannot tell an outage from a shape change.

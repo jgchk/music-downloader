@@ -128,13 +128,15 @@ describe('rankReleaseGroups', () => {
   });
 
   it('neither rewards nor punishes a release whose type the catalog does not name', () => {
+    // Ordered so the untyped release is offered FIRST: if an unnamed type were penalised, the
+    // named-but-unbonused Broadcast would overtake it, and the stable sort could not hide it.
     const ranked = rankReleaseGroups('graceland', [
-      releaseGroup('Graceland', 'Paul Simon', { primaryType: 'Broadcast' }),
       releaseGroup('Graceland', 'Paul Simon', { primaryType: undefined }),
+      releaseGroup('Graceland', 'Paul Simon', { primaryType: 'Broadcast' }),
       releaseGroup('Graceland', 'Paul Simon', { primaryType: 'Album' }),
     ]);
 
-    expect(ranked.map((item) => item.primaryType)).toEqual(['Album', 'Broadcast', undefined]);
+    expect(ranked.map((item) => item.primaryType)).toEqual(['Album', undefined, 'Broadcast']);
   });
 
   it('returns nothing for no hits, and leaves a blank query in provider order', () => {

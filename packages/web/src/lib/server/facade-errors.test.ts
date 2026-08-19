@@ -102,8 +102,10 @@ describe('messageOf', () => {
     expect(messageOf({ kind: 'InvalidResolution', detail: 'no candidates' })).toContain(
       'no candidates',
     );
-    expect(messageOf({ kind: 'InfraError', operation: 'bridge.apply', message: 'x' })).toContain(
-      'bridge.apply',
-    );
+    // An infrastructure fault is the one kind with NO actionable detail to carry: its operation
+    // is a module noun, and the diagnosis belongs in the log beside the correlation id.
+    expect(
+      messageOf({ kind: 'InfraError', operation: 'bridge.apply', message: 'x' }),
+    ).not.toContain('bridge.apply');
   });
 });

@@ -41,10 +41,10 @@ describe('cachingCoverArt', () => {
     // An absence costs no bytes, so the byte budget does not bound it — and most identifiers the
     // archive is asked about have no art at all.
     const inner = archive(
-      { kind: 'absent' },
-      { kind: 'absent' },
-      { kind: 'absent' },
-      { kind: 'absent' },
+      { kind: 'absent', listedImages: 0 },
+      { kind: 'absent', listedImages: 0 },
+      { kind: 'absent', listedImages: 0 },
+      { kind: 'absent', listedImages: 0 },
     );
     const cached = cachingCoverArt(inner, { maxEntries: 2 }, clock().now);
 
@@ -59,6 +59,18 @@ describe('cachingCoverArt', () => {
     expect(inner.calls()).toBe(4);
   });
 
+  it('holds an answer for exactly as long as it says it will', async () => {
+    const inner = archive(found(4), found(8));
+    const time = clock();
+    const cached = cachingCoverArt(inner, { ttlMs: 1000 }, time.now);
+
+    await cached.front('release-group', MBID, 250);
+    time.advance(1000);
+    await cached.front('release-group', MBID, 250);
+
+    expect(inner.calls()).toBe(1);
+  });
+
   it('serves a second request for the same art without asking the archive again', async () => {
     const inner = archive(found(4));
     const cached = cachingCoverArt(inner, {}, clock().now);
@@ -71,13 +83,13 @@ describe('cachingCoverArt', () => {
   });
 
   it('remembers that a record has no art, so a missing cover is asked about once', async () => {
-    const inner = archive({ kind: 'absent' });
+    const inner = archive({ kind: 'absent', listedImages: 0 });
     const cached = cachingCoverArt(inner, {}, clock().now);
 
     await cached.front('release-group', MBID, 250);
     const second = await cached.front('release-group', MBID, 250);
 
-    expect(second._unsafeUnwrap()).toEqual({ kind: 'absent' });
+    expect(second._unsafeUnwrap()).toEqual({ kind: 'absent', listedImages: 0 });
     expect(inner.calls()).toBe(1);
   });
 

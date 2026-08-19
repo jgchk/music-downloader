@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
+import { MALFORMED, UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
 
 const MBID = '19847822-1430-3380-9cf1-bc45545b34ac';
 
@@ -45,11 +45,14 @@ describe('httpCatalog', () => {
 
   it('refuses an answer of the right status but the wrong shape', async () => {
     // A stale deploy, a proxy, or another route matching: JSON that parses but is not this answer.
+    // Told apart from an unreadable body, because "sign in again" cannot fix a shape disagreement.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const stub = fetchStub(Response.json({ leading: 'nonsense' }));
 
     const answer = await httpCatalog(stub).search('graceland');
 
-    expect(answer).toEqual({ ok: false, message: UNREADABLE });
+    expect(answer).toEqual({ ok: false, message: MALFORMED });
+    expect(console.error).toHaveBeenCalled();
   });
 
   it('reports a refusal as a message a person can act on', async () => {
@@ -106,7 +109,8 @@ describe('httpCatalog', () => {
 
   it('gives up on a server that accepts the request and never answers', async () => {
     // A silent connection is the least actionable state there is: the search would spin forever
-    // and a person cannot tell it from a slow catalog.
+    // and a person cannot tell it from a slow catalog. The deadline is a seam so this test proves
+    // the behaviour in milliseconds rather than waiting out the production one.
     const stub = vi.fn(
       (_path: string, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
@@ -114,10 +118,10 @@ describe('httpCatalog', () => {
         }),
     ) as never;
 
-    const answer = await httpCatalog(stub).search('graceland');
+    const answer = await httpCatalog(stub, { timeoutMs: 5 }).search('graceland');
 
     expect(answer).toEqual({ ok: false, message: UNREACHABLE });
-  }, 20_000);
+  });
 
   it('abandons the request when the caller abandons the search', async () => {
     // The page abandons a search the moment a newer keystroke starts one; the request must go

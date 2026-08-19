@@ -203,9 +203,7 @@ export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionList
       id: mbid,
       status: release.status ?? undefined,
       date: release.date ?? undefined,
-      // The picker's own convention for an unknown count is the sentinel `0` (it ranks by modal
-      // count and an unknown must not win); the presentation keeps them apart. See mapping.ts.
-      trackCount: trackCount ?? 0,
+      trackCount,
     });
   }
 

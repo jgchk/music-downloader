@@ -94,6 +94,9 @@ export const fixtureSchemas: Record<string, ZodType> = {
  * branches on a field) — do not let it linger here.
  */
 export const unconsumedResponseFixtures: readonly string[] = [
+  // The catalog's own "no such thing": what is contract here is the 404 STATUS — it drives the
+  // lookup's fallthrough between entity kinds — and the adapter never reads the body it carries.
+  'musicbrainz/catalog-not-found.json',
   'slskd/live/transfers-enqueue.json', // 201 empty-body ack
   'slskd/full-flow/transfers-enqueue.json', // 201 empty-body ack
   'slskd/queued/transfers-enqueue.json', // 201 empty-body ack

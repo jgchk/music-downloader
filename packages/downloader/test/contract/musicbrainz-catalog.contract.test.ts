@@ -181,10 +181,27 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
     const tracks = await unwrap(adapter().tracklist(release, testScope()));
 
     // The recorded bytes are fixed, so the running order is knowable rather than merely typed.
-    expect(tracks[0]).toMatchObject({ position: 1, title: 'Silence Is Golden' });
+    expect(tracks[0]).toMatchObject({ position: 1, title: 'Mrs. Robinson' });
     expect(tracks.map((track) => track.position)).toEqual(tracks.map((_track, index) => index + 1));
     const sent = server.requests.find((request) => request.path === `/release/${release}`)!;
     expect(sent.query).toEqual(byName('catalog-tracklist.json').request.query);
+  });
+
+  it('reads the catalog’s own "no such thing" as an outcome, having tried every kind', async () => {
+    // The 404 is what sends a lookup on to the next entity kind, and what the page shows as "that
+    // identifier names nothing" — replayed from the archive's real answer rather than a synthetic
+    // one, because the fallthrough is only correct if the real status is what it thinks it is.
+    const unknown = recordedMbid(byName('catalog-not-found.json').request.path.split('/').at(-1)!);
+
+    const found = await unwrap(adapter().lookup(unknown, testScope()));
+
+    expect(found).toEqual({ kind: 'notFound' });
+    const asked = server.requests.map((request) => request.path);
+    expect(asked).toEqual([
+      `/release-group/${unknown}`,
+      `/artist/${unknown}`,
+      `/recording/${unknown}`,
+    ]);
   });
 
   it('groups a release group’s editions by tracklist and names the pipeline’s own pick', async () => {

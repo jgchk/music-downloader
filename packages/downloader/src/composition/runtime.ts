@@ -358,9 +358,10 @@ export async function createDownloaderRuntime(
   const catalog =
     overrides.catalog ??
     new MusicBrainzCatalogSearch(
-      // Its own cache instance: the entries are keyed by URL, and this adapter's requests carry
-      // headers no other adapter's do.
-      cachingHttpClient(fetchHttpClient, {}, clock),
+      // Its own cache instance, on its own clock: freshness here is wall-clock infrastructure, not
+      // the domain time the rest of this runtime keeps — a frozen `clock` in a test or fixture
+      // would otherwise make every catalog answer immortal.
+      cachingHttpClient(fetchHttpClient),
       { baseUrl: config.musicbrainz.baseUrl, userAgent: config.musicbrainz.userAgent },
     );
   const facade = createDownloaderFacade(dependencies, { catalog, logger });

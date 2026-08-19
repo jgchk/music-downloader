@@ -341,22 +341,32 @@ export interface ReleaseGroupEdition<Id extends string = string> {
   readonly id: Id;
   readonly status: string | undefined;
   readonly date: string | undefined;
-  readonly trackCount: number;
+  /**
+   * How many tracks, or nothing when the catalog states no count. NOT a sentinel `0`: zero is
+   * lower than every real count, and the modal tie-break prefers the lower — so an edition the
+   * catalog declined to describe would beat a properly described one and be downloaded.
+   */
+  readonly trackCount: number | undefined;
 }
 
 /**
  * The most common track count among the editions, breaking a tie toward the *lower* count (the more
  * conservative, standard-like edition). Map iteration is insertion order, so the tie rule is applied
- * explicitly rather than relying on it. Total by construction: an empty input yields 0, and both
- * callers then filter their own empty list against it and present nothing — which is why neither
- * guards the call.
+ * explicitly rather than relying on it. Total by construction: an input with no stated count yields
+ * `undefined`, and both callers then filter their own list against that — keeping the uncounted
+ * editions only when there is nothing better, which is why neither guards the call.
+ *
+ * An unstated count does not stand for election. It cannot be "most common" — there is no count to
+ * be common — and treating it as one would hand the group to the edition the catalog says least
+ * about.
  */
-function modalTrackCount(counts: readonly number[]): number {
+function modalTrackCount(counts: readonly (number | undefined)[]): number | undefined {
   const frequency = new Map<number, number>();
   for (const count of counts) {
+    if (count === undefined) continue;
     frequency.set(count, (frequency.get(count) ?? 0) + 1);
   }
-  let modal = 0;
+  let modal: number | undefined;
   let modalFrequency = 0;
   for (const [count, freq] of frequency) {
     // RECORDED SURVIVOR, waiver withheld: `count <= modal` is equivalent — `modal` is only ever a
@@ -367,7 +377,7 @@ function modalTrackCount(counts: readonly number[]): number {
     // — `>=`/`<=` on the frequency test, `!==` on the tie test, and `count >= modal`, which
     // inverts the documented lower-count tie-break. Silencing four real findings to hide one
     // equivalent mutant is the trade the waiver doctrine rejects.
-    if (!(freq > modalFrequency || (freq === modalFrequency && count < modal))) {
+    if (!(freq > modalFrequency || (freq === modalFrequency && count < (modal ?? 0)))) {
       continue;
     }
 
@@ -432,11 +442,15 @@ export function releaseGroupCandidateIds(
   return releaseGroupEditionIds(editions);
 }
 
-/** An edition's total track count: the sum of its media's `track-count`s (unknown contributes 0). */
-function totalTrackCount(release: MbBrowseRelease): number {
-  // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no
-  // `track-count`, so it adds 0 and the sum is the same as over no media at all.
-  return (release.media ?? []).reduce((sum, medium) => sum + (medium['track-count'] ?? 0), 0);
+/**
+ * An edition's total track count: the sum of its media's `track-count`s, or nothing at all when no
+ * medium states one. Absent rather than 0 — see {@link ReleaseGroupEdition.trackCount}.
+ */
+function totalTrackCount(release: MbBrowseRelease): number | undefined {
+  const counts = (release.media ?? [])
+    .map((medium) => medium['track-count'])
+    .filter((count): count is number => typeof count === 'number');
+  return counts.length === 0 ? undefined : counts.reduce((sum, count) => sum + count, 0);
 }
 
 /**
@@ -451,9 +465,12 @@ function totalTrackCount(release: MbBrowseRelease): number {
 export function releaseGroupEditionCandidates(
   releases: readonly MbBrowseRelease[] | undefined,
 ): readonly EditionCandidate[] {
-  // The numeric count (0 = unknown) rides alongside each candidate purely for the picker's modal
-  // ranking; it never reaches the event, where an unknown count is absent (never the sentinel 0).
-  const editions: { readonly candidate: EditionCandidate; readonly count: number }[] = [];
+  // The count rides alongside each candidate purely for the picker's modal ranking; it never
+  // reaches the event, where an unknown count is simply absent — as it is here.
+  const editions: {
+    readonly candidate: EditionCandidate;
+    readonly count: number | undefined;
+  }[] = [];
   // Stryker disable next-line ArrayDeclaration: equivalent — an injected string has no `id`, so
   // `optionalMbid` reads it as absent and the loop's guard skips it, presenting no candidate.
   const releaseList = releases ?? [];
@@ -478,7 +495,7 @@ export function releaseGroupEditionCandidates(
         date: release.date ?? undefined,
         country: release.country ?? undefined,
         format: formats.length > 0 ? formats.join(' + ') : undefined,
-        ...(count > 0 && { trackCount: count }),
+        ...(count !== undefined && { trackCount: count }),
       },
     });
   }

@@ -10,8 +10,10 @@ import type { ResultAsync } from 'neverthrow';
  *
  * The distinction the whole capability turns on: art the archive does not have is an ANSWER
  * (`absent`) that a caller may cache and render a placeholder for, while an archive that cannot be
- * reached is a FAULT — never cached, never rendered as "no cover", because tomorrow's request may
- * well find the art.
+ * reached is a FAULT — never CACHED as "no cover", because tomorrow's request may well find the
+ * art. (A fault does still reach the viewer as a placeholder: a cover is not load-bearing, and the
+ * grid paints the same initials either way. The difference is that the fault is logged and not
+ * remembered.)
  */
 
 /** Which catalog entity the art belongs to; both are addressable in the archive. */
@@ -36,7 +38,15 @@ export interface CoverArtImage {
 }
 
 export type CoverArtAnswer =
-  { readonly kind: 'found'; readonly image: CoverArtImage } | { readonly kind: 'absent' };
+  | { readonly kind: 'found'; readonly image: CoverArtImage }
+  /**
+   * No front cover to serve — with how many images the archive listed while saying so. A record
+   * with back-only scans genuinely has none; a manifest whose `front` flag was RENAMED also has
+   * none, and the two are indistinguishable per request. The count is what tells them apart in
+   * aggregate, which is the difference between a diagnosable drift and a grid that quietly went
+   * blank everywhere at once.
+   */
+  | { readonly kind: 'absent'; readonly listedImages: number };
 
 /** The archive is down, erroring, or off-contract — distinct from it having no art. */
 export interface CoverArtUnavailable {

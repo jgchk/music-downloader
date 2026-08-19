@@ -213,6 +213,17 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(sent).toHaveLength(3);
   });
 
+  it.each([[429], [408]])(
+    'reports a %d as a passing fault, since it is the catalog asking for later, not never',
+    async (status) => {
+      const { port } = searcher([{ match: '/release-group?query=', status }]);
+
+      const failure = await unwrapErr(port.search('graceland', testScope()));
+
+      expect(failure.permanent).toBeFalsy();
+    },
+  );
+
   it('reports a request the catalog refuses as permanent, since retrying reproduces it', async () => {
     const { port } = searcher([{ match: '/release-group?query=', status: 400 }]);
 
@@ -260,19 +271,27 @@ describe('MusicBrainzCatalogSearch.search', () => {
 });
 
 describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
-  it('refuses an answer whose hits carry no identifier, rather than presenting none of them', async () => {
-    // A renamed `id` parses clean under a tolerant reader and empties every result silently. An
-    // identifier is the one field a hit cannot be shown without, so its absence is drift.
-    const { port } = searcher([
-      { match: '/release-group?query=', json: { 'release-groups': [{ title: 'Graceland' }] } },
-      { match: '/artist?query=', json: PAUL_SIMON },
-      { match: '/recording?query=', json: BUBBLE },
-    ]);
+  it.each([
+    ['release group', { 'release-groups': [{ title: 'Graceland' }] }, undefined, undefined],
+    ['artist', undefined, { artists: [{ name: 'Paul Simon' }] }, undefined],
+    ['track', undefined, undefined, { recordings: [{ title: 'The Boy in the Bubble' }] }],
+  ])(
+    'refuses a %s hit that carries no identifier, rather than presenting none of them',
+    async (_kind, groups, artists, recordings) => {
+      // A renamed `id` parses clean under a tolerant reader and empties every result silently. An
+      // identifier is the one field a hit cannot be shown without, so its absence is drift — and
+      // it is drift on whichever of the three reads it happens to.
+      const { port } = searcher([
+        { match: '/release-group?query=', json: groups ?? GRACELAND },
+        { match: '/artist?query=', json: artists ?? PAUL_SIMON },
+        { match: '/recording?query=', json: recordings ?? BUBBLE },
+      ]);
 
-    const failure = await unwrapErr(port.search('graceland', testScope()));
+      const failure = await unwrapErr(port.search('graceland', testScope()));
 
-    expect(failure.permanent).toBe(true);
-  });
+      expect(failure.permanent).toBe(true);
+    },
+  );
 
   it('says out loud when the catalog answered with hits it could present none of', async () => {
     // Every id well-formed, every TITLE gone: tolerable field by field, and yet the page would
@@ -296,6 +315,22 @@ describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
     expect(watched.warnings.join('')).toContain(
       'catalog answered with hits none of which could be presented',
     );
+  });
+
+  it('names which of the three reads it could present nothing from', async () => {
+    // The operator's actual question is "what drifted"; a warning that always names all three
+    // answers it no better than one that names none.
+    const { port } = searcher([
+      { match: '/release-group?query=', json: GRACELAND },
+      { match: '/artist?query=', json: { artists: [{ id: ARTIST_ID, score: 100, name: null }] } },
+      { match: '/recording?query=', json: BUBBLE },
+    ]);
+    const watched = watchedScope();
+
+    await unwrap(port.search('graceland', watched.scope));
+
+    const [line] = watched.warnings;
+    expect(JSON.parse(line!)).toMatchObject({ emptied: ['artists'] });
   });
 
   it('stays quiet when a query genuinely matches nothing', async () => {
@@ -328,24 +363,20 @@ describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
 
 describe('MusicBrainzCatalogSearch.lookup', () => {
   it.each([
-    ['release-group', `/release-group/${RG_ID}`, 'catalog release group could not be presented'],
-    ['artist', `/artist/${ARTIST_ID}`, 'catalog artist could not be presented'],
-    ['recording', `/recording/${RECORDING_ID}`, 'catalog recording could not be presented'],
-  ])(
-    'says when the catalog answered about a %s it could not present',
-    async (kind, route, said) => {
-      // A 200 carrying an entity with no usable name is drift, not absence — and the two are
-      // indistinguishable downstream, so the adapter is where it has to be said.
-      const { port } = searcher([
-        { match: route, json: { id: 'not-a-uuid', title: null, name: null } },
-      ]);
-      const mbid = { 'release-group': RG_ID, artist: ARTIST_ID, recording: RECORDING_ID }[kind]!;
-      const watched = watchedScope();
+    ['release-group', RG_ID, 'catalog release group could not be presented'],
+    ['artist', ARTIST_ID, 'catalog artist could not be presented'],
+    ['recording', RECORDING_ID, 'catalog recording could not be presented'],
+  ])('says when the catalog answered about a %s it could not present', async (kind, mbid, said) => {
+    // A 200 carrying an entity with no usable name is drift, not absence — and the two are
+    // indistinguishable downstream, so the adapter is where it has to be said.
+    const { port } = searcher([
+      { match: `/${kind}/${mbid}`, json: { id: 'not-a-uuid', title: null, name: null } },
+    ]);
+    const watched = watchedScope();
 
-      expect(await unwrap(port.lookup(asMbid(mbid), watched.scope))).toEqual({ kind: 'notFound' });
-      expect(watched.warnings.join('')).toContain(said);
-    },
-  );
+    expect(await unwrap(port.lookup(asMbid(mbid), watched.scope))).toEqual({ kind: 'notFound' });
+    expect(watched.warnings.join('')).toContain(said);
+  });
 
   it('resolves an identifier that names an album', async () => {
     const { port } = searcher([

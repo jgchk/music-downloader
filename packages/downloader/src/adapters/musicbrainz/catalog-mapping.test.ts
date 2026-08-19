@@ -367,7 +367,7 @@ describe('toEditionListing', () => {
     expect(listing.groups[0]?.representative.trackCount).toBeUndefined();
   });
 
-  it('keeps an uncounted edition out of the group of counted ones, and behind it', () => {
+  it('keeps an uncounted edition out of the group of counted ones', () => {
     const listing = toEditionListing({
       releases: [
         official(RELEASE_ID, 0, { media: undefined }),
@@ -377,6 +377,41 @@ describe('toEditionListing', () => {
     });
 
     expect(listing.groups.map((group) => group.representative.trackCount)).toEqual([11, undefined]);
+  });
+
+  it('puts a group it cannot describe behind one it can, even when both are equally common', () => {
+    // One edition each, so the "most published first" rule cannot decide: what is left is the
+    // rule that a group nobody can name a length for must not lead the listing.
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 0, { media: undefined }), official(RELEASE_ID_2, 11)],
+    });
+
+    expect(listing.groups.map((group) => group.representative.trackCount)).toEqual([11, undefined]);
+  });
+
+  it('does not let the one edition the catalog says least about become the pick', () => {
+    // With one edition each, "most common count" cannot decide — and a sentinel 0 for the
+    // uncounted one would WIN the tie-break toward lower counts, sending the download to the
+    // pressing MusicBrainz declined to describe.
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 0, { media: undefined }), official(RELEASE_ID_2, 12)],
+    });
+
+    expect(listing.bestMatch).toEqual({ kind: 'pick', mbid: RELEASE_ID_2 });
+  });
+
+  it('does not let an uncounted edition become the pipeline’s pick', () => {
+    // The presentation says "not stated" while the picker reads the same edition as 0 tracks —
+    // a deliberate divergence, and one that must never end with an unknown edition winning.
+    const listing = toEditionListing({
+      releases: [
+        official(RELEASE_ID, 0, { media: undefined }),
+        official(RELEASE_ID_2, 11),
+        official(RELEASE_ID_3, 11),
+      ],
+    });
+
+    expect(listing.bestMatch).toEqual({ kind: 'pick', mbid: RELEASE_ID_2 });
   });
 
   it('drops an edition the catalog names no identifier for', () => {

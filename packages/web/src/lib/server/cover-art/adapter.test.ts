@@ -13,7 +13,7 @@ function manifest(images: unknown[]): Response {
   return Response.json({ images });
 }
 
-function image(): Response {
+function jpeg(): Response {
   return new Response(IMAGE_BYTES, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
 }
 
@@ -52,7 +52,7 @@ describe('CoverArtArchive.front', () => {
           thumbnails: { '250': 'http://coverartarchive.org/release/abc/123-250.jpg' },
         },
       ]),
-      image(),
+      jpeg(),
     );
 
     const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
@@ -78,7 +78,7 @@ describe('CoverArtArchive.front', () => {
           },
         },
       ]),
-      image(),
+      jpeg(),
     );
 
     await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 500));
@@ -89,7 +89,7 @@ describe('CoverArtArchive.front', () => {
   it('falls back to the full image when the archive has no thumbnail of that size', async () => {
     const stub = fetchStub(
       manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.jpg' }]),
-      image(),
+      jpeg(),
     );
 
     await unwrap(archive(stub).front('release', RELEASE_GROUP, 250));
@@ -107,7 +107,7 @@ describe('CoverArtArchive.front', () => {
           thumbnails: { '250': 'http://coverartarchive.org/release/abc/123-250.jpg' },
         },
       ]),
-      image(),
+      jpeg(),
     );
 
     await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 500));
@@ -133,13 +133,14 @@ describe('CoverArtArchive.front', () => {
 
     expect(await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250))).toEqual({
       kind: 'absent',
+      listedImages: 0,
     });
   });
 
   it('identifies this application to the archive', async () => {
     const stub = fetchStub(
       manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.jpg' }]),
-      image(),
+      jpeg(),
     );
 
     await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
@@ -173,6 +174,8 @@ describe('CoverArtArchive.front', () => {
   it.each([
     ['one that is not a URL at all', 'not a url'],
     ['one on a scheme we will not fetch over', 'ftp://coverartarchive.org/release/abc.jpg'],
+    ['a host that merely ends in one of ours', 'https://evilcoverartarchive.org/release/abc.jpg'],
+    ['a host that merely contains one of ours', 'https://coverartarchive.org.evil.test/a.jpg'],
   ])('will not fetch an image from %s', async (_case, image) => {
     const stub = fetchStub(manifest([{ front: true, image }]));
 
@@ -181,6 +184,37 @@ describe('CoverArtArchive.front', () => {
     expect(failure.kind).toBe('cover-art-unavailable');
     expect(stub).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['the archive’s own host', 'https://coverartarchive.org/release/abc/123.jpg'],
+    ['a storage node it fronts', 'https://ia800207.us.archive.org/16/items/mbid-abc/123.jpg'],
+  ])('fetches an image the archive names on %s', async (_case, image) => {
+    // The archive serves bytes from its own host AND from the archive.org storage nodes it fronts;
+    // dropping either would blank every cover in production while every test stayed green.
+    const stub = fetchStub(manifest([{ front: true, image }]), jpeg());
+
+    const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    expect(answer).toMatchObject({ kind: 'found' });
+    expect(stub).toHaveBeenLastCalledWith(image, expect.anything());
+  });
+
+  it.each([['image/jpeg'], ['image/png'], ['image/gif'], ['image/webp']])(
+    're-serves %s as itself, since it is a type we are willing to serve',
+    async (type) => {
+      // Every entry in the allowlist is proven, not just one: three of the four could be deleted
+      // with the suite green, and the archive's real png/gif/webp covers would be mislabelled.
+      const typed = new Response(IMAGE_BYTES, { status: 200, headers: { 'Content-Type': type } });
+      const stub = fetchStub(
+        manifest([{ front: true, image: 'https://coverartarchive.org/release/abc/123.bin' }]),
+        typed,
+      );
+
+      const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+      expect(answer).toMatchObject({ kind: 'found', image: { contentType: type } });
+    },
+  );
 
   it('serves only an image type, whatever type the archive declares', async () => {
     const mislabelled = new Response(IMAGE_BYTES, {
@@ -202,17 +236,20 @@ describe('CoverArtArchive.front', () => {
 
     const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
-    expect(answer).toEqual({ kind: 'absent' });
+    expect(answer).toEqual({ kind: 'absent', listedImages: 0 });
   });
 
-  it('reads art with no front cover as absent — a back cover is not what a picker shows', async () => {
+  it('says how much art it saw while finding no front cover, so drift can be told from a back-only scan', async () => {
+    // Both are "no cover to show" per request. Only the count distinguishes a record that really
+    // has back scans only from a manifest whose `front` flag was renamed — which would otherwise
+    // blank every cover in the product, cached, with nothing said anywhere.
     const stub = fetchStub(
       manifest([{ front: false, image: 'http://coverartarchive.org/release/abc/back.jpg' }]),
     );
 
     const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
-    expect(answer).toEqual({ kind: 'absent' });
+    expect(answer).toEqual({ kind: 'absent', listedImages: 1 });
   });
 
   it('reports an unreachable archive as unavailable, so absence is never inferred from a fault', async () => {
