@@ -26,7 +26,14 @@ function releaseGroup(
 }
 
 function artist(name: string, extras: Partial<ScoredArtist> = {}): ScoredArtist {
-  return { mbid: asMbid(`ar-${name}`), name, disambiguation: undefined, score: 50, ...extras };
+  return {
+    mbid: asMbid(`ar-${name}`),
+    name,
+    disambiguation: undefined,
+    type: undefined,
+    score: 50,
+    ...extras,
+  };
 }
 
 function recording(

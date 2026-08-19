@@ -36,6 +36,62 @@ function clock(start = 1000): { now: () => number; advance: (ms: number) => void
   };
 }
 
+describe('an archive that cannot be reached', () => {
+  it('is not asked again for every other cover on the page', async () => {
+    // The whole grid asks at once. Without a memo, each key independently waits out the proxy's
+    // full timeout — twenty-five covers, six at a time, is minutes of a page doing nothing.
+    const time = clock();
+    const down = archive('unavailable');
+    const cache = cachingCoverArt(down, {}, time.now);
+
+    const first = await cache.front('release-group', MBID, 250);
+    const neighbour = await cache.front('release-group', OTHER_MBID, 250);
+
+    expect(first.isErr()).toBe(true);
+    expect(neighbour.isErr()).toBe(true);
+    // One fault, one round trip: the neighbour was answered from the memo, not from the archive.
+    expect(down.calls()).toBe(1);
+  });
+
+  it('goes back to the archive once the memo has expired', async () => {
+    const time = clock();
+    const down = archive('unavailable', found(4));
+    const cache = cachingCoverArt(down, { unavailableForMs: 60_000 }, time.now);
+
+    await cache.front('release-group', MBID, 250);
+    time.advance(60_001);
+    const later = await cache.front('release-group', OTHER_MBID, 250);
+
+    // An outage that passed must not keep the covers away: the memo expires on its own, with no
+    // one to clear it.
+    expect(later.isOk()).toBe(true);
+    expect(down.calls()).toBe(2);
+  });
+
+  it('never turns a fault into an answer of "there is no cover"', async () => {
+    const time = clock();
+    const cache = cachingCoverArt(archive('unavailable'), {}, time.now);
+
+    const answer = await cache.front('release-group', MBID, 250);
+
+    // Remembering an outage as absence would hide a cover that exists, permanently.
+    expect(answer.isErr()).toBe(true);
+  });
+
+  it('does not hold back a cover it already has', async () => {
+    const time = clock();
+    const archived = archive(found(4), 'unavailable');
+    const cache = cachingCoverArt(archived, {}, time.now);
+
+    await cache.front('release-group', MBID, 250);
+    await cache.front('release-group', OTHER_MBID, 250);
+    const cached = await cache.front('release-group', MBID, 250);
+
+    // The memo short-circuits reads, not the answers already remembered.
+    expect(cached.isOk()).toBe(true);
+  });
+});
+
 describe('cachingCoverArt', () => {
   it('forgets the oldest absences rather than keeping a key per identifier ever asked about', async () => {
     // An absence costs no bytes, so the byte budget does not bound it — and most identifiers the
@@ -87,13 +143,17 @@ describe('cachingCoverArt', () => {
   });
 
   it('lets a shared read that failed be tried again, rather than remembering the failure', async () => {
+    const time = clock();
     const inner = archive('unavailable', found(4));
-    const cached = cachingCoverArt(inner, {}, clock().now);
+    const cached = cachingCoverArt(inner, {}, time.now);
 
     await Promise.all([
       cached.front('release-group', MBID, 250),
       cached.front('release-group', MBID, 250),
     ]);
+    // Past the unavailability memo, which is what holds the retry back in the moments after a
+    // fault — the failure itself is still not remembered as this cover's answer.
+    time.advance(60_001);
     const retried = await cached.front('release-group', MBID, 250);
 
     expect(retried.isOk()).toBe(true);
@@ -122,13 +182,17 @@ describe('cachingCoverArt', () => {
   });
 
   it('never remembers a fault as an answer, so art can still turn up later', async () => {
+    const time = clock();
     const inner = archive('unavailable', found(4));
-    const cached = cachingCoverArt(inner, {}, clock().now);
+    const cached = cachingCoverArt(inner, {}, time.now);
 
     const failed = await cached.front('release-group', MBID, 250);
+    time.advance(60_001);
     const retried = await cached.front('release-group', MBID, 250);
 
     expect(failed.isErr()).toBe(true);
+    // The distinction that matters: the outage held back the ASKING for a minute, and never
+    // became the answer "this record has no cover".
     expect(retried._unsafeUnwrap()).toMatchObject({ kind: 'found' });
     expect(inner.calls()).toBe(2);
   });

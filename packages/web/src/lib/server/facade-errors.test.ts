@@ -36,10 +36,30 @@ describe('statusOf', () => {
     ['IllegalTransition', 409],
     ['UnknownEdition', 400],
     ['ConcurrencyConflict', 409],
-    ['InfraError', 500],
+    ['InfraError', 502],
   ] as const)('%s -> %d (downloader)', (kind, status) => {
     const error = downloaderErrors.find((entry) => entry.kind === kind)!;
     expect(statusOf(error)).toBe(status);
+  });
+
+  it('answers a fault that may pass with a status that says so', () => {
+    // 502: the thing behind us could not be reached. A caller may try again and it may work.
+    expect(statusOf({ kind: 'InfraError', operation: 'catalog.search', message: 'timeout' })).toBe(
+      502,
+    );
+  });
+
+  it('answers a fault that will not pass as this application going wrong', () => {
+    // 500: the answer could not be READ. No amount of retrying by anyone outside fixes that, and
+    // saying "try again" to a person would be a lie.
+    expect(
+      statusOf({
+        kind: 'InfraError',
+        operation: 'catalog.search',
+        message: 'drifted',
+        permanent: true,
+      }),
+    ).toBe(500);
   });
 
   it.each([

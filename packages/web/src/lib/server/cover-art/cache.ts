@@ -1,4 +1,4 @@
-import { ResultAsync, okAsync } from 'neverthrow';
+import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import type {
   CoverArtAnswer,
   CoverArtEntity,
@@ -21,6 +21,11 @@ import type {
  * absence costs no bytes at all and would otherwise accumulate a key per identifier ever asked
  * about — millions of release groups have no art, and a grid asks about twenty-five at a time.
  * Both are ceilings on the same insertion-ordered map, so the oldest key goes first either way.
+ *
+ * A fault is still never remembered AS AN ANSWER — but it is remembered as a fact about the
+ * ARCHIVE: while one is in force, every key answers unavailable immediately instead of waiting
+ * out its own timeout. Per-key would be no use here, since the keys that hurt are the
+ * twenty-four OTHER covers on the page, each of which has never been asked about before.
  */
 
 export interface CoverArtCacheConfig {
@@ -30,12 +35,23 @@ export interface CoverArtCacheConfig {
   readonly maxBytes?: number;
   /** The ceiling on entries of any kind — what actually bounds remembered absences. */
   readonly maxEntries?: number;
+  /**
+   * How long an unreachable archive is taken at its word before anyone asks it again. Not an
+   * environment knob: no deployment has a reason to differ, and it is a property of how a page
+   * of tiles behaves during an outage rather than of where this runs.
+   */
+  readonly unavailableForMs?: number;
 }
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
 /** Generous for one household's browsing, and finite, which is the point. */
 const DEFAULT_MAX_ENTRIES = 4096;
+/**
+ * Long enough that one page's worth of tiles asks once, short enough that a passing outage costs
+ * a person one refresh rather than their session.
+ */
+const DEFAULT_UNAVAILABLE_FOR_MS = 60 * 1000;
 
 interface Entry {
   readonly answer: CoverArtAnswer;
@@ -57,12 +73,17 @@ export function cachingCoverArt(
   const ttlMs = config.ttlMs ?? DEFAULT_TTL_MS;
   const maxBytes = config.maxBytes ?? DEFAULT_MAX_BYTES;
   const maxEntries = config.maxEntries ?? DEFAULT_MAX_ENTRIES;
+  const unavailableForMs = config.unavailableForMs ?? DEFAULT_UNAVAILABLE_FOR_MS;
   // Insertion order is recency order: a hit re-inserts, so the oldest key is the least recently
   // used one — which is exactly what a Map's iteration order gives for free.
   const entries = new Map<string, Entry>();
   /** Reads already on the wire, so a page of tiles asking for one cover asks the archive once. */
   const inFlight = new Map<string, ResultAsync<CoverArtAnswer, CoverArtUnavailable>>();
   let heldBytes = 0;
+  /** When the archive is believed to be reachable again; nothing recorded means "ask it". */
+  let unavailableUntil: number | undefined;
+  /** The fault that set the memo, so the answer during it is the archive's own words. */
+  let lastFault: CoverArtUnavailable | undefined;
 
   const forget = (key: string): void => {
     const entry = entries.get(key);
@@ -97,6 +118,14 @@ export function cachingCoverArt(
         }
         forget(key);
       }
+      // Asked AFTER the cache, so a cover already held is still served during an outage — the
+      // memo is about reaching the archive, not about what is already known.
+      if (unavailableUntil !== undefined && lastFault !== undefined) {
+        if (now() < unavailableUntil) return errAsync(lastFault);
+        unavailableUntil = undefined;
+        lastFault = undefined;
+      }
+
       const existing = inFlight.get(key);
       // Derived from the shared read rather than re-issued: `map` returns a new ResultAsync over
       // the SAME pending request, so every concurrent caller is served by one archive round trip.
@@ -109,7 +138,14 @@ export function cachingCoverArt(
       const settled = (async () => {
         try {
           const answer = await inner.front(entity, mbid, size);
-          if (answer.isOk()) remember(key, answer.value);
+          if (answer.isOk()) {
+            remember(key, answer.value);
+          } else {
+            // Not an answer about this cover — a fact about the archive, held briefly so the rest
+            // of the page fails fast instead of queueing behind the same dead upstream.
+            unavailableUntil = now() + unavailableForMs;
+            lastFault = answer.error;
+          }
           return answer;
         } finally {
           inFlight.delete(key);

@@ -14,13 +14,13 @@ creates and extends its layout tests).
 
 ## 2. Wire semantics (web server)
 
-- [ ] 2.1 `statusOf` splits `InfraError` on its `permanent` flag (red first): 502 transient,
+- [x] 2.1 `statusOf` splits `InfraError` on its `permanent` flag (red first): 502 transient,
       500 permanent; existing consumers proven tolerant; the catalog route's logging unchanged
-- [ ] 2.2 Cover-art unavailability memo (red first): one archive-wide "unreachable until T" mark
+- [x] 2.2 Cover-art unavailability memo (red first): one archive-wide "unreachable until T" mark
       set by any transport failure and consulted by every lookup, TTL through the cache's config
       with a ~60s default, proven by the injected clock; never promoted to absence; absence and
       art lifetimes untouched
-- [ ] 2.3 `COVER_ART_BASE_URL` joins the environment schema with the archive default; the adapter
+- [x] 2.3 `COVER_ART_BASE_URL` joins the environment schema with the archive default; the adapter
       is constructed from config like every other upstream
 
 ## 3. Top results and honest counts (web)

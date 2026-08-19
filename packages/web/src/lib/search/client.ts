@@ -27,6 +27,15 @@ export type CatalogAnswer<T> =
 /** The message shown when the server itself could not be reached, or answered without saying why. */
 export const UNREACHABLE = 'The catalog could not be reached. Check the connection and try again.';
 
+/**
+ * Shown when the catalog answered and this application could not read the answer. Deliberately
+ * carries no advice: the connection is fine, the query is fine, and retrying will fail the same
+ * way until someone changes the code. Telling a person otherwise sends them to check their wifi
+ * for a bug of ours.
+ */
+export const DRIFTED =
+  'The catalog answered in a way this page could not read. That is a bug here, not something you did — it will need fixing before this search works.';
+
 /** Shown when an answer arrives that is not JSON at all — most often an expired session. */
 export const UNREADABLE =
   'That answer could not be read. Reload the page, and sign in again if asked.';
@@ -133,6 +142,11 @@ export function httpCatalog(
       console.error('catalog answer did not match the expected shape', path, shaped.error.issues);
       return { ok: false, message: MALFORMED };
     }
+    // Infrastructure faults get this page's own words, because the server's are deliberately
+    // generic (`messageOf` serves every consumer) and the two cases need opposite advice. The
+    // status carries the distinction the module drew: 502 could not reach, 500 could not read.
+    if (response.status === 502) return { ok: false, message: UNREACHABLE };
+    if (response.status === 500) return { ok: false, message: DRIFTED };
     // A refusal that carries no readable body is normal: its status already said what happened.
     // What it DOES carry is parsed rather than trusted — the words are rendered to a person, and
     // a proxy's non-string `message` would otherwise reach them as "[object Object]".

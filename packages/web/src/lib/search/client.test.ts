@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MALFORMED, UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
+import { DRIFTED, MALFORMED, UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
 
 const MBID = '19847822-1430-3380-9cf1-bc45545b34ac';
 
@@ -90,11 +90,38 @@ describe('httpCatalog', () => {
   });
 
   it('falls back to a message a person can act on when the server sent none', async () => {
-    const stub = fetchStub(new Response('gateway', { status: 502 }));
+    // A refusal this page has no words of its own for, and no readable body to borrow any from.
+    // (502 and 500 do not reach here — they are the two the page answers itself.)
+    const stub = fetchStub(new Response('no body worth reading', { status: 403 }));
 
     const answer = await httpCatalog(stub).search('graceland');
 
     expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+  });
+
+  it('tells someone a catalog it could not reach is worth trying again', async () => {
+    // 502 is the server saying the thing behind it did not answer. That may pass, so the words
+    // are about waiting and retrying — not about this application being broken.
+    const stub = fetchStub(
+      Response.json({ message: 'Something went wrong. Try again.' }, { status: 502 }),
+    );
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+  });
+
+  it('does not blame the reader for a catalog whose answer could not be read', async () => {
+    // 500 is this application failing to understand an answer it did get. Retrying, checking the
+    // connection, and retyping the query are all useless, and saying otherwise wastes their time.
+    const stub = fetchStub(
+      Response.json({ message: 'Something went wrong. Try again.' }, { status: 500 }),
+    );
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: DRIFTED });
+    expect(DRIFTED).not.toMatch(/connection|try again/i);
   });
 
   it('refuses a refusal whose message is not words a person could read', async () => {
