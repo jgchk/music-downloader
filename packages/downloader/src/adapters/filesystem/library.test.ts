@@ -26,10 +26,10 @@ async function workspace(): Promise<
   const root = await mkdtemp(path.join(tmpdir(), 'md-lib-'));
   roots.push(root);
   const stagingRoot = path.join(root, 'staging');
-  const libraryRoot = path.join(root, 'library');
+  const depositRoot = path.join(root, 'library');
   await mkdir(stagingRoot, { recursive: true });
   return {
-    libraryRoot,
+    depositRoot,
     stagingRoot,
     stage: async (name) => {
       const filePath = path.join(stagingRoot, name);
@@ -53,7 +53,7 @@ describe('FilesystemLibrary.import', () => {
     const importResult = await library.import(files, TARGET, testScope());
     const result = importResult._unsafeUnwrap();
 
-    const expected = path.join(ws.libraryRoot, 'The_Band', 'Great_Album_(2020)');
+    const expected = path.join(ws.depositRoot, 'The_Band', 'Great_Album_(2020)');
     expect(result).toEqual({ kind: 'imported', location: expected });
     expect(await readFile(path.join(expected, '01.flac'), 'utf8')).toBe('contents-of-01.flac');
     expect(existsSync(files[0]!.path)).toBe(false);
@@ -61,7 +61,7 @@ describe('FilesystemLibrary.import', () => {
 
   it('reports a conflict without clobbering an existing release', async () => {
     const ws = await workspace();
-    const location = path.join(ws.libraryRoot, 'The_Band', 'Great_Album_(2020)');
+    const location = path.join(ws.depositRoot, 'The_Band', 'Great_Album_(2020)');
     await mkdir(location, { recursive: true });
     await writeFile(path.join(location, 'existing.flac'), 'original');
     const file = await ws.stage('01.flac');
@@ -88,7 +88,7 @@ describe('FilesystemLibrary.import', () => {
     const importResult3 = await library.import([file], TARGET, testScope());
     const result = importResult3._unsafeUnwrap();
 
-    const expected = path.join(ws.libraryRoot, 'The_Band', 'Great_Album_(2020)');
+    const expected = path.join(ws.depositRoot, 'The_Band', 'Great_Album_(2020)');
     expect(result).toEqual({ kind: 'imported', location: expected });
     expect(await readFile(path.join(expected, '01.flac'), 'utf8')).toBe('contents-of-01.flac');
     expect(existsSync(file.path)).toBe(false);

@@ -131,6 +131,7 @@ async function boot(
   if (config.isErr()) throw new Error(config.error);
 
   const logger = createLogger(config.value.logLevel, overrides.logDestination);
+  for (const warning of config.value.warnings) logger.warn(warning);
 
   const downloaderResult = await (overrides.createDownloader ?? createDownloaderRuntime)(
     config.value.downloader,

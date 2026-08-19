@@ -17,7 +17,13 @@ const environmentSchema = z.object({
 
   // --- downloader ------------------------------------------------------------------------------
   DOWNLOADER_DATABASE_FILE: z.string().min(1).default('data/downloader/events.db'),
-  LIBRARY_ROOT: z.string().min(1),
+  /**
+   * Where the downloader deposits a fulfilled release for the importer to pick up. `LIBRARY_ROOT`
+   * is the same setting under its former name — a fossil from when this module placed files in the
+   * library itself, which it never does now (beets does). Either name works; they may not disagree.
+   */
+  DEPOSIT_ROOT: z.string().min(1).optional(),
+  LIBRARY_ROOT: z.string().min(1).optional(),
   STAGING_ROOT: z.string().min(1),
   SLSKD_BASE_URL: z.string().min(1).optional(),
   SLSKD_API_KEY: z.string().min(1).optional(),
@@ -77,6 +83,8 @@ export interface AccessConfig {
 
 export interface ComposedConfig {
   readonly logLevel: string;
+  /** Deprecations and the like, surfaced once the logger this config builds exists. */
+  readonly warnings: readonly string[];
   readonly downloader: DownloaderRuntimeConfig;
   readonly importer: ImporterRuntimeConfig;
   readonly intakeSourceRoot: string;
@@ -94,11 +102,30 @@ export function loadComposedConfig(
     return err(`invalid configuration — ${detail}`);
   }
   const v = parsed.data;
+
+  const depositRoot = v.DEPOSIT_ROOT ?? v.LIBRARY_ROOT;
+  if (depositRoot === undefined) {
+    return err('invalid configuration — DEPOSIT_ROOT: required');
+  }
+  if (v.DEPOSIT_ROOT !== undefined && v.LIBRARY_ROOT !== undefined && v.DEPOSIT_ROOT !== v.LIBRARY_ROOT) {
+    return err(
+      'invalid configuration — DEPOSIT_ROOT and LIBRARY_ROOT are both set to different paths; ' +
+        'remove LIBRARY_ROOT, which is the former name of the same setting',
+    );
+  }
+  // Reported rather than logged: this function is pure, and the logger does not exist until the
+  // configuration it is built from has parsed.
+  const warnings =
+    v.DEPOSIT_ROOT === undefined && v.LIBRARY_ROOT !== undefined
+      ? ['LIBRARY_ROOT is the former name of DEPOSIT_ROOT; set DEPOSIT_ROOT instead']
+      : [];
+
   return ok({
+    warnings,
     logLevel: v.LOG_LEVEL,
     downloader: {
       databaseFile: v.DOWNLOADER_DATABASE_FILE,
-      libraryRoot: v.LIBRARY_ROOT,
+      depositRoot,
       stagingRoot: v.STAGING_ROOT,
       musicbrainz: { baseUrl: v.MUSICBRAINZ_BASE_URL, userAgent: v.MUSICBRAINZ_USER_AGENT },
       slskd: { baseUrl: v.SLSKD_BASE_URL, apiKey: v.SLSKD_API_KEY },
@@ -125,7 +152,7 @@ export function loadComposedConfig(
       bridgeScript: v.BRIDGE_SCRIPT,
       autoApplyThreshold: v.AUTO_APPLY_THRESHOLD,
     },
-    intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? v.LIBRARY_ROOT,
+    intakeSourceRoot: v.INTAKE_SOURCE_ROOT ?? depositRoot,
     access: {
       sessionSecret: v.SESSION_SECRET,
       plex: { machineId: v.PLEX_SERVER_MACHINE_ID, baseUrl: v.PLEX_API_BASE_URL },

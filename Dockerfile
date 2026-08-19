@@ -68,7 +68,7 @@ COPY packages/web/package.json ./packages/web/package.json
 
 # Config is supplied entirely via the environment (12-factor) — see .env.example for the full
 # surface. Mount volumes for the two event stores (DOWNLOADER_DATABASE_FILE,
-# IMPORTER_DATABASE_FILE), the shared music roots (STAGING_ROOT/INTAKE_ROOT, LIBRARY_ROOT), and
+# IMPORTER_DATABASE_FILE), the shared music roots (STAGING_ROOT/INTAKE_ROOT, DEPOSIT_ROOT), and
 # the beets config + library (BEETS_CONFIG). The web interface listens on PORT (default 3000).
 EXPOSE 3000
 USER node

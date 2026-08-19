@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadComposedConfig } from './config.js';
 
 const VALID = {
-  LIBRARY_ROOT: '/library',
+  DEPOSIT_ROOT: '/library',
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
@@ -104,8 +104,8 @@ describe('loadComposedConfig', () => {
   });
 
   it('fails naming the offending setting', () => {
-    const error = loadComposedConfig({ ...VALID, LIBRARY_ROOT: undefined })._unsafeUnwrapErr();
-    expect(error).toContain('LIBRARY_ROOT');
+    const error = loadComposedConfig({ ...VALID, STAGING_ROOT: undefined })._unsafeUnwrapErr();
+    expect(error).toContain('STAGING_ROOT');
     const bad = loadComposedConfig({ ...VALID, BRIDGE_TIMEOUT_MS: 'soon' })._unsafeUnwrapErr();
     expect(bad).toContain('BRIDGE_TIMEOUT_MS');
   });
@@ -157,5 +157,57 @@ describe('loadComposedConfig', () => {
     expect(config.access.plex.baseUrl).toBe('http://localhost:8083');
     expect(config.access.sessionSecret).toBe('test-session-secret-0123456789abcd');
     expect(config.access.plex.machineId).toBe('abc123machine');
+  });
+});
+
+describe('the deposit directory setting', () => {
+  const withoutRoot = { ...VALID } as Record<string, string | undefined>;
+  delete withoutRoot.DEPOSIT_ROOT;
+
+  it('reads DEPOSIT_ROOT with no deprecation warning', () => {
+    const config = loadComposedConfig({ ...withoutRoot, DEPOSIT_ROOT: '/deposit' })._unsafeUnwrap();
+    expect(config.downloader.depositRoot).toBe('/deposit');
+    expect(config.warnings).toEqual([]);
+  });
+
+  it('still honours the legacy LIBRARY_ROOT, warning that DEPOSIT_ROOT is the current name', () => {
+    const config = loadComposedConfig({
+      ...withoutRoot,
+      LIBRARY_ROOT: '/legacy',
+    })._unsafeUnwrap();
+    expect(config.downloader.depositRoot).toBe('/legacy');
+    expect(config.warnings).toHaveLength(1);
+    expect(config.warnings[0]).toContain('DEPOSIT_ROOT');
+    expect(config.warnings[0]).toContain('LIBRARY_ROOT');
+  });
+
+  it('accepts both names silently when they agree', () => {
+    const config = loadComposedConfig({
+      ...withoutRoot,
+      DEPOSIT_ROOT: '/same',
+      LIBRARY_ROOT: '/same',
+    })._unsafeUnwrap();
+    expect(config.downloader.depositRoot).toBe('/same');
+    expect(config.warnings).toEqual([]);
+  });
+
+  it('fails startup when the two names disagree, naming both', () => {
+    const error = loadComposedConfig({
+      ...withoutRoot,
+      DEPOSIT_ROOT: '/one',
+      LIBRARY_ROOT: '/two',
+    })._unsafeUnwrapErr();
+    expect(error).toContain('DEPOSIT_ROOT');
+    expect(error).toContain('LIBRARY_ROOT');
+  });
+
+  it('fails startup when neither name is set, naming the current one', () => {
+    const error = loadComposedConfig(withoutRoot)._unsafeUnwrapErr();
+    expect(error).toContain('DEPOSIT_ROOT');
+  });
+
+  it('defaults the intake source root to the resolved deposit directory', () => {
+    const config = loadComposedConfig({ ...withoutRoot, LIBRARY_ROOT: '/legacy' })._unsafeUnwrap();
+    expect(config.intakeSourceRoot).toBe('/legacy');
   });
 });
