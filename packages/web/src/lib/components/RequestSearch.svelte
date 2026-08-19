@@ -330,7 +330,7 @@
     <summary>Request by artist and title</summary>
     <!-- Enhanced like every other request form: this is the one carrying free text, so it is the
          one most likely to come back refused — and without JavaScript it is still a plain POST. -->
-    <form method="POST" data-testid="native-form" use:enhance>
+    <form method="POST" action="?/submit" data-testid="native-form" use:enhance>
       <label>
         Artist
         <input name="artist" data-testid="native-artist" value={values?.artist ?? ''} />

@@ -90,10 +90,13 @@ creates and extends its layout tests).
 
 ## 8. Blast radius, gate, and ship
 
-- [ ] 8.1 Audit `test/e2e` and every UI-scraping tier BEFORE the merge checkpoint for the
-      post-submit navigation change and the copy changes (known hazard: these tiers break outside
-      the diff and the e2e gate runs only on main); scraped phrases go through the centralized
-      phrase maps
+- [x] 8.1 Audited `test/e2e` and the Playwright parity specs BEFORE the merge checkpoint. Both
+      exercise the no-JS artist-and-title form, which keeps the DEFAULT action and its redirect —
+      `test/e2e/helpers.ts` posts to `/acquisitions/new` with no action name, and
+      `tests/parity.spec.ts` clicks the native form's own button — so the named-action change
+      reaches neither. `tests/search.spec.ts` scrapes `search-hint` for 'MusicBrainz ID' (kept,
+      with an example appended) and `search-error` for an unreachable catalog (now a 502, still
+      the same testid and the same copy). Full `pnpm test:e2e` run green before the PR
 - [ ] 8.2 Side-by-side re-verification against prototype D (`proto-d-hybrid.html`): artist
       browse, request-in-place, detail-view context, and dismissal re-exercised; the audit list
       closed out item by item

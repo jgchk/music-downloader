@@ -66,7 +66,7 @@ describe('submit acquisition action', () => {
       .fn()
       .mockResolvedValue({ ok: true, value: { acquisitionId: 'acq-9' } });
     await expect(
-      actions.default!(
+      actions.submit!(
         event({ kind: 'musicbrainz', mbid: 'mb-1', targetType: 'album' }, { submitAcquisition }),
       ),
     ).rejects.toSatisfy(
@@ -85,7 +85,7 @@ describe('submit acquisition action', () => {
       ok: false,
       error: { kind: 'ValidationFailed', message: 'mbid required' },
     });
-    const result = (await actions.default!(
+    const result = (await actions.submit!(
       event({ kind: 'musicbrainz', targetType: 'album' }, { submitAcquisition }),
     )) as { status: number; data: { message: string; values: Record<string, string> } };
     expect(result.status).toBe(400);
