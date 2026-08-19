@@ -78,3 +78,19 @@ Node · TypeScript (strict) · pnpm workspace · neverthrow · zod · pino · vi
 - `test/e2e`, `scripts/release` — product-level tiers and tooling at the workspace root.
 
 **Keep the two at their right altitude.** `docs/development/*.md` is constitutional: durable, largely project-agnostic principles for _how_ we build. Write them without domain specifics — no aggregate names, no source names, no schemas. Code-level, project-specific design (the actual aggregate, ports, event schema, policies, endpoints) belongs in OpenSpec under `openspec/changes/<change>/`, which already carries that detail. If a development doc starts needing concrete design specifics, that's the signal it belongs in OpenSpec instead.
+
+## Agent skills
+
+Per-repo configuration for the `mattpocock-skills` engineering skills lives in `docs/agents/`.
+
+### Issue tracker
+
+GitHub Issues on `jgchk/music-downloader`, via the `gh` CLI. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its role name. See [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Multi-context: `CONTEXT-MAP.md` + `packages/*/CONTEXT.md`, with OpenSpec standing in for ADRs. See [docs/agents/domain.md](docs/agents/domain.md).
