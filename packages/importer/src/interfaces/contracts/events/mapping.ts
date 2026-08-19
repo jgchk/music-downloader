@@ -7,7 +7,7 @@ import type {
   PublishedEventMapping,
   RenderError,
 } from '../../../application/ports/published-events-port.js';
-import { CONTEXT_NAME, isCorrelationId } from '../../../application/correlation/context.js';
+import { CONTEXT_NAME } from '../../../application/correlation/context.js';
 import {
   RELEASE_VERDICT_TYPE,
   publishedCorrelationSchema,
@@ -15,7 +15,7 @@ import {
 } from './schemas.js';
 
 /**
- * The correlation envelope for a published event, or `undefined` when the story is unavailable.
+ * The correlation envelope for a published event.
  *
  * The story is taken from the CYCLE the event belongs to — the most recent `ImportRequested` at or
  * before it — not from the event's own metadata. A verdict is a fact about the import cycle, and
@@ -32,20 +32,31 @@ import {
  * revival loop honest: a replacement delivery opens a NEW cycle with its own adopted story, and
  * its verdict must be published under that one, not the original delivery's.
  *
- * Never fabricated: a cycle whose rows predate the capability yields no block at all, and the
+ * Never fabricated: a cycle whose rows predate the capability publishes no block at all, and the
  * consumer mints its own rather than inheriting an invented story.
+ *
+ * The block it returns is PROPOSED, not vouched for. Its one validator is
+ * `publishedCorrelationSchema` at the call site, which drops the block whole when the story is
+ * absent or malformed. This function used to pre-check with `isCorrelationId` as well, and that
+ * guard could reject nothing the schema would accept — `isCorrelationId` is
+ * `CORRELATION_ID_PATTERN.test(value)` and the schema's `correlationId` is
+ * `z.string().regex(CORRELATION_ID_PATTERN)`, the same regex from the same module. It decided
+ * nothing, and split "is this block publishable?" across two places that had to agree.
  */
 function correlationOf(
   stored: StoredEvent,
   prefix: readonly StoredEvent[],
-): Record<string, unknown> | undefined {
+): Record<string, unknown> {
   const cycleStart = prefix.findLast(
+    // Stryker recorded-survivor EqualityOperator `entry.version < stored.version`: equivalent — the
+    // only entry AT `stored.version` is `stored` itself, and `renderVerdict` has already refused
+    // anything that is not a `ReleaseVerdictRecorded`, which `isCycleStart` never accepts. The
+    // boundary case the two operators disagree about cannot arise. The `>` mutant on this line IS a
+    // real finding — it walks forward into a later cycle — which is why the line takes no waiver.
     (entry) => entry.version <= stored.version && isCycleStart(entry.event),
   );
-  const story = cycleStart?.metadata.correlationId;
-  if (story === undefined || !isCorrelationId(story)) return undefined;
   return {
-    correlationId: story,
+    correlationId: cycleStart?.metadata.correlationId,
     // This event's OWN coordinates — the causal parent of whatever the consumer does on receipt.
     causation: {
       kind: 'event',
@@ -101,15 +112,16 @@ function renderVerdict(
   // permanent by contract: the outbound feed surfaces it, the consumer's checkpoint holds, and it
   // fails identically on every retry — so a defect in a purely DIAGNOSTIC field would
   // head-of-line-block the whole cross-context seam, forever. Telemetry may degrade the trace; it
-  // may never stop the work. `correlationOf` yields only a well-formed block or nothing at all.
-  // Validated, but never fatal. Moving the block out of the envelope's own parse (so a diagnostic
-  // defect could not head-of-line-block the seam) would otherwise leave `publishedCorrelationSchema`
-  // enforcing nothing at all — a rename in `correlationOf` would compile, pass every gate, and
-  // silently detach every cross-context trace. So it is checked here and DROPPED on failure:
-  // telemetry still cannot stop the work, and what ships is again what the contract declares.
-  const block = correlationOf(stored, prefix);
-  const checked = block === undefined ? undefined : publishedCorrelationSchema.safeParse(block);
-  const metadata = checked?.success === true ? checked.data : undefined;
+  // may never stop the work. So the block is validated here and DROPPED on failure, never returned
+  // as an error — and this parse is the block's ONLY validator, which is what keeps
+  // `publishedCorrelationSchema` load-bearing: a rename in `correlationOf` would otherwise compile,
+  // pass every gate, and silently detach every cross-context trace.
+  const checked = publishedCorrelationSchema.safeParse(correlationOf(stored, prefix));
+  const metadata = checked.success ? checked.data : undefined;
+  // Stryker recorded-survivor ConditionalExpression `false`: equivalent — forced to the else arm,
+  // the spread adds `metadata: undefined`, and `JSON.stringify` drops an undefined property, so the
+  // published bytes are identical. Asserting the key's absence would pin a distinction no consumer
+  // can observe (`OutboundFeed` re-adds the key one layer out) — a test written for the score.
   return ok(metadata === undefined ? parsed.data : { ...parsed.data, metadata });
 }
 

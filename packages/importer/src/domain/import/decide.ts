@@ -247,6 +247,13 @@ export function decide(command: ImportCommand, state: ImportState): Decision {
       ]);
     }
     case 'RecordIntakeDeleted': {
+      // Stryker recorded-survivor ConditionalExpression `false`: equivalent — `settled` is declared
+      // on the `awaiting-review` phase alone, so any other phase forced past this guard reads
+      // `undefined` on the very next line and returns the same `NOTHING` one line later. The guard
+      // is the narrowing `state.settled` needs, and the place to say that a deletion is only ever
+      // owed by a review that settled. Waived per mutant, not per line: forcing it TRUE returns
+      // NOTHING for every phase — the intake is never deleted at all — a real finding under the
+      // same mutator on the same line.
       if (state.phase !== 'awaiting-review') return NOTHING;
       const settled = state.settled;
       if (settled === undefined) return NOTHING; // review resolved to a non-terminal verb; nothing owed

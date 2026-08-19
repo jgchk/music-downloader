@@ -88,12 +88,12 @@ function candidateToDomain(candidate: BridgeCandidate): MetadataMatch {
     // only the album fields need a key rename (`albumdisambig`).
     tracks: candidate.tracks.map((track) => ({
       ...track,
-      // RECORDED SURVIVOR, waiver withheld: forcing this condition FALSE is equivalent. The guard
-      // is a TYPE-level narrowing, not a runtime one — `branded` is the identity at runtime (the
-      // brand is a phantom tag, erased), so the lift arm applied to an absent distance yields
-      // exactly the `undefined` the other arm returns. Forcing it TRUE is not equivalent: it drops
-      // every per-track distance beets reported, which the per-track distances in
-      // `bridge-adapter.test.ts` catch — so the line takes no waiver.
+      // Stryker recorded-survivor ConditionalExpression `false`: equivalent — the guard is a
+      // TYPE-level narrowing, not a runtime one. `branded` is the identity at runtime (the brand is
+      // a phantom tag, erased), so the lift arm applied to an absent distance yields exactly the
+      // `undefined` the other arm returns. Waived per mutant, not per line: forcing it TRUE drops
+      // every per-track distance beets reported, which the per-track distance assertions in
+      // `bridge-adapter.test.ts` catch — a real finding under the same mutator on the same line.
       distance: track.distance === undefined ? undefined : branded<Distance>(track.distance),
     })),
     extraItems: candidate.extra_items,

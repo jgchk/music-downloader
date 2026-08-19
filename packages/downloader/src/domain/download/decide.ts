@@ -318,13 +318,13 @@ export function decide(command: DownloadCommand, state: DownloadState): Decision
       // other phase converges silently: absorbing terminals stay absorbed, a legacy fulfilment has
       // no retained candidate to judge, a mismatched reference is stale, and a redelivery after
       // the revival finds the download already back in flight.
-      // RECORDED SURVIVOR, waiver withheld: forcing this guard false is equivalent. `resume` is
-      // declared on `FulfilledState` alone and no fold path carries it onto another phase, so every
-      // other phase reads `undefined` on the very next line and converges on the same `ok([])` two
-      // lines later. The guard is the narrowing that lets `state.resume` type-check, and the place
-      // to say out loud that Fulfilled is the one revivable phase. Forcing it TRUE is a different
-      // matter — the revival never happens at all — so a `disable next-line` here would trade a
-      // real finding for a cosmetic zero.
+      // Stryker recorded-survivor ConditionalExpression `false`: equivalent — `resume` is declared
+      // on `FulfilledState` alone and no fold path carries it onto another phase, so every other
+      // phase forced past this guard reads `undefined` on the very next line and converges on the
+      // same `ok([])` two lines later. The guard is the narrowing that lets `state.resume`
+      // type-check, and the place to say out loud that Fulfilled is the one revivable phase. Waived
+      // per mutant, not per line: forcing it TRUE is a different matter — the revival never happens
+      // at all — so a `disable next-line` would trade that real finding for a cosmetic zero.
       if (state.phase !== 'Fulfilled') return ok([]);
       const resume = state.resume;
       if (resume === undefined || !isReferringTo(command.candidate, resume.candidate.identity)) {

@@ -42,12 +42,12 @@ function manualTagsToDomain(
     title: track.title,
     artist: track.artist,
     trackNumber: toPositiveInt(track.trackNumber),
-    // RECORDED SURVIVOR, waiver withheld: forcing this condition FALSE is equivalent.
-    // `toPositiveInt` is a runtime-erased brand lift (`branded` returns its argument unchanged), so
-    // taking the lift arm for an absent disc number yields the same `undefined` the true arm
-    // supplies; the ternary exists solely because the parameter is typed `number`, not
-    // `number | undefined`. Forcing it TRUE is NOT equivalent — it drops every disc number the
-    // client sent — so the line takes no waiver.
+    // Stryker recorded-survivor ConditionalExpression `false`: equivalent — `toPositiveInt` is a
+    // runtime-erased brand lift (`branded` returns its argument unchanged), so taking the lift arm
+    // for an absent disc number yields the same `undefined` the true arm supplies. The ternary
+    // exists solely because the parameter is typed `number`, not `number | undefined`. Waived per
+    // mutant, not per line: forcing it TRUE drops every disc number the client sent — a real
+    // finding under the same mutator on the same line.
     discNumber: track.discNumber === undefined ? undefined : toPositiveInt(track.discNumber),
   }));
   return {

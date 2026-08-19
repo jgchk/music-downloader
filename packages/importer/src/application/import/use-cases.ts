@@ -111,12 +111,11 @@ export function getImportForAcquisition(
   const importId = dependencies.status.importIdForAcquisition(
     toOriginatingDownloadId(acquisitionId),
   );
-  // RECORDED SURVIVOR, waiver withheld: forcing this ternary's condition false is equivalent. With
-  // nothing indexed, `getImport` would look the missing id up in the projection's map, miss, and
-  // answer `undefined` anyway. The guard states the absence rather than round-tripping a missing
-  // key through the read model, and is the narrowing `ImportId` needs. Forcing it TRUE blanks every
-  // acquisition's import — a real finding, on this same line under the same mutator, which is
-  // exactly why the line takes no `disable next-line`.
+  // Stryker recorded-survivor ConditionalExpression `false`: equivalent — with nothing indexed,
+  // `getImport` looks the missing id up in the projection's map, misses, and answers `undefined`
+  // anyway. The guard states the absence rather than round-tripping a missing key through the read
+  // model, and is the narrowing `ImportId` needs. Waived per mutant, not per line: forcing it TRUE
+  // blanks every acquisition's import — a real finding, same mutator, same line.
   return importId === undefined ? undefined : getImport(dependencies, importId);
 }
 

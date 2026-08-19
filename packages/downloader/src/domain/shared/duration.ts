@@ -22,6 +22,14 @@ export function alignmentScore(expected: readonly number[], actual: readonly num
     // An expectation with no counterpart track — the release is short of the target — aligns with
     // nothing. Pairing by position over the sorted lists makes the shorter list the bound.
     const actualMs = sortedActual[index];
+    // Stryker recorded-survivor ConditionalExpression `true`: equivalent — this is the
+    // `actualMs !== undefined` operand, the narrowing that lets a possibly-absent element reach a
+    // `(number, number)` comparison. Forced true, a missing counterpart reaches
+    // `isWithinDurationTolerance(expectedMs, undefined)`, whose `Math.abs(a - undefined)` is `NaN`
+    // and whose `NaN <= tolerance` is false — so the expectation is dropped from `aligned` either
+    // way and the score is identical. Waived per mutant, not per line: the whole conjunction forced
+    // true (every expectation aligns, so a release short of the target scores 1) and forced false
+    // (nothing ever aligns) are both real findings, under this same mutator on this same line.
     return actualMs !== undefined && isWithinDurationTolerance(expectedMs, actualMs);
   });
   return aligned.length / expected.length;
