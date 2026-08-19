@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mbArtistEntitySchema,
+  mbArtistSearchSchema,
+  mbCatalogRecordingSearchSchema,
   mbRecordingSchema,
   mbRecordingSearchSchema,
   mbReleaseGroupBrowseSchema,
+  mbReleaseGroupEntitySchema,
+  mbReleaseGroupSearchSchema,
   mbReleaseSchema,
   mbReleaseSearchSchema,
 } from './schemas.js';
@@ -227,5 +232,92 @@ describe('MusicBrainz contract schemas', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['releases', 0, 'media', 0, 'format']);
+  });
+
+  it('reads an edition’s disambiguation, which names what makes that pressing different', () => {
+    const parsed = mbReleaseGroupBrowseSchema.parse({
+      releases: [{ id: 'rel-1', title: 'Album', disambiguation: 'UK limited edition gatefold' }],
+    });
+
+    expect(parsed.releases?.[0]?.disambiguation).toBe('UK limited edition gatefold');
+  });
+});
+
+describe('MusicBrainz catalog-search schemas', () => {
+  it('accepts a release-group search hit carrying every consumed field', () => {
+    const parsed = mbReleaseGroupSearchSchema.parse({
+      'release-groups': [
+        {
+          id: 'rg-1',
+          score: 100,
+          title: 'Graceland',
+          'first-release-date': '1986-08-25',
+          'primary-type': 'Album',
+          'secondary-types': ['Live'],
+          'artist-credit': [{ name: 'Paul Simon' }],
+        },
+      ],
+    });
+
+    const hit = parsed['release-groups']?.[0];
+    expect(hit?.['secondary-types']).toEqual(['Live']);
+    expect(hit?.['first-release-date']).toBe('1986-08-25');
+  });
+
+  it('accepts an artist search hit carrying every consumed field', () => {
+    const parsed = mbArtistSearchSchema.parse({
+      artists: [
+        { id: 'ar-1', score: 97, name: 'Paul Simon', disambiguation: 'US singer', type: 'Person' },
+      ],
+    });
+
+    expect(parsed.artists?.[0]?.disambiguation).toBe('US singer');
+  });
+
+  it('accepts a recording search hit with the release it appears on', () => {
+    const parsed = mbCatalogRecordingSearchSchema.parse({
+      recordings: [
+        {
+          id: 'rec-1',
+          score: 90,
+          title: 'The Boy in the Bubble',
+          'artist-credit': [{ name: 'Paul Simon' }],
+          releases: [{ id: 'rel-1', title: 'Graceland' }],
+        },
+      ],
+    });
+
+    expect(parsed.recordings?.[0]?.releases?.[0]?.title).toBe('Graceland');
+  });
+
+  it('tolerates a sparse catalog: absent lists, absent scores, and nulls for unknowns', () => {
+    expect(mbReleaseGroupSearchSchema.parse({})['release-groups']).toBeUndefined();
+    expect(mbArtistSearchSchema.parse({}).artists).toBeUndefined();
+    expect(mbCatalogRecordingSearchSchema.parse({}).recordings).toBeUndefined();
+
+    const sparse = mbReleaseGroupSearchSchema.parse({
+      'release-groups': [
+        { id: 'rg-1', title: null, 'first-release-date': null, 'primary-type': null },
+      ],
+    });
+
+    expect(sparse['release-groups']?.[0]?.title).toBeNull();
+    expect(sparse['release-groups']?.[0]?.score).toBeUndefined();
+  });
+
+  it('parses a bare release group and artist, as an identifier lookup returns them', () => {
+    expect(mbReleaseGroupEntitySchema.parse({ id: 'rg-1', title: 'Graceland' }).title).toBe(
+      'Graceland',
+    );
+    expect(mbArtistEntitySchema.parse({ id: 'ar-1', name: 'Paul Simon' }).name).toBe('Paul Simon');
+  });
+
+  it('rejects drift in a consumed field, so a changed provider fails at the boundary', () => {
+    const result = mbReleaseGroupSearchSchema.safeParse({
+      'release-groups': [{ id: 'rg-1', 'secondary-types': 'Live' }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['release-groups', 0, 'secondary-types']);
   });
 });

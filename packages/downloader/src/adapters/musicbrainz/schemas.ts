@@ -86,6 +86,9 @@ export const mbReleaseSearchSchema = z.object({
 const browseReleaseSchema = z.object({
   id: z.string().optional(),
   title: z.string().nullable().optional(),
+  // What makes this pressing different from its siblings ("UK limited edition gatefold"). Editions
+  // of one group share a title, so this is often the only thing telling two rows apart on screen.
+  disambiguation: z.string().nullable().optional(),
   status: z.string().nullable().optional(),
   date: z.string().nullable().optional(),
   country: z.string().nullable().optional(), // null = MusicBrainz doesn't know — a value, not drift
@@ -109,6 +112,64 @@ export const mbRecordingSearchSchema = z.object({
   recordings: z.array(scoredEntrySchema).optional(),
 });
 
+/**
+ * The catalog-search half of the contract. Search-to-FORMULATE-a-request reads different fields
+ * than resolve-a-request does: it needs what a person recognizes on screen (titles, credits, years,
+ * types, the release a recording sits on) where resolution needs only scored ids. Modeling that as
+ * its own set of schemas keeps the resolution path's tolerances untouched — a presentation field
+ * going missing must never turn into a resolution fault.
+ */
+const releaseGroupEntitySchema = z.object({
+  id: z.string().optional(),
+  score: z.number().optional(), // absent on a browse, present on a search
+  title: z.string().nullable().optional(),
+  'first-release-date': z.string().nullable().optional(),
+  'primary-type': z.string().nullable().optional(),
+  'secondary-types': z.array(z.string()).nullable().optional(), // Live/Remix/Compilation/…
+  'artist-credit': z.array(artistCreditSchema).optional(),
+});
+
+const artistEntitySchema = z.object({
+  id: z.string().optional(),
+  score: z.number().optional(),
+  name: z.string().nullable().optional(),
+  disambiguation: z.string().nullable().optional(),
+  type: z.string().nullable().optional(), // Person/Group/… — shown when there is no disambiguation
+});
+
+const catalogRecordingSchema = z.object({
+  id: z.string().optional(),
+  score: z.number().optional(),
+  title: z.string().nullable().optional(),
+  'artist-credit': z.array(artistCreditSchema).optional(),
+  // Only the first release is read, for artwork and context; the rest of the list is ignored.
+  releases: z
+    .array(z.object({ id: z.string().optional(), title: z.string().nullable().optional() }))
+    .optional(),
+});
+
+/** `GET /release-group/{mbid}?inc=artist-credits&fmt=json` — one album identity by id. */
+export const mbReleaseGroupEntitySchema = releaseGroupEntitySchema;
+/** `GET /artist/{mbid}?fmt=json` — one artist by id. */
+export const mbArtistEntitySchema = artistEntitySchema;
+/** `GET /recording/{mbid}?inc=artist-credits+releases&fmt=json` — one recording by id. */
+export const mbCatalogRecordingEntitySchema = catalogRecordingSchema;
+
+/** `GET /release-group?query=…&fmt=json` (and the artist browse, which shares the shape). */
+export const mbReleaseGroupSearchSchema = z.object({
+  'release-groups': z.array(releaseGroupEntitySchema).optional(),
+});
+
+/** `GET /artist?query=…&fmt=json`. */
+export const mbArtistSearchSchema = z.object({
+  artists: z.array(artistEntitySchema).optional(),
+});
+
+/** `GET /recording?query=…&inc=releases&fmt=json` — the presentation-shaped recording search. */
+export const mbCatalogRecordingSearchSchema = z.object({
+  recordings: z.array(catalogRecordingSchema).optional(),
+});
+
 export type MbRelease = z.infer<typeof mbReleaseSchema>;
 export type MbRecording = z.infer<typeof mbRecordingSchema>;
 export type MbScoredEntry = z.infer<typeof scoredEntrySchema>;
@@ -117,3 +178,9 @@ export type MbReleaseSearch = z.infer<typeof mbReleaseSearchSchema>;
 export type MbRecordingSearch = z.infer<typeof mbRecordingSearchSchema>;
 export type MbReleaseGroupBrowse = z.infer<typeof mbReleaseGroupBrowseSchema>;
 export type MbBrowseRelease = z.infer<typeof browseReleaseSchema>;
+export type MbReleaseGroupEntity = z.infer<typeof releaseGroupEntitySchema>;
+export type MbArtistEntity = z.infer<typeof artistEntitySchema>;
+export type MbCatalogRecording = z.infer<typeof catalogRecordingSchema>;
+export type MbReleaseGroupSearch = z.infer<typeof mbReleaseGroupSearchSchema>;
+export type MbArtistSearch = z.infer<typeof mbArtistSearchSchema>;
+export type MbCatalogRecordingSearch = z.infer<typeof mbCatalogRecordingSearchSchema>;

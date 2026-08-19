@@ -5,11 +5,11 @@ All production code test-first (red before green), per `docs/development/testing
 ## 1. Catalog-search core (downloader)
 
 - [ ] 1.1 Record contract fixtures for the newly consumed MusicBrainz shapes: release-group/artist/recording entity search, release browse by release-group with media, release lookup with recordings (tracklist); extend the live recorder scripts and replay tests in `packages/downloader/test/contract`
-- [ ] 1.2 Add zod response schemas for the new MB shapes in `adapters/musicbrainz/schemas.ts` (tolerant readers, consumed fields only)
-- [ ] 1.3 Port the prototype's ranking as pure functions with table-driven tests: pair score (artist-credit token coverage, subtitle-noise penalty, secondary-type penalty, type bonus, MB-score tiebreak), artist ranking with matched-name-length tie-break, recording ranking ("paul simon graceland" fixture must rank Graceland/Paul Simon first)
-- [ ] 1.4 Implement intent ordering (exact artist name → artists; best recording > best album-shaped RG + margin, Singles excluded from album evidence → recordings; else release groups) with the three canonical query fixtures as tests
-- [ ] 1.5 Define the catalog-search port (search, resolve-by-id, browse artist, list editions, get tracklist) and implement the MusicBrainz adapter over the shared rate-limited, User-Agent-identified client with short-TTL query caching
-- [ ] 1.6 Implement the best-match preview by reusing `releaseGroupEditionIds` on the browse result (head of its output, or the explicit no-automatic-pick outcome); test that preview and pipeline agree on shared fixtures
+- [x] 1.2 Add zod response schemas for the new MB shapes in `adapters/musicbrainz/schemas.ts` (tolerant readers, consumed fields only)
+- [x] 1.3 Port the prototype's ranking as pure functions with table-driven tests: pair score (artist-credit token coverage, subtitle-noise penalty, secondary-type penalty, type bonus, MB-score tiebreak), artist ranking with matched-name-length tie-break, recording ranking ("paul simon graceland" fixture must rank Graceland/Paul Simon first)
+- [x] 1.4 Implement intent ordering (exact artist name → artists; best recording > best album-shaped RG + margin, Singles excluded from album evidence → recordings; else release groups) with the three canonical query fixtures as tests
+- [x] 1.5 Define the catalog-search port (search, resolve-by-id, browse artist, list editions, get tracklist) and implement the MusicBrainz adapter over the shared User-Agent-identified client, with short-TTL query caching and in-flight sharing (no pacing queue — it would serialize a search's entity reads; see the corrected stewardship requirement)
+- [x] 1.6 Implement the best-match preview by reusing `releaseGroupEditionIds` on the browse result (head of its output, or the explicit no-automatic-pick outcome); test that preview and pipeline agree on shared fixtures
 - [ ] 1.7 Expose the facade read verbs (`searchCatalog`, `browseArtist`, `listEditions`, `getTracklist`) with zod boundaries, modeled failures distinct from empty results, and wire them in composition
 
 ## 2. Cover art (downloader + web)
@@ -32,5 +32,5 @@ All production code test-first (red before green), per `docs/development/testing
 
 - [ ] 4.1 Playwright specs for the spec's scenarios: type→results→one-click request; dig-in with pinned edition; pasted MBID; filter + zero-result switch
 - [ ] 4.2 Audit `test/e2e` and any UI-scraping parity specs for dependence on the old form's copy/flow before the merge checkpoint (e2e runs only on main)
-- [ ] 4.3 Verify all three skins render the new page without component changes (tokens only) and the drawer sheet works at phone width
+- [ ] 4.3 Define the catalog-search anatomy once in `base.css` plus new semantic tokens, then deliberately theme it in all three skins (forum, glass, terminal); verify no skin leaves it browser-default and the detail surface becomes a bottom sheet at phone width
 - [ ] 4.4 `pnpm check` green (format, lint, typecheck, build, all tiers, 100% coverage); update `openspec/specs` via archive flow when shipped
