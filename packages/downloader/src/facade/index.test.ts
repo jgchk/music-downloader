@@ -153,6 +153,9 @@ describe('createDownloaderFacade', () => {
       if (!result.ok) {
         expect(result.error.kind).toBe('InfraError');
         expect(result.error).not.toHaveProperty('cause');
+        // And no `reason`: this module's store is not the catalog, and "could not be reached"
+        // is not a thing to say about a disk. A reader must not read transience off a full one.
+        expect(result.error).not.toHaveProperty('reason');
         expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
       }
     });

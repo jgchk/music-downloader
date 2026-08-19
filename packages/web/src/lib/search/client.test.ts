@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { DRIFTED, MALFORMED, UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { DRIFTED, MALFORMED, UNEXPECTED, UNREACHABLE, UNREADABLE, httpCatalog } from './client.js';
 
 const MBID = '19847822-1430-3380-9cf1-bc45545b34ac';
 
@@ -89,14 +89,39 @@ describe('httpCatalog', () => {
     expect(answer).toEqual({ ok: false, message: UNREADABLE });
   });
 
-  it('falls back to a message a person can act on when the server sent none', async () => {
-    // A refusal this page has no words of its own for, and no readable body to borrow any from.
-    // (502 and 500 do not reach here — they are the two the page answers itself.)
-    const stub = fetchStub(new Response('no body worth reading', { status: 403 }));
+  it('does not invent transience for a refusal from outside this application', async () => {
+    // A proxy's HTML error page carries a 500 and no words. Telling someone to pause and press
+    // Enter would assert a passing outage that nobody described.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const stub = fetchStub(new Response('<html>gateway</html>', { status: 500 }));
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: UNEXPECTED });
+  });
+
+  it('reads a bare 502 as the one thing a status can say on its own', async () => {
+    // A gateway's own 502, with no body and nothing named: "did not reach" is exactly what that
+    // status means, so the retry advice is honest here even with nobody to quote.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const stub = fetchStub(new Response('<html>bad gateway</html>', { status: 502 }));
 
     const answer = await httpCatalog(stub).search('graceland');
 
     expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+  });
+
+  it('falls back to a message a person can act on when the server sent none', async () => {
+    // A refusal this page has no words of its own for, and no readable body to borrow any from.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const stub = fetchStub(new Response('no body worth reading', { status: 403 }));
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: UNEXPECTED });
   });
 
   it('tells someone a catalog it could not reach is worth trying again', async () => {
@@ -137,11 +162,13 @@ describe('httpCatalog', () => {
   it('refuses a refusal whose message is not words a person could read', async () => {
     // The message is rendered verbatim; a proxy answering with a shape of its own would otherwise
     // reach the page as "[object Object]".
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
     const stub = fetchStub(Response.json({ message: { code: 42 } }, { status: 400 }));
 
     const answer = await httpCatalog(stub).search('graceland');
 
-    expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+    expect(answer).toEqual({ ok: false, message: UNEXPECTED });
   });
 
   it('gives up on a server that accepts the request and never answers', async () => {

@@ -162,11 +162,15 @@ export function httpCatalog(
     if (named?.success === true && named.data.reason === 'unreadable') {
       return { ok: false, message: DRIFTED };
     }
-    // A refusal that carries no readable body is normal: its status already said what happened.
-    // What it DOES carry is parsed rather than trusted — the words are rendered to a person, and
-    // a proxy's non-string `message` would otherwise reach them as "[object Object]".
+    // What a refusal DOES carry is parsed rather than trusted — the words are rendered to a
+    // person, and a proxy's non-string `message` would otherwise reach them as "[object Object]".
     const refusal = body.parsed ? refusalSchema.safeParse(body.value) : undefined;
-    return { ok: false, message: refusal?.success === true ? refusal.data.message : UNREACHABLE };
+    if (refusal?.success === true) return { ok: false, message: refusal.data.message };
+    // No words and no classification: a proxy's HTML error page, or a fault from outside this
+    // application entirely. 502 is the one status that means "did not reach" on its own; for
+    // anything else, inventing transience here is the very mistake the branch above avoids.
+    console.error('a catalog refusal carried no readable body', path, response.status);
+    return { ok: false, message: response.status === 502 ? UNREACHABLE : UNEXPECTED };
   }
 
   const byId = <T>(
