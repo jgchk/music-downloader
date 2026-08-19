@@ -372,6 +372,41 @@ describe('mutation gate placement', () => {
     expect(pipeline).toContain('__fixtures__');
   });
 
+  it('trips the safe-character tripwire on unsafe TypeScript, and only on TypeScript', () => {
+    // The tripwire exists to catch a path that IS in the mutate scope but whose bytes were dropped
+    // by the narrow character class — a filename carrying shell metacharacters, about to become a
+    // command argument. Its pre-filter, though, selected on `src/` alone, so it also caught files
+    // that were never in scope to begin with: the Python bridge and its `requirements.txt` live
+    // under `packages/importer/src/`, and `bridge.py` is audited by `pnpm test:bridge`, not here.
+    // Touching either failed the whole mutation job with "rejected by the safe-character filter" —
+    // a change with nothing to mutate, reported as a scope violation.
+    //
+    // Evaluated rather than pattern-matched: the greps are read out of the shipped workflow and run
+    // against representative paths, so this fails on the behaviour and not on a rewording.
+    const rejectedBlock = /REJECTED="\$\((.*?)\)"/s.exec(
+      stepNamed('Resolve the changed production files'),
+    )?.[1];
+    expect(rejectedBlock).toBeDefined();
+
+    const filters = (rejectedBlock ?? '')
+      .matchAll(/match (-vE|-E) '([^']+)'/g)
+      .map(([, flag, pattern]) => ({ drop: flag === '-vE', test: new RegExp(pattern ?? '') }))
+      .toArray();
+    // Three greps: select in-scope, drop test code and fixtures, drop everything the class accepts.
+    expect(filters).toHaveLength(3);
+
+    const isRejected = (file: string): boolean =>
+      filters.every(({ drop, test }) => (drop ? !test.test(file) : test.test(file)));
+
+    // The Python tier is not TypeScript, so it is not in scope, so it is not a rejection.
+    expect(isRejected('packages/importer/src/adapters/beets/bridge/requirements.txt')).toBe(false);
+    expect(isRejected('packages/importer/src/adapters/beets/bridge/bridge.py')).toBe(false);
+    // Ordinary production TypeScript passes the class and is likewise no rejection.
+    expect(isRejected('packages/downloader/src/domain/download/state.ts')).toBe(false);
+    // …and the case the tripwire is FOR still bites, or this scenario has argued it away.
+    expect(isRejected('packages/downloader/src/domain/oops; rm -rf ~.ts')).toBe(true);
+  });
+
   it('carries the changed-line verdict in a step of its own', () => {
     // Without this, deleting the whole gate — the step that decides — leaves the boundary tier
     // green. The existing scenarios pin the mutation RUN; the run is now advisory by construction

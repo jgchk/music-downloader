@@ -178,8 +178,15 @@ jobs:
 
           # A path that is in scope by package but was dropped by the character class is a case
           # nobody intended; fail rather than silently mutate less than the diff.
+          #
+          # "In scope" means TypeScript, so the pre-filter says so: the character class is the only
+          # thing a path is compared against here, and it accepts nothing but `.ts`. Selecting on
+          # `src/` alone swept in files that were never candidates — the Python bridge and its
+          # `requirements.txt` live under `packages/importer/src/` and are audited by
+          # `pnpm test:bridge` — so touching either failed this job for a scope violation it had
+          # not committed, with nothing to mutate either way.
           REJECTED="$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD \
-            | match -E '^packages/(downloader|eventing|importer)/src/' \
+            | match -E '^packages/(downloader|eventing|importer)/src/.*\.ts$' \
             | match -vE '(\.test\.ts$|/__fixtures__/)' \
             | match -vE '^packages/(downloader|eventing|importer)/src/[A-Za-z0-9._/-]+\.ts$')"
           if [ -n "$REJECTED" ]; then
