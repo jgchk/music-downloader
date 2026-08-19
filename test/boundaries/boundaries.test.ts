@@ -168,13 +168,20 @@ describe('module boundary lint zones', () => {
      * values: through the barrel, a page would pull the facade and the application layer behind it
      * into the client. It is allowed because of where it points, not because of what it is called.
      */
-    const entries: Record<string, readonly string[]> = {
-      // The facade: the only entry interface code may consume.
-      '.': ['./src/facade/index.ts'],
-      // A dependency-free slice of the same facade, for code that ships to a browser.
-      './catalog-dto': ['./src/facade/catalog-dto.ts'],
-      // The runtime factory: consumed exclusively by $lib/server (lint-enforced above).
-      './runtime': ['./src/composition/runtime.ts'],
+    const expected: Record<string, Record<string, string>> = {
+      downloader: {
+        // The facade: the only entry interface code may consume.
+        '.': './src/facade/index.ts',
+        // The same facade's wire schemas, reachable without the application layer behind them —
+        // which is what code shipping to a browser may import as values.
+        './catalog-dto': './src/facade/catalog-dto.ts',
+        // The runtime factory: consumed exclusively by $lib/server (lint-enforced above).
+        './runtime': './src/composition/runtime.ts',
+      },
+      importer: {
+        '.': './src/facade/index.ts',
+        './runtime': './src/composition/runtime.ts',
+      },
     };
 
     for (const pkg of ['downloader', 'importer']) {
@@ -182,12 +189,9 @@ describe('module boundary lint zones', () => {
         with: { type: 'json' },
       })) as { default: { exports: Record<string, string> } };
 
-      const declared = Object.keys(manifest.default.exports);
-      // Every entry is one of the allowed ones, and they appear in the allowed order.
-      expect(declared).toEqual(Object.keys(entries).filter((entry) => declared.includes(entry)));
-      for (const [entry, target] of Object.entries(manifest.default.exports)) {
-        expect(entries[entry]).toContain(target);
-      }
+      // Stated in full, not derived from what is there: an expectation computed from the manifest
+      // would keep passing after the facade entry was deleted from it.
+      expect(manifest.default.exports).toEqual(expected[pkg]);
     }
   });
 });

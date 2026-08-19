@@ -200,6 +200,27 @@ async function advanceUntil(isDone: () => boolean, stepMs: number, slices = 30):
 }
 
 describe('createDownloaderRuntime', () => {
+  it('composes the catalog behind its answer cache, not just beside one', async () => {
+    // The decorator has its own tests; this proves it is actually IN FRONT of the composed
+    // adapter. Without it, every keystroke's three reads would reach MusicBrainz again.
+    const answered = vi.fn(() =>
+      Promise.resolve(
+        Response.json({ 'release-groups': [], artists: [], recordings: [] }, { status: 200 }),
+      ),
+    );
+    vi.stubGlobal('fetch', answered);
+    cleanups.push(() => {
+      vi.unstubAllGlobals();
+    });
+    const runtime = await testRuntime();
+
+    await runtime.facade.searchCatalog({ query: 'graceland' }, STORY);
+    await runtime.facade.searchCatalog({ query: 'graceland' }, STORY);
+
+    // Three reads for the first search — one per entity kind — and none at all for the second.
+    expect(answered).toHaveBeenCalledTimes(3);
+  });
+
   it('drives a submitted download to fulfilment and exposes it on the seam surfaces', async () => {
     const runtime = await testRuntime();
     const wokeUp = vi.fn();

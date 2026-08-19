@@ -81,7 +81,11 @@ export function messageOf(error: FacadeError): string {
       return 'The record changed while you were working - reload and try again.';
     }
     case 'InfraError': {
-      return `Something went wrong (${error.operation}). Try again.`;
+      // No operation id: `musicbrainz.catalog.search.release-group` is a module noun and the name
+      // of an upstream provider, neither of which is this application's voice — and now that the
+      // routes log the fault with its operation and correlation id, the words a person reads no
+      // longer have to carry the diagnosis.
+      return 'Something went wrong. Try again.';
     }
   }
 }

@@ -31,7 +31,7 @@ See `proposal.md` for motivation. The current request page is a progressive-enha
 
 ## Risks / Trade-offs
 
-- [MB rate limiting under real typing] → server cache + single rate-limited client + debounce; the UI's search-failed state ("MusicBrainz didn't answer… retry") is a first-class scenario, verified in prototypes where live 503s occurred.
+- [MB rate limiting under real typing] → server cache + a single cached client + debounce; the UI's search-failed state ("MusicBrainz didn't answer… retry") is a first-class scenario, verified in prototypes where live 503s occurred.
 - [Token ranking is heuristic; some queries will still order oddly] → all scoring is pure and table-driven-testable; the popularity follow-up is explicitly out of scope and tracked in the proposal.
 - [First heavy-JS surface strains the SSR/browser/Playwright test regime] → keep the search page's state in plain testable modules (ranking/order/grouping already pure); component tests cover rendering states (empty/loading/results/zero/failed) — the states are enumerated in the spec.
 - [E2E and parity specs scrape the current form] → audit `test/e2e` and any UI-scraping tiers before the merge checkpoint (known blast-radius hazard).

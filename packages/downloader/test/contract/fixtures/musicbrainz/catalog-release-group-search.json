@@ -16,7 +16,7 @@
   "response": {
     "status": 200,
     "body": {
-      "created": "2026-08-19T01:06:50.170Z",
+      "created": "2026-08-19T04:42:51.412Z",
       "count": 22285,
       "offset": 0,
       "release-groups": [
@@ -4015,35 +4015,6 @@
           ]
         },
         {
-          "id": "186f6df6-6cf9-413a-b107-d65d6cfe6665",
-          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
-          "score": 33,
-          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
-          "artist-credit-id": "39c5153b-fb4b-3407-91e2-7115e17e778f",
-          "count": 1,
-          "title": "Graceland",
-          "first-release-date": "2001-07-19",
-          "primary-type": "Album",
-          "artist-credit": [
-            {
-              "name": "Civet",
-              "artist": {
-                "id": "c8912da4-5533-4623-b6bb-e6f20cb3406e",
-                "name": "Civet",
-                "sort-name": "Civet"
-              }
-            }
-          ],
-          "releases": [
-            {
-              "id": "5769c451-c1cb-4402-ae9a-7dade8f4a360",
-              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
-              "title": "Graceland",
-              "status": "Official"
-            }
-          ]
-        },
-        {
           "id": "05b1e1af-1f2d-4713-b0ee-41e2968a9db4",
           "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
           "score": 33,
@@ -4100,6 +4071,35 @@
               "id": "edf4f01e-1c8c-4dbc-b97e-6f5b6e66dd9a",
               "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
               "title": "GRACELAND",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "186f6df6-6cf9-413a-b107-d65d6cfe6665",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "39c5153b-fb4b-3407-91e2-7115e17e778f",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2001-07-19",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Civet",
+              "artist": {
+                "id": "c8912da4-5533-4623-b6bb-e6f20cb3406e",
+                "name": "Civet",
+                "sort-name": "Civet"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "5769c451-c1cb-4402-ae9a-7dade8f4a360",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
               "status": "Official"
             }
           ]

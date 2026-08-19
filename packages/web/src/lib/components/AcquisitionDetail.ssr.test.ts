@@ -450,7 +450,7 @@ describe('AcquisitionDetail (SSR)', () => {
         },
         timeline: [],
         importSection: { state: 'none' },
-        error: 'Something went wrong (store). Try again.',
+        error: 'Something went wrong. Try again.',
       },
     });
     expect(body).toContain('data-testid="action-error"');

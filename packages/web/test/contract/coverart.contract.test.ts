@@ -118,7 +118,7 @@ describe('CoverArtArchive contract (tier 1)', () => {
       const result = await adapter.front(entity, WITHOUT_ART, 250);
       const answer = result._unsafeUnwrap();
 
-      expect(answer).toEqual({ kind: 'absent' });
+      expect(answer).toEqual({ kind: 'absent', listedImages: 0 });
     },
   );
 });

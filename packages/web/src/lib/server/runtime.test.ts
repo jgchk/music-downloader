@@ -391,6 +391,26 @@ describe('bootRuntimes', () => {
     expect(access.plex).toBeInstanceOf(PlexTvAccess);
   });
 
+  it('composes the archive behind its cache, not just beside one', async () => {
+    // The cache has its own tests; this proves it is actually IN FRONT of the composed archive.
+    // Without it, a grid of twenty-five tiles would re-ask the archive on every render.
+    const mbid = '19847822-1430-3380-9cf1-bc45545b34ac';
+    const answered = vi.fn(() => Promise.resolve(new Response('nope', { status: 404 })));
+    vi.stubGlobal('fetch', answered);
+    const fakes = fakeRuntimes([]);
+    await bootRuntimes(VALID_ENV, {
+      createDownloader: fakes.createDownloader,
+      createImporter: fakes.createImporter,
+      onShutdownSignal: vi.fn(),
+    });
+
+    await coverArtOf().front('release-group', mbid, 250);
+    await coverArtOf().front('release-group', mbid, 250);
+
+    vi.unstubAllGlobals();
+    expect(answered).toHaveBeenCalledTimes(1);
+  });
+
   it('facadesOf refuses before boot', () => {
     expect(() => facadesOf()).toThrow(/init hook/);
   });

@@ -23,7 +23,7 @@ import {
 import type { ZodType } from 'zod';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { OperationScope } from '../../application/correlation/context.js';
-import type { HttpClient } from '../support/http.js';
+import type { HttpClient, HttpRequest, HttpResponse } from '../support/http.js';
 import type { Mbid } from '../../domain/shared/mbid.js';
 import type {
   CatalogEditionListing,
@@ -54,6 +54,9 @@ const DEFAULT_BASE_URL = 'https://musicbrainz.org/ws/2';
 const DEFAULT_USER_AGENT = 'music-downloader/0.0 (https://github.com/anthropics/music-downloader)';
 /** Per entity kind. Wide enough that ranking has real candidates to reorder, not a pre-cut list. */
 const DEFAULT_SEARCH_LIMIT = 25;
+/** The two 4xx statuses that mean "later", not "never". */
+const TOO_MANY_REQUESTS = 429;
+const REQUEST_TIMEOUT = 408;
 /** MusicBrainz's browse ceiling, shared by the edition listing and the artist discography. */
 const BROWSE_LIMIT = 100;
 
@@ -84,6 +87,16 @@ export function luceneLiteral(query: string): string {
 
 const parseJson = Result.fromThrowable(
   (body: string): unknown => JSON.parse(body),
+  (cause) => cause,
+);
+
+/**
+ * The client call as a value. `fromThrowable` rather than `fromPromise(client.send(…))`: the
+ * latter evaluates the call as an ARGUMENT, so a client that throws before it returns a promise
+ * throws past the wrapper meant to tame it — and this method promises a Result.
+ */
+const sendSafely = ResultAsync.fromThrowable(
+  async (http: HttpClient, request: HttpRequest): Promise<HttpResponse> => await http.send(request),
   (cause) => cause,
 );
 
@@ -301,37 +314,42 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     schema: ZodType<T>,
     operation: string,
   ): ResultAsync<T | undefined, InfraError> {
-    return ResultAsync.fromPromise(
-      this.http.send({
-        url,
-        headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
-      }),
-      (cause) => infraError(operation, 'the catalog could not be reached', cause),
-    ).andThen((response): Result<T | undefined, InfraError> => {
-      // The catalog saying "no such thing" is an answer, not a fault.
-      if (response.status === 404) return ok(undefined);
-      if (response.status >= 400 && response.status < 500) {
-        // A refusal of the request we built — a query it cannot parse, an unsupported parameter.
-        // Retrying reproduces it exactly, so it is permanent rather than a passing fault.
-        return err(
-          permanentInfraError(operation, `the catalog refused the request (${response.status})`),
-        );
-      }
-      if (response.status < 200 || response.status >= 300) {
-        return err(infraError(operation, `the catalog responded ${response.status}`));
-      }
-      return parseJson(response.body)
-        .mapErr((cause) =>
-          permanentInfraError(operation, 'the catalog returned malformed JSON', cause),
-        )
-        .andThen((json) => {
-          const parsed = schema.safeParse(json);
-          return parsed.success
-            ? ok<T | undefined, InfraError>(parsed.data)
-            : err<T | undefined, InfraError>(
-                permanentInfraError(operation, 'the catalog’s shape has drifted', parsed.error),
-              );
-        });
-    });
+    return sendSafely(this.http, {
+      url,
+      headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
+    })
+      .mapErr((cause) => infraError(operation, 'the catalog could not be reached', cause))
+      .andThen((response): Result<T | undefined, InfraError> => {
+        // The catalog saying "no such thing" is an answer, not a fault.
+        if (response.status === 404) return ok(undefined);
+        // 429 and 408 are the provider asking for less, or for the same again — the one class of
+        // 4xx that retrying is the correct answer to. Marking them permanent would turn a moment
+        // of backpressure into a search that stays broken until someone restarts something.
+        if (response.status === TOO_MANY_REQUESTS || response.status === REQUEST_TIMEOUT) {
+          return err(infraError(operation, `the catalog answered ${response.status}`));
+        }
+        if (response.status >= 400 && response.status < 500) {
+          // A refusal of the request we built — a query it cannot parse, an unsupported parameter.
+          // Retrying reproduces it exactly, so it is permanent rather than a passing fault.
+          return err(
+            permanentInfraError(operation, `the catalog refused the request (${response.status})`),
+          );
+        }
+        if (response.status < 200 || response.status >= 300) {
+          return err(infraError(operation, `the catalog responded ${response.status}`));
+        }
+        return parseJson(response.body)
+          .mapErr((cause) =>
+            permanentInfraError(operation, 'the catalog returned malformed JSON', cause),
+          )
+          .andThen((json) => {
+            const parsed = schema.safeParse(json);
+            return parsed.success
+              ? ok<T | undefined, InfraError>(parsed.data)
+              : err<T | undefined, InfraError>(
+                  permanentInfraError(operation, 'the catalog’s shape has drifted', parsed.error),
+                );
+          });
+      });
   }
 }

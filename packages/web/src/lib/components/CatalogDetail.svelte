@@ -173,6 +173,11 @@
       </form>
     {:else if detail.kind === 'artist'}
       <h3>Releases</h3>
+      {#if detail.discography.releaseGroups.length === 0}
+        <p class="detail-status" data-testid="discography-empty">
+          The catalog lists no releases under this artist.
+        </p>
+      {/if}
       <ul class="discography">
         {#each detail.discography.releaseGroups as group (group.mbid)}
           <li>

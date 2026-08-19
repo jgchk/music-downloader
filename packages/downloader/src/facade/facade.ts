@@ -2,6 +2,7 @@ import { err, ok as okResult } from 'neverthrow';
 import { z } from 'zod';
 import type { Result } from 'neverthrow';
 import type { CommandError } from '../application/download/command-handler.js';
+import type { InfraError } from '../application/ports/errors.js';
 import { adoptOrMint } from '../application/correlation/context.js';
 import type { CommandContext } from '../application/correlation/context.js';
 import { parseMbid } from '../domain/shared/mbid.js';
@@ -190,6 +191,22 @@ export function createDownloaderFacade(
   const scopeFor = (story: StoryId): OperationScope =>
     operationScope(contextFor(story), catalogDependencies.logger);
 
+  /**
+   * A catalog fault, written down where the CAUSE still exists. `toFacadeError` drops it — the
+   * wire cannot carry a zod issue list or a fetch error — so an interface above this one can only
+   * ever log "the catalog's shape has drifted" and an operation name. The one fact that says WHICH
+   * field moved lives here and nowhere else, and it is the whole diagnosis.
+   */
+  const catalogFailed = (read: string, error: InfraError): FacadeResult<never> => {
+    // Typed as the port's own error rather than the whole command union: a catalog read fails
+    // only as infrastructure, so there is no other kind of failure to branch on here.
+    catalogDependencies.logger.warn(
+      { read, operation: error.operation, permanent: error.permanent, cause: error.cause },
+      error.message,
+    );
+    return fail(toFacadeError(error));
+  };
+
   return {
     async submitAcquisition(input, story) {
       const parsed = submitAcquisitionRequestSchema.safeParse(input);
@@ -274,7 +291,7 @@ export function createDownloaderFacade(
       const result = await catalogDependencies.catalog.search(parsed.data.query, scopeFor(story));
       return result.match(
         (results) => ok(searchResultsToDto(results)),
-        (error) => fail(toFacadeError(error)),
+        (error) => catalogFailed('search', error),
       );
     },
 
@@ -284,7 +301,7 @@ export function createDownloaderFacade(
       const result = await catalogDependencies.catalog.lookup(mbid.value, scopeFor(story));
       return result.match(
         (lookup) => ok(lookupToDto(lookup)),
-        (error) => fail(toFacadeError(error)),
+        (error) => catalogFailed('lookup', error),
       );
     },
 
@@ -294,7 +311,7 @@ export function createDownloaderFacade(
       const result = await catalogDependencies.catalog.discography(mbid.value, scopeFor(story));
       return result.match(
         (groups) => ok(discographyToDto(groups)),
-        (error) => fail(toFacadeError(error)),
+        (error) => catalogFailed('discography', error),
       );
     },
 
@@ -304,7 +321,7 @@ export function createDownloaderFacade(
       const result = await catalogDependencies.catalog.editions(mbid.value, scopeFor(story));
       return result.match(
         (listing) => ok(editionsToDto(listing)),
-        (error) => fail(toFacadeError(error)),
+        (error) => catalogFailed('editions', error),
       );
     },
 
@@ -314,7 +331,7 @@ export function createDownloaderFacade(
       const result = await catalogDependencies.catalog.tracklist(mbid.value, scopeFor(story));
       return result.match(
         (tracks) => ok(tracklistToDto(tracks)),
-        (error) => fail(toFacadeError(error)),
+        (error) => catalogFailed('tracklist', error),
       );
     },
   };

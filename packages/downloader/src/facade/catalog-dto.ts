@@ -110,14 +110,22 @@ export const catalogEditionsResultSchema = z
      * one, and would relabel the wrong tracklist if a producer re-sorted without saying so.
      */
     groups: z.array(
-      z.object({
-        /**
-         * The edition the group's tracklist is read from — always present, never inferred. Its
-         * `trackCount` IS the group's; carried once so the two can never disagree.
-         */
-        representative: catalogEditionDtoSchema,
-        editions: z.array(catalogEditionDtoSchema),
-      }),
+      z
+        .object({
+          /**
+           * The edition the group's tracklist is read from — always present, never inferred. Its
+           * `trackCount` IS the group's; carried once so the two can never disagree.
+           */
+          representative: catalogEditionDtoSchema,
+          editions: z.array(catalogEditionDtoSchema),
+        })
+        // A group is created by putting an edition in it, so it always contains the one it is
+        // read from. Stated here too, because a reader heads the group with the representative's
+        // tracklist and lists `editions` beneath it: "12 tracks · 0 editions" is not a thing.
+        .refine(
+          (group) => group.editions.some((edition) => edition.mbid === group.representative.mbid),
+          'a group must contain the edition its tracklist is read from',
+        ),
     ),
     /**
      * `pick` carries the FIRST edition the pipeline would try (it walks its picker's ordered ids

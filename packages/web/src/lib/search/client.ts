@@ -27,9 +27,17 @@ export type CatalogAnswer<T> =
 /** The message shown when the server itself could not be reached, or answered without saying why. */
 export const UNREACHABLE = 'The catalog could not be reached. Check the connection and try again.';
 
-/** Shown when an answer arrives that this page cannot read — most often an expired session. */
+/** Shown when an answer arrives that is not JSON at all — most often an expired session. */
 export const UNREADABLE =
   'That answer could not be read. Reload the page, and sign in again if asked.';
+
+/**
+ * Shown when the answer IS this application's, and its shape is not the one this page knows.
+ * Kept apart from {@link UNREADABLE} on purpose: telling someone to sign in again cannot possibly
+ * help with a producer and consumer that disagree, and they would go and do it.
+ */
+export const MALFORMED =
+  'That answer could not be understood. Reload the page — if it keeps happening, this is a bug.';
 
 export interface CatalogClient {
   search(query: string, signal?: AbortSignal): Promise<CatalogAnswer<CatalogSearchResultDto>>;
@@ -40,6 +48,11 @@ export interface CatalogClient {
   ): Promise<CatalogAnswer<CatalogDiscographyResultDto>>;
   editions(mbid: string, signal?: AbortSignal): Promise<CatalogAnswer<CatalogEditionsResultDto>>;
   tracklist(mbid: string, signal?: AbortSignal): Promise<CatalogAnswer<CatalogTracklistResultDto>>;
+}
+
+export interface CatalogClientConfig {
+  /** How long to wait for an answer. A seam so a test need not wait out a real deadline. */
+  readonly timeoutMs?: number;
 }
 
 /**
@@ -76,7 +89,11 @@ async function send(fetchImpl: typeof fetch, path: string, signal: AbortSignal):
 /** The refusal a server sent, if it sent one a person can act on. */
 const refusalSchema = z.object({ message: z.string() });
 
-export function httpCatalog(fetchImpl: typeof fetch = fetch): CatalogClient {
+export function httpCatalog(
+  fetchImpl: typeof fetch = fetch,
+  config: CatalogClientConfig = {},
+): CatalogClient {
+  const timeoutMs = config.timeoutMs ?? REQUEST_TIMEOUT_MS;
   async function read<T>(
     path: string,
     schema: ZodType<T>,
@@ -84,7 +101,7 @@ export function httpCatalog(fetchImpl: typeof fetch = fetch): CatalogClient {
   ): Promise<CatalogAnswer<T>> {
     // A deadline of our own, combined with the caller's abandon signal: without it a server that
     // accepts the connection and never answers leaves the page waiting forever.
-    const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const deadline = AbortSignal.timeout(timeoutMs);
     const attempt = await send(
       fetchImpl,
       path,
@@ -105,7 +122,12 @@ export function httpCatalog(fetchImpl: typeof fetch = fetch): CatalogClient {
       // this proves what arrived is that — a stale deploy, a proxy, or a different route matching
       // would otherwise reach the page as a result object whose fields are quietly absent.
       const shaped = schema.safeParse(body.value);
-      return shaped.success ? { ok: true, value: shaped.data } : { ok: false, message: UNREADABLE };
+      if (shaped.success) return { ok: true, value: shaped.data };
+      // A 200 whose JSON this page cannot read is this application disagreeing with itself. The
+      // server logged nothing — to it the read succeeded — so the console is the only place the
+      // evidence can live.
+      console.error('catalog answer did not match the expected shape', path, shaped.error.issues);
+      return { ok: false, message: MALFORMED };
     }
     // A refusal that carries no readable body is normal: its status already said what happened.
     // What it DOES carry is parsed rather than trusted — the words are rendered to a person, and
@@ -119,7 +141,10 @@ export function httpCatalog(fetchImpl: typeof fetch = fetch): CatalogClient {
     schema: ZodType<T>,
     mbid: string,
     signal?: AbortSignal,
-  ): Promise<CatalogAnswer<T>> => read<T>(`/catalog/${read_}?mbid=${mbid}`, schema, signal);
+  ): Promise<CatalogAnswer<T>> =>
+    // Encoded rather than interpolated: the DTOs type an identifier as a string, and this page
+    // does not get to assume every string it is handed is URL-shaped.
+    read<T>(`/catalog/${read_}?${new URLSearchParams({ mbid }).toString()}`, schema, signal);
 
   return {
     search: (query, signal) =>

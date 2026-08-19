@@ -101,7 +101,7 @@ describe('GET /catalog/[read]', () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      message: 'Something went wrong (musicbrainz.catalog.search). Try again.',
+      message: 'Something went wrong. Try again.',
     });
   });
 
@@ -129,16 +129,27 @@ describe('GET /catalog/[read]', () => {
     expect(warn).toHaveBeenCalledWith({ read: 'search', error }, 'catalog read failed');
   });
 
-  it('says nothing to the log about a refusal the caller can fix themselves', async () => {
+  it('says nothing to the log about a refusal, which is the caller’s to fix', async () => {
+    // A widened guard — `status >= 400` — would turn every malformed request into an operator
+    // alert, so the refusing case has to be the one asserted, not a successful read.
     const warn = vi.fn();
+    const downloader = facade({
+      lookupCatalog: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'ValidationFailed' as const, message: 'not a MusicBrainz identifier' },
+        }),
+      ),
+    });
     const request = {
       params: { read: 'lookup' },
       url: new URL('https://app.test/catalog/lookup?mbid=not-an-mbid'),
-      locals: { facades: { downloader: facade() }, correlationId: STORY, logger: { warn } },
+      locals: { facades: { downloader }, correlationId: STORY, logger: { warn } },
     } as never;
 
-    await GET(request);
+    const response = await GET(request);
 
+    expect(response.status).toBe(400);
     expect(warn).not.toHaveBeenCalled();
   });
 

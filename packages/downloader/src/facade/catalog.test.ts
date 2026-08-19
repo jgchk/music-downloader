@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CATALOG_EDITIONS,
   CATALOG_RELEASE_GROUP,
   CATALOG_RESULTS,
   UNREACHABLE_CATALOG_FAULT,
   fakeCatalog,
 } from '../application/__fixtures__/catalog.js';
 import { STORY } from '../application/__fixtures__/correlation.js';
+import { createLogger } from '../application/logging/logger.js';
 import { catalogSearchWiring } from './__fixtures__/wiring.js';
 import {
   catalogEditionsResultSchema,
@@ -153,6 +153,58 @@ describe('lookupCatalog', () => {
   });
 });
 
+describe('a catalog read that faults', () => {
+  it('writes down the cause the wire answer cannot carry', async () => {
+    // `toFacadeError` drops the zod issues and the fetch error — the wire cannot hold them — so
+    // this is the last place that knows WHICH field of the catalog's shape moved.
+    const lines: string[] = [];
+    const logger = createLogger({
+      level: 'warn',
+      destination: { write: (line: string) => void lines.push(line) },
+    });
+    const drifted = {
+      kind: 'InfraError' as const,
+      operation: 'musicbrainz.catalog.search',
+      message: 'the catalog’s shape has drifted',
+      permanent: true,
+      cause: { issues: [{ path: ['release-groups', 0, 'id'] }] },
+    };
+    const facade = catalogSearchWiring(fakeCatalog({ fault: drifted }), logger).facade;
+
+    const result = await facade.searchCatalog({ query: 'graceland' }, STORY);
+
+    expect(result.ok).toBe(false);
+    expect(lines.join('')).toContain('release-groups');
+    expect(JSON.parse(lines[0]!)).toMatchObject({ read: 'search', permanent: true });
+  });
+});
+
+describe('the editions answer’s wire shape', () => {
+  const edition = { mbid: RELEASE_ID, title: 'Graceland', formats: [], trackCount: 11 };
+
+  it('refuses a group that does not contain the edition it is read from', () => {
+    // The heading is the representative's tracklist and the list beneath it is `editions`; a group
+    // that does not contain its own representative renders as "11 tracks · 0 editions".
+    expect(
+      catalogEditionsResultSchema.safeParse({
+        groups: [{ representative: edition, editions: [] }],
+        bestMatch: { kind: 'selection-required' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a pick that names an edition the listing does not contain', () => {
+    // Such a pick renders NEITHER the badge nor the "no default" notice — the surface would say
+    // nothing at all about what the pipeline would do, which is what it exists to preview.
+    expect(
+      catalogEditionsResultSchema.safeParse({
+        groups: [{ representative: edition, editions: [edition] }],
+        bestMatch: { kind: 'pick', mbid: '271faeb3-fdd1-3ebb-80aa-97b3116e9341' },
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('the lookup answer’s wire shape', () => {
   const ARTIST = { mbid: RG_ID, name: 'Paul Simon' };
 
@@ -242,9 +294,7 @@ describe('listEditions', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(catalogEditionsResultSchema.safeParse(roundTrip(result.value)).success).toBe(true);
-    expect(result.value.groups[0]?.representative.trackCount).toBe(
-      CATALOG_EDITIONS.groups[0]?.representative.trackCount,
-    );
+    expect(result.value.groups[0]?.representative.trackCount).toBe(11);
     expect(result.value.bestMatch).toEqual({ kind: 'pick', mbid: RELEASE_ID });
   });
 

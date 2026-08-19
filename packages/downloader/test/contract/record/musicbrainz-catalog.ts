@@ -32,6 +32,8 @@ const ARTIST_QUERY = 'paul simon';
 const TRACK_QUERY = 'paul simon the boy in the bubble';
 /** Mirrors the adapter's own per-entity search limit. */
 const SEARCH_LIMIT = 25;
+/** A well-formed identifier the catalog holds nothing under — the 404 half of every lookup. */
+const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 /** Mirrors the adapter's browse ceiling. */
 const BROWSE_LIMIT = 100;
 
@@ -46,7 +48,9 @@ async function get(requestPath: string, rawQuery: string): Promise<ContractFixtu
   const response = await fetch(`${BASE_URL}${requestPath}?${rawQuery}`, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
   });
-  const body: unknown = await response.json();
+  // A 404 carries a body of its own; what matters about it is the status, so it is recorded as
+  // the answer it is rather than as a shape anything parses.
+  const body: unknown = response.status === 404 ? undefined : await response.json();
   await sleep(1100); // ≥1 req/s
   return {
     provenance: { source: `${BASE_URL} (live)`, capturedAt, note: 'public data; no sanitization' },
@@ -132,6 +136,15 @@ async function main(): Promise<void> {
     'release',
   );
   write('catalog-tracklist.json', await get(`/release/${releaseId}`, 'inc=recordings&fmt=json'));
+
+  // --- the answer that drives the whole paste-an-identifier fallthrough --------------------------
+  // "No such release group" is what sends a lookup on to the artist and then the recording read,
+  // and what a page shows as "that identifier names nothing". A well-formed identifier the catalog
+  // holds nothing for captures it without depending on some record staying deleted forever.
+  write(
+    'catalog-not-found.json',
+    await get(`/release-group/${UNKNOWN_ID}`, 'inc=artist-credits&fmt=json'),
+  );
 }
 
 void main();

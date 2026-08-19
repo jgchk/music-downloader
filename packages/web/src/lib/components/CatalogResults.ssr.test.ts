@@ -113,7 +113,7 @@ describe('CatalogResults (SSR)', () => {
     expect(html).toContain('No tracks matched');
     expect(html).toContain('paul simon graceland');
     // Counted in the singular when there is one — "1 albums" is the defect this pins.
-    expect(html).toContain('1 album');
+    expect(html).toContain('>1 album<');
     expect(html).toContain('1 artist');
   });
 

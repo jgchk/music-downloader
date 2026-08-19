@@ -47,7 +47,7 @@ describe('CatalogDetail (SSR)', () => {
     // page holds it, and that is deliberate.)
     const html = body(releaseGroup({ kind: 'pick', mbid: PICK }), {}, { album: RG, edition: PICK });
 
-    expect(html).toContain('chosen');
+    expect(html).toContain('>chosen<');
     expect(html).toContain('Request this edition');
     expect(html).toContain('name="targetType" value="album"');
     expect(html).toContain(`name="mbid" value="${PICK}"`);
@@ -216,6 +216,19 @@ describe('CatalogDetail (SSR)', () => {
     expect(html).toContain('value="track"');
     expect(html).toContain('Request this track');
     expect(html).toContain('Quality floor');
+  });
+
+  it('says an artist has no releases listed, rather than heading an empty list', () => {
+    // The album arm says so; the artist arm rendered "Releases" over nothing at all, which reads
+    // as a page that failed rather than a catalog that knows of none.
+    const html = body({
+      kind: 'artist',
+      mbid: RG,
+      title: 'Paul Simon',
+      discography: { releaseGroups: [] },
+    });
+
+    expect(html).toContain('lists no releases under this artist');
   });
 
   it('says the catalog listed no pressings, rather than offering a choice of none', () => {

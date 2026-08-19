@@ -13,8 +13,13 @@
   interface Properties {
     /** Action-failure message from a rejected submission (the native fallback's path). */
     error?: string;
-    /** What was submitted, echoed back so a rejected submission is corrected rather than retyped. */
-    values?: { artist?: string; title?: string; album?: string };
+    /**
+     * What was submitted, echoed back so a rejected submission is corrected rather than retyped.
+     * `kind` says WHICH form was refused: a request made from a search result is not this page's
+     * fallback form, and treating every refusal as that form's would open it under a message about
+     * something else entirely.
+     */
+    values?: { kind?: string; artist?: string; title?: string };
     /** The catalog conversation — injected so the surface can be driven without a server. */
     catalog?: CatalogClient;
     /** When typing becomes a search — injected so tests need not wait out a debounce. */
@@ -183,9 +188,11 @@
     onClose={() => (detail = undefined)}
   />
 
-  <!-- Open when a submission was refused: the message names a field in a form that is otherwise
-       folded away, and pointing at something invisible is not pointing at anything. -->
-  <details class="native-request" open={error !== undefined}>
+  <!-- Open when THIS form's submission was refused: the message names a field in a form that is
+       otherwise folded away, and pointing at something invisible is not pointing at anything. A
+       refusal of a request made from a result is not this form's, and opening it there would sit
+       the message above a form the person never touched. -->
+  <details class="native-request" open={values?.kind === 'descriptor'}>
     <summary>Request by artist and title</summary>
     <form method="POST" data-testid="native-form">
       <label>

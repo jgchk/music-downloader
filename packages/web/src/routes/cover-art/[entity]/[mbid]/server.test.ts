@@ -72,12 +72,43 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
 
   it('answers "no cover" in a way the browser may remember, so a placeholder settles', async () => {
     const response = await GET(
-      event(port({ kind: 'absent' }), { entity: 'release-group', mbid: MBID }),
+      event(port({ kind: 'absent', listedImages: 0 }), { entity: 'release-group', mbid: MBID }),
     );
 
     expect(response.status).toBe(404);
     // Far shorter than the artwork's: the archive GAINING art is the change worth noticing.
     expect(response.headers.get('cache-control')).toBe('private, max-age=3600');
+  });
+
+  it('writes down an answer of "no front cover" that came with art in it', async () => {
+    const debug = vi.fn();
+    const request = {
+      params: { entity: 'release-group', mbid: MBID },
+      url: new URL('https://app.test/cover-art/x/y'),
+      locals: {
+        coverArt: port({ kind: 'absent', listedImages: 3 }),
+        logger: { warn: vi.fn(), debug },
+      },
+    } as never;
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(404);
+    expect(debug).toHaveBeenCalledWith(
+      expect.objectContaining({ listedImages: 3 }),
+      'cover art manifest names no front cover',
+    );
+  });
+
+  it('serves the type the archive gave, not one type for everything', async () => {
+    const png = {
+      kind: 'found' as const,
+      image: { contentType: 'image/png' as const, bytes: BYTES },
+    };
+
+    const response = await GET(event(port(png), { entity: 'release-group', mbid: MBID }));
+
+    expect(response.headers.get('content-type')).toBe('image/png');
   });
 
   it('answers an unreachable archive as a fault the browser must not remember', async () => {

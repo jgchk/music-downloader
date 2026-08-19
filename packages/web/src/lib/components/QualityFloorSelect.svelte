@@ -22,6 +22,5 @@
     <option value="LOSSY_HIGH">High quality lossy</option>
     <option value="LOSSY_STANDARD">Standard lossy</option>
     <option value="LOSSY_LOW">Low quality lossy</option>
-    <option value="UNKNOWN">Unknown</option>
   </select>
 </label>
