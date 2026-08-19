@@ -4,6 +4,15 @@
    Note the layout inversion vs forum/terminal: nav becomes a left rail.
    ============================================================================ */
 
+/* The cascade's order, repeated at the head of EVERY stylesheet in this system. Layer order is
+   fixed by first appearance, so a single declaration would make the app's import order
+   load-bearing — reorder the layout's imports and a skin's `theme` would register first and then
+   lose to the base for the rest of time. Restating it is idempotent and order-independent, so no
+   import order can invert it. `theme` sits LAST on purpose: a skin overriding the base is the
+   skin system's whole contract. What that deliberately does not buy — protection from a skin
+   re-chroming bare buttons — is held by the convention test beside these files instead. */
+@layer reset, base, theme;
+
 /* A skin is the theme layer: last in the cascade, so it overrides the base without having to
    out-specify it. What it may NOT do is put chrome back on bare buttons — see the layers test. */
 @layer theme {

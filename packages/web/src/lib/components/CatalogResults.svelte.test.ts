@@ -132,7 +132,7 @@ describe('CatalogResults', () => {
     expect(image.getAttribute('loading')).toBe('lazy');
   });
 
-  it('opens the detail surface for whatever was clicked', async () => {
+  it('opens the detail view for whatever was clicked', async () => {
     const onOpen = vi.fn();
     await render(CatalogResults, props({ onOpen }));
 

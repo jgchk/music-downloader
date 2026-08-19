@@ -5,6 +5,7 @@ import {
   artUrl,
   countOf,
   emptyLead,
+  initialsOf,
   isCatalogId,
   orderedKinds,
   otherMatches,
@@ -157,5 +158,21 @@ describe('artUrl', () => {
   it('asks this application for artwork, at the size being rendered', () => {
     expect(artUrl('release-group', 'rg-1', 250)).toBe('/cover-art/release-group/rg-1?size=250');
     expect(artUrl('release', 'rel-1', 500)).toBe('/cover-art/release/rel-1?size=500');
+  });
+});
+
+describe('initialsOf', () => {
+  it.each([
+    ['Graceland', 'G'],
+    ['Paul Simon', 'PS'],
+    ['The Rise and Fall of Ziggy Stardust', 'TR'],
+    ['sam kurt', 'SK'],
+  ])('stands in for %s’s missing cover with %s', (title, initials) => {
+    expect(initialsOf(title)).toBe(initials);
+  });
+
+  it('still says something for a record whose title is blank', () => {
+    // An empty placeholder is the empty grey box the placeholder exists to replace.
+    expect(initialsOf(' '.repeat(3))).toBe('♪');
   });
 });

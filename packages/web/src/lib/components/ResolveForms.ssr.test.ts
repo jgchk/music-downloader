@@ -80,7 +80,9 @@ describe('ResolveForms (SSR)', () => {
     expect(upToReject).not.toContain('danger');
     const rejectSlice = fromReject.split('data-testid="reject-unusable"', 1)[0] ?? '';
     const unusableSlice = fromReject.slice(rejectSlice.length);
-    expect(rejectSlice).toContain('class="btn danger"');
-    expect(unusableSlice).toContain('class="btn danger"');
+    // Matched rather than compared whole: the behaviour is "these two verbs carry the danger
+    // marking", which a change to the rest of the class list must not be able to fail.
+    expect(rejectSlice).toMatch(/class="[^"]*\bdanger\b/);
+    expect(unusableSlice).toMatch(/class="[^"]*\bdanger\b/);
   });
 });

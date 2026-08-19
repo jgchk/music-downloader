@@ -70,7 +70,7 @@
    * Nothing SHOULD reject — the client converts every failure to a value — so a rejection is a
    * bug, and the least debuggable way for one to surface is a spinner that never stops. Each
    * conversation therefore hands in its OWN recovery: they set different loading state before
-   * they await (the page's "Searching…", the detail surface's "Reading the catalog…", a
+   * they await (the page's "Searching…", the detail view's "Reading the catalog…", a
    * disclosure's tracklist), and a single page-level banner would leave the other two spinning —
    * the tracklist one permanently, since a tracklist already being read is never asked for again.
    */

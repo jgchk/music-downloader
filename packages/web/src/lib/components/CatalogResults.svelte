@@ -23,7 +23,7 @@
     filter: EntityFilter;
     /** What was searched for, so an empty answer can name it. */
     query: string;
-    /** Open a result's detail surface. */
+    /** Open a result's detail view. */
     onOpen: (kind: EntityKind, mbid: string, title: string) => void;
     /** Look at a different kind — the way out of an empty filtered view. */
     onFilter: (filter: EntityFilter) => void;
@@ -119,7 +119,7 @@
               class="result-open"
               onclick={() => onOpen('artist', artist.mbid, artist.name)}
             >
-              <CoverArt initials={initialsOf(artist.name)} shape="art-artist" />
+              <CoverArt initials={initialsOf(artist.name)} shape="artist" />
               <span class="result-title">{artist.name}</span>
               <span class="result-detail">{artist.disambiguation ?? 'Artist'}</span>
               <span class="result-action">Browse releases</span>
@@ -141,7 +141,7 @@
                   ? undefined
                   : artUrl('release', recording.release.mbid, 250)}
                 initials={initialsOf(recording.title)}
-                shape="art-thumb"
+                shape="thumb"
               />
               <span class="result-title">{recording.title}</span>
               <span class="result-detail">{trackDetail(recording)}</span>

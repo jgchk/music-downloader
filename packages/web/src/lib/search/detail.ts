@@ -5,7 +5,7 @@ import type {
 } from '@music/downloader';
 
 /**
- * The detail surface's state, the rule for which edition a choice applies to, and the derived
+ * The detail view's state, the rule for which edition a choice applies to, and the derived
  * strings it reads out. Kept out of the component so "what an edition says about itself" — and
  * "whose album that choice was made on" — are testable as values rather than through a rendered DOM.
  */

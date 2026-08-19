@@ -452,7 +452,7 @@ describe('RequestSearch', () => {
     expect(consoleError).toHaveBeenCalled();
   });
 
-  it('does not leave a detail surface reading forever when its read rejects', async () => {
+  it('does not leave a detail view reading forever when its read rejects', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     onTestFinished(() => consoleError.mockRestore());
     const catalog = catalogStub({

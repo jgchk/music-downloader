@@ -37,10 +37,16 @@ for new container buttons (none exist today; the inversion protects future ones 
    component styles (that is the skin system's whole contract; the research's
    components-above-theme ordering would break it). The layers' job here is narrower: a skin's
    plain single-class rule now beats any base selector without the `:root[data-skin]` specificity
-   arms race. What layers deliberately do NOT guarantee — a future skin re-chroming bare
-   `button` — is pinned instead by a stylesheet-scanning test: outside the reset layer, no rule
-   may attach chrome declarations to a bare `button` type selector. The scan test is the
-   structural guard; the inversion makes it easy to obey.
+   arms race. The order statement is **repeated at the head of every stylesheet**, not declared
+   once: layer order is fixed by first appearance, so a single declaration would quietly make the
+   layout's import order load-bearing — reorder those imports and `theme` registers first and
+   then loses to the base everywhere. Restating it is idempotent and order-independent.
+   What layers deliberately do NOT guarantee — a future skin re-chroming bare `button` — is
+   pinned instead by a stylesheet-scanning test whose subject rule is **restrictive by default**:
+   a selector is treated as reaching unclaimed buttons unless a class or id narrows it, so
+   `:is(html, body) button`, `* button` and `button[type='submit']` are all caught rather than
+   only the literal forms someone thought to enumerate. The scan test is the structural guard;
+   the inversion makes it easy to obey.
 3. **Layout facts get layout tests.** The browser-mode tier asserts computed geometry per shipped
    skin hook: the art slot's box is square and non-zero before any image loads; a long title's
    box does not exceed its card; a track row's children lay out horizontally with the request

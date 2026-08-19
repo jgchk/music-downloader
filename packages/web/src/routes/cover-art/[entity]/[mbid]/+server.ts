@@ -43,9 +43,11 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
   const { entity, mbid } = params;
   const size = sizeFrom(url.searchParams.get('size'));
   if (size === undefined || !isEntity(entity) || !isMbidShaped(mbid)) {
-    // A page emitting art URLs this route refuses would show a grid of placeholders and say
-    // nothing at all; at debug, the wall of 400s is at least greppable.
-    locals.logger.debug({ entity, mbid, size: url.searchParams.get('size') }, 'cover art refused');
+    // A URL this application emitted and this route refuses is a first-party defect, and since
+    // a failed cover now renders as its placeholder rather than the browser's broken-image mark,
+    // this line is the only sign of it left. `warn`, not `debug`: debug is off in production,
+    // which is exactly where a systemic blanking of every cover would go unnoticed.
+    locals.logger.warn({ entity, mbid, size: url.searchParams.get('size') }, 'cover art refused');
     return new Response(undefined, { status: 400 });
   }
 

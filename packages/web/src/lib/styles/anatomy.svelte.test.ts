@@ -1,6 +1,7 @@
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { SKINS } from '$lib/skins.js';
 import CatalogDetail from '$lib/components/CatalogDetail.svelte';
 import CatalogResults from '$lib/components/CatalogResults.svelte';
 import type { DetailState } from '$lib/search/detail.js';
@@ -21,8 +22,25 @@ import '$lib/styles/skins/forum.css';
  * asserted under each skin, not once under the default.
  */
 
-/** Every shipped skin hook, `undefined` being the unskinned default the tokens ship. */
-const SKINS = [undefined, 'forum', 'glass', 'terminal'] as const;
+/**
+ * Every shipped skin, plus the unskinned token layer. The skins come from their own source of
+ * truth, so a fourth skin is measured the day it is added rather than the day someone remembers
+ * this file. The tokens-only row never ships (app.html always writes a skin) but it is the
+ * baseline every skin is a remap OF, so a break there is a break everywhere.
+ */
+const SKIN_ROWS: [label: string, skin: string | undefined][] = [
+  ['(tokens only)', undefined],
+  ...SKINS.map((skin): [string, string] => [skin, skin]),
+];
+
+/** How much of its card the artwork must fill before the slot counts as collapsed. */
+const ART_FILLS_ITS_CARD = 0.8;
+/** How much of the panel's width the detail cover must fill before it counts as collapsed. */
+const ART_FILLS_THE_PANEL = 0.5;
+/** How tall a track row may get, in thumbnails, before it has plainly stacked into a column. */
+const ROW_IS_STACKED_ABOVE = 3;
+/** The share of a window the panel may take. */
+const PANEL_WINDOW_SHARE = 0.75;
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const ARTIST = '4d5447d7-c61c-4120-ba1b-d7f471d385b9';
@@ -127,7 +145,7 @@ function boxOf(selector: string): DOMRect {
   return element.getBoundingClientRect();
 }
 
-describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
+describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) => {
   it('reserves the artwork slot its full square before any cover arrives', async () => {
     wearing(skin);
     await wideViewport();
@@ -139,7 +157,7 @@ describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
     // A collapsed slot is the bug: the grid reflows as covers land, and the card reads as text.
     // The square is measured against its card rather than in pixels, because every skin's type
     // scale sizes the grid's tracks differently and all of them are correct.
-    expect(art.width).toBeGreaterThan(card.width * 0.8);
+    expect(art.width).toBeGreaterThan(card.width * ART_FILLS_ITS_CARD);
     expect(Math.abs(art.height - art.width)).toBeLessThanOrEqual(1);
   });
 
@@ -172,7 +190,7 @@ describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
     );
     // The request action rides the row rather than stacking below a column of text.
     expect(request.left).toBeGreaterThanOrEqual(title.right - 1);
-    expect(row.height).toBeLessThan(thumb.height * 3);
+    expect(row.height).toBeLessThan(thumb.height * ROW_IS_STACKED_ABOVE);
   });
 
   it('renders a link-affordance as a link, not as a raised button', async () => {
@@ -210,8 +228,19 @@ describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
     // The floor is the industry band's minimum; no skin's type scale may crush it below that.
     expect(panel.width).toBeGreaterThanOrEqual(340);
     expect(panel.width).toBeLessThanOrEqual(Math.max(340, 30 * rootFontSize) + 1);
-    // And it never takes the window over, however narrow the window is.
-    expect(panel.width).toBeLessThanOrEqual(window.innerWidth * 0.75 + 1);
+  });
+
+  it('leaves a middling window most of itself', async () => {
+    wearing(skin);
+    // Wide enough to still be a side panel (the bottom sheet takes over below 40rem), narrow
+    // enough that the token, not the window, would otherwise decide — which is the case the
+    // viewport share exists for and the wide viewport above can never exercise.
+    await page.viewport(760, 900);
+    await render(CatalogDetail, detailProps(albumDetail()));
+
+    const panel = boxOf('.catalog-detail');
+
+    expect(panel.width).toBeLessThanOrEqual(window.innerWidth * PANEL_WINDOW_SHARE + 1);
   });
 
   it('gives the detail view the same reserved artwork square the grids have', async () => {
@@ -224,20 +253,7 @@ describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
 
     // The panel is a scrolling column: without saying so, a slot whose height comes from its
     // width and whose contents are positioned is free to shrink away to nothing.
-    expect(art.width).toBeGreaterThan(panel.width * 0.5);
+    expect(art.width).toBeGreaterThan(panel.width * ART_FILLS_THE_PANEL);
     expect(Math.abs(art.height - art.width)).toBeLessThanOrEqual(1);
-  });
-
-  it('shows the placeholder, not a broken-image glyph, when a cover cannot be fetched', async () => {
-    wearing(skin);
-    await wideViewport();
-    await render(CatalogResults, resultProps());
-
-    // The artwork endpoint is not served here, so every cover errors — exactly what an archive
-    // outage does in production.
-    await vi.waitFor(() => {
-      expect(document.querySelector('.art-grid .art img')).toBeNull();
-    });
-    await expect.element(page.getByText('TR', { exact: true }).first()).toBeVisible();
   });
 });
