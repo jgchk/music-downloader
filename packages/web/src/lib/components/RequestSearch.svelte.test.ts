@@ -1,5 +1,6 @@
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
+import { tick } from 'svelte';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import RequestSearch from './RequestSearch.svelte';
 import type { CatalogClient } from '$lib/search/client.js';
@@ -427,7 +428,10 @@ describe('RequestSearch', () => {
       .click();
     await expect.element(page.getByTestId('detail')).toBeVisible();
 
-    await page.getByRole('button', { name: /DE · CD/ }).click();
+    // Scoped to the edition rows: the best-match summary above them says the same thing about the
+    // same pressing, which is the point of it — it is not what a person clicks to CHOOSE one.
+    document.querySelector<HTMLButtonElement>('.editions .edition')!.click();
+    await tick();
 
     const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
     expect(new FormData(form).get('kind')).toBe('musicbrainz');

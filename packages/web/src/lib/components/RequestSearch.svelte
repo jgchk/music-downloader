@@ -11,7 +11,7 @@
   import type {
     DetailContext,
     DetailState,
-    EditionPin,
+    ChosenEdition,
     TracklistState,
   } from '$lib/search/detail.js';
   import type { TypingDriver } from '$lib/search/typing.js';
@@ -42,8 +42,8 @@
   let searching = $state(false);
   let detail = $state<DetailState | undefined>();
   let tracklists = $state<Record<string, TracklistState>>({});
-  /** The pressing chosen by hand, if any — see `activeEdition` for why it carries its album. */
-  let pin = $state<EditionPin | undefined>();
+  /** The pressing chosen by hand, if any — see `chosenEdition` for why it carries its album. */
+  let chosen = $state<ChosenEdition | undefined>();
 
   /** The search in flight, abandoned as soon as a newer one starts. */
   let inFlight: AbortController | undefined;
@@ -223,9 +223,9 @@
         readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists))),
         () => (tracklists = { ...tracklists, [mbid]: { kind: 'failed', message: UNEXPECTED } }),
       )}
-    {pin}
+    {chosen}
     {values}
-    onPin={(chosen) => (pin = chosen)}
+    onChoose={(edition) => (chosen = edition)}
     onClose={() => (detail = undefined)}
   />
 

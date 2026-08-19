@@ -1129,6 +1129,35 @@
     gap: var(--step-1);
   }
 
+  /* The system's own pick, stated once above everything. A surface rather than a push button:
+     it is what the view already does, offered back as a way to undo a hand-made choice. */
+  .best-match {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-0);
+    width: 100%;
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    background: var(--surface-2);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .best-match[aria-pressed='true'] {
+    border-color: var(--accent);
+  }
+  .best-match-title {
+    font-weight: var(--fw-head);
+  }
+  .format-filter {
+    display: flex;
+    gap: var(--step-0);
+    flex-wrap: wrap;
+  }
+  .format-filter button[aria-pressed='true'] {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+  }
+
   .edition-groups,
   .editions,
   .discography {
@@ -1172,7 +1201,7 @@
   }
   /* Both of these say what they mean in words; the colour is reinforcement. */
   .edition-default,
-  .edition-pinned {
+  .edition-chosen {
     color: var(--accent);
     font-size: var(--fs-small);
   }

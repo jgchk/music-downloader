@@ -146,7 +146,7 @@
     color: var(--accent);
   }
   :root[data-skin='terminal'] .edition-default,
-  :root[data-skin='terminal'] .edition-pinned {
+  :root[data-skin='terminal'] .edition-chosen {
     text-transform: var(--tt-label);
     letter-spacing: var(--tracking-label);
   }

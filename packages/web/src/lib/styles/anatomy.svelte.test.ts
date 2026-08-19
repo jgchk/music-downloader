@@ -129,8 +129,8 @@ const detailProps = (detail: DetailState) => ({
   detail,
   tracklists: {},
   onTracklist: vi.fn(),
-  pin: undefined,
-  onPin: vi.fn(),
+  chosen: undefined,
+  onChoose: vi.fn(),
   onClose: vi.fn(),
 });
 

@@ -123,8 +123,94 @@ export function trackTime(durationMs: number | undefined): string {
   return `${Math.floor(totalSeconds / 60)}:${String(seconds).padStart(2, '0')}`;
 }
 
+/**
+ * The shelves a person browses pressings by. Deliberately four and no more: the catalog names
+ * dozens of media types, and a filter with dozens of options is a list, not a filter.
+ */
+export const FORMAT_CATEGORIES = ['all', 'cd', 'vinyl', 'digital', 'other'] as const;
+export type FormatCategory = (typeof FORMAT_CATEGORIES)[number];
+/** Every category except the one that means "do not narrow at all". */
+export type EditionFormat = Exclude<FormatCategory, 'all'>;
+
+/**
+ * Which shelf a pressing belongs on. A pressing may carry several media (a CD+DVD set), and it is
+ * filed under the first a person would go looking for it as, rather than under none.
+ */
+export function formatCategory(formats: readonly string[]): EditionFormat {
+  const said = formats.join(' ').toLowerCase();
+  if (said.includes('cd')) return 'cd';
+  if (said.includes('vinyl')) return 'vinyl';
+  if (said.includes('digital') || said.includes('file')) return 'digital';
+
+  return 'other';
+}
+
+/**
+ * The listing narrowed to one shelf: pressings of other formats are dropped, the groups that keep
+ * any are recounted, and a group nothing survived in goes entirely — a heading claiming pressings
+ * that are no longer under it is worse than one fewer heading.
+ *
+ * `bestMatch` is carried through untouched. What the system would pick does not change because
+ * someone is looking at the vinyl.
+ */
+export function narrowedToFormat(
+  editions: CatalogEditionsResultDto,
+  format: FormatCategory,
+): CatalogEditionsResultDto {
+  if (format === 'all') return editions;
+
+  return {
+    ...editions,
+    groups: editions.groups
+      .map((group) => ({
+        ...group,
+        editions: group.editions.filter((edition) => formatCategory(edition.formats) === format),
+      }))
+      .filter((group) => group.editions.length > 0),
+  };
+}
+
+/** What the view says, above everything, about the pressing the system would take on its own. */
+export type BestMatchSummary =
+  | {
+      readonly kind: 'pick';
+      readonly mbid: string;
+      /** The pressing's own name, plus whatever the catalog says makes it different. */
+      readonly title: string;
+      /** When, where, on what, and how much of it — the same line the row itself carries. */
+      readonly detail: string;
+    }
+  | { readonly kind: 'selection-required' };
+
+/**
+ * The pick, found wherever the catalog put it. Groups are ordered by how many pressings share a
+ * tracklist, and the pick is chosen on entirely different grounds, so it is regularly not in the
+ * first group — and regularly inside a collapsed one, which is why this is stated above them all
+ * rather than left as a badge to go hunting for.
+ */
+export function bestMatchSummary(editions: CatalogEditionsResultDto): BestMatchSummary {
+  const mbid = pickedMbid(editions);
+  if (mbid === undefined) return { kind: 'selection-required' };
+  const picked = editions.groups
+    .flatMap((group) => group.editions)
+    .find((edition) => edition.mbid === mbid);
+  // A pick naming a pressing that is not in the listing is the producer disagreeing with itself;
+  // saying "choose one" is the honest reading, and the only one a person can act on.
+  if (picked === undefined) return { kind: 'selection-required' };
+
+  return {
+    kind: 'pick',
+    mbid,
+    title:
+      picked.disambiguation === undefined
+        ? picked.title
+        : `${picked.title} (${picked.disambiguation})`,
+    detail: editionSummary(picked),
+  };
+}
+
 /** An edition chosen by hand, and the album it was chosen on — the pair is what keeps it honest. */
-export interface EditionPin {
+export interface ChosenEdition {
   readonly album: string;
   readonly edition: string;
 }
@@ -137,10 +223,10 @@ export interface EditionPin {
  * failed, an artist, a track — has no chosen edition, so re-reading the same album drops the badge
  * until its editions are back in hand.
  */
-export function activeEdition(
+export function chosenEdition(
   detail: DetailState | undefined,
-  pin: EditionPin | undefined,
+  chosen: ChosenEdition | undefined,
 ): string | undefined {
   if (detail?.kind !== 'release-group') return undefined;
-  return pin?.album === detail.mbid ? pin.edition : undefined;
+  return chosen?.album === detail.mbid ? chosen.edition : undefined;
 }
