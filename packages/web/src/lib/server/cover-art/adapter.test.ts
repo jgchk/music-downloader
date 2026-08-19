@@ -169,6 +169,9 @@ describe('CoverArtArchive.front', () => {
     const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
     expect(failure.detail).toContain('could not be fetched');
+    // Scope, because the cache stops asking on everyone's behalf for one of these and not
+    // the other: the image host is a different one from the manifest API and goes down on its own.
+    expect(failure.scope).toBe('archive');
   });
 
   it.each([
@@ -258,25 +261,9 @@ describe('CoverArtArchive.front', () => {
     const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
     expect(failure.kind).toBe('cover-art-unavailable');
-  });
-
-  it.each([
-    ['a manifest listing a front cover with no image', 'record'],
-    ['a manifest naming an image somewhere we will not fetch from', 'record'],
-  ])('files %s as being about the record', async (_case, scope) => {
-    const stub = fetchStub(
-      Response.json({
-        images:
-          scope === 'record' && _case.includes('no image')
-            ? [{ front: true }]
-            : [{ front: true, thumbnails: { '250': 'https://elsewhere.invalid/x.jpg' } }],
-      }),
-    );
-
-    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
-
-    // One odd record. Treating it as an outage blanks every other cover on the page.
-    expect(failure.scope).toBe('record');
+    // Scope, because the cache stops asking on everyone's behalf for one of these and not
+    // the other: nobody will get an answer while it cannot be reached.
+    expect(failure.scope).toBe('archive');
   });
 
   it.each([
@@ -390,6 +377,9 @@ describe('CoverArtArchive.front', () => {
     expect(failure.detail).toBe(
       'the cover art archive listed a front cover with no image to fetch',
     );
+    // Scope, because the cache stops asking on everyone's behalf for one of these and not
+    // the other: one manifest saying something odd about one record.
+    expect(failure.scope).toBe('record');
   });
 
   it('reports an archive answering with something other than JSON as unavailable', async () => {
@@ -414,5 +404,21 @@ describe('CoverArtArchive.front', () => {
     const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
     expect(failure.kind).toBe('cover-art-unavailable');
+    // A 500 from the image host is that host saying it is down — the cache should stop asking on
+    // everyone's behalf, exactly as it would for the manifest API.
+    expect(failure.scope).toBe('archive');
+  });
+
+  it('files an image the archive simply does not have as being about that record', async () => {
+    const stub = fetchStub(
+      manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.jpg' }]),
+      new Response('nope', { status: 404 }),
+    );
+
+    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    // One missing image says nothing about the next record, and treating it as an outage would
+    // blank the whole grid over it.
+    expect(failure.scope).toBe('record');
   });
 });

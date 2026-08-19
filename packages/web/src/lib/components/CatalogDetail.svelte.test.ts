@@ -145,15 +145,27 @@ describe('CatalogDetail', () => {
     expect(groups.map((group) => group.open)).toEqual([true, true]);
   });
 
-  it('says which pressing is chosen, and which control is the system’s', async () => {
+  it('says the system’s own choice is in force until a pressing is chosen', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    // For someone who cannot see the border, the pressed state is the only signal of which of
+    // the two — the summary or a row — is currently in force.
+    await expect.element(page.getByTestId('best-match')).toHaveAttribute('aria-pressed', 'true');
+    const rows = [...document.querySelectorAll('.editions .edition')];
+    expect(rows.map((row) => row.getAttribute('aria-pressed'))).not.toContain('true');
+  });
+
+  it('says which pressing is in force once one is chosen by hand', async () => {
     await render(CatalogDetail, {
       ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
       chosen: { album: RG, edition: OTHER },
     });
 
-    // For someone who cannot see the border, the pressed state is the only signal of which of the
-    // two — the summary or a row — is currently in force.
     await expect.element(page.getByTestId('best-match')).toHaveAttribute('aria-pressed', 'false');
+    const rows = [...document.querySelectorAll<HTMLElement>('.editions .edition')];
+    const pressed = rows.filter((row) => row.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]?.textContent).toContain('chosen');
   });
 
   it('recounts a group’s heading against the pressings the filter left', async () => {

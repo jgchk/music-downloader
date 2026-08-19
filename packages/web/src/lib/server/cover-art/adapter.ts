@@ -210,10 +210,14 @@ export class CoverArtArchive implements CoverArtPort {
         unavailable(`the cover art image could not be fetched: ${String(cause)}`, 'archive'),
     ).andThen((image) => {
       if (!image.ok) {
-        // The manifest promised an image the archive would not serve. That is the archive failing,
-        // not the record lacking art — remembering it as absence would hide the art for good.
+        // The manifest promised an image that did not arrive. Never remembered as absence —
+        // that would hide the art for good — and the same split as the manifest: a host saying
+        // it is down, or asking for less, is about the archive; a 404 on one image is not.
         return errAsync<CoverArtAnswer, CoverArtUnavailable>(
-          unavailable(`the cover art archive served ${image.status} for its own image`, 'record'),
+          unavailable(
+            `the cover art archive served ${image.status} for its own image`,
+            isAboutTheArchive(image.status) ? 'archive' : 'record',
+          ),
         );
       }
       return ResultAsync.fromPromise(image.arrayBuffer(), () =>
