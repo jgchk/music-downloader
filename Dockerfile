@@ -4,7 +4,7 @@
 # The product ships as ONE image: the SvelteKit adapter-node build whose init hook boots both
 # module runtimes (packages/web bundles the workspace TS sources; better-sqlite3 and pino stay
 # external and are served from packages/web/node_modules at runtime).
-FROM node:24.18.0-slim AS builder
+FROM node:24.19.0-slim AS builder
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
 ENV CI=true
@@ -39,7 +39,7 @@ RUN rm -rf node_modules packages/downloader/node_modules packages/importer/node_
 # pins beets at the contract-tested version (packages/importer/src/adapters/beets/bridge/
 # requirements.txt); fpcalc (libchromaprint-tools), flac (badfiles' FLAC validator), oggz-tools
 # and opus-tools let the user's beets plugin chain run unmodified.
-FROM node:24.18.0-slim AS runtime
+FROM node:24.19.0-slim AS runtime
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     python3 python3-venv ffmpeg libchromaprint-tools flac oggz-tools opus-tools \
