@@ -31,7 +31,13 @@ export function verdictEventConsumer(
     const parsed = externalVerdictDeliverySchema.safeParse({ data: event.data });
     if (!parsed.success) {
       // A malformed payload of a known type is a producer contract defect, not a passing storm.
-      return err({ kind: 'Permanent' as const, reason: 'InvalidPayload' });
+      // The zod issues ride along: this classification HALTS the seam, so the log line it produces
+      // is the operator's whole account of why, and 'InvalidPayload' alone names no field.
+      return err({
+        kind: 'Permanent' as const,
+        reason: 'InvalidPayload',
+        cause: { eventType: event.type, globalSeq: event.globalSeq, issues: parsed.error.issues },
+      });
     }
 
     const { acquisitionId, candidate, reasons } = verdictToFailureInput(parsed.data);
@@ -49,7 +55,7 @@ export function verdictEventConsumer(
     return recorded.match(
       () => ok<void, { kind: 'Transient'; reason: string }>(undefined),
       // Infra faults and append races both heal on redelivery; the decider converges either way.
-      (error) => err({ kind: 'Transient' as const, reason: error.kind }),
+      (error) => err({ kind: 'Transient' as const, reason: error.kind, cause: error }),
     );
   };
 }

@@ -107,7 +107,12 @@ describe('the verdict event consumer', () => {
 
     const outcome = await consume(verdictEvent({ data: { verdict: 'rejected' } }));
 
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Permanent', reason: 'InvalidPayload' });
+    // The classification HALTS the seam, so the failure it returns is the operator's whole account
+    // of why: `InvalidPayload` alone names no field, and the zod issues are the only thing that does.
+    const failure = outcome._unsafeUnwrapErr();
+    expect(failure).toMatchObject({ kind: 'Permanent', reason: 'InvalidPayload' });
+    expect(failure.cause).toMatchObject({ eventType: 'release.verdict', globalSeq: 1 });
+    expect(JSON.stringify(failure.cause)).toContain('verdict');
   });
 
   it('an infra fault is transient — the seam redelivers', async () => {

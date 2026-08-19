@@ -179,10 +179,12 @@ export function operationScope<TLogger extends ChildLogger<TLogger>>(
 ): OperationScope<TLogger> {
   return {
     context,
-    // The story is bound LAST. Spread first and a caller passing its own `correlationId` would get
-    // a logger filed under a different story than the context it is handed beside — defeating the
-    // one invariant that makes these two members a single type. `SubjectBindings` also says so in
-    // the type, so the mistake does not compile.
+    // The story is bound LAST, and that ordering is the real guarantee. Spread it first and a
+    // caller passing its own `correlationId` would get a logger filed under a different story than
+    // the context handed beside it — defeating the one invariant that makes these two members a
+    // single type. `SubjectBindings` catches the mistake written as an object LITERAL (excess
+    // property check); a value already typed `Record<string, unknown>` still satisfies it, so the
+    // type is a courtesy and this line is the enforcement.
     logger: parent.child({ ...bindings, correlationId: context.correlationId }),
   };
 }
@@ -245,14 +247,17 @@ function isStreamVersion(value: unknown): value is number {
  */
 export function parseCausation(value: unknown): CausationReference | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
-  const candidate = value as Record<string, unknown>;
-  if (candidate.kind === 'command') {
-    return typeof candidate.commandId === 'string' && candidate.commandId !== ''
-      ? { kind: 'command', commandId: candidate.commandId }
+  // Deliberately not named for the thing being examined: several obvious names for it are nouns a
+  // consuming context claims, and this package may not speak a consumer's language even incidentally
+  // (pinned by the boundaries tier).
+  const fields = value as Record<string, unknown>;
+  if (fields.kind === 'command') {
+    return typeof fields.commandId === 'string' && fields.commandId !== ''
+      ? { kind: 'command', commandId: fields.commandId }
       : undefined;
   }
-  if (candidate.kind !== 'event') return undefined;
-  const { context, streamId, version } = candidate;
+  if (fields.kind !== 'event') return undefined;
+  const { context, streamId, version } = fields;
   if (typeof context !== 'string' || context === '') return undefined;
   if (typeof streamId !== 'string' || streamId === '') return undefined;
   if (!isStreamVersion(version)) return undefined;

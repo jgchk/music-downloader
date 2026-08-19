@@ -25,6 +25,15 @@ export const DEFAULT_REDACT_PATHS: readonly string[] = [
   'req.headers.authorization',
   'fileContents',
   '*.fileContents',
+  // One level deeper, for the seam drain's `err.cause` — the producer's own error, nested under the
+  // classification. The wildcards above are single-level (`*.fileContents` matches
+  // `err.fileContents`, not `err.cause.fileContents`), and a redaction guarantee reaches exactly as
+  // far as its paths say.
+  'err.cause.password',
+  'err.cause.apiKey',
+  'err.cause.token',
+  'err.cause.authorization',
+  'err.cause.fileContents',
 ];
 
 export interface CreateLoggerOptions {

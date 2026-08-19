@@ -51,7 +51,13 @@ export function intakeEventConsumer(
     const parsed = acquisitionFulfilledSchema.safeParse({ type: event.type, data: event.data });
     if (!parsed.success) {
       // A malformed payload of a known type is a producer contract defect, not a passing storm.
-      return err({ kind: 'Permanent' as const, reason: 'InvalidPayload' });
+      // The zod issues ride along: this classification HALTS the seam, so the log line it produces
+      // is the operator's whole account of why, and 'InvalidPayload' alone names no field.
+      return err({
+        kind: 'Permanent' as const,
+        reason: 'InvalidPayload',
+        cause: { eventType: event.type, globalSeq: event.globalSeq, issues: parsed.error.issues },
+      });
     }
 
     const { acquisitionId, location, hints, candidate } = fulfilledToSubmission(parsed.data);
@@ -140,7 +146,7 @@ export function intakeEventConsumer(
       // one domain refusal this command can raise — CycleInFlight, the decider's own
       // store-derived hold when a new delivery meets a live cycle (the backstop when the
       // projection's `settled` was stale) — resolves once the cycle settles.
-      (error) => err({ kind: 'Transient' as const, reason: error.kind }),
+      (error) => err({ kind: 'Transient' as const, reason: error.kind, cause: error }),
     );
   };
 }

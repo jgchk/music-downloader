@@ -30,6 +30,15 @@ export const DEFAULT_REDACT_PATHS: readonly string[] = [
   '*.fileContents',
   'username',
   '*.username',
+  // One level deeper, for the seam drain's `err.cause` — the producer's own error, nested under the
+  // classification. The wildcards above are single-level (`*.username` matches `err.username`, not
+  // `err.cause.username`), and a redaction guarantee reaches exactly as far as its paths say.
+  'err.cause.password',
+  'err.cause.apiKey',
+  'err.cause.token',
+  'err.cause.authorization',
+  'err.cause.fileContents',
+  'err.cause.username',
 ];
 
 export interface CreateLoggerOptions {

@@ -1,6 +1,7 @@
 import { ResultAsync, err, ok } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import { FakeCheckpointStore, silentLogger } from '../__fixtures__/fakes.js';
+import { createLogger } from '../logging/logger.js';
 import { catchUpSubscription } from './catch-up-subscription.js';
 import type { SeamEvent, SeamFeed } from './catch-up-subscription.js';
 
@@ -21,14 +22,11 @@ const event = (globalSeq: number): SeamEvent => ({
 /** A feed that answers with `events` (positions past `from`) or always fails with `failure`. */
 function feedOf(options: {
   events?: readonly SeamEvent[];
-  failure?: { readonly kind: string };
+  failure?: { readonly kind: string; readonly eventType?: string; readonly message?: string };
   scannedTo?: number;
-}): SeamFeed & { reads: number[] } {
-  const reads: number[] = [];
+}): SeamFeed {
   return {
-    reads,
     read: (from, limit) => {
-      reads.push(from);
       if (options.failure !== undefined) return Promise.resolve(err(options.failure));
       const pending = (options.events ?? [])
         .filter((event) => event.globalSeq > from)
@@ -42,12 +40,14 @@ function feedOf(options: {
 }
 
 let checkpoints: FakeCheckpointStore;
+let logged: string[];
 
 function subscriptionOver(
   feed: SeamFeed,
   handled: number[] = [],
 ): ReturnType<typeof catchUpSubscription> {
   checkpoints = new FakeCheckpointStore();
+  logged = [];
   return catchUpSubscription({
     name: 'seam:acquisitions',
     feed,
@@ -56,7 +56,10 @@ function subscriptionOver(
       handled.push(delivered.globalSeq);
       return Promise.resolve(ok(undefined));
     },
-    logger: silentLogger(),
+    logger: createLogger({
+      level: 'error',
+      destination: { write: (line) => void logged.push(line) },
+    }),
     tuning: {
       retry: { attempts: 1, baseDelayMs: 0 },
       sleep: () => Promise.resolve(),
@@ -120,11 +123,18 @@ describe('the catch-up subscription over the downloader feed', () => {
     // the producer's error type would be a shared kernel), so the contract tier pins the literal
     // against the producer's declared `seam-contract.json`; what is pinned here is that a permanent
     // classification reaches the drain at all.
-    const subscription = subscriptionOver(feedOf({ failure: { kind: 'RenderError' } }));
+    const subscription = subscriptionOver(
+      feedOf({ failure: { kind: 'RenderError', eventType: 'X', message: 'schema refused it' } }),
+    );
 
     await subscription.start();
 
     expect(subscription.isHalted).toBe(true);
+    // The adapter classifies AND carries: `reason` names the producer's kind, and the producer's own
+    // error survives under `cause` — without it the halt log tells an operator only what readiness
+    // already told them.
+    expect(logged.join('')).toContain('"reason":"RenderError"');
+    expect(logged.join('')).toContain('schema refused it');
     await subscription.stop();
   });
 

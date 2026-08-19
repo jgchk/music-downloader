@@ -239,6 +239,26 @@ describe('operationScope', () => {
     expect(bound).toEqual([{ correlationId: STORY, streamId: 'stream-1' }]);
   });
 
+  it('cannot be talked out of the story it was handed, even by a widened bindings bag', () => {
+    // The type catches an object LITERAL naming correlationId; a value already typed
+    // `Record<string, unknown>` satisfies it, so the bind-LAST ordering is the actual enforcement.
+    // Without this test, reverting that ordering passes the whole suite.
+    const bound: Record<string, unknown>[] = [];
+    const parent: TestLogger = {
+      child(bindings: Record<string, unknown>) {
+        bound.push(bindings);
+        return parent;
+      },
+    };
+    const smuggled: Record<string, unknown> = { correlationId: OTHER, streamId: 'stream-1' };
+    const context = newOperation(source(STORY, 'command-1'));
+
+    const scope = operationScope(context, parent, smuggled);
+
+    expect(bound).toEqual([{ correlationId: STORY, streamId: 'stream-1' }]);
+    expect(scope.context.correlationId).toBe(STORY);
+  });
+
   it('binds the story alone when the unit of work has no subject identity yet', () => {
     const bound: Record<string, unknown>[] = [];
     const parent: ChildLogger<TestLogger> & TestLogger = {
