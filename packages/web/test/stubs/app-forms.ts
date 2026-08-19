@@ -30,10 +30,35 @@ export function holdSubmissions(): { release: () => void } {
   };
 }
 
+/** What the action answered. The framework builds this from the response; a test states it. */
+export interface ActionResult {
+  readonly type: 'success' | 'failure' | 'error' | 'redirect';
+  readonly data?: Record<string, unknown> | undefined;
+}
+
+let answer: ActionResult = { type: 'success' };
+
+/**
+ * What the next submissions' action answers with. The component's own half of `enhance` branches
+ * on this — a request that keeps the page reads its confirmation out of it — so a test that could
+ * not state it could only assert the in-flight half of the round trip.
+ */
+export function answerWith(result: ActionResult): void {
+  answer = result;
+}
+
+/** Back to a plain success, so one test's answer is not the next one's. */
+export function resetAnswer(): void {
+  answer = { type: 'success' };
+}
+
 interface UpdateOptions {
   reset: boolean;
 }
-type SubmitResult = (event: { update: (options: UpdateOptions) => Promise<void> }) => Promise<void>;
+type SubmitResult = (event: {
+  result: ActionResult;
+  update: (options: UpdateOptions) => Promise<void>;
+}) => Promise<void>;
 type SubmitFunction = (event: { formData: FormData }) => SubmitResult | void;
 
 export function enhance(form: HTMLFormElement, submit?: SubmitFunction): { destroy: () => void } {
@@ -42,7 +67,7 @@ export function enhance(form: HTMLFormElement, submit?: SubmitFunction): { destr
     const result = submit?.({ formData: new FormData(form) });
     // The framework would post the form here; the stub resolves the update immediately — or when
     // a test releases it, so the in-flight state has a moment long enough to be seen.
-    void result?.({ update: () => held ?? Promise.resolve() });
+    void result?.({ result: answer, update: () => held ?? Promise.resolve() });
   };
   form.addEventListener('submit', onSubmit);
   return { destroy: () => form.removeEventListener('submit', onSubmit) };

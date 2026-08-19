@@ -585,7 +585,7 @@ describe('RequestSearch', () => {
     document.querySelector<HTMLButtonElement>('.editions .edition')!.click();
     await tick();
 
-    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    const form = document.querySelector<HTMLFormElement>('.catalog-detail form.request-form')!;
     expect(new FormData(form).get('kind')).toBe('musicbrainz');
     expect(new FormData(form).get('mbid')).toBe(RELEASE);
   });

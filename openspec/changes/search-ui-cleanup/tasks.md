@@ -65,13 +65,13 @@ creates and extends its layout tests).
 
 ## 6. Requesting stays on the page (web)
 
-- [ ] 6.1 The named request action (red first): result-borne forms post to `?/request`, which
+- [x] 6.1 The named request action (red first): result-borne forms post to `?/request`, which
       answers modeled success (identifier + display title) instead of redirecting; the default
       action keeps the redirect for the no-JS fallback; rejected submissions unchanged
-- [ ] 6.2 Per-form confirmation (red first): the status-register line naming the download and
+- [x] 6.2 Per-form confirmation (red first): the status-register line naming the download and
       linking its identifier renders at the form that submitted; results, filters, and any open
       detail view survive; several requests leave several confirmations
-- [ ] 6.3 Per-form busy state (red first): only the submitting form disables; sibling request
+- [x] 6.3 Per-form busy state (red first): only the submitting form disables; sibling request
       actions stay live; double-submit still impossible per form
 
 ## 7. Dismissal and copy (web)

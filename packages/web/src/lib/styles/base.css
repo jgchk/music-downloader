@@ -1047,11 +1047,10 @@
   .request-form {
     margin: 0;
   }
-  .request {
+  /* A card's request is the width of its card; a row's is the width of its words. */
+  .art-grid .request-form .btn,
+  .artist-row .request-form .btn {
     width: 100%;
-  }
-  .track-rows .request {
-    width: auto;
   }
   /* The artist discography view's head: whose releases these are, and the way back to the search
      results that were held all along. */
@@ -1060,6 +1059,15 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
+  /* The confirmation, at the form that made the request. */
+  .requested {
+    margin: 0;
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.5ch;
     flex-wrap: wrap;
   }
   .empty-results {
@@ -1132,10 +1140,12 @@
   .detail-status {
     color: var(--text-muted);
   }
-  .detail-request {
+  /* The panel's request carries the quality policies above its button, so it is a column. */
+  .catalog-detail .request-form {
     display: flex;
     flex-direction: column;
     gap: var(--step-1);
+    align-items: stretch;
   }
 
   /* The system's own pick, stated once above everything. A surface rather than a push button:
@@ -1234,9 +1244,7 @@
     gap: var(--inline-gap);
     flex-wrap: wrap;
   }
-  .discography .request-form {
-    margin-left: auto;
-  }
+
   .native-request summary {
     cursor: pointer;
     color: var(--text-muted);

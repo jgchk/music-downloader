@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
   import {
     FORMAT_CATEGORIES,
     chosenEdition,
@@ -13,6 +12,7 @@
   } from '$lib/search/detail.js';
   import { artUrl, initialsOf } from '$lib/search/view.js';
   import CoverArt from './CoverArt.svelte';
+  import RequestForm from './RequestForm.svelte';
   import RequestPolicies from './RequestPolicies.svelte';
   import type {
     DetailState,
@@ -42,18 +42,6 @@
   }
 
   let { detail, tracklists, onTracklist, chosen, onChoose, values, onClose }: Properties = $props();
-
-  /** How many requests are in flight, so a submitted form cannot be submitted again. */
-  let requesting = $state(0);
-
-  /** Enhanced submission keeps the page — which also keeps the button live for the round trip. */
-  const oneAtATime = () => {
-    requesting += 1;
-    return async ({ update }: { update: (options: { reset: boolean }) => Promise<void> }) => {
-      await update({ reset: false });
-      requesting -= 1;
-    };
-  };
 
   const chosenHere = $derived(chosenEdition(detail, chosen));
   /** Which shelf of pressings is being looked at. Narrowing is a view of the same listing. */
@@ -246,25 +234,15 @@
         {/each}
       </ul>
 
-      <form
-        method="POST"
-        action="/acquisitions/new"
-        use:enhance={oneAtATime}
-        class="detail-request"
+      <RequestForm
+        fields={chosenHere === undefined
+          ? { kind: 'release-group', mbid: detail.mbid }
+          : { kind: 'musicbrainz', targetType: 'album', mbid: chosenHere }}
+        title={detail.title}
+        label={chosenHere === undefined ? 'Request download' : 'Request this edition'}
       >
-        {#if chosenHere === undefined}
-          <input type="hidden" name="kind" value="release-group" />
-          <input type="hidden" name="mbid" value={detail.mbid} />
-        {:else}
-          <input type="hidden" name="kind" value="musicbrainz" />
-          <input type="hidden" name="targetType" value="album" />
-          <input type="hidden" name="mbid" value={chosenHere} />
-        {/if}
         <RequestPolicies {values} />
-        <button type="submit" class="btn primary" disabled={requesting > 0}>
-          {chosenHere === undefined ? 'Request download' : 'Request this edition'}
-        </button>
-      </form>
+      </RequestForm>
     {:else if detail.kind === 'recording'}
       <!-- Bound once: read straight off `detail` in the markup, each access compiles to its own
            defensive check for a value this branch has already established. -->
@@ -285,20 +263,13 @@
              compiles to a nullish guard for a case this branch already ruled out. -->
         <p class="detail-from">{`from ${release.title}`}</p>
       {/if}
-      <form
-        method="POST"
-        action="/acquisitions/new"
-        use:enhance={oneAtATime}
-        class="detail-request"
+      <RequestForm
+        fields={{ kind: 'musicbrainz', targetType: 'track', mbid: detail.mbid }}
+        title={detail.title}
+        label="Request this track"
       >
-        <input type="hidden" name="kind" value="musicbrainz" />
-        <input type="hidden" name="targetType" value="track" />
-        <input type="hidden" name="mbid" value={detail.mbid} />
         <RequestPolicies {values} />
-        <button type="submit" class="btn primary" disabled={requesting > 0}>
-          Request this track
-        </button>
-      </form>
+      </RequestForm>
     {/if}
   </div>
 {/if}
