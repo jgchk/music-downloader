@@ -30,7 +30,7 @@ const shippedVersion = (
  */
 
 const VALID_ENV = {
-  LIBRARY_ROOT: '/library',
+  DEPOSIT_ROOT: '/deposit',
   STAGING_ROOT: '/staging',
   INTAKE_ROOT: '/intake',
   BEETS_CONFIG: '/config/beets.yaml',
@@ -146,7 +146,7 @@ describe('bootRuntimes', () => {
     expect(log).toEqual([
       'downloader:create',
       'importer:create',
-      'acquisitions:connect:/library',
+      'acquisitions:connect:/deposit',
       'acquisitions:start',
       'verdicts:start',
     ]);
@@ -197,6 +197,24 @@ describe('bootRuntimes', () => {
     await captured!();
     expect(log).toEqual(['acquisitions:stop', 'verdicts:stop', 'downloader:stop', 'importer:stop']);
     expect(() => facadesOf()).toThrow(/not booted/);
+  });
+
+  it('warns at startup when booting on the deprecated deposit-directory name', async () => {
+    const lines: string[] = [];
+    const legacy = { ...VALID_ENV } as Record<string, string | undefined>;
+    delete legacy.DEPOSIT_ROOT;
+    legacy.LIBRARY_ROOT = '/deposit';
+
+    await bootRuntimes(legacy, {
+      ...fakeRuntimes([]),
+      logDestination: {
+        write: (line: string) => {
+          lines.push(line);
+        },
+      },
+    });
+
+    expect(lines.some((line) => line.includes('DEPOSIT_ROOT'))).toBe(true);
   });
 
   it('fails fast on an invalid environment, naming the setting', async () => {
@@ -401,7 +419,7 @@ describe('bootRuntimes', () => {
     try {
       await expect(
         bootRuntimes({
-          LIBRARY_ROOT: path.join(directory, 'library'),
+          DEPOSIT_ROOT: path.join(directory, 'deposit'),
           STAGING_ROOT: path.join(directory, 'staging'),
           INTAKE_ROOT: path.join(directory, 'intake'),
           BEETS_CONFIG: path.join(directory, 'beets.yaml'),

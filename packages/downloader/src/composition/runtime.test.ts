@@ -31,7 +31,7 @@ import type { DownloaderRuntime } from './runtime.js';
  * The runtime factory under test: the composed-process construction path (merge-modular-monolith
  * D8) — store, projections, reactor, seam surfaces — driven end to end with fake effect ports.
  * The composed product entry (packages/web) calls exactly this factory; these tests are its
- * wiring proof: an download submitted through the facade is fulfilled by the reactor, appears
+ * wiring proof: a download submitted through the facade is fulfilled by the reactor, appears
  * on the outbound feed, fires the post-commit wakeup, and a verdict consumed from the importer's
  * feed revives it — all against a runtime built by the factory, not hand-wired.
  */

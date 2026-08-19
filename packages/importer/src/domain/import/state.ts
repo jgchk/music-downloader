@@ -316,6 +316,12 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
       return state;
     }
   }
+  // A tag outside the union can only reach here from a log written by a newer version of this
+  // module — the storage seam passes an unrecognized token through rather than losing the event.
+  // Ignoring it keeps replay total, which the aggregate's contract requires. The switch above is
+  // still exhaustively checked: a union member with no case would not narrow to `never` here.
+  event satisfies never;
+  return state;
 }
 
 /** Fold a whole history into state — the replay path and a convenient test builder. */

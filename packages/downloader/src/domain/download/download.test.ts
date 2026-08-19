@@ -76,7 +76,7 @@ const validationFailedThenSelecting: DownloadEvent[] = [
 describe('Download.execute — submission', () => {
   it('accepts a new submission and starts the download', () => {
     const result = Download.fromHistory([]).execute({
-      type: 'SubmitAcquisition',
+      type: 'SubmitDownload',
       request: sampleRequest,
       policies,
     });
@@ -85,7 +85,7 @@ describe('Download.execute — submission', () => {
 
   it('rejects submitting onto an existing download', () => {
     const result = Download.fromHistory(resolvedHistory()).execute({
-      type: 'SubmitAcquisition',
+      type: 'SubmitDownload',
       request: sampleRequest,
       policies,
     });
@@ -183,7 +183,7 @@ describe('Download.execute — happy path', () => {
     expect(
       types(
         Download.fromHistory(selectedHistory([a]))
-          .execute({ type: 'RecordDownloadCompleted', files: [], candidate: a.identity })
+          .execute({ type: 'RecordTryCompleted', files: [], candidate: a.identity })
           ._unsafeUnwrap(),
       ),
     ).toEqual(['TryCompleted']);
@@ -225,7 +225,7 @@ describe('Download.execute — retry loop', () => {
     const events = Download.fromHistory(
       selectedHistory([matchingCandidate('a'), matchingCandidate('b'), matchingCandidate('c')]),
     )
-      .execute({ type: 'RecordDownloadFailed', reason: 'PeerUnavailable', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'PeerUnavailable', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['TryFailed', 'CandidateRejected', 'CandidateSelected']);
     const selected = events[2] as Extract<DownloadEvent, { type: 'CandidateSelected' }>;
@@ -246,7 +246,7 @@ describe('Download.execute — retry loop', () => {
 
   it('requests a bounded re-search when the working set empties', () => {
     const events = Download.fromHistory(selectedHistory([matchingCandidate('a')]))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['TryFailed', 'CandidateRejected', 'SearchRequested']);
   });
@@ -256,7 +256,7 @@ describe('Download.execute — retry loop', () => {
       retry: createRetryPolicy({ maxSearchRounds: 1, maxTotalAttempts: 15 })._unsafeUnwrap(),
     });
     const events = Download.fromHistory(selectedHistory([matchingCandidate('a')], oneRound))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['TryFailed', 'CandidateRejected', 'DownloadExhausted']);
   });
@@ -268,7 +268,7 @@ describe('Download.execute — retry loop', () => {
     const events = Download.fromHistory(
       selectedHistory([matchingCandidate('a'), matchingCandidate('b')], oneAttempt),
     )
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['TryFailed', 'CandidateRejected', 'DownloadExhausted']);
   });
@@ -407,7 +407,7 @@ describe('Download.execute — an external validation failure revives fulfilment
     expect(revived.execute(verdict(a.identity))._unsafeUnwrap()).toEqual([]);
   });
 
-  it('ignores a verdict on an download that never fulfilled', () => {
+  it('ignores a verdict on a download that never fulfilled', () => {
     expect(Download.fromHistory([]).execute(verdict(a.identity))._unsafeUnwrap()).toEqual([]);
     expect(
       Download.fromHistory(selectedHistory([a]))
@@ -445,7 +445,7 @@ describe('Download.execute — cancellation and guards', () => {
     expect(
       types(
         Download.fromHistory(selectedHistory([a]))
-          .execute({ type: 'CancelAcquisition' })
+          .execute({ type: 'CancelDownload' })
           ._unsafeUnwrap(),
       ),
     ).toEqual(['DownloadCancelled']);
@@ -457,13 +457,13 @@ describe('Download.execute — cancellation and guards', () => {
     { type: 'RecordTarget', target: sampleTarget },
     { type: 'RecordMetadataFailed' },
     { type: 'RecordSearchResults', candidates: [] },
-    { type: 'RecordDownloadCompleted', files: [], candidate: a.identity },
-    { type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity },
+    { type: 'RecordTryCompleted', files: [], candidate: a.identity },
+    { type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity },
     { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
     { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
     { type: 'RecordImportConflict', location: '/x' },
-    { type: 'CancelAcquisition' },
+    { type: 'CancelDownload' },
   ];
 
   it.each(effectResults)('ignores a stale $type on a terminal download', (command) => {
@@ -473,8 +473,8 @@ describe('Download.execute — cancellation and guards', () => {
   const pending = Download.fromHistory(requestedHistory());
   const illegalOnPending: DownloadCommand[] = [
     { type: 'RecordSearchResults', candidates: [] },
-    { type: 'RecordDownloadCompleted', files: [], candidate: a.identity },
-    { type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity },
+    { type: 'RecordTryCompleted', files: [], candidate: a.identity },
+    { type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity },
     { type: 'RecordValidationPassed', verdict: { confidence: asUnit(1), reasons: [] } },
     { type: 'RecordValidationFailed', verdict: { confidence: asUnit(0), reasons: [] } },
     { type: 'RecordImported', location: '/x' },
@@ -497,7 +497,7 @@ describe('Download.execute — cancellation and guards', () => {
 
   it('rejects the pending candidate when a cancelled download settles (completed)', () => {
     const events = Download.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadCompleted', files: sampleFiles, candidate: a.identity })
+      .execute({ type: 'RecordTryCompleted', files: sampleFiles, candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['CandidateRejected']);
     const rejected = events[0] as Extract<DownloadEvent, { type: 'CandidateRejected' }>;
@@ -506,7 +506,7 @@ describe('Download.execute — cancellation and guards', () => {
 
   it('rejects the pending candidate when a cancelled download settles (failed)', () => {
     const events = Download.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Cancelled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(types(events)).toEqual(['CandidateRejected']);
   });
@@ -519,7 +519,7 @@ describe('Download.execute — cancellation and guards', () => {
     expect(settled.phase).toBe('Cancelled');
     expect(
       settled
-        .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
+        .execute({ type: 'RecordTryFailed', reason: 'Cancelled', candidate: a.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -544,7 +544,7 @@ describe('Download.execute — cleanup events carry the staged files (D3)', () =
 
   it('carries no staged files on a rejection from a download that never staged anything', () => {
     const events = Download.fromHistory(selectedHistory([a, matchingCandidate('b')]))
-      .execute({ type: 'RecordDownloadFailed', reason: 'Stalled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Stalled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
   });
@@ -554,7 +554,7 @@ describe('Download.execute — cleanup events carry the staged files (D3)', () =
     // subset on the failed command, and `decide` stamps it onto the rejection for cleanup (D2).
     const events = Download.fromHistory(selectedHistory([a, matchingCandidate('b')]))
       .execute({
-        type: 'RecordDownloadFailed',
+        type: 'RecordTryFailed',
         reason: 'Stalled',
         files: sampleFiles,
         candidate: a.identity,
@@ -566,7 +566,7 @@ describe('Download.execute — cleanup events carry the staged files (D3)', () =
   it('stamps an aborted candidate’s completed files onto the cancelled-settlement rejection', () => {
     const events = Download.fromHistory(cancelledHistory)
       .execute({
-        type: 'RecordDownloadFailed',
+        type: 'RecordTryFailed',
         reason: 'Cancelled',
         files: sampleFiles,
         candidate: a.identity,
@@ -579,7 +579,7 @@ describe('Download.execute — cleanup events carry the staged files (D3)', () =
     // The abort landed before any file completed, so the settlement's rejection names nothing to
     // clean up — an absent report is no files, never an unknown list.
     const events = Download.fromHistory(cancelledHistory)
-      .execute({ type: 'RecordDownloadFailed', reason: 'Cancelled', candidate: a.identity })
+      .execute({ type: 'RecordTryFailed', reason: 'Cancelled', candidate: a.identity })
       ._unsafeUnwrap();
     expect(eventOf(events, 'CandidateRejected').files).toEqual([]);
   });
@@ -600,14 +600,14 @@ describe('Download.execute — cleanup events carry the staged files (D3)', () =
 
   it('stamps the staged files onto a cancellation after the transfer settled', () => {
     const events = Download.fromHistory(validatingHistory([a]))
-      .execute({ type: 'CancelAcquisition' })
+      .execute({ type: 'CancelDownload' })
       ._unsafeUnwrap();
     expect(eventOf(events, 'DownloadCancelled').files).toEqual(sampleFiles);
   });
 
   it('carries no files on an in-flight cancellation', () => {
     const events = Download.fromHistory(selectedHistory([a]))
-      .execute({ type: 'CancelAcquisition' })
+      .execute({ type: 'CancelDownload' })
       ._unsafeUnwrap();
     expect(eventOf(events, 'DownloadCancelled').files).toEqual([]);
   });
@@ -944,12 +944,12 @@ describe('Download — immutability', () => {
   it('does not mutate on execute; repeated calls agree', () => {
     const acq = Download.fromHistory(selectedHistory([matchingCandidate('a')]));
     const first = acq.execute({
-      type: 'RecordDownloadFailed',
+      type: 'RecordTryFailed',
       reason: 'Stalled',
       candidate: a.identity,
     });
     const second = acq.execute({
-      type: 'RecordDownloadFailed',
+      type: 'RecordTryFailed',
       reason: 'Stalled',
       candidate: a.identity,
     });
@@ -1034,7 +1034,7 @@ describe('Download.execute — manual edition selection', () => {
     });
   });
 
-  it('rejects a selection on an download that is not awaiting one', () => {
+  it('rejects a selection on a download that is not awaiting one', () => {
     const result = Download.fromHistory(resolvedHistory()).execute({
       type: 'SelectEdition',
       releaseMbid: asMbid('boot-1'),
@@ -1072,7 +1072,7 @@ describe('Download.execute — manual edition selection', () => {
 
   it('cancelling while awaiting selection follows the existing cancel path', () => {
     const acq = Download.fromHistory(awaitingSelectionHistory());
-    const events = acq.execute({ type: 'CancelAcquisition' })._unsafeUnwrap();
+    const events = acq.execute({ type: 'CancelDownload' })._unsafeUnwrap();
     expect(events).toEqual([{ type: 'DownloadCancelled', files: [] }]);
   });
 
@@ -1107,7 +1107,7 @@ describe('Download.execute — the downloading phase is a recorded fact', () => 
 
   it('records the start once the source accepts the enqueue', () => {
     const events = Download.fromHistory(selectedHistory([candidate]))
-      .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+      .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
       ._unsafeUnwrap();
     expect(events).toEqual([{ type: 'TryStarted', candidate: candidate.identity }]);
   });
@@ -1115,7 +1115,7 @@ describe('Download.execute — the downloading phase is a recorded fact', () => 
   it('absorbs a duplicate start report without appending twice', () => {
     expect(
       Download.fromHistory(startedHistory([candidate]))
-        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -1124,7 +1124,7 @@ describe('Download.execute — the downloading phase is a recorded fact', () => 
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(selectedHistory([candidate]))
-        .execute({ type: 'RecordDownloadStarted', candidate: other.identity })
+        .execute({ type: 'RecordTryStarted', candidate: other.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -1132,7 +1132,7 @@ describe('Download.execute — the downloading phase is a recorded fact', () => 
   it('absorbs a start report on a terminal download (the cancel won the race)', () => {
     expect(
       Download.fromHistory([...selectedHistory([candidate]), { type: 'DownloadCancelled' }])
-        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -1142,32 +1142,32 @@ describe('Download.execute — the downloading phase is a recorded fact', () => 
     // reactor's own start report — lawful ordering, absorbed without an event or an error.
     expect(
       Download.fromHistory(validatingHistory([candidate]))
-        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
     // The same lawful ordering one phase further on: validation has already passed and the import
     // is under way when the start report finally lands.
     expect(
       Download.fromHistory(importingHistory([candidate]))
-        .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+        .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
         ._unsafeUnwrap(),
     ).toEqual([]);
     // A start report naming some OTHER candidate in that state stays a protocol violation.
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(validatingHistory([candidate]))
-        .execute({ type: 'RecordDownloadStarted', candidate: other.identity })
+        .execute({ type: 'RecordTryStarted', candidate: other.identity })
         ._unsafeUnwrapErr(),
     ).toMatchObject({ kind: 'IllegalTransition' });
   });
 
   it('rejects a start report outside the downloading phase as a protocol violation', () => {
     const error = Download.fromHistory(resolvedHistory())
-      .execute({ type: 'RecordDownloadStarted', candidate: candidate.identity })
+      .execute({ type: 'RecordTryStarted', candidate: candidate.identity })
       ._unsafeUnwrapErr();
     expect(error).toEqual({
       kind: 'IllegalTransition',
-      command: 'RecordDownloadStarted',
+      command: 'RecordTryStarted',
       phase: 'Searching',
     });
   });
@@ -1179,7 +1179,7 @@ describe('Download.execute — asynchronous outcomes carry their candidate as th
   it('accepts a completion naming the candidate in flight', () => {
     const events = Download.fromHistory(startedHistory([candidate]))
       .execute({
-        type: 'RecordDownloadCompleted',
+        type: 'RecordTryCompleted',
         candidate: candidate.identity,
         files: sampleFiles,
       })
@@ -1191,7 +1191,7 @@ describe('Download.execute — asynchronous outcomes carry their candidate as th
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(startedHistory([candidate]))
-        .execute({ type: 'RecordDownloadCompleted', candidate: other.identity, files: sampleFiles })
+        .execute({ type: 'RecordTryCompleted', candidate: other.identity, files: sampleFiles })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -1200,7 +1200,7 @@ describe('Download.execute — asynchronous outcomes carry their candidate as th
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(startedHistory([candidate]))
-        .execute({ type: 'RecordDownloadFailed', candidate: other.identity, reason: 'Stalled' })
+        .execute({ type: 'RecordTryFailed', candidate: other.identity, reason: 'Stalled' })
         ._unsafeUnwrap(),
     ).toEqual([]);
   });
@@ -1210,14 +1210,14 @@ describe('Download.execute — asynchronous outcomes carry their candidate as th
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(cancelled)
-        .execute({ type: 'RecordDownloadCompleted', candidate: other.identity, files: sampleFiles })
+        .execute({ type: 'RecordTryCompleted', candidate: other.identity, files: sampleFiles })
         ._unsafeUnwrap(),
     ).toEqual([]);
     expect(
       types(
         Download.fromHistory(cancelled)
           .execute({
-            type: 'RecordDownloadCompleted',
+            type: 'RecordTryCompleted',
             candidate: candidate.identity,
             files: sampleFiles,
           })
@@ -1231,14 +1231,14 @@ describe('Download.execute — asynchronous outcomes carry their candidate as th
     const other = matchingCandidate('z');
     expect(
       Download.fromHistory(cancelled)
-        .execute({ type: 'RecordDownloadFailed', candidate: other.identity, reason: 'Cancelled' })
+        .execute({ type: 'RecordTryFailed', candidate: other.identity, reason: 'Cancelled' })
         ._unsafeUnwrap(),
     ).toEqual([]);
     expect(
       types(
         Download.fromHistory(cancelled)
           .execute({
-            type: 'RecordDownloadFailed',
+            type: 'RecordTryFailed',
             candidate: candidate.identity,
             reason: 'Cancelled',
           })

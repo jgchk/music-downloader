@@ -6,7 +6,7 @@ import type { Target, TargetType } from '../target/target.js';
 import type { ValidationVerdict } from '../validation/verdict.js';
 
 /**
- * Domain events — the facts that make up an download's history (event-sourcing). They read as
+ * Domain events — the facts that make up a download's history (event-sourcing). They read as
  * a business narrative, not telemetry: only business-meaningful transitions are events. High-
  * frequency transfer progress is deliberately kept OFF the stream (D1) as an ephemeral read model.
  */

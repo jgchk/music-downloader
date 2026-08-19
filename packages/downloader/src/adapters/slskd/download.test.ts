@@ -1532,7 +1532,7 @@ describe('SlskdDownload', () => {
   it('a failed successor start still retires progress once it was the last hope', async () => {
     // Watch A winds down seeing successor B's reservation (so A skips retirement); B's enqueue
     // is then refused and B releases LAST — B's guard path must retire the progress, or the bar
-    // freezes forever for an download whose ladder has already moved on.
+    // freezes forever for a download whose ladder has already moved on.
     const control = manualTimer();
     const gate = Promise.withResolvers<HttpResponse>();
     const successor: Candidate = {

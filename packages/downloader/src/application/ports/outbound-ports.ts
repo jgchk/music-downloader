@@ -84,7 +84,7 @@ export type TryStart =
   { readonly kind: 'started' } | { readonly kind: 'rejected'; readonly reason: TryFailureReason };
 
 /**
- * The application-owned face the download supervisor reports through
+ * The application-owned face the transfer supervisor reports through
  * (nonblocking-download-observation D1/D2; progress stays ephemeral per D4): live progress
  * ticks, the single candidate-level outcome fact once the watch settles, and the watch's end
  * (so ephemeral progress is retired).

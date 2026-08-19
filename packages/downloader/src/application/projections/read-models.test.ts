@@ -256,7 +256,7 @@ describe('projectStatus — the downloading phase is visible and narrated', () =
     ]);
   });
 
-  it('an download recorded before the start fact existed folds without the entry', () => {
+  it('a download recorded before the start fact existed folds without the entry', () => {
     const view = projectStatus('acq-1', stored(selectedHistory([a])));
     expect(view.status).toBe('Downloading');
     expect(view.transferStarted).toBe(false);
@@ -456,7 +456,7 @@ describe('DownloadStatusProjection', () => {
     return projection;
   }
 
-  it('reads back the view for an download it has applied', () => {
+  it('reads back the view for a download it has applied', () => {
     expect(applied().get('acq-1')?.status).toBe('Fulfilled');
   });
 

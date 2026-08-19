@@ -122,7 +122,7 @@ function decideResolutionForReview(state: AwaitingReviewState, resolution: Resol
       return err({ kind: 'UnknownMatch', candidate: matchReferenceKey(resolution.ref) });
   } else if (resolution.kind === 'reject-unusable-delivery') {
     // The verdict echoes back the exact copy the importer judged (opaque provenance for the
-    // consumer); without a retained candidate the verb is refused precisely — plain reject stays
+    // consumer); without a retained delivered copy the verb is refused precisely — plain reject stays
     // available.
     const source = state.source;
     if (source?.candidate === undefined) return err({ kind: 'NoRetainedCopy' });

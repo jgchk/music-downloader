@@ -247,7 +247,7 @@ const happyOptions: E2EOptions = {
 };
 
 describe('download E2E', () => {
-  it('fulfills an download end to end through the facade', async () => {
+  it('fulfills a download end to end through the facade', async () => {
     const { w, facade } = await startApp(happyOptions);
 
     const id = await submit(facade);

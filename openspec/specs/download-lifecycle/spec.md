@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Govern the autonomous lifecycle of a download (the domain calls the whole saga a download — see `CONTEXT-MAP.md`; "download" is retained here as the code and wire name): from accepting a download request, through the strictly sequential next-best-candidate walk over ranked candidates, bounded re-search, and terminal outcomes (fulfilled, exhausted, cancelled). Ensures processing is durable across restarts and rejects stale external outcomes.
+Govern the autonomous lifecycle of a download (the aggregate is a download; "acquisition" survives only in frozen wire and storage names — `acquisition.fulfilled`, `acquisitionId`, the stored event tokens — see `CONTEXT-MAP.md`): from accepting a download request, through the strictly sequential next-best-candidate walk over ranked candidates, bounded re-search, and terminal outcomes (fulfilled, exhausted, cancelled). Ensures processing is durable across restarts and rejects stale external outcomes.
 ## Requirements
 ### Requirement: Submitting a download request starts a download
 The system SHALL accept a musical request together with optional quality, match, retry, and download policies, and SHALL begin an autonomous download that runs to a terminal outcome without further user interaction.

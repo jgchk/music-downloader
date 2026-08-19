@@ -10,11 +10,11 @@ Three altitudes, three words, and the code obeys them: a **download** is the who
 
 **Download**:
 One autonomous saga to obtain one piece of music — from accepted request, through as many tries as it takes, to the music in the library or a terminal failure. The sole aggregate of this context; its id is the key the importer joins on. The noun "download" always means the whole saga — never one file transfer, never one try.
-_Avoid_: acquisition (the code's legacy name for exactly this — classes, ids, and wire contracts still carry it), download job, request (a request _starts_ a download)
+_Avoid_: acquisition (the retired name; it survives only where it spells a frozen wire or storage artifact — `acquisition.fulfilled`, `acquisitionId`, the `/acquisitions` routes, and the stored event tokens), download job, request (a request _starts_ a download)
 
 **Download request**:
 The caller's ask, in one of three kinds: a MusicBrainz release/recording id, a release-group id, or a descriptor (artist/title, optional album) to resolve. Retained forever so an unresolved download is still describable.
-_Avoid_: acquisition request (code/spec name), musical intent, query, search term
+_Avoid_: acquisition request (the retired name), musical intent, query, search term
 
 **Target**:
 The normalized, source-agnostic description of exactly what is to be acquired: artist, title, track list with per-track durations, optional year and MusicBrainz id. The output of metadata resolution and the yardstick for all matching and validation.
@@ -105,7 +105,7 @@ The lowest acceptable bucket in a quality policy; below it a candidate is exclud
 
 **Download policies**:
 The per-download bundle carried from the first event: quality, match, retry, and download policies. Unspecified ones fall back to configured defaults at submission.
-_Avoid_: acquisition policies (code name `AcquisitionPolicies`)
+_Avoid_: acquisition policies (the retired name)
 
 **Match policy**:
 A single threshold used for both the search-time ranking gate and the post-download validation pass/fail.

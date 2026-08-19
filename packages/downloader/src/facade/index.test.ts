@@ -321,7 +321,7 @@ describe('createDownloaderFacade', () => {
   });
 
   describe('getAcquisition', () => {
-    it('exposes the candidate editions while an download awaits manual selection', async () => {
+    it('exposes the candidate editions while a download awaits manual selection', async () => {
       const wiring = testWiring();
       await wiring.store.append(
         'acq-1',

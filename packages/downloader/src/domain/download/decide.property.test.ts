@@ -52,15 +52,15 @@ const ALL_PHASES: readonly DownloadPhase[] = [
 
 /**
  * The commands that may answer a *terminal* state with an error — not "the commands a caller
- * issues": `CancelAcquisition` is caller-issued too, and converges on a settled download. These
+ * issues": `CancelDownload` is caller-issued too, and converges on a settled download. These
  * two are the ones whose refusal the caller must learn about (a submission onto a live stream is a
  * duplicate; an edition choice that arrives too late did nothing). Every other command except
- * `CancelAcquisition` is an effect *result* re-entering, and a result that arrives after the
+ * `CancelDownload` is an effect *result* re-entering, and a result that arrives after the
  * download settled is late news, not a protocol violation; a cancellation of something already
  * settled is simply redundant, so it converges too.
  */
 const REFUSABLE_ON_TERMINAL: ReadonlySet<DownloadCommandType> = new Set<DownloadCommandType>([
-  'SubmitAcquisition',
+  'SubmitDownload',
   'SelectEdition',
 ]);
 
@@ -245,7 +245,7 @@ describe('the one defeasible edge: an external verdict may revive a fulfilment',
   });
 });
 
-describe('no reachable state violates an download invariant', () => {
+describe('no reachable state violates a download invariant', () => {
   /** How many times each guarded invariant actually got to assert something. */
   const reached = {
     menu: 0,

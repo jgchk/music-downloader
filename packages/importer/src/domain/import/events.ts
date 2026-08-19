@@ -261,7 +261,7 @@ export type ImportEvent =
   | {
       /**
        * A record-only fact the importer publishes: the delivered copy was rejected as unusable
-       * (reject-unusable-delivery). It echoes back the acquisition id and delivered candidate as
+       * (reject-unusable-delivery). It echoes back the originating download id and delivered copy as
        * opaque provenance, plus the reviewer's own rejection reasons — what a consumer does with
        * them is the consumer's business. Minted in the same decision as the rejection's
        * `ReviewResolved`; drives no effect, no state.

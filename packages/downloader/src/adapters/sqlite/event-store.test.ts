@@ -78,8 +78,10 @@ describe('SqliteEventStore', () => {
       `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    raw.run('acq-1', 0, 'DownloadExhausted', 1, '{"type":"DownloadExhausted"}', '{}');
-    raw.run('acq-1', 2, 'DownloadExhausted', 1, '{"type":"DownloadExhausted"}', '{}');
+    // Raw seeding bypasses the token seam, so these must be the STORED token for the model's
+    // `DownloadExhausted` — writing the model name here would describe a row that cannot exist.
+    raw.run('acq-1', 0, 'AcquisitionExhausted', 1, '{"type":"AcquisitionExhausted"}', '{}');
+    raw.run('acq-1', 2, 'AcquisitionExhausted', 1, '{"type":"AcquisitionExhausted"}', '{}');
 
     const conflict = await store.append('acq-1', 2, [FULFILLED], META);
 
@@ -204,6 +206,47 @@ describe('SqliteEventStore', () => {
       type: 'ManualSelectionRequested',
       candidates: [{ releaseMbid: 'b', title: 'Unknown' }],
     });
+  });
+
+  it('writes the frozen storage token to both the type column and the data blob', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+
+    await store.append('acq-1', 0, [FULFILLED], META);
+
+    // FULFILLED is the model's `DownloadFulfilled`; disk has always called it
+    // `AcquisitionFulfilled`, and the blob must agree with the column it is indexed by — an
+    // out-of-band reader (DB surgery, a migration, analytics) sees only these two.
+    const row = database
+      .prepare('SELECT type, data FROM events WHERE stream_id = ?')
+      .get('acq-1') as { type: string; data: string };
+    expect(row.type).toBe('AcquisitionFulfilled');
+    expect((JSON.parse(row.data) as { type: string }).type).toBe('AcquisitionFulfilled');
+  });
+
+  it('reads a row written before the rename as the current model type', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+    // Exactly the bytes a pre-rename release wrote.
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'acq-1',
+        0,
+        'AcquisitionFulfilled',
+        CURRENT_SCHEMA_VERSION,
+        '{"type":"AcquisitionFulfilled","location":"/library/album"}',
+        '{}',
+      );
+
+    const readResult = await store.readStream('acq-1');
+    const read = readResult._unsafeUnwrap();
+
+    expect(read[0]!.type).toBe('DownloadFulfilled');
+    expect(read[0]!.event).toEqual({ type: 'DownloadFulfilled', location: '/library/album' });
   });
 
   it('upcasts stored events on read', async () => {

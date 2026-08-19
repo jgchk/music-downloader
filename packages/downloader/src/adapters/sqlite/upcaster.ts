@@ -25,12 +25,12 @@ export class UpcasterRegistry {
   // event type -> (fromVersion -> upcaster that produces fromVersion + 1)
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();
 
-  /** Register the upcaster that lifts `type` events from `fromVersion` to the next version. */
   /** The stored tokens this registry has steps for — the seam's tests assert they are real. */
   registeredTypes(): readonly string[] {
     return this.upcasters.keys().toArray();
   }
 
+  /** Register the upcaster that lifts `type` events from `fromVersion` to the next version. */
   register(type: string, fromVersion: number, upcaster: Upcaster): this {
     const forType = this.upcasters.get(type) ?? new Map<number, Upcaster>();
     forType.set(fromVersion, upcaster);
@@ -94,9 +94,4 @@ export function buildUpcasterRegistry(): UpcasterRegistry {
     1,
     manualSelectionRequestedV1ToV2,
   );
-}
-
-/** Exposes a registry's keys so the storage-token seam can verify they are stored tokens. */
-export function registeredUpcasterTypes(registry: UpcasterRegistry): readonly string[] {
-  return registry.registeredTypes();
 }

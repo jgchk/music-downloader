@@ -307,7 +307,7 @@ describe('evolve — the tolerant, total fold', () => {
     expect(rejected).toMatchObject({ phase: 'rejected', source: SOURCE });
   });
 
-  it('folds a legacy ImportRequested without a source to no retained candidate', () => {
+  it('folds a legacy ImportRequested without a source to no retained delivered copy', () => {
     const state = foldEvents(awaitingMatchReview());
     expect('source' in state ? state.source : null).toBeUndefined();
   });

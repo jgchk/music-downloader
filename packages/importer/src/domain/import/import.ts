@@ -46,7 +46,7 @@ export interface OpenReview {
  * The resolution verbs permitted for an open review — the importer's authoritative, curated set. A
  * remediation review resolves only through accept/retry-enrichment; the review kinds offer their
  * curated verb set, with `apply-candidate` present only when candidates exist and
- * `reject-unusable-delivery` only when a delivered candidate is retained (the `NoRetainedCopy`
+ * `reject-unusable-delivery` only when a delivered copy is retained (the `NoRetainedCopy`
  * precondition `decide` enforces). The curation is narrower than the raw `decide`-legal set on
  * purpose (e.g. a duplicate review offers no manual re-tag), and never wider — every verb it lists is
  * one `decide` would accept for that review.
@@ -55,14 +55,11 @@ function permittedActionsFor(
   kind: ReviewKind,
   // An options object, not two positional booleans: the two gate different verbs, so a transposed
   // pair would be a behavioural bug the compiler cannot catch.
-  {
-    hasCandidates,
-    hasRetainedCandidate,
-  }: { hasCandidates: boolean; hasRetainedCandidate: boolean },
+  { hasCandidates, hasRetainedCopy }: { hasCandidates: boolean; hasRetainedCopy: boolean },
 ): readonly ResolutionKind[] {
   const isAllowed = (verb: ResolutionKind): boolean =>
     (verb !== 'apply-candidate' || hasCandidates) &&
-    (verb !== 'reject-unusable-delivery' || hasRetainedCandidate);
+    (verb !== 'reject-unusable-delivery' || hasRetainedCopy);
   switch (kind) {
     case 'match-review':
     case 'no-match': {
@@ -115,7 +112,7 @@ function openReviewOf(state: ImportState): OpenReview | undefined {
       candidates: state.candidates,
       availableActions: permittedActionsFor(state.cause.kind, {
         hasCandidates: state.candidates.length > 0,
-        hasRetainedCandidate: state.source?.candidate !== undefined,
+        hasRetainedCopy: state.source?.candidate !== undefined,
       }),
     };
   }
@@ -125,7 +122,7 @@ function openReviewOf(state: ImportState): OpenReview | undefined {
     // and never consults `isAllowed`, so no value here can change the set. Kept because the
     // parameter is required, and hoisted so the waiver below covers exactly these three mutants.
     // Stryker disable next-line ObjectLiteral,BooleanLiteral: unread on this path, as argued above
-    const facts = { hasCandidates: false, hasRetainedCandidate: false };
+    const facts = { hasCandidates: false, hasRetainedCopy: false };
     return {
       cause: { kind: 'remediation-review', failures: state.remediation.failures },
       candidates: [],

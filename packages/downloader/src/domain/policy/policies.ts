@@ -117,7 +117,7 @@ export const DEFAULT_DOWNLOAD_POLICY: TryPolicy = createDownloadPolicy({
   maxQueueWaitMs: 600_000,
 })._unsafeUnwrap();
 
-// --- The bundle carried on an download ------------------------------------------------------
+// --- The bundle carried on a download ------------------------------------------------------
 
 export interface DownloadPolicies {
   readonly quality: QualityPolicy;

@@ -5,7 +5,7 @@
 Define the encapsulation boundary of the download domain: its decision logic (the functional decide/evolve/react decider and the folded state) is a private engine wrapped behind a single pure, immutable `Download` aggregate facade. Every other layer interacts with download behavior only through that facade, while commands, events, domain errors, effects, and phase remain the public contract.
 ## Requirements
 ### Requirement: The Download aggregate is the sole entry point to download decision logic
-The domain SHALL expose download decision logic exclusively through an `Download` aggregate facade providing rehydration from history, command execution, and event reaction. Code outside the domain's download module MUST NOT be able to import the decider internals (the state shape, initial state, fold, decision function, or reaction function); such an import SHALL fail the lint gate and therefore CI.
+The domain SHALL expose download decision logic exclusively through a `Download` aggregate facade providing rehydration from history, command execution, and event reaction. Code outside the domain's download module MUST NOT be able to import the decider internals (the state shape, initial state, fold, decision function, or reaction function); such an import SHALL fail the lint gate and therefore CI.
 
 #### Scenario: Application code rehydrates and executes through the aggregate
 - **WHEN** the command handler processes a command for a download with a stored event history

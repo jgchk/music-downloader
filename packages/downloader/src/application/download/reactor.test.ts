@@ -1672,7 +1672,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
 
   it('absorbs an outcome that lands before the start report (the re-attach-to-settled race)', async () => {
     // The composed interleave: start registers the watch, the watch finds the transfers already
-    // settled and delivers the outcome BEFORE the reactor's own RecordDownloadStarted append.
+    // settled and delivers the outcome BEFORE the reactor's own RecordTryStarted append.
     // The late start report is an IllegalTransition in Validating — recorded and advanced past;
     // the stream ends sane, unparked, with exactly one completion.
     const a = matchingCandidate('a');
@@ -1709,7 +1709,7 @@ describe('Reactor.process — reacts against the state as of the event (prefix f
 
   it('re-fires Download on redelivery of CandidateSelected, then absorbs the late start report', async () => {
     // Redelivered CandidateSelected folds to Downloading at its position (the stream has since
-    // reached Validating). The ensure-start re-fires; its late RecordDownloadStarted names the
+    // reached Validating). The ensure-start re-fires; its late RecordTryStarted names the
     // same candidate, so decide absorbs it silently — no event, no park, no wedge.
     await seed(validatingHistory([matchingCandidate('a')]));
     const before = streamEventTypes('acq-1');

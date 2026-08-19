@@ -34,22 +34,22 @@ isolated behind ports (slskd, MusicBrainz, ffmpeg, filesystem, SQLite).
 All configuration comes from the environment (12-factor); invalid config fails startup fast. See
 [`.env.example`](.env.example).
 
-| Variable                 | Required | Default                  | Description                                                                         |
-| ------------------------ | -------- | ------------------------ | ----------------------------------------------------------------------------------- |
-| `LIBRARY_ROOT`           | yes      | —                        | Where validated releases are organized.                                             |
-| `STAGING_ROOT`           | yes      | —                        | Where in-flight downloads stage before import.                                      |
-| `HTTP_PORT`              | no       | `3000`                   | HTTP API port.                                                                      |
-| `HTTP_HOST`              | no       | `0.0.0.0`                | HTTP API bind host.                                                                 |
-| `DATABASE_FILE`          | no       | `data/events.db`         | SQLite event-store file.                                                            |
-| `LOG_LEVEL`              | no       | `info`                   | pino level (`debug`/`info`/`warn`/`error`).                                         |
-| `MUSICBRAINZ_BASE_URL`   | no       | public MusicBrainz       | Metadata API base URL.                                                              |
-| `MUSICBRAINZ_USER_AGENT` | no       | built-in                 | User-Agent sent to MusicBrainz.                                                     |
-| `SLSKD_BASE_URL`         | no       | `http://localhost:5030`  | slskd API base URL.                                                                 |
-| `SLSKD_API_KEY`          | no       | —                        | slskd API key (secret; never commit).                                               |
-| `SESSION_SECRET`         | yes      | —                        | Signs session cookies; ≥32 chars or startup fails (rotating it signs everyone out). |
-| `PLEX_SERVER_MACHINE_ID` | yes      | —                        | Your Plex server's `machineIdentifier` — accounts that see it may sign in.          |
-| `PLEX_API_BASE_URL`      | no       | `https://plex.tv/api/v2` | plex.tv API base; overridden only by test tiers.                                    |
-| `ORIGIN`                 | prod     | —                        | The public browsing URL, exact-match-enforced on form posts.                        |
+| Variable                 | Required | Default                  | Description                                                                                                                    |
+| ------------------------ | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `DEPOSIT_ROOT`           | yes      | —                        | Where validated releases are deposited for the importer. (Formerly `LIBRARY_ROOT`, still honoured with a deprecation warning.) |
+| `STAGING_ROOT`           | yes      | —                        | Where in-flight downloads stage before import.                                                                                 |
+| `HTTP_PORT`              | no       | `3000`                   | HTTP API port.                                                                                                                 |
+| `HTTP_HOST`              | no       | `0.0.0.0`                | HTTP API bind host.                                                                                                            |
+| `DATABASE_FILE`          | no       | `data/events.db`         | SQLite event-store file.                                                                                                       |
+| `LOG_LEVEL`              | no       | `info`                   | pino level (`debug`/`info`/`warn`/`error`).                                                                                    |
+| `MUSICBRAINZ_BASE_URL`   | no       | public MusicBrainz       | Metadata API base URL.                                                                                                         |
+| `MUSICBRAINZ_USER_AGENT` | no       | built-in                 | User-Agent sent to MusicBrainz.                                                                                                |
+| `SLSKD_BASE_URL`         | no       | `http://localhost:5030`  | slskd API base URL.                                                                                                            |
+| `SLSKD_API_KEY`          | no       | —                        | slskd API key (secret; never commit).                                                                                          |
+| `SESSION_SECRET`         | yes      | —                        | Signs session cookies; ≥32 chars or startup fails (rotating it signs everyone out).                                            |
+| `PLEX_SERVER_MACHINE_ID` | yes      | —                        | Your Plex server's `machineIdentifier` — accounts that see it may sign in.                                                     |
+| `PLEX_API_BASE_URL`      | no       | `https://plex.tv/api/v2` | plex.tv API base; overridden only by test tiers.                                                                               |
+| `ORIGIN`                 | prod     | —                        | The public browsing URL, exact-match-enforced on form posts.                                                                   |
 
 ### Access control
 
@@ -110,7 +110,7 @@ without any network. Threshold-free by design — the 100% coverage gate lives i
 ```bash
 docker build -t music-downloader .
 docker run --rm -p 3000:3000 \
-  -e LIBRARY_ROOT=/music/library -e STAGING_ROOT=/music/staging \
+  -e DEPOSIT_ROOT=/music/library -e STAGING_ROOT=/music/staging \
   -e SLSKD_BASE_URL=http://slskd:5030 -e SLSKD_API_KEY=... \
   -v /host/music:/music music-downloader
 ```

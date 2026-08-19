@@ -28,21 +28,21 @@ export interface UseCaseDependencies extends CommandDependencies {
   readonly stalled: StalledReadModel;
 }
 
-export interface SubmitAcquisitionInput {
+export interface SubmitDownloadInput {
   readonly request: DownloadRequest;
   readonly policies: DownloadPolicies;
 }
 
 export function submitAcquisition(
   dependencies: UseCaseDependencies,
-  input: SubmitAcquisitionInput,
+  input: SubmitDownloadInput,
   context: CommandContext,
 ): ResultAsync<{ readonly acquisitionId: string }, CommandError> {
   const acquisitionId = dependencies.ids.next();
   return applyCommand(
     dependencies,
     acquisitionId,
-    { type: 'SubmitAcquisition', request: input.request, policies: input.policies },
+    { type: 'SubmitDownload', request: input.request, policies: input.policies },
     context,
   ).map(() => ({ acquisitionId }));
 }
@@ -52,14 +52,14 @@ export function cancelAcquisition(
   acquisitionId: string,
   context: CommandContext,
 ): ResultAsync<void, CommandError> {
-  return applyCommand(dependencies, acquisitionId, { type: 'CancelAcquisition' }, context).map(
+  return applyCommand(dependencies, acquisitionId, { type: 'CancelDownload' }, context).map(
     () => {},
   );
 }
 
 /**
- * Resume an download awaiting manual edition selection with the user's choice. `decide` is the
- * single guard: an off-menu edition or an download in any other state is a modeled rejection
+ * Resume a download awaiting manual edition selection with the user's choice. `decide` is the
+ * single guard: an off-menu edition or a download in any other state is a modeled rejection
  * (`UnknownEdition` / `IllegalTransition`) with no state change (manual-edition-selection D2).
  */
 export function selectEdition(
@@ -83,7 +83,7 @@ export interface ExternalValidationFailureInput {
 }
 
 /**
- * Record an external validation failure against an download. `decide` is the single guard: a
+ * Record an external validation failure against a download. `decide` is the single guard: a
  * matching verdict on a revivable fulfilment revives the retry ladder; anything stale, mismatched,
  * or redelivered converges to a no-op — never an error — so redelivery over the verdict catch-up
  * subscription is safe end-to-end.

@@ -131,9 +131,9 @@ const moduleBoundaryZones = [
 const aggregates = [
   {
     pkg: 'downloader',
-    dir: 'acquisition',
+    dir: 'download',
     message:
-      'Acquisition decider internals are private to the aggregate — import the Acquisition facade from domain/acquisition/acquisition.js instead.',
+      'Download decider internals are private to the aggregate — import the Download facade from domain/download/download.js instead.',
   },
   {
     pkg: 'importer',

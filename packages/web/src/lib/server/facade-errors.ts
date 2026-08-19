@@ -64,14 +64,14 @@ export function messageOf(error: FacadeError): string {
       return `Invalid resolution: ${error.detail}`;
     }
     case 'UnknownMatch': {
-      return `Unknown candidate: ${error.candidate}.`;
+      return `Unknown match: ${error.candidate}.`;
     }
     case 'UnknownEdition': {
       return `Unknown edition: ${error.releaseMbid}. It is not among the offered candidates — reload and choose from the list.`;
     }
     case 'NoRetainedCopy': {
       // One-voice register: no module nouns in user-visible copy; the refusal is deterministic
-      // (no retained candidate ⇒ the verb is refused), so it is stated plainly, not hedged.
+      // (no retained delivered copy ⇒ the verb is refused), so it is stated plainly, not hedged.
       return 'These files didn\u{2019}t come from a tracked download, so rejecting them can\u{2019}t resume a search for a replacement. A plain reject is still available.';
     }
     case 'CycleInFlight': {

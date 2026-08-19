@@ -91,7 +91,7 @@ describe('statusViewToDto', () => {
   const candidate = asCandidateIdentity({ username: 'u1', path: 'p', sizeBytes: 100 });
   const MBID = '11111111-1111-4111-8111-111111111111';
 
-  /** A view of an download whose metadata never resolved, so only the request describes it. */
+  /** A view of a download whose metadata never resolved, so only the request describes it. */
   const unresolvedView = (requestedTarget: DownloadStatusView['requestedTarget']) =>
     ({
       acquisitionId: 'acq-1',

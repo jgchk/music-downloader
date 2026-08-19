@@ -406,9 +406,9 @@ export const blindStepArbitraryByCommandType: {
     (state: DownloadState) => Extract<DownloadCommand, { type: K }>
   >;
 } = {
-  SubmitAcquisition: fc
+  SubmitDownload: fc
     .tuple(arbRequest, arbPolicies)
-    .map(([request, policies]) => () => ({ type: 'SubmitAcquisition', request, policies })),
+    .map(([request, policies]) => () => ({ type: 'SubmitDownload', request, policies })),
   RecordTarget: arbTarget.map((target) => () => ({ type: 'RecordTarget', target })),
   RecordMetadataFailed: fc.constant(() => ({ type: 'RecordMetadataFailed' as const })),
   RecordManualSelectionRequested: arbEditionCandidates.map((candidates) => () => ({
@@ -422,17 +422,17 @@ export const blindStepArbitraryByCommandType: {
     type: 'RecordSearchResults',
     candidates,
   })),
-  RecordDownloadStarted: arbCandidateIdentity.map((candidate) => () => ({
-    type: 'RecordDownloadStarted',
+  RecordTryStarted: arbCandidateIdentity.map((candidate) => () => ({
+    type: 'RecordTryStarted',
     candidate,
   })),
-  RecordDownloadCompleted: fc
+  RecordTryCompleted: fc
     .tuple(arbCandidateIdentity, arbDownloadedFiles)
-    .map(([candidate, files]) => () => ({ type: 'RecordDownloadCompleted', candidate, files })),
-  RecordDownloadFailed: fc
+    .map(([candidate, files]) => () => ({ type: 'RecordTryCompleted', candidate, files })),
+  RecordTryFailed: fc
     .tuple(arbCandidateIdentity, arbDownloadFailureReason, arbDownloadedFiles)
     .map(([candidate, reason, files]) => () => ({
-      type: 'RecordDownloadFailed',
+      type: 'RecordTryFailed',
       candidate,
       reason,
       files,
@@ -458,7 +458,7 @@ export const blindStepArbitraryByCommandType: {
       candidate: { username: identity.username, path: identity.path },
       reasons,
     })),
-  CancelAcquisition: fc.constant(() => ({ type: 'CancelAcquisition' as const })),
+  CancelDownload: fc.constant(() => ({ type: 'CancelDownload' as const })),
 };
 
 /**
@@ -497,7 +497,7 @@ export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
     return (state) => {
       switch (state.phase) {
         case 'Empty': {
-          return { type: 'SubmitAcquisition', request: draw.request, policies: draw.policies };
+          return { type: 'SubmitDownload', request: draw.request, policies: draw.policies };
         }
         case 'Pending': {
           if (draw.branch === 0) return { type: 'RecordMetadataFailed' };
@@ -524,20 +524,20 @@ export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
           // A cancellation while the transfer is live: the only way to reach `Cancelled` with
           // `in-flight` staging, and therefore the only way the deferred-cleanup invariants and the
           // `AbortDownload` reaction get asserted at all.
-          if (draw.branch === 5) return { type: 'CancelAcquisition' };
+          if (draw.branch === 5) return { type: 'CancelDownload' };
           if (draw.branch === 0) {
-            return { type: 'RecordDownloadStarted', candidate: reportedIdentity(state) };
+            return { type: 'RecordTryStarted', candidate: reportedIdentity(state) };
           }
           if (draw.branch <= 2) {
             return {
-              type: 'RecordDownloadFailed',
+              type: 'RecordTryFailed',
               candidate: reportedIdentity(state),
               reason: draw.reason,
               files: draw.files,
             };
           }
           return {
-            type: 'RecordDownloadCompleted',
+            type: 'RecordTryCompleted',
             candidate: reportedIdentity(state),
             files: draw.files,
           };
@@ -569,7 +569,7 @@ export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
         case 'Cancelled':
         case 'MetadataFailed':
         case 'Conflicted': {
-          return { type: 'CancelAcquisition' };
+          return { type: 'CancelDownload' };
         }
       }
     };
