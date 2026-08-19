@@ -162,16 +162,32 @@ describe('module boundary lint zones', () => {
   });
 
   it('keeps each module package importable only via its facade and runtime entries', async () => {
+    /**
+     * Every entry must resolve INSIDE the facade or the composition root — never into the domain
+     * or application layers. `./catalog-dto` is a facade subpath the browser bundle imports as
+     * values: through the barrel, a page would pull the facade and the application layer behind it
+     * into the client. It is allowed because of where it points, not because of what it is called.
+     */
+    const entries: Record<string, readonly string[]> = {
+      // The facade: the only entry interface code may consume.
+      '.': ['./src/facade/index.ts'],
+      // A dependency-free slice of the same facade, for code that ships to a browser.
+      './catalog-dto': ['./src/facade/catalog-dto.ts'],
+      // The runtime factory: consumed exclusively by $lib/server (lint-enforced above).
+      './runtime': ['./src/composition/runtime.ts'],
+    };
+
     for (const pkg of ['downloader', 'importer']) {
       const manifest = (await import(`../../packages/${pkg}/package.json`, {
         with: { type: 'json' },
       })) as { default: { exports: Record<string, string> } };
-      expect(manifest.default.exports).toEqual({
-        // The facade: the only entry interface code may consume.
-        '.': './src/facade/index.ts',
-        // The runtime factory: consumed exclusively by $lib/server (lint-enforced above).
-        './runtime': './src/composition/runtime.ts',
-      });
+
+      const declared = Object.keys(manifest.default.exports);
+      // Every entry is one of the allowed ones, and they appear in the allowed order.
+      expect(declared).toEqual(Object.keys(entries).filter((entry) => declared.includes(entry)));
+      for (const [entry, target] of Object.entries(manifest.default.exports)) {
+        expect(entries[entry]).toContain(target);
+      }
     }
   });
 });

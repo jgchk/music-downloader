@@ -1,3 +1,4 @@
+import { isMbidShaped } from '@music/downloader/catalog-dto';
 import type { RequestHandler } from './$types';
 import type { CoverArtEntity, CoverArtSize } from '$lib/server/cover-art/port.js';
 
@@ -18,7 +19,6 @@ import type { CoverArtEntity, CoverArtSize } from '$lib/server/cover-art/port.js
 const ART_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const ABSENCE_MAX_AGE_SECONDS = 60 * 60;
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // `satisfies` ties each list to the union it guards: growing either union without growing its list
 // stops compiling here, rather than silently 400-ing the new arm or serving the wrong size.
 const ENTITIES = ['release-group', 'release'] as const satisfies readonly CoverArtEntity[];
@@ -28,18 +28,28 @@ const DEFAULT_SIZE: CoverArtSize = 250;
 const isEntity = (value: string): value is CoverArtEntity =>
   (ENTITIES as readonly string[]).includes(value);
 
-function sizeFrom(value: string | null): CoverArtSize {
+/**
+ * The size asked for, or nothing when the request named a size this route does not serve. Refused
+ * rather than quietly downgraded: silently serving a 250px image to a request for 1000 hands the
+ * caller a blurry cover and no way to learn why.
+ */
+function sizeFrom(value: string | null): CoverArtSize | undefined {
+  if (value === null) return DEFAULT_SIZE;
   const asked = Number(value);
-  return (SIZES as readonly number[]).includes(asked) ? (asked as CoverArtSize) : DEFAULT_SIZE;
+  return (SIZES as readonly number[]).includes(asked) ? (asked as CoverArtSize) : undefined;
 }
 
 export const GET: RequestHandler = async ({ params, url, locals }) => {
   const { entity, mbid } = params;
-  if (!isEntity(entity) || !UUID_PATTERN.test(mbid)) {
+  const size = sizeFrom(url.searchParams.get('size'));
+  if (size === undefined || !isEntity(entity) || !isMbidShaped(mbid)) {
+    // A page emitting art URLs this route refuses would show a grid of placeholders and say
+    // nothing at all; at debug, the wall of 400s is at least greppable.
+    locals.logger.debug({ entity, mbid, size: url.searchParams.get('size') }, 'cover art refused');
     return new Response(undefined, { status: 400 });
   }
 
-  const answer = await locals.coverArt.front(entity, mbid, sizeFrom(url.searchParams.get('size')));
+  const answer = await locals.coverArt.front(entity, mbid, size);
 
   return answer.match(
     (found) =>
@@ -48,14 +58,16 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
             status: 200,
             headers: {
               'Content-Type': found.image.contentType,
-              'Cache-Control': `public, max-age=${ART_MAX_AGE_SECONDS}`,
+              // `private`: the response is served from behind the access gate, so a shared cache
+              // has no business holding it even though a cover is not itself a secret.
+              'Cache-Control': `private, max-age=${ART_MAX_AGE_SECONDS}`,
               // Serving third-party bytes from our own origin: the declared type is the only type.
               'X-Content-Type-Options': 'nosniff',
             },
           })
         : new Response(undefined, {
             status: 404,
-            headers: { 'Cache-Control': `public, max-age=${ABSENCE_MAX_AGE_SECONDS}` },
+            headers: { 'Cache-Control': `private, max-age=${ABSENCE_MAX_AGE_SECONDS}` },
           }),
     (failure) => {
       // The one place that knows WHY the archive failed. Unlogged, an operator sees a grid of

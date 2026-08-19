@@ -27,6 +27,12 @@ const TODAY = new Date().toISOString().slice(0, 10);
 /** Graceland — the album the ranking fixtures use, and one the archive definitely has art for. */
 const WITH_ART = '19847822-1430-3380-9cf1-bc45545b34ac';
 /**
+ * A release with front art — the same one the MusicBrainz tracklist fixture reads. Both entities
+ * are recorded because both are asked for in production: an album tile asks by release group, and
+ * every track row asks by the release its recording sits on, which is the more numerous of the two.
+ */
+const RELEASE_WITH_ART = '1eaac429-02a7-48c7-b328-d1247f4d93a4';
+/**
  * A well-formed identifier the archive holds nothing for. The 404 is the contract being pinned —
  * "no art" — and the archive answers the same way for an unknown id as for a known one with no
  * images, so a synthetic id captures it without depending on some record staying artless forever.
@@ -70,6 +76,14 @@ async function main(): Promise<void> {
   write(
     'release-group-absent.json',
     await get(`/release-group/${WITHOUT_ART}`, 'the archive holds no art for this identifier'),
+  );
+  write(
+    'release-front.json',
+    await get(`/release/${RELEASE_WITH_ART}`, 'public data; projected to consumed fields'),
+  );
+  write(
+    'release-absent.json',
+    await get(`/release/${WITHOUT_ART}`, 'the archive holds no art for this identifier'),
   );
 }
 

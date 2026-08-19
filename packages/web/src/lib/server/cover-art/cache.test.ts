@@ -37,6 +37,28 @@ function clock(start = 1000): { now: () => number; advance: (ms: number) => void
 }
 
 describe('cachingCoverArt', () => {
+  it('forgets the oldest absences rather than keeping a key per identifier ever asked about', async () => {
+    // An absence costs no bytes, so the byte budget does not bound it — and most identifiers the
+    // archive is asked about have no art at all.
+    const inner = archive(
+      { kind: 'absent' },
+      { kind: 'absent' },
+      { kind: 'absent' },
+      { kind: 'absent' },
+    );
+    const cached = cachingCoverArt(inner, { maxEntries: 2 }, clock().now);
+
+    // Three identifiers into room for two: the first is forgotten, so asking for it again costs
+    // another read while the newest is still answered from memory.
+    await cached.front('release-group', 'first', 250);
+    await cached.front('release-group', 'second', 250);
+    await cached.front('release-group', 'third', 250);
+    await cached.front('release-group', 'third', 250);
+    await cached.front('release-group', 'first', 250);
+
+    expect(inner.calls()).toBe(4);
+  });
+
   it('serves a second request for the same art without asking the archive again', async () => {
     const inner = archive(found(4));
     const cached = cachingCoverArt(inner, {}, clock().now);

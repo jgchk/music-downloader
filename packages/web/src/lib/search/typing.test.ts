@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MIN_QUERY_LENGTH, debouncedTyping, startTyping } from './typing.js';
 import type { TypingDriver } from './typing.js';
 
@@ -72,21 +72,27 @@ describe('startTyping', () => {
 });
 
 describe('debouncedTyping', () => {
-  it('settles once the typing pauses', () => {
+  // Installed and restored around each test rather than inside it: a failing assertion would
+  // otherwise leave fake timers installed for every test after it in this worker.
+  beforeEach(() => {
     vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('settles once the typing pauses', () => {
     const settled = vi.fn();
 
     debouncedTyping(600).settle(settled);
     vi.advanceTimersByTime(599);
     expect(settled).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
-    expect(settled).toHaveBeenCalledTimes(1);
 
-    vi.useRealTimers();
+    expect(settled).toHaveBeenCalledTimes(1);
   });
 
   it('does not settle once abandoned', () => {
-    vi.useFakeTimers();
     const settled = vi.fn();
 
     const cancel = debouncedTyping(600).settle(settled);
@@ -94,6 +100,5 @@ describe('debouncedTyping', () => {
     vi.advanceTimersByTime(1000);
 
     expect(settled).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 });

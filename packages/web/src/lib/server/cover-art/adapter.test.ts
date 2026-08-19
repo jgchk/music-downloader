@@ -240,11 +240,14 @@ describe('CoverArtArchive.front', () => {
   });
 
   it('names the step that failed, so a truncated image is not reported as a dead archive', async () => {
-    const truncated = new Response(IMAGE_BYTES, {
-      status: 200,
-      headers: { 'Content-Type': 'image/jpeg' },
-    });
-    vi.spyOn(truncated, 'arrayBuffer').mockRejectedValue(new Error('aborted'));
+    // A real stream that errors part-way, rather than a stubbed method: this is what a dropped
+    // connection does, and it stays true however the adapter chooses to read the body.
+    const truncated = new Response(
+      new ReadableStream({
+        start: (controller) => controller.error(new Error('aborted')),
+      }),
+      { status: 200, headers: { 'Content-Type': 'image/jpeg' } },
+    );
     const stub = fetchStub(
       manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.jpg' }]),
       truncated,
@@ -252,8 +255,52 @@ describe('CoverArtArchive.front', () => {
 
     const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
-    expect(failure.detail).toContain('image');
-    expect(failure.detail).not.toContain('could not be reached');
+    expect(failure.detail).toBe('the cover art image could not be read to the end');
+  });
+
+  it('refuses to re-serve a script-bearing type as a cover', async () => {
+    // The archive's images are user-contributed and re-served from OUR origin: an SVG is a
+    // document that runs script, and `nosniff` does not help when the declared type is the
+    // dangerous one. Served as bytes, labelled as the default — never echoed.
+    const svg = new Response(IMAGE_BYTES, {
+      status: 200,
+      headers: { 'Content-Type': 'image/svg+xml' },
+    });
+    const stub = fetchStub(
+      manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.svg' }]),
+      svg,
+    );
+
+    const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/jpeg' } });
+  });
+
+  it('serves a type it is willing to serve, parameters and casing and all', async () => {
+    const png = new Response(IMAGE_BYTES, {
+      status: 200,
+      headers: { 'Content-Type': 'IMAGE/PNG; charset=binary' },
+    });
+    const stub = fetchStub(
+      manifest([{ front: true, image: 'http://coverartarchive.org/release/abc/123.png' }]),
+      png,
+    );
+
+    const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/png' } });
+  });
+
+  it('reports a front cover the archive names no image for, rather than calling it absent', async () => {
+    // Absence is remembered for a day and served as a 404: a renamed `image` field would blank
+    // every cover in the grid, at two layers, with nothing said anywhere.
+    const stub = fetchStub(manifest([{ front: true }]));
+
+    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    expect(failure.detail).toBe(
+      'the cover art archive listed a front cover with no image to fetch',
+    );
   });
 
   it('reports an archive answering with something other than JSON as unavailable', async () => {

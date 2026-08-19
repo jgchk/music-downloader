@@ -4,7 +4,8 @@ import {
   catalogLookupResultSchema,
   catalogSearchResultSchema,
   catalogTracklistResultSchema,
-} from '@music/downloader';
+} from '@music/downloader/catalog-dto';
+import { z } from 'zod';
 import type { ZodType } from 'zod';
 import type {
   CatalogDiscographyResultDto,
@@ -12,7 +13,7 @@ import type {
   CatalogLookupResultDto,
   CatalogSearchResultDto,
   CatalogTracklistResultDto,
-} from '@music/downloader';
+} from '@music/downloader/catalog-dto';
 
 /**
  * The page's conversation with its own server. Failures are values here too: the page must render
@@ -41,6 +42,13 @@ export interface CatalogClient {
   tracklist(mbid: string, signal?: AbortSignal): Promise<CatalogAnswer<CatalogTracklistResultDto>>;
 }
 
+/**
+ * How long the page waits for its own server before calling it unreachable. A connection that is
+ * accepted and never answered would otherwise leave the search spinning forever, which is the
+ * least actionable state there is — a person cannot tell it from a slow catalog.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /** Whether a body could be read at all, as a value — an absent body and an unreadable one differ. */
 type JsonBody = { readonly parsed: true; readonly value: unknown } | { readonly parsed: false };
 
@@ -52,39 +60,58 @@ async function readJson(response: Response): Promise<JsonBody> {
   }
 }
 
+/** Whether the request itself completed — the one throwing surface here belongs to the platform. */
+type Attempt = { readonly sent: true; readonly response: Response } | { readonly sent: false };
+
+async function send(fetchImpl: typeof fetch, path: string, signal: AbortSignal): Promise<Attempt> {
+  try {
+    return { sent: true, response: await fetchImpl(path, { signal }) };
+  } catch {
+    // Including an abandoned request: the caller that abandoned it has already moved on, and a
+    // page that is no longer waiting for this answer will not render the message.
+    return { sent: false };
+  }
+}
+
+/** The refusal a server sent, if it sent one a person can act on. */
+const refusalSchema = z.object({ message: z.string() });
+
 export function httpCatalog(fetchImpl: typeof fetch = fetch): CatalogClient {
   async function read<T>(
     path: string,
     schema: ZodType<T>,
     signal?: AbortSignal,
   ): Promise<CatalogAnswer<T>> {
-    try {
-      const response = await fetchImpl(path, { signal });
-      const body = await readJson(response);
-      if (response.ok) {
-        // An answer that cannot be read is not an answer, however successful its status. A session
-        // that expired while this page was open redirects to the sign-in page, which arrives here
-        // as perfectly ordinary 200 HTML — reporting that as a successful search would tell someone
-        // who is merely signed out that nothing matched.
-        if (!body.parsed) return { ok: false, message: UNREADABLE };
-        // The wire shape is checked HERE, not assumed. The server's own tests prove what it sends;
-        // this proves what arrived is that — a stale deploy, a proxy, or a different route matching
-        // would otherwise reach the page as a result object whose fields are quietly absent.
-        const shaped = schema.safeParse(body.value);
-        return shaped.success
-          ? { ok: true, value: shaped.data }
-          : { ok: false, message: UNREADABLE };
-      }
-      // A refusal that carries no readable body is normal: its status already said what happened.
-      const message = body.parsed
-        ? (body.value as { message?: string } | null)?.message
-        : undefined;
-      return { ok: false, message: message ?? UNREACHABLE };
-    } catch {
-      // Including an abandoned request: the caller that abandoned it has already moved on, and a
-      // page that is no longer waiting for this answer will not render the message.
-      return { ok: false, message: UNREACHABLE };
+    // A deadline of our own, combined with the caller's abandon signal: without it a server that
+    // accepts the connection and never answers leaves the page waiting forever.
+    const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const attempt = await send(
+      fetchImpl,
+      path,
+      signal === undefined ? deadline : AbortSignal.any([signal, deadline]),
+    );
+    // Everything below runs OUTSIDE that catch: only `fetch` may throw here, and a first-party bug
+    // reported as "check your connection" would send a person to look at their wifi.
+    if (!attempt.sent) return { ok: false, message: UNREACHABLE };
+    const { response } = attempt;
+    const body = await readJson(response);
+    if (response.ok) {
+      // An answer that cannot be read is not an answer, however successful its status. A session
+      // that expired while this page was open redirects to the sign-in page, which arrives here
+      // as perfectly ordinary 200 HTML — reporting that as a successful search would tell someone
+      // who is merely signed out that nothing matched.
+      if (!body.parsed) return { ok: false, message: UNREADABLE };
+      // The wire shape is checked HERE, not assumed. The server's own tests prove what it sends;
+      // this proves what arrived is that — a stale deploy, a proxy, or a different route matching
+      // would otherwise reach the page as a result object whose fields are quietly absent.
+      const shaped = schema.safeParse(body.value);
+      return shaped.success ? { ok: true, value: shaped.data } : { ok: false, message: UNREADABLE };
     }
+    // A refusal that carries no readable body is normal: its status already said what happened.
+    // What it DOES carry is parsed rather than trusted — the words are rendered to a person, and
+    // a proxy's non-string `message` would otherwise reach them as "[object Object]".
+    const refusal = body.parsed ? refusalSchema.safeParse(body.value) : undefined;
+    return { ok: false, message: refusal?.success === true ? refusal.data.message : UNREACHABLE };
   }
 
   const byId = <T>(

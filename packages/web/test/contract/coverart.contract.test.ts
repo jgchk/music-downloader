@@ -16,6 +16,7 @@ import type { FixtureServer } from './support/server.js';
  */
 
 const WITH_ART = '19847822-1430-3380-9cf1-bc45545b34ac';
+const RELEASE_WITH_ART = '1eaac429-02a7-48c7-b328-d1247f4d93a4';
 const WITHOUT_ART = '00000000-0000-4000-8000-000000000000';
 const IMAGE_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 
@@ -50,52 +51,74 @@ afterEach(async () => {
 });
 
 describe('cover art fixtures', () => {
-  it('cover both answers the adapter must tell apart', () => {
+  it('cover both answers the adapter must tell apart, for both entities it asks about', () => {
     expect(fixtures.map((fixture) => fixture.name).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'release-absent.json',
+      'release-front.json',
       'release-group-absent.json',
       'release-group-front.json',
     ]);
   });
 
-  it('conform to the consumed manifest schema', () => {
-    const manifest = byName('release-group-front.json');
-    expect(manifest.response.status).toBe(200);
-    expect(coverArtManifestSchema.safeParse(manifest.response.body).success).toBe(true);
-  });
+  it.each([['release-group-front.json'], ['release-front.json']])(
+    '%s conforms to the consumed manifest schema',
+    (name) => {
+      const manifest = byName(name);
+      expect(manifest.response.status).toBe(200);
+      expect(coverArtManifestSchema.safeParse(manifest.response.body).success).toBe(true);
+    },
+  );
 
-  it('record the absent answer as the archive gives it: a 404 with nothing to read', () => {
-    const absent = byName('release-group-absent.json');
-    expect(absent.response.status).toBe(404);
-    expect(absent.response.body).toBeUndefined();
-  });
+  it.each([['release-group-absent.json'], ['release-absent.json']])(
+    '%s records the absent answer as the archive gives it: a 404 with nothing to read',
+    (name) => {
+      const absent = byName(name);
+      expect(absent.response.status).toBe(404);
+      expect(absent.response.body).toBeUndefined();
+    },
+  );
 
-  it('carry a front cover with the sizes the request page asks for', () => {
-    const parsed = coverArtManifestSchema.parse(byName('release-group-front.json').response.body);
-    const front = (parsed.images ?? []).find((image) => image.front === true);
-    expect(front?.thumbnails?.['250']).toBeDefined();
-    expect(front?.thumbnails?.['500']).toBeDefined();
-  });
+  it.each([['release-group-front.json'], ['release-front.json']])(
+    '%s carries a front cover with the sizes the request page asks for',
+    (name) => {
+      const parsed = coverArtManifestSchema.parse(byName(name).response.body);
+      const front = (parsed.images ?? []).find((image) => image.front === true);
+      expect(front?.thumbnails?.['250']).toBeDefined();
+      expect(front?.thumbnails?.['500']).toBeDefined();
+    },
+  );
 });
 
 describe('CoverArtArchive contract (tier 1)', () => {
-  it('reads the front cover from the recorded manifest, asking the recorded path', async () => {
-    const adapter = new CoverArtArchive({ baseUrl: server.baseUrl }, fetchWithStubbedImages());
+  // Both entities are replayed because both are asked for in production: an album tile asks by
+  // release group, and every track row asks by the release its recording sits on.
+  it.each([
+    ['release-group' as const, WITH_ART],
+    ['release' as const, RELEASE_WITH_ART],
+  ])(
+    'reads a %s front cover from the recorded manifest, asking the recorded path',
+    async (entity, mbid) => {
+      const adapter = new CoverArtArchive({ baseUrl: server.baseUrl }, fetchWithStubbedImages());
 
-    const result = await adapter.front('release-group', WITH_ART, 250);
-    const answer = result._unsafeUnwrap();
+      const result = await adapter.front(entity, mbid, 250);
+      const answer = result._unsafeUnwrap();
 
-    expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/jpeg' } });
-    const sent = server.requests.find((request) => request.path === `/release-group/${WITH_ART}`)!;
-    expect(sent.method).toBe('GET');
-    expect(sent.headers['user-agent']).toContain('music-downloader');
-  });
+      expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/jpeg' } });
+      const sent = server.requests.find((request) => request.path === `/${entity}/${mbid}`)!;
+      expect(sent.method).toBe('GET');
+      expect(sent.headers['user-agent']).toContain('music-downloader');
+    },
+  );
 
-  it('reads the recorded 404 as absent, never as a fault', async () => {
-    const adapter = new CoverArtArchive({ baseUrl: server.baseUrl }, fetchWithStubbedImages());
+  it.each([['release-group' as const], ['release' as const]])(
+    'reads a %s’s recorded 404 as absent, never as a fault',
+    async (entity) => {
+      const adapter = new CoverArtArchive({ baseUrl: server.baseUrl }, fetchWithStubbedImages());
 
-    const result = await adapter.front('release-group', WITHOUT_ART, 250);
-    const answer = result._unsafeUnwrap();
+      const result = await adapter.front(entity, WITHOUT_ART, 250);
+      const answer = result._unsafeUnwrap();
 
-    expect(answer).toEqual({ kind: 'absent' });
-  });
+      expect(answer).toEqual({ kind: 'absent' });
+    },
+  );
 });

@@ -46,7 +46,7 @@ See `proposal.md` for motivation. The current request page is a progressive-enha
 
 The multi-agent review before merge found three behavioural bugs worth recording, because each came from a type that under-specified rather than from a slip:
 
-- A pinned edition was remembered as a bare id, so it outlived the album it was chosen on — the detail surface is mounted once and re-used. The pin now carries the album it belongs to, which makes a stale one unrepresentable rather than merely unlikely.
+- A pinned edition was remembered as a bare id, so it outlived the album it was chosen on — the detail surface is mounted once and re-used. The choice now carries the album it belongs to, which makes a stale one detectable at the point of use rather than indistinguishable from a live one — and it is held by the page rather than inside the surface, so the component stays a function of its props.
 - Track positions were passed through from the provider, which numbers them WITHIN a medium; a two-disc edition therefore produced two tracks numbered 1, and the surface keyed on that number. Positions are now assigned by reading order, which is what the type meant all along.
 - The browser trusted any 2xx as a well-shaped answer. An expired session redirects to the sign-in page, which arrives as 200 HTML — reported as a successful search of nothing. The client now parses every answer against the facade's own exported schema.
 

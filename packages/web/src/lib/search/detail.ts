@@ -5,8 +5,9 @@ import type {
 } from '@music/downloader';
 
 /**
- * The detail surface's state and the few derived strings it needs. Kept out of the component so
- * "what an edition says about itself" is testable as a sentence rather than through a rendered DOM.
+ * The detail surface's state, the rule for which edition a choice applies to, and the derived
+ * strings it reads out. Kept out of the component so "what an edition says about itself" — and
+ * "whose album that choice was made on" — are testable as values rather than through a rendered DOM.
  */
 
 export type DetailState =
@@ -41,7 +42,12 @@ interface EditionLike {
   readonly date?: string | undefined;
   readonly country?: string | undefined;
   readonly formats: readonly string[];
-  readonly trackCount: number;
+  readonly trackCount?: number | undefined;
+}
+
+/** How many tracks, said as a person says it — or nothing, when the catalog does not say. */
+function trackCount(count: number | undefined): string | undefined {
+  return count === undefined ? undefined : `${count} ${count === 1 ? 'track' : 'tracks'}`;
 }
 
 /**
@@ -55,7 +61,7 @@ export function editionSummary(edition: EditionLike): string {
     edition.country,
     // Joined here, at the one place it is read aloud — the separator is presentation, not contract.
     edition.formats.length === 0 ? undefined : edition.formats.join(' + '),
-    `${edition.trackCount} ${edition.trackCount === 1 ? 'track' : 'tracks'}`,
+    trackCount(edition.trackCount),
   ]
     .filter((part) => part !== undefined && part !== '')
     .join(' · ');
@@ -76,14 +82,20 @@ export function releaseLine(group: {
     .join(' · ');
 }
 
-/** How one edition group heads itself: the tracklist, and how many pressings share it. */
+/**
+ * How one edition group heads itself: the tracklist, and how many pressings share it. The count
+ * comes from the group's representative — the one edition its tracklist was read from — so the
+ * heading cannot disagree with the list beneath it.
+ */
 export function groupHeading(group: {
-  readonly trackCount: number;
+  readonly representative: EditionLike;
   readonly editions: readonly unknown[];
 }): string {
   const editions = group.editions.length;
-  const tracks = `${group.trackCount} ${group.trackCount === 1 ? 'track' : 'tracks'}`;
-  return `${tracks} \u{00B7} ${editions} ${editions === 1 ? 'edition' : 'editions'}`;
+  const pressings = `${editions} ${editions === 1 ? 'edition' : 'editions'}`;
+  const tracks = trackCount(group.representative.trackCount);
+  // An unstated count is said as such: "0 tracks" would be a falsehood about a record that has some.
+  return `${tracks ?? 'Tracklist not stated'} \u{00B7} ${pressings}`;
 }
 
 /** A running time as a sleeve prints it; nothing at all when the catalog has no timing. */
@@ -104,7 +116,9 @@ export interface EditionPin {
  * The chosen edition, but only while the album it was chosen on is the one still open. The detail
  * surface is mounted once and re-used, so a choice that remembered only an edition would survive
  * closing one album and opening another — and then quietly request the first album's pressing under
- * the second album's name.
+ * the second album's name. Anything that is not an open album — a read still loading, one that
+ * failed, an artist, a track — has no chosen edition, so re-reading the same album drops the badge
+ * until its editions are back in hand.
  */
 export function activeEdition(
   detail: DetailState | undefined,

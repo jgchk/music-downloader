@@ -35,15 +35,16 @@ const releaseGroup = (bestMatch: {
   mbid: RG,
   title: 'Graceland',
   editions: {
-    groups: [{ trackCount: 11, representative: edition(PICK), editions: [edition(PICK)] }],
+    groups: [{ representative: edition(PICK), editions: [edition(PICK)] }],
     bestMatch,
   },
 });
 
 describe('CatalogDetail (SSR)', () => {
   it('requests the chosen pressing, said in words, once one has been chosen', () => {
-    // The choice is rendered on the server too: it is the page's state, not something the browser
-    // discovers, so a reload with a pressing chosen must come back showing that pressing.
+    // The component is a pure function of its props — the choice is markup, not something a
+    // browser-only effect paints in afterwards. (Nothing persists the choice across a reload; the
+    // page holds it, and that is deliberate.)
     const html = body(releaseGroup({ kind: 'pick', mbid: PICK }), {}, { album: RG, edition: PICK });
 
     expect(html).toContain('chosen');
@@ -70,7 +71,7 @@ describe('CatalogDetail (SSR)', () => {
       mbid: RG,
       title: 'Graceland',
       editions: {
-        groups: [{ trackCount: 11, representative: bare, editions: [bare] }],
+        groups: [{ representative: bare, editions: [bare] }],
         bestMatch: { kind: 'pick', mbid: PICK },
       },
     });
@@ -123,7 +124,7 @@ describe('CatalogDetail (SSR)', () => {
   it('says when the system would ask rather than choose for itself', () => {
     const html = body(releaseGroup({ kind: 'selection-required' }));
 
-    expect(html).toContain('ask you to choose');
+    expect(html).toContain('ask you to pick one');
     expect(html).not.toContain('the system’s default');
   });
 
@@ -135,7 +136,6 @@ describe('CatalogDetail (SSR)', () => {
       editions: {
         groups: [
           {
-            trackCount: 11,
             representative: edition(PICK, { disambiguation: 'UK limited edition gatefold' }),
             editions: [edition(PICK, { disambiguation: 'UK limited edition gatefold' })],
           },
@@ -218,7 +218,9 @@ describe('CatalogDetail (SSR)', () => {
     expect(html).toContain('Quality floor');
   });
 
-  it('renders an empty edition list without pretending there is a choice', () => {
+  it('says the catalog listed no pressings, rather than offering a choice of none', () => {
+    // "Pick one" above an empty list is a confident dead end; the honest sentence is that the
+    // catalog told us nothing about this album's pressings.
     const html = body({
       kind: 'release-group',
       mbid: RG,
@@ -226,7 +228,8 @@ describe('CatalogDetail (SSR)', () => {
       editions: { groups: [], bestMatch: { kind: 'selection-required' } },
     });
 
-    expect(html).toContain('ask you to choose');
+    expect(html).toContain('lists no pressings');
+    expect(html).not.toContain('pick one');
     expect(html).not.toContain('View tracklist');
   });
 });

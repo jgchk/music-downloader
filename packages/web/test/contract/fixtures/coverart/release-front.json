@@ -1,0 +1,34 @@
+{
+  "provenance": {
+    "source": "https://coverartarchive.org (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; projected to consumed fields"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release/1eaac429-02a7-48c7-b328-d1247f4d93a4"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "images": [
+        {
+          "front": true,
+          "image": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865480535.jpg",
+          "thumbnails": {
+            "250": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865480535-250.jpg",
+            "500": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865480535-500.jpg"
+          }
+        },
+        {
+          "front": false,
+          "image": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865483146.jpg",
+          "thumbnails": {
+            "250": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865483146-250.jpg",
+            "500": "http://coverartarchive.org/release/1eaac429-02a7-48c7-b328-d1247f4d93a4/19865483146-500.jpg"
+          }
+        }
+      ]
+    }
+  }
+}

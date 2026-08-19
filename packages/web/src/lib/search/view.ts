@@ -1,5 +1,6 @@
+import { isMbidShaped } from '@music/downloader/catalog-dto';
 import type { qualityBucketSchema } from '@music/downloader';
-import type { CatalogSearchResultDto } from '@music/downloader';
+import type { CatalogSearchResultDto } from '@music/downloader/catalog-dto';
 import type { z } from 'zod';
 
 /**
@@ -13,8 +14,6 @@ export type EntityFilter = 'all' | EntityKind;
 
 /** The reading order behind whichever kind leads: albums, then who made them, then their tracks. */
 const READING_ORDER: readonly EntityKind[] = ['release-group', 'artist', 'recording'];
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function countOf(results: CatalogSearchResultDto, kind: EntityKind): number {
   switch (kind) {
@@ -94,6 +93,10 @@ export function trackDetail(recording: {
 }
 
 /** Where this application serves a catalog entity's artwork from, at the size being rendered. */
+// The entity union is spelt out rather than imported from the cover-art port: this module runs in
+// the browser, and SvelteKit forbids client code importing `$lib/server`. The route's own
+// `satisfies` guard is what makes growing that union a build error there; if it ever grows, this
+// list has to be grown by hand to match.
 export function artUrl(entity: 'release-group' | 'release', mbid: string, size: 250 | 500): string {
   return `/cover-art/${entity}/${mbid}?size=${size}`;
 }
@@ -130,9 +133,11 @@ export function alternativeLabel(other: OtherMatch): string {
 }
 
 /**
- * Every quality floor the request contract accepts, with the words a person chooses it by. Keyed by
- * the wire union, so a new tier is a build error here rather than a tier quietly missing from the
- * form — which is how `LOSSY_LOW` went missing when this page replaced the old one.
+ * Every quality floor a request may name, keyed by the wire union so a new tier is a build error
+ * here. The options themselves are written out in `QualityFloorSelect.svelte` (the compiler emits
+ * an unreachable nullish guard around an interpolated `<option>`), and the two are held together
+ * by a test that asserts the rendered values are exactly these keys — which is what stops a tier
+ * from quietly missing from the form, the way `LOSSY_LOW` once did.
  */
 export const QUALITY_FLOORS: Record<z.infer<typeof qualityBucketSchema>, string> = {
   LOSSLESS_HIRES: 'Hi-res lossless',
@@ -145,5 +150,6 @@ export const QUALITY_FLOORS: Record<z.infer<typeof qualityBucketSchema>, string>
 
 /** Whether what was typed is a catalog identifier rather than something to search for. */
 export function isCatalogId(text: string): boolean {
-  return UUID_PATTERN.test(text.trim());
+  // The rule belongs to the context that mints these identifiers; asked for rather than re-spelt.
+  return isMbidShaped(text);
 }

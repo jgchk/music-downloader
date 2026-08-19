@@ -118,9 +118,15 @@ export const mbRecordingSearchSchema = z.object({
  * types, the release a recording sits on) where resolution needs only scored ids. Modeling that as
  * its own set of schemas keeps the resolution path's tolerances untouched — a presentation field
  * going missing must never turn into a resolution fault.
+ *
+ * `id` is the one REQUIRED field in all three. Everything else is presentation and may go missing
+ * without the answer becoming unreadable, but a hit with no identifier cannot be shown, requested,
+ * or told apart from its neighbours — the mapper drops it either way. Requiring it here is what
+ * turns a rename of `id` into the permanent drift fault this adapter reports, instead of a
+ * perfectly-parsing answer whose every hit is silently discarded.
  */
 const releaseGroupEntitySchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   score: z.number().optional(), // absent on a browse, present on a search
   title: z.string().nullable().optional(),
   'first-release-date': z.string().nullable().optional(),
@@ -130,7 +136,7 @@ const releaseGroupEntitySchema = z.object({
 });
 
 const artistEntitySchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   score: z.number().optional(),
   name: z.string().nullable().optional(),
   disambiguation: z.string().nullable().optional(),
@@ -138,11 +144,12 @@ const artistEntitySchema = z.object({
 });
 
 const catalogRecordingSchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   score: z.number().optional(),
   title: z.string().nullable().optional(),
   'artist-credit': z.array(artistCreditSchema).optional(),
-  // Only the first release is read, for artwork and context; the rest of the list is ignored.
+  // Only the first ADDRESSABLE release is read, for artwork and context: the mapper walks past a
+  // release whose id it cannot parse, and the rest of the list is ignored.
   releases: z
     .array(z.object({ id: z.string().optional(), title: z.string().nullable().optional() }))
     .optional(),
@@ -155,7 +162,7 @@ export const mbArtistEntitySchema = artistEntitySchema;
 /** `GET /recording/{mbid}?inc=artist-credits+releases&fmt=json` — one recording by id. */
 export const mbCatalogRecordingEntitySchema = catalogRecordingSchema;
 
-/** `GET /release-group?query=…&fmt=json` (and the artist browse, which shares the shape). */
+/** `GET /release-group?query=…&fmt=json` (and `GET /release-group?artist=…`, the same shape). */
 export const mbReleaseGroupSearchSchema = z.object({
   'release-groups': z.array(releaseGroupEntitySchema).optional(),
 });

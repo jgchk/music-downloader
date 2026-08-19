@@ -74,9 +74,18 @@
       />
 
       <h3>Edition</h3>
-      {#if picked === undefined}
+      {#if detail.editions.groups.length === 0}
+        <!-- No editions to show is not "no default": it is the catalog telling us nothing, and
+             saying "choose one" above an empty list is a confident dead end. -->
+        <p class="detail-status" data-testid="editions-unknown">
+          The catalog lists no pressings for this album.
+        </p>
+      {:else if picked === undefined}
+        <!-- Says WHAT the system would do, not WHY: the reason is the picker's, and a copy that
+             restates its criterion becomes a falsehood the moment the picker widens. -->
         <p class="detail-status" data-testid="selection-required">
-          No edition is official here, so the system would ask you to choose one before downloading.
+          No edition here can be chosen automatically, so the system would ask you to pick one
+          before downloading.
         </p>
       {/if}
 
@@ -102,6 +111,8 @@
                 <p class="detail-status">Reading the tracklist…</p>
               {:else if state?.kind === 'failed'}
                 <p class="error" role="alert">{state.message}</p>
+              {:else if state?.kind === 'loaded' && state.tracklist.tracks.length === 0}
+                <p class="detail-status">The catalog lists no tracks for this pressing.</p>
               {:else if state?.kind === 'loaded'}
                 <ol class="tracklist">
                   {#each state.tracklist.tracks as track (track.position)}
@@ -175,7 +186,7 @@
           </li>
         {/each}
       </ul>
-    {:else}
+    {:else if detail.kind === 'recording'}
       <form method="POST" action="/acquisitions/new" class="detail-request">
         <input type="hidden" name="kind" value="musicbrainz" />
         <input type="hidden" name="targetType" value="track" />

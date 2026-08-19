@@ -76,7 +76,12 @@ export interface CatalogEdition {
   /** The edition's distinct media formats (e.g. `['CD', 'DVD']`); empty when the catalog is silent. */
   readonly formats: readonly string[];
   readonly status: string | undefined;
-  readonly trackCount: number;
+  /**
+   * How many tracks this pressing has, or absent when the catalog does not say. Absent rather than
+   * `0`: the two are different facts, and collapsing them groups every uncounted pressing together
+   * and prints "0 tracks" under a record that plainly has some.
+   */
+  readonly trackCount: number | undefined;
 }
 
 /**
@@ -84,11 +89,11 @@ export interface CatalogEdition {
  * choice that changes what gets downloaded is WHICH TRACKLIST, while format is a filter over it.
  */
 export interface CatalogEditionGroup {
-  readonly trackCount: number;
   /**
    * The edition this group is read from — its tracklist is the group's tracklist. Modeled
    * explicitly rather than left as "the first one", so no reader has to guard against a group
-   * with no editions, which grouping cannot produce.
+   * with no editions, which grouping cannot produce. Its `trackCount` is the group's — carried
+   * once, on the edition it was read from, so the two can never disagree.
    */
   readonly representative: CatalogEdition;
   readonly editions: readonly CatalogEdition[];
@@ -121,7 +126,7 @@ export interface CatalogSearchPort {
   search(query: string, scope: OperationScope): ResultAsync<CatalogSearchResults, InfraError>;
   /** Resolve one identifier to whichever entity kind it names. */
   lookup(mbid: Mbid, scope: OperationScope): ResultAsync<CatalogLookup, InfraError>;
-  /** An artist's release groups: albums first, everything else after, newest first within a band. */
+  /** An artist's release groups: albums first, everything else after, newest first within each of those two groups. */
   discography(
     artist: Mbid,
     scope: OperationScope,

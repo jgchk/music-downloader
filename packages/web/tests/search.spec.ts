@@ -45,13 +45,19 @@ test.describe('request page search', () => {
   }) => {
     await page.goto('/acquisitions/new');
 
-    // The archive is unreachable in this tier, so the endpoint's own answer is what is asserted:
-    // it responds, from this application, without the page ever naming a third-party host.
+    // The archive is unreachable in this tier, so the answer is knowable: this application says
+    // it could not reach it, and says so in a way no browser will remember.
     const response = await request.get(
       '/cover-art/release-group/19847822-1430-3380-9cf1-bc45545b34ac?size=250',
     );
 
-    expect([200, 404, 502]).toContain(response.status());
+    expect(response.status()).toBe(502);
+    expect(response.headers()['cache-control']).toBe('no-store');
+  });
+
+  test('names no third-party host in the page it serves', async ({ page }) => {
+    await page.goto('/acquisitions/new');
+
     expect(await page.content()).not.toContain('coverartarchive.org');
   });
 

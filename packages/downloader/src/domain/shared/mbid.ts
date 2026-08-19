@@ -17,6 +17,15 @@ export interface InvalidMbid {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+/**
+ * Whether a string is shaped like a catalog identifier. Exported for callers that must DECIDE
+ * something without holding an `Mbid` — a page telling "search for this" from "look this up" —
+ * so the format rule has one home rather than a copy per surface.
+ */
+export function isMbidShaped(value: string): boolean {
+  return UUID_PATTERN.test(value.trim().toLowerCase());
+}
+
 /** Parse-don't-validate: a UUID-shaped string becomes an {@link Mbid}, anything else an error value. */
 export function parseMbid(value: string): Result<Mbid, InvalidMbid> {
   const canonical = value.trim().toLowerCase();

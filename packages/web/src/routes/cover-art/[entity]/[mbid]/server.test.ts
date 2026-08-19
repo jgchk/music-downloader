@@ -27,7 +27,7 @@ function event(coverArt: CoverArtPort, params: Record<string, string>, size?: st
   return {
     params,
     url: new URL(`https://app.test/cover-art/x/y${size === undefined ? '' : `?size=${size}`}`),
-    locals: { coverArt, logger: { warn: vi.fn() } },
+    locals: { coverArt, logger: { warn: vi.fn(), debug: vi.fn() } },
   } as never;
 }
 
@@ -46,7 +46,7 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
   it('lets the artwork be cached, since a cover does not change under its identifier', async () => {
     const response = await GET(event(port(foundAnswer), { entity: 'release', mbid: MBID }));
 
-    expect(response.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(response.headers.get('cache-control')).toBe('private, max-age=2592000');
     // Third-party bytes from our own origin: the declared type must be the only type.
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   });
@@ -59,12 +59,15 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
     expect(art.front).toHaveBeenCalledWith('release-group', MBID, 500);
   });
 
-  it('falls back to the grid size when the asked-for size is not one we serve', async () => {
+  it('refuses a size it does not serve rather than answering with a different one', async () => {
+    // A blurry cover served for a request that asked for a sharp one is a wrong answer wearing a
+    // 200; the caller has no way to learn its URL was never going to work.
     const art = port(foundAnswer);
 
-    await GET(event(art, { entity: 'release-group', mbid: MBID }, '9999'));
+    const response = await GET(event(art, { entity: 'release-group', mbid: MBID }, '9999'));
 
-    expect(art.front).toHaveBeenCalledWith('release-group', MBID, 250);
+    expect(response.status).toBe(400);
+    expect(art.front).not.toHaveBeenCalled();
   });
 
   it('answers "no cover" in a way the browser may remember, so a placeholder settles', async () => {
@@ -74,7 +77,7 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
 
     expect(response.status).toBe(404);
     // Far shorter than the artwork's: the archive GAINING art is the change worth noticing.
-    expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    expect(response.headers.get('cache-control')).toBe('private, max-age=3600');
   });
 
   it('answers an unreachable archive as a fault the browser must not remember', async () => {
@@ -89,7 +92,7 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
     const request = {
       params: { entity: 'release-group', mbid: MBID },
       url: new URL('https://app.test/cover-art/x/y'),
-      locals: { coverArt: port('unavailable'), logger: { warn } },
+      locals: { coverArt: port('unavailable'), logger: { warn, debug: vi.fn() } },
     } as never;
 
     await GET(request);

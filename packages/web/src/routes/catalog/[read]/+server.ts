@@ -18,32 +18,38 @@ type FacadeResult =
   | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly error: DownloaderFacadeError };
 
-function respond(result: FacadeResult): Response {
+function respond(result: FacadeResult, read: string, locals: App.Locals): Response {
   if (result.ok) return json(result.value);
-  return json({ message: messageOf(result.error) }, { status: statusOf(result.error) });
+  const status = statusOf(result.error);
+  // Below this line the cause is gone and only a status survives, so a fault is written down HERE
+  // or nowhere: without it an operator finds the request under its correlation id and no record
+  // that anything went wrong — no way to tell a rate-limited catalog from a drifted one.
+  if (status >= 500) locals.logger.warn({ read, error: result.error }, 'catalog read failed');
+  return json({ message: messageOf(result.error) }, { status });
 }
 
 export const GET: RequestHandler = async ({ params, url, locals }) => {
   const downloader = locals.facades.downloader;
+  const read = params.read;
   const story = locals.correlationId;
   const query = url.searchParams.get('q') ?? '';
   const mbid = url.searchParams.get('mbid') ?? '';
 
-  switch (params.read) {
+  switch (read) {
     case 'search': {
-      return respond(await downloader.searchCatalog({ query }, story));
+      return respond(await downloader.searchCatalog({ query }, story), read, locals);
     }
     case 'lookup': {
-      return respond(await downloader.lookupCatalog({ mbid }, story));
+      return respond(await downloader.lookupCatalog({ mbid }, story), read, locals);
     }
     case 'discography': {
-      return respond(await downloader.browseArtist({ mbid }, story));
+      return respond(await downloader.browseArtist({ mbid }, story), read, locals);
     }
     case 'editions': {
-      return respond(await downloader.listEditions({ mbid }, story));
+      return respond(await downloader.listEditions({ mbid }, story), read, locals);
     }
     case 'tracklist': {
-      return respond(await downloader.getTracklist({ mbid }, story));
+      return respond(await downloader.getTracklist({ mbid }, story), read, locals);
     }
     // The read name comes from the URL, so an unknown one is a request for something this
     // application does not offer — not an unhandled variant of a closed set.

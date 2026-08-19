@@ -98,6 +98,35 @@ describe('runSearch', () => {
     expect(spies.onSearching).toHaveBeenLastCalledWith(false);
   });
 
+  it('reports a catalog that could not answer a pasted identifier either', async () => {
+    const client = catalog({
+      lookup: vi.fn(() =>
+        Promise.resolve({ ok: false as const, message: 'Could not be reached.' }),
+      ),
+    });
+    const spies = hooks();
+
+    await runSearch(client, RG, new AbortController().signal, spies);
+
+    expect(spies.onFailure).toHaveBeenCalledWith('Could not be reached.');
+    expect(spies.onOutcome).not.toHaveBeenCalled();
+  });
+
+  it('drops an answer about an identifier nobody is waiting for any more', async () => {
+    const controller = new AbortController();
+    const client = catalog({
+      lookup: vi.fn(() => {
+        controller.abort();
+        return Promise.resolve({ ok: true as const, value: { kind: 'not-found' as const } });
+      }),
+    });
+    const spies = hooks();
+
+    await runSearch(client, RG, controller.signal, spies);
+
+    expect(spies.onOutcome).not.toHaveBeenCalled();
+  });
+
   it('drops an answer to a search that was abandoned, so the newer one stands', async () => {
     const controller = new AbortController();
     const client = catalog({
@@ -141,6 +170,15 @@ describe('lookupAsOutcome', () => {
 
     expect(outcome).toMatchObject({ kind: 'results', results: { leading: 'recording' } });
   });
+
+  it.each([['release-group'], ['artist'], ['recording']])(
+    'shows nothing for a %s answer that carries no record to show',
+    (kind) => {
+      // The wire schema refuses this shape, so it can only arrive from a caller that built the DTO
+      // by hand — and to a person, "we cannot show what that names" reads as an unknown id.
+      expect(lookupAsOutcome({ kind } as never, RG)).toEqual({ kind: 'unknown-id', mbid: RG });
+    },
+  );
 
   it('says an identifier names nothing, rather than answering with an empty search', () => {
     expect(lookupAsOutcome({ kind: 'not-found' }, RECORDING)).toEqual({
@@ -226,6 +264,28 @@ describe('openDetail', () => {
     });
 
     expect(opened.at(-1)).toMatchObject({ kind: 'failed', message: 'Could not be reached.' });
+  });
+
+  it('says nothing about an artist whose surface has moved on', async () => {
+    const client = catalog({
+      discography: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: { releaseGroups: [RELEASE_GROUP_HIT] } }),
+      ),
+    });
+    const opened: DetailState[] = [];
+
+    await openDetail(
+      client,
+      'artist',
+      ARTIST,
+      'Paul Simon',
+      (d) => {
+        opened.push(d);
+      },
+      () => false,
+    );
+
+    expect(opened.map((state) => state.kind)).toEqual(['loading']);
   });
 });
 

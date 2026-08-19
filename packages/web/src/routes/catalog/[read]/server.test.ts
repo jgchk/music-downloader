@@ -34,7 +34,7 @@ function event(read: string, query: string, downloader: unknown) {
   return {
     params: { read },
     url: new URL(`https://app.test/catalog/${read}?${query}`),
-    locals: { facades: { downloader }, correlationId: STORY },
+    locals: { facades: { downloader }, correlationId: STORY, logger: { warn: vi.fn() } },
   } as never;
 }
 
@@ -100,7 +100,46 @@ describe('GET /catalog/[read]', () => {
     const response = await GET(event('search', 'q=graceland', downloader));
 
     expect(response.status).toBe(500);
-    expect(((await response.json()) as { message: string }).message.length).toBeGreaterThan(0);
+    expect(await response.json()).toEqual({
+      message: 'Something went wrong (musicbrainz.catalog.search). Try again.',
+    });
+  });
+
+  it('writes down a fault the answer cannot carry, so an outage is not just a 500', async () => {
+    // Below the route the cause is gone: the zod issue that says which field drifted, the fetch
+    // error that says the catalog is unreachable. Unlogged, an operator has the request and no
+    // record that anything failed.
+    const warn = vi.fn();
+    const error = {
+      kind: 'InfraError',
+      operation: 'musicbrainz.catalog.search',
+      message: 'down',
+    };
+    const downloader = facade({
+      searchCatalog: vi.fn(() => Promise.resolve({ ok: false, error })),
+    });
+    const request = {
+      params: { read: 'search' },
+      url: new URL('https://app.test/catalog/search?q=graceland'),
+      locals: { facades: { downloader }, correlationId: STORY, logger: { warn } },
+    } as never;
+
+    await GET(request);
+
+    expect(warn).toHaveBeenCalledWith({ read: 'search', error }, 'catalog read failed');
+  });
+
+  it('says nothing to the log about a refusal the caller can fix themselves', async () => {
+    const warn = vi.fn();
+    const request = {
+      params: { read: 'lookup' },
+      url: new URL('https://app.test/catalog/lookup?mbid=not-an-mbid'),
+      locals: { facades: { downloader: facade() }, correlationId: STORY, logger: { warn } },
+    } as never;
+
+    await GET(request);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('has nothing to say about a read it does not offer', async () => {

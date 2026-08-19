@@ -14,6 +14,7 @@ const ARTIST_ID = '4d5447d7-c61c-4120-ba1b-d7f471d385b9';
 const RECORDING_ID = '0b6b4ba0-d36f-47bd-b4ea-6a5b91842d29';
 const RELEASE_ID = '1b022e01-4da6-387b-8658-8678046e4cef';
 const RELEASE_ID_2 = 'ef6e0c0a-9f1f-41af-820a-e3ca91560c13';
+const RELEASE_ID_3 = '723ba05c-98c9-4366-ae79-3c89f8a370ca';
 
 describe('toReleaseGroups', () => {
   it('reads an album identity a searcher would recognize', () => {
@@ -64,10 +65,9 @@ describe('toReleaseGroups', () => {
     expect(group?.year).toBe(1972);
   });
 
-  it('drops a hit that cannot be presented or requested — no id, or no title', () => {
+  it('drops a hit that cannot be presented or requested — an unaddressable id, or no title', () => {
     const groups = toReleaseGroups({
       'release-groups': [
-        { title: 'Nameless id' },
         { id: 'not-a-uuid', title: 'Bad id' },
         { id: RG_ID, title: null },
         { id: RG_ID_2, title: 'Keeper' },
@@ -117,7 +117,14 @@ describe('toArtists', () => {
   });
 
   it('drops an artist with no usable identity', () => {
-    expect(toArtists({ artists: [{ id: ARTIST_ID, name: null }, { name: 'No id' }] })).toEqual([]);
+    expect(
+      toArtists({
+        artists: [
+          { id: ARTIST_ID, name: null },
+          { id: 'not-a-uuid', name: 'Bad id' },
+        ],
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -147,7 +154,7 @@ describe('toRecordings', () => {
   it('drops a recording that could not be presented or requested', () => {
     const recordings = toRecordings({
       recordings: [
-        { title: 'No id' },
+        { id: 'not-a-uuid', title: 'Bad id' },
         { id: RECORDING_ID, title: null },
         { id: RECORDING_ID, title: 'Keeper' },
       ],
@@ -242,7 +249,10 @@ describe('toEditionListing', () => {
     });
 
     expect(
-      listing.groups.map((group) => ({ n: group.trackCount, size: group.editions.length })),
+      listing.groups.map((group) => ({
+        n: group.representative.trackCount,
+        size: group.editions.length,
+      })),
     ).toEqual([
       { n: 11, size: 2 },
       { n: 19, size: 1 },
@@ -295,7 +305,7 @@ describe('toEditionListing', () => {
       country: undefined,
       formats: [],
       status: undefined,
-      trackCount: 0,
+      trackCount: undefined,
     });
   });
 
@@ -304,7 +314,7 @@ describe('toEditionListing', () => {
       releases: [official(RELEASE_ID, 19), official(RELEASE_ID_2, 11)],
     });
 
-    expect(listing.groups.map((group) => group.trackCount)).toEqual([11, 19]);
+    expect(listing.groups.map((group) => group.representative.trackCount)).toEqual([11, 19]);
   });
 
   it('names the edition the pipeline itself would pick', () => {
@@ -346,13 +356,39 @@ describe('toEditionListing', () => {
       releases: [official(RELEASE_ID, 11, { media: [{ format: 'CD' }, { 'track-count': 4 }] })],
     });
 
-    expect(listing.groups[0]?.trackCount).toBe(4);
+    expect(listing.groups[0]?.representative.trackCount).toBe(4);
   });
 
-  it('reads an edition with no media at all as having no tracks', () => {
+  it('says nothing about the length of an edition the catalog has not counted', () => {
+    // Not zero: a pressing the catalog states no count for still has a tracklist, and "0 tracks"
+    // both reads as a falsehood and heaps every uncounted pressing into one group.
     const listing = toEditionListing({ releases: [official(RELEASE_ID, 0, { media: undefined })] });
 
-    expect(listing.groups[0]?.trackCount).toBe(0);
+    expect(listing.groups[0]?.representative.trackCount).toBeUndefined();
+  });
+
+  it('keeps an uncounted edition out of the group of counted ones, and behind it', () => {
+    const listing = toEditionListing({
+      releases: [
+        official(RELEASE_ID, 0, { media: undefined }),
+        official(RELEASE_ID_2, 11),
+        official(RELEASE_ID_3, 11),
+      ],
+    });
+
+    expect(listing.groups.map((group) => group.representative.trackCount)).toEqual([11, undefined]);
+  });
+
+  it('drops an edition the catalog names no identifier for', () => {
+    // Unlike a search hit, a browsed release may arrive with no id at all — and an edition we
+    // cannot address is one we could neither show a tracklist for nor request.
+    const listing = toEditionListing({
+      releases: [{ title: 'Nameless' }, official(RELEASE_ID, 11)],
+    });
+
+    expect(listing.groups.flatMap((group) => group.editions.map((one) => one.mbid))).toEqual([
+      RELEASE_ID,
+    ]);
   });
 
   it('reads a release group with no editions as an empty listing needing selection', () => {
