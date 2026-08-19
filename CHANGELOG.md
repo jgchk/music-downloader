@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.20.0](https://github.com/jgchk/music-downloader/compare/v3.19.0...v3.20.0) (2026-08-19)
+
+### Features
+
+* **runtime:** name the deposit directory DEPOSIT_ROOT, honouring LIBRARY_ROOT ([871cc0b](https://github.com/jgchk/music-downloader/commit/871cc0b62d1f0f517575818ad8949ac68173a364))
+
+### Bug Fixes
+
+* **downloader,importer:** make replay total and pin the frozen storage tokens ([42407c5](https://github.com/jgchk/music-downloader/commit/42407c5f427a7ca9b3c727670b60934e242a8291))
+* **store:** harden the token seam's read and write edges ([bda25c8](https://github.com/jgchk/music-downloader/commit/bda25c8a56dd4fafeafbfbe9614b1a7c78ec93d9))
 ## [3.19.0](https://github.com/jgchk/music-downloader/compare/v3.18.1...v3.19.0) (2026-08-19)
 
 ### Features
