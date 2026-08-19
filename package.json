@@ -39,7 +39,7 @@
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "better-sqlite3": "^13.0.0",
-    "conventional-changelog-conventionalcommits": "10.2.1",
+    "conventional-changelog-conventionalcommits": "10.4.0",
     "conventional-changelog-writer": "9.2.0",
     "conventional-commits-parser": "7.1.0",
     "eslint": "^10.0.0",
