@@ -43,10 +43,11 @@ export const actions: Actions = {
     const { data, result } = await submit(request, locals);
     if (!result.ok) return refusal(data, result.error);
 
-    // The title rides the form so the confirmation can name what was asked for rather than only
-    // its identifier — the page already had it on screen, and re-reading it to say it back would
-    // be a round trip for a word.
-    const title = data.get('title');
+    // The display title rides the form so the confirmation can name what was asked for rather
+    // than only its identifier — the page already had it on screen, and re-reading it to say it
+    // back would be a round trip for a word. Deliberately not called `title`: that name is the
+    // submit contract's, for a descriptor request's actual target.
+    const title = data.get('displayTitle');
 
     return {
       requested: {

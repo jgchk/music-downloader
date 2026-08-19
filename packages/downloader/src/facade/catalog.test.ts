@@ -66,6 +66,18 @@ describe('searchCatalog', () => {
     });
   });
 
+  it('carries what kind of act an artist is all the way onto the wire', async () => {
+    const result = await facadeWith(fakeCatalog()).searchCatalog({ query: 'paul simon' }, STORY);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Through the schema, not just off the port: the DTO strips what it does not declare, so a
+      // projection that forgot this field would drop it silently on its way to a browser.
+      const onTheWire = catalogSearchResultSchema.parse(roundTrip(result.value));
+      expect(onTheWire.artists[0]?.type).toBe('Person');
+    }
+  });
+
   it('says whether a fault is worth retrying, so a reader need not guess', async () => {
     // Reached-or-drifted is decided by the adapter that failed, and it is the difference between
     // "try again in a moment" and "this will never work until we fix it". Dropping it at the
@@ -76,11 +88,11 @@ describe('searchCatalog', () => {
 
     expect(unreachable).toMatchObject({ ok: false, error: { kind: 'InfraError' } });
     if (!unreachable.ok && unreachable.error.kind === 'InfraError') {
-      expect(unreachable.error.permanent).not.toBe(true);
+      expect(unreachable.error.reason).toBe('unreachable');
     }
   });
 
-  it('marks a drifted catalog permanent all the way to the wire', async () => {
+  it('names a drifted catalog unreadable all the way to the wire', async () => {
     const drifted = {
       kind: 'InfraError' as const,
       operation: 'musicbrainz.catalog.search',
@@ -95,7 +107,7 @@ describe('searchCatalog', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.kind === 'InfraError') {
-      expect(result.error.permanent).toBe(true);
+      expect(result.error.reason).toBe('unreadable');
       // And it survives serialization — this is a value a BFF reads on the other side of a wire.
       expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
     }

@@ -104,20 +104,11 @@ export function detailSubtitle(context: DetailContext): string {
     .join(' \u{00B7} ');
 }
 
-/** What the catalog knows of a release beyond its title: when, and of what kind. */
-export function releaseLine(group: {
-  readonly year?: number | undefined;
-  readonly primaryType?: string | undefined;
-}): string {
-  return [group.year?.toString(), group.primaryType]
-    .filter((part) => part !== undefined && part !== '')
-    .join(' · ');
-}
-
 /**
- * How one edition group heads itself: the tracklist, and how many pressings share it. The count
- * comes from the group's representative — the one edition its tracklist was read from — so the
- * heading cannot disagree with the list beneath it.
+ * How one edition group heads itself: the track count, and how many pressings share it. The count
+ * comes from the group's representative, and the group is keyed on that very number, so the
+ * heading cannot disagree with the list beneath it. (Grouping is by COUNT, not by running order:
+ * two different tracklists of the same length land in one group.)
  */
 export function groupHeading(group: {
   readonly representative: EditionLike;
@@ -185,6 +176,20 @@ export function narrowedToFormat(
   };
 }
 
+/**
+ * An edition's own name, plus whatever the catalog says makes it different. Shared, because the
+ * summary above the groups and the rows beneath it name the same pressing — two copies of this
+ * would show up as one record called two things on one screen.
+ */
+export function editionTitle(edition: {
+  readonly title: string;
+  readonly disambiguation?: string | undefined;
+}): string {
+  return edition.disambiguation === undefined
+    ? edition.title
+    : `${edition.title} (${edition.disambiguation})`;
+}
+
 /** What the view says, above everything, about the pressing the system would take on its own. */
 export type BestMatchSummary =
   | {
@@ -198,10 +203,15 @@ export type BestMatchSummary =
   | { readonly kind: 'selection-required' };
 
 /**
- * The pick, found wherever the catalog put it. Groups are ordered by how many pressings share a
- * tracklist, and the pick is chosen on entirely different grounds, so it is regularly not in the
- * first group — and regularly inside a collapsed one, which is why this is stated above them all
- * rather than left as a badge to go hunting for.
+ * The pick, found wherever the catalog put it, and stated above the listing rather than left as a
+ * badge to go hunting for. Two reasons it cannot be left in the rows:
+ *
+ * - It is read from the WHOLE listing, while the rows are whatever the format filter left. A
+ *   person browsing the vinyl would otherwise lose all sight of what a request would actually
+ *   get, which is a CD.
+ * - Its group is not reliably the first one. Groups are ordered by how many pressings share a
+ *   track count; the pick is the modal track count among OFFICIAL pressings only, earliest first.
+ *   The two usually agree and come apart exactly when the unofficial pressings are numerous.
  */
 export function bestMatchSummary(editions: CatalogEditionsResultDto): BestMatchSummary {
   const mbid = pickedMbid(editions);
@@ -216,10 +226,7 @@ export function bestMatchSummary(editions: CatalogEditionsResultDto): BestMatchS
   return {
     kind: 'pick',
     mbid,
-    title:
-      picked.disambiguation === undefined
-        ? picked.title
-        : `${picked.title} (${picked.disambiguation})`,
+    title: editionTitle(picked),
     detail: editionSummary(picked),
   };
 }

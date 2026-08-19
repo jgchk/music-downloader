@@ -372,6 +372,58 @@ describe('RequestSearch', () => {
     await expect.element(page.getByTestId('browse-error')).toBeVisible();
   });
 
+  it('does not reopen an artist the person already went back from', async () => {
+    // The rejection lands after they left. Reopening the browse view to tell them about someone
+    // they stopped looking at is worse than saying nothing.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const late = Promise.withResolvers<never>();
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() => late.promise),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('back-to-results')).toBeVisible();
+
+    await page.getByTestId('back-to-results').click();
+    late.reject(new Error('boom'));
+    await tick();
+
+    expect(document.querySelector('[data-testid="browse-error"]')).toBeNull();
+  });
+
+  it('does not reopen a detail view the person already closed', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const late = Promise.withResolvers<never>();
+    const catalog = catalogStub({ editions: vi.fn(() => late.promise) });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Graceland/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('detail')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Close' }).click();
+    late.reject(new Error('boom'));
+    await tick();
+
+    expect(document.querySelector('[data-testid="detail"]')).toBeNull();
+  });
+
   it('says an artist has no releases the catalog knows of', async () => {
     const catalog = catalogStub({
       search: vi.fn(() =>

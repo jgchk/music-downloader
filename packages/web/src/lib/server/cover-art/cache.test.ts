@@ -1,7 +1,8 @@
-import { errAsync, okAsync } from 'neverthrow';
+import { ResultAsync, errAsync, ok, okAsync } from 'neverthrow';
+import type { Result } from 'neverthrow';
 import { describe, expect, it, vi } from 'vitest';
 import { cachingCoverArt } from './cache.js';
-import type { CoverArtAnswer, CoverArtPort } from './port.js';
+import type { CoverArtAnswer, CoverArtPort, CoverArtUnavailable } from './port.js';
 
 const MBID = '19847822-1430-3380-9cf1-bc45545b34ac';
 const OTHER_MBID = '271faeb3-fdd1-3ebb-80aa-97b3116e9341';
@@ -13,15 +14,31 @@ function found(size: number): CoverArtAnswer {
   };
 }
 
-/** A port that answers with the given outcomes in order, counting how often it was asked. */
+/**
+ * A port that answers with the given outcomes in order, counting how often it was asked.
+ * `'unavailable'` is the archive itself failing; `'record-unavailable'` is one identifier's
+ * artwork failing, which says nothing about the next one.
+ */
 function archive(
-  ...answers: (CoverArtAnswer | 'unavailable')[]
+  ...answers: (CoverArtAnswer | 'unavailable' | 'record-unavailable')[]
 ): CoverArtPort & { calls: () => number } {
   const front = vi.fn(() => {
     const next = answers.shift() ?? found(4);
-    return next === 'unavailable'
-      ? errAsync({ kind: 'cover-art-unavailable' as const, detail: 'down' })
-      : okAsync(next);
+    if (next === 'unavailable') {
+      return errAsync({
+        kind: 'cover-art-unavailable' as const,
+        detail: 'down',
+        scope: 'archive' as const,
+      });
+    }
+    if (next === 'record-unavailable') {
+      return errAsync({
+        kind: 'cover-art-unavailable' as const,
+        detail: 'that record’s manifest names an image we will not fetch',
+        scope: 'record' as const,
+      });
+    }
+    return okAsync(next);
   });
   return { front: front, calls: () => front.mock.calls.length };
 }
@@ -53,6 +70,38 @@ describe('an archive that cannot be reached', () => {
     expect(down.calls()).toBe(1);
   });
 
+  it('lets a read already on the wire finish, rather than handing it a remembered fault', async () => {
+    // Ordering: the in-flight join is asked before the memo. A key whose own answer is already
+    // coming has a real one; replacing it with someone else's fault would be inventing a failure.
+    const time = clock();
+    const { promise, resolve } = Promise.withResolvers<CoverArtAnswer>();
+    /** The read the test holds open, so a second caller can join it while it is still running. */
+    const held = async (): Promise<Result<CoverArtAnswer, CoverArtUnavailable>> =>
+      ok(await promise);
+    const inner: CoverArtPort = {
+      front: vi.fn((_entity, mbid) =>
+        mbid === MBID
+          ? new ResultAsync(held())
+          : errAsync({
+              kind: 'cover-art-unavailable' as const,
+              detail: 'down',
+              scope: 'archive' as const,
+            }),
+      ),
+    };
+    const cache = cachingCoverArt(inner, {}, time.now);
+
+    const slow = cache.front('release-group', MBID, 250);
+    await cache.front('release-group', OTHER_MBID, 250);
+    const joined = cache.front('release-group', MBID, 250);
+    resolve(found(4));
+
+    const first = await slow;
+    const second = await joined;
+    expect(first.isOk()).toBe(true);
+    expect(second.isOk()).toBe(true);
+  });
+
   it('goes back to the archive once the memo has expired', async () => {
     const time = clock();
     const down = archive('unavailable', found(4));
@@ -66,6 +115,36 @@ describe('an archive that cannot be reached', () => {
     // one to clear it.
     expect(later.isOk()).toBe(true);
     expect(down.calls()).toBe(2);
+  });
+
+  it('does not let one odd record stop the archive being asked about any other', async () => {
+    // A manifest naming an image we will not fetch is ordinary archive data, not an outage.
+    // Remembering it archive-wide would blank every cover in the house over one release group —
+    // and answer 24 healthy identifiers with a fault describing a record nobody asked about.
+    const time = clock();
+    const odd = archive('record-unavailable');
+    const cache = cachingCoverArt(odd, {}, time.now);
+
+    const first = await cache.front('release-group', MBID, 250);
+    const neighbour = await cache.front('release-group', OTHER_MBID, 250);
+
+    expect(first.isErr()).toBe(true);
+    expect(neighbour.isOk()).toBe(true);
+    expect(odd.calls()).toBe(2);
+  });
+
+  it('keeps serving art it already holds while the archive is down', async () => {
+    // The only copy, dropped at the moment it cannot be replaced, turns a passing outage into a
+    // cover that is gone for good.
+    const time = clock();
+    const cache = cachingCoverArt(archive(found(4), 'unavailable'), { ttlMs: 1000 }, time.now);
+
+    await cache.front('release-group', MBID, 250);
+    time.advance(1001);
+    await cache.front('release-group', OTHER_MBID, 250);
+    const stale = await cache.front('release-group', MBID, 250);
+
+    expect(stale.isOk()).toBe(true);
   });
 
   it('never turns a fault into an answer of "there is no cover"', async () => {

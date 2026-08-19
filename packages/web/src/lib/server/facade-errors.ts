@@ -5,8 +5,9 @@ import type { ImporterFacadeError } from '@music/importer';
  * The BFF's one mapping from facade error values to what a user sees: an actionable message and
  * an HTTP status for the form-action response. Mirrors the retired HTTP layer's status semantics
  * (validation → 400, absence → 404, conflict-shaped kinds → 409) so error behavior survives the
- * transport change — with one distinction the modules make and this mapping keeps: an
- * infrastructure fault that MAY pass answers 502, and one that will not answers 500.
+ * transport change — with one distinction the modules make and this mapping keeps: a fault a
+ * module named `unreachable` answers 502, because trying again may work. Anything else, named
+ * `unreadable` or not named at all, answers 500.
  */
 
 type FacadeError = DownloaderFacadeError | ImporterFacadeError;
@@ -33,10 +34,10 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 | 502 {
       return 409;
     }
     case 'InfraError': {
-      // The module that failed already decided whether retrying is futile; this only translates
-      // it. Unmarked means "nobody said", which has to be read as possibly-transient — telling a
-      // person a passing outage is a permanent bug is the worse of the two mistakes.
-      return error.permanent === true ? 500 : 502;
+      // The module that failed named the fault; this only translates it. A module that did not
+      // classify says nothing, and nothing is not evidence of transience — so it keeps the
+      // status it always had rather than being promoted to "the upstream may come back".
+      return 'reason' in error && error.reason === 'unreachable' ? 502 : 500;
     }
   }
 }

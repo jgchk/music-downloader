@@ -24,8 +24,13 @@ import type {
 export type CatalogAnswer<T> =
   { readonly ok: true; readonly value: T } | { readonly ok: false; readonly message: string };
 
-/** The message shown when the server itself could not be reached, or answered without saying why. */
-export const UNREACHABLE = 'The catalog could not be reached. Check the connection and try again.';
+/**
+ * Shown when the catalog could not be reached — which may pass, so the words are about trying
+ * again. They name the retry this page actually offers (stop typing for a moment, or press
+ * Enter) rather than sending someone to inspect a connection that is very likely fine.
+ */
+export const UNREACHABLE =
+  'The catalog could not be reached. Pause a moment, or press Enter to try again.';
 
 /**
  * Shown when the catalog answered and this application could not read the answer. Deliberately

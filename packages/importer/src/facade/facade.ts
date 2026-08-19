@@ -54,12 +54,6 @@ export const importerFacadeErrorSchema = z.discriminatedUnion('kind', [
     kind: z.literal('InfraError'),
     operation: z.string(),
     message: z.string(),
-    /**
-     * Whether retrying is futile — the adapter's own classification (schema drift, a refusal it
-     * recognized) rather than a guess. Additive and optional: an older producer simply does not
-     * say, and a reader that cannot tell must treat the fault as possibly-transient.
-     */
-    permanent: z.boolean().optional(),
   }),
 ]);
 
@@ -82,9 +76,10 @@ function validationFailed<T>(error: z.ZodError): FacadeResult<T> {
 /** Command failures pass through as values; the infra fault drops its non-serializable `cause`. */
 function toFacadeError(error: CommandError): ImporterFacadeError {
   if (error.kind === 'InfraError') {
-    // No `permanent`: nothing in this module classifies a fault that way yet, and the field's
-    // absence already means "this producer did not say" — which a reader must treat as
-    // possibly-transient. Inventing `false` here would assert a fact nobody established.
+    // This module publishes no fault classification: nothing in it tells a passing fault from a
+    // permanent one yet. Carrying a field it could never set would leave every reader
+    // interpreting its absence — and reading absence as "may pass" asserts a transience nobody
+    // established, which is what a status code would then repeat to a person.
     return { kind: 'InfraError', operation: error.operation, message: error.message };
   }
   return error;

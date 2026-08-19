@@ -36,30 +36,42 @@ describe('statusOf', () => {
     ['IllegalTransition', 409],
     ['UnknownEdition', 400],
     ['ConcurrencyConflict', 409],
-    ['InfraError', 502],
+    ['InfraError', 500],
   ] as const)('%s -> %d (downloader)', (kind, status) => {
     const error = downloaderErrors.find((entry) => entry.kind === kind)!;
     expect(statusOf(error)).toBe(status);
   });
 
-  it('answers a fault that may pass with a status that says so', () => {
-    // 502: the thing behind us could not be reached. A caller may try again and it may work.
-    expect(statusOf({ kind: 'InfraError', operation: 'catalog.search', message: 'timeout' })).toBe(
-      502,
-    );
+  it('answers a fault named unreachable with a status that says it may pass', () => {
+    expect(
+      statusOf({
+        kind: 'InfraError',
+        operation: 'catalog.search',
+        message: 'timeout',
+        reason: 'unreachable',
+      }),
+    ).toBe(502);
   });
 
-  it('answers a fault that will not pass as this application going wrong', () => {
-    // 500: the answer could not be READ. No amount of retrying by anyone outside fixes that, and
-    // saying "try again" to a person would be a lie.
+  it('answers a fault named unreadable as this application going wrong', () => {
+    // No amount of retrying by anyone outside fixes an answer we cannot read, and saying "try
+    // again" to a person would be a lie.
     expect(
       statusOf({
         kind: 'InfraError',
         operation: 'catalog.search',
         message: 'drifted',
-        permanent: true,
+        reason: 'unreadable',
       }),
     ).toBe(500);
+  });
+
+  it('does not read an unclassified fault as one that may pass', () => {
+    // The importer names no reason. Absence is not evidence of transience, and promoting it to
+    // 502 would tell every proxy and operator that an upstream is flapping when nobody said so.
+    expect(statusOf({ kind: 'InfraError', operation: 'bridge.apply', message: 'timeout' })).toBe(
+      500,
+    );
   });
 
   it.each([

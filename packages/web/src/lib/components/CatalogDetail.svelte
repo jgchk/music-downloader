@@ -46,8 +46,18 @@
   const chosenHere = $derived(chosenEdition(detail, chosen));
   /** The panel itself, so "outside it" is a question that can be asked of the DOM. */
   let panel = $state<HTMLElement | undefined>();
-  /** Which shelf of pressings is being looked at. Narrowing is a view of the same listing. */
+  /**
+   * Which shelf of pressings is being looked at. Reset whenever the open record changes: this
+   * view is mounted once and reused, so a filter chosen on one album would otherwise greet the
+   * next one already narrowed — and, on a CD-only record, narrowed to nothing.
+   */
   let format = $state<FormatCategory>('all');
+  let filteredAlbum: string | undefined;
+  $effect.pre(() => {
+    if (detail?.mbid === filteredAlbum) return;
+    filteredAlbum = detail?.mbid;
+    format = 'all';
+  });
   const FORMAT_LABELS: Record<FormatCategory, string> = {
     all: 'All',
     cd: 'CD',
@@ -137,9 +147,10 @@
           before downloading.
         </p>
       {:else}
-        <!-- Above the groups, and outside the format filter, because the pick regularly sits in a
-             collapsed group and on a shelf nobody is looking at. It doubles as the way back to
-             letting the system choose: selecting it clears any pressing chosen by hand. -->
+        <!-- Above the groups and outside the format filter, because the pick is read from the
+             whole listing: narrow to the vinyl and the CD the system would take is no longer on
+             screen at all. It doubles as the way back to letting the system choose — selecting it
+             clears any pressing chosen by hand. -->
         <button
           type="button"
           class="best-match"
@@ -183,8 +194,9 @@
           {@const state = tracklists[group.representative.mbid]}
           {@const holdsThePick = group.editions.some((edition) => edition.mbid === picked)}
           <li>
-            <!-- The most-common tracklist, and whichever group the pick is in — a pick nobody can
-                 see is a pick nobody can check. -->
+            <!-- The largest group, and whichever group holds the pick: the two are usually the
+                 same and come apart when the unofficial pressings are numerous, and a pick behind
+                 a closed disclosure is a pick nobody can check. -->
             <details class="edition-group" open={index === 0 || holdsThePick}>
               <summary>
                 <span>{groupHeading(group)}</span>
@@ -262,8 +274,8 @@
         <RequestPolicies {values} />
       </RequestForm>
     {:else if detail.kind === 'recording'}
-      <!-- Bound once: read straight off `detail` in the markup, each access compiles to its own
-           defensive check for a value this branch has already established. -->
+      <!-- Bound once so the two blocks below narrow off the same value: `detail.release` is
+           optional, and TypeScript re-widens it across separate `{#if}` blocks. -->
       {@const release = detail.release}
       {#if release !== undefined}
         <CoverArt

@@ -78,7 +78,8 @@
    * bug, and the least debuggable way for one to surface is a spinner that never stops. Each
    * conversation therefore hands in its OWN recovery: they set different loading state before
    * they await (the page's "Searching…", the detail view's "Reading the catalog…", a
-   * disclosure's tracklist), and a single page-level banner would leave the other two spinning —
+   * disclosure's tracklist, an artist's releases), and a single page-level banner would leave the
+   * others spinning —
    * the tracklist one permanently, since a tracklist already being read is never asked for again.
    */
   async function attempt(conversation: Promise<void>, recover: () => void): Promise<void> {
@@ -151,7 +152,11 @@
         (opened) => (browse = opened),
         () => browse?.mbid === mbid,
       ),
-      () => (browse = { kind: 'failed', mbid, name, message: UNEXPECTED }),
+      () => {
+        // Guarded like the happy path: a rejection landing after the person went back would
+        // otherwise reopen an artist they had already left.
+        if (browse?.mbid === mbid) browse = { kind: 'failed', mbid, name, message: UNEXPECTED };
+      },
     );
   }
 
@@ -180,7 +185,12 @@
         (opened) => (detail = opened),
         () => detail?.mbid === mbid,
       ),
-      () => (detail = { kind: 'failed', mbid, ...context, message: UNEXPECTED }),
+      () => {
+        // Same guard: reopening a view the person dismissed, to tell them about a record they
+        // stopped looking at, is worse than saying nothing.
+        if (detail?.mbid === mbid)
+          detail = { kind: 'failed', mbid, ...context, message: UNEXPECTED };
+      },
     );
   }
 

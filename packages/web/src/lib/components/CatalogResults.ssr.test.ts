@@ -49,6 +49,22 @@ const body = (overrides: Record<string, unknown> = {}): string =>
   }).body;
 
 describe('CatalogResults (SSR)', () => {
+  it('says both reasons when a search hit one of each', () => {
+    const html = body({
+      results: results({
+        unavailable: [
+          { kind: 'release-group', reason: 'unreadable' },
+          { kind: 'artist', reason: 'unreachable' },
+        ],
+      }),
+    });
+
+    // The two need opposite advice. Collapsing them into the retry sentence tells someone to try
+    // again about a kind that answered perfectly well and will answer the same way every time.
+    expect(html).toContain('could not be reached for artists');
+    expect(html).toContain('about albums in a way this page could not read');
+  });
+
   it('says a kind could not be read, rather than letting it read as nothing matching', () => {
     // An empty block means "nothing matched" OR "nobody could ask"; a person told the first will
     // change their spelling, and the spelling was never the problem.

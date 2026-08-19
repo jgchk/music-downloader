@@ -16,7 +16,11 @@ function port(
 ): CoverArtPort & { front: ReturnType<typeof vi.fn> } {
   const front = vi.fn(() =>
     answer === 'unavailable'
-      ? errAsync({ kind: 'cover-art-unavailable' as const, detail: 'down' })
+      ? errAsync({
+          kind: 'cover-art-unavailable' as const,
+          detail: 'down',
+          scope: 'archive' as const,
+        })
       : okAsync(answer),
   );
   return { front };

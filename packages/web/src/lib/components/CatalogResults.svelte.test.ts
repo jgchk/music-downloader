@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
-import { holdSubmissions } from '../../../test/stubs/app-forms.js';
+import { answerWith, holdSubmissions, resetAnswer } from '../../../test/stubs/app-forms.js';
 import CatalogResults from './CatalogResults.svelte';
 import type { CatalogSearchResultDto } from '@music/downloader';
 
@@ -46,6 +46,30 @@ const props = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('CatalogResults', () => {
+  /** A search that matched far more of one kind than a person wants to scan at once. */
+  const wallOf = (kind: 'release-group' | 'artist' | 'recording', count: number) => {
+    const many = <T>(make: (index: number) => T) =>
+      Array.from({ length: count }, (_u, i) => make(i));
+    if (kind === 'artist') {
+      return results({
+        artists: many((index) => ({
+          mbid: String(index).padStart(8, '0') + ARTIST.slice(8),
+          name: `Artist ${index}`,
+        })),
+      });
+    }
+    if (kind === 'recording') {
+      return results({
+        recordings: many((index) => ({
+          mbid: String(index).padStart(8, '0') + RECORDING.slice(8),
+          title: `Track ${index}`,
+          artistCredit: 'Paul Simon',
+        })),
+      });
+    }
+    return wall(count);
+  };
+
   /** A search that matched far more than a person wants to scan at once. */
   const wall = (count: number) =>
     results({
@@ -66,13 +90,19 @@ describe('CatalogResults', () => {
     await expect.element(page.getByRole('button', { name: '10 of 25' })).toBeVisible();
   });
 
-  it('takes a person to the rest of that kind from the count itself', async () => {
+  it.each([
+    ['release-group' as const, '10 of 25'],
+    ['artist' as const, '6 of 25'],
+    ['recording' as const, '6 of 25'],
+  ])('takes a person from the %s count to the rest of that kind', async (kind, label) => {
+    // Each heading's link has to name ITS OWN kind — one hardcoded kind would quietly send a
+    // person looking for more tracks to the albums tab.
     const onFilter = vi.fn();
-    await render(CatalogResults, props({ results: wall(25), onFilter }));
+    await render(CatalogResults, props({ results: wallOf(kind, 25), onFilter }));
 
-    await page.getByRole('button', { name: '10 of 25' }).click();
+    await page.getByRole('button', { name: label }).first().click();
 
-    expect(onFilter).toHaveBeenCalledWith('release-group');
+    expect(onFilter).toHaveBeenCalledWith(kind);
   });
 
   it('lists everything once a kind is what is being looked at', async () => {
@@ -87,6 +117,34 @@ describe('CatalogResults', () => {
     // No affordance where there is nothing behind it — a link to "everything" that is already on
     // screen teaches a person the link means nothing.
     expect(document.querySelector('.results[data-kind="release-group"] .linkish')).toBeNull();
+  });
+
+  it('leaves every other result requestable while one request is in flight', async () => {
+    // The whole point of per-form state. A page-level counter passes every single-form test and
+    // still disables all twenty-five buttons the moment one is pressed.
+    const submission = holdSubmissions();
+    onTestFinished(() => submission.release());
+    await render(CatalogResults, props({ results: wall(3) }));
+
+    await page.getByRole('button', { name: 'Request' }).first().click();
+
+    const buttons = [
+      ...document.querySelectorAll<HTMLButtonElement>('.art-grid .request-form button'),
+    ];
+    expect(buttons.filter((button) => button.disabled)).toHaveLength(1);
+    expect(buttons.length).toBeGreaterThan(1);
+  });
+
+  it('confirms at the form that submitted, and nowhere else', async () => {
+    answerWith({ type: 'success', data: { requested: { acquisitionId: 'acq-9' } } });
+    onTestFinished(resetAnswer);
+    await render(CatalogResults, props({ results: wall(3) }));
+
+    await page.getByRole('button', { name: 'Request' }).first().click();
+    await expect.element(page.getByRole('status').first()).toBeVisible();
+
+    // One request, one confirmation — beside the record it is about.
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
   });
 
   it('will not send a second request while the first is still going', async () => {

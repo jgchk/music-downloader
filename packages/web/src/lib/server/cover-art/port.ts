@@ -52,6 +52,15 @@ export type CoverArtAnswer =
 export interface CoverArtUnavailable {
   readonly kind: 'cover-art-unavailable';
   readonly detail: string;
+  /**
+   * Whose problem this is. `archive` means nobody will get an answer right now — it did not
+   * respond, or it answered in a shape we cannot read. `record` means this one identifier's
+   * artwork could not be served and says nothing about anyone else's.
+   *
+   * The distinction is the port's to draw because only the adapter knows which happened, and a
+   * caller that cannot tell them apart must treat one bad record as an outage.
+   */
+  readonly scope: 'archive' | 'record';
 }
 
 export interface CoverArtPort {

@@ -19,13 +19,19 @@ import type {
  *
  * The byte budget bounds the IMAGES; a separate entry ceiling bounds everything, because an
  * absence costs no bytes at all and would otherwise accumulate a key per identifier ever asked
- * about — millions of release groups have no art, and a grid asks about twenty-five at a time.
+ * about — millions of release groups have no art, and a grid asks about a page of them at once.
  * Both are ceilings on the same insertion-ordered map, so the oldest key goes first either way.
  *
- * A fault is still never remembered AS AN ANSWER — but it is remembered as a fact about the
- * ARCHIVE: while one is in force, every key answers unavailable immediately instead of waiting
- * out its own timeout. Per-key would be no use here, since the keys that hurt are the
- * twenty-four OTHER covers on the page, each of which has never been asked about before.
+ * A fault is still never remembered AS AN ANSWER — but a fault the port calls ARCHIVE-wide is
+ * remembered as a fact about the archive: while one is in force, every key not already held and
+ * not already being read answers unavailable immediately instead of waiting out its own timeout.
+ * Per-key would be no use here, since the keys that hurt are the OTHER covers on the page, none
+ * of which has been asked about before.
+ *
+ * A fault about one RECORD — a manifest naming an image we will not fetch, an image the archive
+ * itself 404s — is left where it belongs, on that key. Otherwise one odd release group would
+ * blank every cover in the house for a minute, and hand every other key a fault describing a
+ * record nobody asked about.
  */
 
 export interface CoverArtCacheConfig {
@@ -48,8 +54,10 @@ const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
 /** Generous for one household's browsing, and finite, which is the point. */
 const DEFAULT_MAX_ENTRIES = 4096;
 /**
- * Long enough that one page's worth of tiles asks once, short enough that a passing outage costs
- * a person one refresh rather than their session.
+ * Long enough that the next page's worth of tiles asks once rather than each waiting out its own
+ * timeout, short enough that a passing outage costs a person one refresh rather than their
+ * session. It does not help the FIRST burst: those reads are already in flight together when the
+ * first fault lands.
  */
 const DEFAULT_UNAVAILABLE_FOR_MS = 60 * 1000;
 
@@ -109,27 +117,33 @@ export function cachingCoverArt(
   return {
     front(entity, mbid, size) {
       const key = keyOf(entity, mbid, size);
+      const isArchiveDown = (): boolean => {
+        if (unavailableUntil === undefined) return false;
+        if (now() < unavailableUntil) return true;
+        unavailableUntil = undefined;
+        lastFault = undefined;
+        return false;
+      };
+
       const entry = entries.get(key);
       if (entry !== undefined) {
-        if (now() - entry.at <= ttlMs) {
+        // A stale entry is kept while the archive is down: dropping the only copy at the moment
+        // it cannot be replaced turns a passing outage into a cover that is gone for good.
+        if (now() - entry.at <= ttlMs || isArchiveDown()) {
           entries.delete(key);
           entries.set(key, entry);
           return okAsync(entry.answer);
         }
         forget(key);
       }
-      // Asked AFTER the cache, so a cover already held is still served during an outage — the
-      // memo is about reaching the archive, not about what is already known.
-      if (unavailableUntil !== undefined && lastFault !== undefined) {
-        if (now() < unavailableUntil) return errAsync(lastFault);
-        unavailableUntil = undefined;
-        lastFault = undefined;
-      }
 
       const existing = inFlight.get(key);
       // Derived from the shared read rather than re-issued: `map` returns a new ResultAsync over
       // the SAME pending request, so every concurrent caller is served by one archive round trip.
+      // Checked BEFORE the memo: a key whose own answer is already on the wire has a real one
+      // coming, and handing it a remembered fault instead would be inventing a failure.
       if (existing !== undefined) return existing.map((answer) => answer);
+      if (lastFault !== undefined && isArchiveDown()) return errAsync(lastFault);
 
       // Built over a plain promise so the entry is cleared however the read ends — including a
       // REJECTION, which `andTee`/`orTee` never see: neverthrow propagates one straight through.
@@ -140,9 +154,10 @@ export function cachingCoverArt(
           const answer = await inner.front(entity, mbid, size);
           if (answer.isOk()) {
             remember(key, answer.value);
-          } else {
+          } else if (answer.error.scope === 'archive') {
             // Not an answer about this cover — a fact about the archive, held briefly so the rest
-            // of the page fails fast instead of queueing behind the same dead upstream.
+            // of the page fails fast instead of queueing behind the same dead upstream. A fault
+            // about one record is deliberately NOT remembered: it says nothing about the next.
             unavailableUntil = now() + unavailableForMs;
             lastFault = answer.error;
           }

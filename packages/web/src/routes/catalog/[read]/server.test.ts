@@ -92,7 +92,12 @@ describe('GET /catalog/[read]', () => {
       searchCatalog: vi.fn(() =>
         Promise.resolve({
           ok: false,
-          error: { kind: 'InfraError', operation: 'musicbrainz.catalog.search', message: 'down' },
+          error: {
+            kind: 'InfraError',
+            operation: 'musicbrainz.catalog.search',
+            message: 'down',
+            reason: 'unreachable',
+          },
         }),
       ),
     });
