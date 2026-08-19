@@ -54,6 +54,18 @@ The web-owned refresh seam deciding when a rendered view is re-read from the fac
 The overlay a selected catalog result opens — a side panel at wide viewports, a bottom sheet at narrow ones — where an album's editions or a track's request live. Say _catalog_ detail view wherever the acquisitions master-detail pane is also in view; the CSS carries `catalog-detail` for that same reason.
 _Avoid_: drawer, detail surface, modal (as a name; modality is a property, not the thing)
 
+**Artist discography view**:
+The results area taken over by one artist's releases, presented the way album results are, with a one-step way back to the held search results.
+_Avoid_: artist drawer, discography takeover
+
+**Chosen edition**:
+The edition the user chose by hand in an album's detail view, making the request target that exact pressing. Clearing the choice is letting the system choose — the pipeline's own pick applies.
+_Avoid_: pin, pinned edition, pinning, selected edition (collides with the downloader's manual-selection pause)
+
+**Top results**:
+The leading slice of one kind's search results the mixed view presents — the ones ranking judged likeliest to be what the query meant. Each kind's filter tab presents all of that kind's results.
+_Avoid_: ranked head, top matches ("match" is claimed by the importer's match review and the edition best match)
+
 ### Access control
 
 **Session**:
