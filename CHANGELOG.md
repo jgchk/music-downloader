@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.22.0](https://github.com/jgchk/music-downloader/compare/v3.21.1...v3.22.0) (2026-08-19)
+
+### Features
+
+* **downloader:** tell a searcher what kind of act an artist is ([6277440](https://github.com/jgchk/music-downloader/commit/62774400036a421ac8ce7de1df62066055fa4a77))
+* **web,downloader:** keep the reached-vs-drifted distinction alive to the reader ([864cc99](https://github.com/jgchk/music-downloader/commit/864cc99167ac9ee26503d507b228a2e2d0cfd7af))
+* **web:** browse an artist's releases where the results are, not beside them ([b477ddb](https://github.com/jgchk/music-downloader/commit/b477ddba8c0b5eea9c6eb8d6bfb1bbf3842e68a2))
+* **web:** let the detail view be dismissed the way a panel is ([2125e06](https://github.com/jgchk/music-downloader/commit/2125e0614ec912b988a0f8ada9d37855e6d6fe04))
+* **web:** let the detail view say what it is showing ([fc52471](https://github.com/jgchk/music-downloader/commit/fc52471a31b1c9a3496ee2b67cc082f1f8f6465d))
+* **web:** request without leaving the search ([324f65c](https://github.com/jgchk/music-downloader/commit/324f65c6d63a31e61dc373c7807d74d0b4b5fda4))
+* **web:** say what the system would take, and let a person browse by format ([a261638](https://github.com/jgchk/music-downloader/commit/a261638ac23c1c7a4f07a017d49c3dac81a96af2))
+* **web:** say what was requested, not only that something was ([6dc07c9](https://github.com/jgchk/music-downloader/commit/6dc07c927473da2fde7b6c1ebf7be45fd21a9b71))
+* **web:** show a person the top results, and say what is being held back ([5ac3878](https://github.com/jgchk/music-downloader/commit/5ac38786f9c838dff6bbfa7fb159233993009ca2))
+
+### Bug Fixes
+
+* **web,downloader:** close the review cycle on the cleanup pass ([583338b](https://github.com/jgchk/music-downloader/commit/583338b5301ccac3536ac5bf7c1efd62592db1af))
+* **web,downloader:** close the second review cycle ([5f760cb](https://github.com/jgchk/music-downloader/commit/5f760cbbb1a245b142f83178825dcd386963ad22))
+* **web,downloader:** close the third review cycle, and the two fixes that were not there ([eaf9378](https://github.com/jgchk/music-downloader/commit/eaf93785948629a4fcbd897ed817129af3e09109))
+* **web:** name both request actions, so the no-JS form still submits ([e5e2a07](https://github.com/jgchk/music-downloader/commit/e5e2a07653151b853c01af4337bbeff2ca4ee66a))
 ## [3.21.1](https://github.com/jgchk/music-downloader/compare/v3.21.0...v3.21.1) (2026-08-19)
 
 ### Bug Fixes
