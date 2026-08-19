@@ -1,0 +1,237 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release/1eaac429-02a7-48c7-b328-d1247f4d93a4",
+    "query": {
+      "inc": "recordings",
+      "fmt": "json"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "date": "2006-08-31",
+      "cover-art-archive": {
+        "darkened": false,
+        "front": true,
+        "back": true,
+        "count": 2,
+        "artwork": true
+      },
+      "id": "1eaac429-02a7-48c7-b328-d1247f4d93a4",
+      "media": [
+        {
+          "position": 1,
+          "track-count": 11,
+          "id": "884dd49a-b6b9-3bfe-aea2-ffe689456215",
+          "format": "CD",
+          "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+          "tracks": [
+            {
+              "id": "4dadaea0-1da8-3797-a834-568810af2765",
+              "title": "Silence Is Golden",
+              "recording": {
+                "id": "40b7fb66-4e1e-460b-9e9c-a803f8de7025",
+                "first-release-date": "2006-08-31",
+                "title": "Silence Is Golden",
+                "video": false,
+                "length": 140666,
+                "disambiguation": ""
+              },
+              "number": "1",
+              "length": 140666,
+              "position": 1
+            },
+            {
+              "title": "Club Oslo",
+              "id": "1069048e-0c4f-3c2f-9bc9-ca970d44f61f",
+              "recording": {
+                "length": 176560,
+                "video": false,
+                "disambiguation": "",
+                "title": "Club Oslo",
+                "first-release-date": "2006-08-31",
+                "id": "1423c7cb-b171-4236-b920-cb9b5a1b931c"
+              },
+              "length": 176560,
+              "number": "2",
+              "position": 2
+            },
+            {
+              "id": "c64755c7-6197-38c3-8993-9b3294a71b3f",
+              "title": "Spectacula",
+              "recording": {
+                "id": "21424b90-0c55-430f-91bb-2983e4bd9492",
+                "first-release-date": "2006-08-31",
+                "title": "Spectacula",
+                "length": 210933,
+                "video": false,
+                "disambiguation": ""
+              },
+              "length": 210933,
+              "number": "3",
+              "position": 3
+            },
+            {
+              "position": 4,
+              "length": 262213,
+              "number": "4",
+              "recording": {
+                "title": "Cast Out Devils",
+                "length": 262213,
+                "video": false,
+                "disambiguation": "",
+                "id": "0a182bff-847b-44fa-a983-ebffaee1d54f",
+                "first-release-date": "2006-08-31"
+              },
+              "id": "de806feb-0759-39f4-b514-49f830cb9c6b",
+              "title": "Cast Out Devils"
+            },
+            {
+              "id": "5ffbd094-c252-3011-9475-0a0080cde486",
+              "title": "Chapel of Love",
+              "recording": {
+                "video": false,
+                "length": 209680,
+                "disambiguation": "",
+                "title": "Chapel of Love",
+                "first-release-date": "2006-08-31",
+                "id": "b43444b2-2294-401d-9024-4a03b99faba5"
+              },
+              "length": 209680,
+              "number": "5",
+              "position": 5
+            },
+            {
+              "position": 6,
+              "length": 172346,
+              "number": "6",
+              "recording": {
+                "id": "4b884a4d-d3b1-43c2-aef4-6c0d0877654c",
+                "first-release-date": "2006-08-31",
+                "title": "Utopiathon",
+                "disambiguation": "",
+                "video": false,
+                "length": 172346
+              },
+              "id": "0bdf6739-9d40-32a8-99ae-50dc9720d808",
+              "title": "Utopiathon"
+            },
+            {
+              "number": "7",
+              "length": 260986,
+              "position": 7,
+              "id": "4c9c25ef-e5d1-3f4b-9fdf-faf2937181b5",
+              "title": "Boy in the Bubble",
+              "recording": {
+                "title": "Boy in the Bubble",
+                "length": 260986,
+                "video": false,
+                "disambiguation": "",
+                "id": "dc116aff-899f-4c39-b9a9-043fc3319138",
+                "first-release-date": "2006-08-31"
+              }
+            },
+            {
+              "position": 8,
+              "length": 241146,
+              "number": "8",
+              "recording": {
+                "title": "Behold the Man",
+                "disambiguation": "",
+                "length": 241146,
+                "video": false,
+                "id": "d54433d9-af85-4288-849f-bde38f3b7596",
+                "first-release-date": "2006-08-31"
+              },
+              "id": "6c846bd3-7d67-35f3-914c-d5b34c1e6c92",
+              "title": "Behold the Man"
+            },
+            {
+              "position": 9,
+              "length": 308746,
+              "number": "9",
+              "recording": {
+                "title": "Psychotherapy",
+                "video": false,
+                "length": 308746,
+                "disambiguation": "",
+                "id": "0ce517b6-a8c4-4176-b1e9-576abc19a38e",
+                "first-release-date": "2006-08-31"
+              },
+              "id": "c958d9ac-9a3b-3b67-8cdf-cf0bcdc87d16",
+              "title": "Psychotherapy"
+            },
+            {
+              "recording": {
+                "title": "IMA Believer",
+                "video": false,
+                "length": 169320,
+                "disambiguation": "",
+                "id": "fd7b6643-0bd8-458d-b036-9b19d6173596",
+                "first-release-date": "2006-08-31"
+              },
+              "title": "IMA Believer",
+              "id": "afc67cf5-6003-3f10-a1d2-556c6c26aa9b",
+              "position": 10,
+              "length": 169320,
+              "number": "10"
+            },
+            {
+              "id": "fc5cb2f9-cbe4-356a-af60-6f9cc696cd9c",
+              "title": "Smellovision",
+              "recording": {
+                "id": "4b498d39-13a7-402a-8ad6-b84cde86c498",
+                "first-release-date": "2006-08-31",
+                "title": "Smellovision",
+                "length": 224693,
+                "video": false,
+                "disambiguation": ""
+              },
+              "number": "11",
+              "length": 224693,
+              "position": 11
+            }
+          ],
+          "track-offset": 0,
+          "title": ""
+        }
+      ],
+      "disambiguation": "",
+      "title": "Cast Out Devils",
+      "country": "US",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "barcode": null,
+      "status": "Official",
+      "asin": null,
+      "release-events": [
+        {
+          "date": "2006-08-31",
+          "area": {
+            "type": null,
+            "type-id": null,
+            "disambiguation": "",
+            "name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States"
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "quality": "normal",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      }
+    }
+  }
+}

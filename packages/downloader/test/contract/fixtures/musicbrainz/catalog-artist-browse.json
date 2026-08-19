@@ -1,0 +1,1265 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release-group",
+    "query": {
+      "artist": "05517043-ff78-4988-9c22-88c68588ebb9",
+      "fmt": "json",
+      "limit": "100"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "release-group-count": 101,
+      "release-group-offset": 0,
+      "release-groups": [
+        {
+          "first-release-date": "2026-05-08",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "040f7ac6-a981-4566-9038-93cdbc94f1cc",
+          "title": "2026-05-07: M&S Bank Arena, Liverpool, UK"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "05fbeb8c-9c54-3717-9a82-fc968c51b61c",
+          "title": "You're the One in Concert",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "first-release-date": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "1990",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "title": "Paul Simon Plus",
+          "id": "0711bad0-cf95-31a4-a3dd-ee854443a92b",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ]
+        },
+        {
+          "first-release-date": "2013-01-28",
+          "secondary-types": [],
+          "disambiguation": "",
+          "primary-type": null,
+          "primary-type-id": null,
+          "id": "0a95b723-a1c3-4300-a728-f3ec361108f0",
+          "title": "Diamonds (Âme Private Edit) / Maiden Voyage (Ripperton Edit)",
+          "secondary-type-ids": []
+        },
+        {
+          "first-release-date": "1993",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "The Paul Simon Anthology",
+          "id": "0f5b014a-606d-3d29-9538-97fa01a82d76"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "title": "The Capeman: Original Broadway Cast",
+          "id": "13386dce-4b42-30ab-926d-78c15b651b81",
+          "secondary-type-ids": [
+            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+          ],
+          "first-release-date": "2006-06-27",
+          "secondary-types": [
+            "Soundtrack"
+          ],
+          "disambiguation": "original Broadway cast"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "167cba1e-c98e-4888-9d4b-99218ddb9702",
+          "title": "Live USA",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "first-release-date": "1993",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "1994",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "171303cf-7d92-4973-ace4-005c6ecbeb65",
+          "title": "Peacelands",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ]
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "first-release-date": "1992",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "17e82740-92e1-3018-9e4e-d1fb3a8e2047",
+          "title": "MTV Unplugged",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "secondary-type-ids": [],
+          "title": "Mother and Child Reunion",
+          "id": "188c3e2f-fa61-34a1-884f-d564922e35f2",
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "1972"
+        },
+        {
+          "first-release-date": "1986-08-29",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [],
+          "title": "Graceland",
+          "id": "19847822-1430-3380-9cf1-bc45545b34ac"
+        },
+        {
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "secondary-type-ids": [],
+          "id": "1d7a6cf7-dc41-4c14-8988-4872ddbdca0d",
+          "title": "Slip Slidin’ Away",
+          "first-release-date": "1977-09",
+          "disambiguation": "",
+          "secondary-types": []
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "1986",
+          "secondary-type-ids": [],
+          "title": "Under African Skies",
+          "id": "1e65d2a2-9506-4289-bc55-6c24148f20a0",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "1f99b3d9-8739-3a62-afa5-2abb8ff11ee0",
+          "title": "Hearts and Bones",
+          "secondary-type-ids": [],
+          "first-release-date": "1983-11",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "secondary-type-ids": [],
+          "id": "234d10ef-ee32-4010-b935-b0aa33a9e121",
+          "title": "50 Ways to Leave Your Lover",
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "1975-12"
+        },
+        {
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "id": "28ea9517-080e-4974-9ec5-95b840694fb0",
+          "title": "The Boy in the Bubble",
+          "secondary-type-ids": [],
+          "first-release-date": "1986",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "id": "2f312e2e-c335-4885-a4a7-b1a1024affeb",
+          "title": "Live in Zimbabwe 1987, Part Two",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2020"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [],
+          "title": "The Wobble (Paul Simon a.k.a. Jerry Landis)",
+          "id": "34e51cf5-cf97-4698-aa34-8b6babd20981",
+          "first-release-date": "2012-05-09",
+          "disambiguation": "",
+          "secondary-types": []
+        },
+        {
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "id": "350e90f2-44f3-496d-8b6c-bebaa7b0c380",
+          "title": "Born at the Right Time",
+          "secondary-type-ids": [],
+          "first-release-date": "1991",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "id": "364959d9-bc06-4580-bded-0ed002a29916",
+          "title": "The Blues",
+          "secondary-type-ids": [],
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "1982"
+        },
+        {
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "1993",
+          "id": "36ada218-a50d-4cd2-a69d-a2ecc24d84d9",
+          "title": "Homeless Children’s: Medical Benefit Concert",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "Unplugged",
+          "id": "3b044709-5896-3e60-a240-ad469ecd18ee",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "first-release-date": "1995"
+        },
+        {
+          "first-release-date": "2013-10-11",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "title": "The Complete Albums Collection",
+          "id": "3b2de920-e823-41e9-adaa-553624201559",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ]
+        },
+        {
+          "id": "3b65c243-3e97-360d-9c7b-88a708d6165d",
+          "title": "Live in Denver 1999",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "1999"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "title": "Greatest Hits, Etc.",
+          "id": "3cbe7fa5-4b6b-31a8-b475-1cdfe0938955",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "first-release-date": "1977-11",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "His Greatest Hits - Live in Concert",
+          "id": "3d4389df-bbd4-470e-a798-07141902269b",
+          "first-release-date": "1994",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation",
+            "Live"
+          ]
+        },
+        {
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "1990",
+          "id": "3e2993be-5b8d-40db-b9fc-a95e25b1cb5b",
+          "title": "The Obvious Child",
+          "secondary-type-ids": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single"
+        },
+        {
+          "first-release-date": "1988-10-18",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "id": "3ed2b388-f3b0-3692-944a-f3d792fe5f69",
+          "title": "Negotiations and Love Songs: 1971–1986"
+        },
+        {
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "2016",
+          "title": "Complete Unplugged",
+          "id": "3f47c739-677d-4995-96bf-67297b90ffca",
+          "secondary-type-ids": [],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "1981",
+          "title": "Collected Works",
+          "id": "3f8492e5-2ede-4012-be2c-439f02289135",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "first-release-date": "2025-12-11",
+          "secondary-types": [
+            "Interview"
+          ],
+          "disambiguation": "",
+          "primary-type-id": "3b2e49e1-2875-37b8-9fa9-1f7cf3f49900",
+          "primary-type": "Broadcast",
+          "title": "Lives Well Lived, Series 3, #15, “Beyond the Sound of Silence”",
+          "id": "3fcad335-af55-48d0-b725-2765697b8e44",
+          "secondary-type-ids": [
+            "12af3f5e-ce2a-3941-8b93-d482884031e5"
+          ]
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "3fd3b865-5751-3712-a2cd-e7c10cf3bf5a",
+          "title": "One‐Trick Pony",
+          "secondary-type-ids": [],
+          "first-release-date": "1980-08-12",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "title": "The Essential Paul Simon",
+          "id": "4b6dfbf0-eba5-3447-90a2-ff87b93eccdb",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2007-08-17"
+        },
+        {
+          "id": "5b5fed0e-0633-4057-bda5-7731be5530e2",
+          "title": "Rhymin’ in NYC",
+          "secondary-type-ids": [],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "2019"
+        },
+        {
+          "first-release-date": "2025-07-21",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "title": "Acoustic & Unplugged (the classic 1992 broadcast)",
+          "id": "5bb56e0f-54c5-494c-8058-e74704c8bc34",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ]
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "title": "Paul Simon",
+          "id": "602d0c54-2901-3469-a683-a5a50f3e5260",
+          "secondary-type-ids": [],
+          "first-release-date": "1972-03",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "primary-type-id": "4fc3be2b-de1e-396b-a933-beb8f1607a22",
+          "primary-type": "Other",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "61412441-9e52-435b-918f-2675d24bd40a",
+          "title": "TEAM FOB",
+          "first-release-date": "",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "title": "So Beautiful or So What",
+          "id": "61ed2527-520c-45a6-a20b-463dd1f611cf",
+          "secondary-type-ids": [],
+          "first-release-date": "2011-04-08",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "1991-10-31",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "64bf4853-4ee5-34d8-aef2-ea30a3a62f67",
+          "title": "Paul Simon’s Concert in the Park",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ]
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "first-release-date": "2010",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "The Early Years",
+          "id": "65ebd69d-ece2-43bf-ab66-270ce1c8e744",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "676c253c-bf4c-38e3-9b66-c55327c841e8",
+          "title": "The Graduate: The Original Sound Track Recording",
+          "secondary-type-ids": [
+            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+          ],
+          "first-release-date": "1968-02",
+          "secondary-types": [
+            "Soundtrack"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "2015-11-13",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "secondary-type-ids": [],
+          "title": "New York Is My Home",
+          "id": "726c7a3e-dc1f-4b9e-b889-27494c2e9954"
+        },
+        {
+          "id": "747e3a90-102e-4ca4-b7fb-97792d84a907",
+          "title": "Over the Bridge of Time: A Paul Simon Retrospective (1964–2011)",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2013"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "Selections From Paul Simon: The Studio Recordings (1972-2000)",
+          "id": "74f515f0-8320-3568-b173-3c5ebb74a80f",
+          "first-release-date": "2004",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ]
+        },
+        {
+          "title": "Graceland: The Remixes",
+          "id": "7836c358-2a8d-4ced-a993-d2286a6b0ad5",
+          "secondary-type-ids": [
+            "0c60f497-ff81-3818-befd-abfc84a4858b"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Remix"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2018-06-01"
+        },
+        {
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "secondary-type-ids": [],
+          "id": "7aeaafa8-76b3-47c3-8707-58d819aa1e13",
+          "title": "Mother And Child Reunion",
+          "first-release-date": "1988",
+          "disambiguation": "",
+          "secondary-types": []
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "Live at Queens College 1964",
+          "id": "7b9c306c-b331-4a88-b5a3-5cd63078ff1f",
+          "first-release-date": "2016",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "first-release-date": "2000-05-01",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "Greatest Hits: Shining Like a National Guitar",
+          "id": "7e2a4557-c3d2-376e-8a54-269d1ae37809"
+        },
+        {
+          "first-release-date": "2011-12-05",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "primary-type-id": null,
+          "primary-type": null,
+          "title": "2011-12-05: Ruth Eckerd Hall, Clearwater, FL, USA",
+          "id": "7e76413b-29c1-4f94-bb5b-3cada893a372",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ]
+        },
+        {
+          "secondary-type-ids": [],
+          "title": "Outrageous",
+          "id": "88cb54aa-bafe-4028-ae7d-fcc2f9b1fa95",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "2006-11-13"
+        },
+        {
+          "first-release-date": "2018",
+          "secondary-types": [
+            "Compilation",
+            "Demo"
+          ],
+          "disambiguation": "",
+          "primary-type": "EP",
+          "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "title": "Alternate Tunings / Rare and Unreleased",
+          "id": "8a50303b-ae97-4ee9-836b-1aed45aa77e0",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+            "81598169-0d6c-3bce-b4be-866fa658eda3"
+          ]
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "You're the One (In Concert for Paris)",
+          "id": "8c9e4e52-8a75-445c-ac0b-dc183440fda1",
+          "first-release-date": "",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "first-release-date": "2024-06-21",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "secondary-type-ids": [],
+          "id": "8dda70a4-b199-44da-897f-cabdb2f9a39d",
+          "title": "Um Vento Passou"
+        },
+        {
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2011-10-24",
+          "id": "9163109a-8fb9-4bf6-b20c-724a76841c9a",
+          "title": "Songwriter",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "first-release-date": "1986-08-29",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "secondary-type-ids": [],
+          "title": "Diamonds on the Soles of Her Shoes / All Around the World or the Myth of Fingerprints",
+          "id": "9216a599-925a-4bd6-b60a-cbd3ab5833bc"
+        },
+        {
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2009-06-01",
+          "id": "94d8f073-8a91-4af7-afc9-2e5b3887f14a",
+          "title": "This Better Be Good",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "first-release-date": "2016-06-03",
+          "secondary-types": [],
+          "disambiguation": "",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "985c560e-fac1-4217-91a0-0098806d4f27",
+          "title": "Stranger to Stranger",
+          "secondary-type-ids": []
+        },
+        {
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "secondary-type-ids": [],
+          "title": "Late in the Evening",
+          "id": "98a73a43-bbef-372c-97d7-20e4f1a1c7e8",
+          "first-release-date": "1980",
+          "disambiguation": "",
+          "secondary-types": []
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "9af04375-1109-42bd-a4dd-9f5e8f1e2993",
+          "title": "Paul Simon, Live USA",
+          "first-release-date": "",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [],
+          "id": "9c08260c-d558-391b-ae2b-aba11b9793d8",
+          "title": "The Rhythm of the Saints",
+          "first-release-date": "1990-10-15",
+          "disambiguation": "",
+          "secondary-types": []
+        },
+        {
+          "id": "9c5c6219-f8e7-4c01-8af7-a3ce56ad1541",
+          "title": "2006-05-25: Bloomsbury Theatre, London, UK",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "3b2e49e1-2875-37b8-9fa9-1f7cf3f49900",
+          "primary-type": "Broadcast",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2006-06-03"
+        },
+        {
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "id": "a1cc3fbd-609b-323c-95e2-435dfceb51e9",
+          "title": "Paul Simon",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "first-release-date": ""
+        },
+        {
+          "first-release-date": "1993-09-28",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "id": "a326a5ba-e63d-3e9f-97a3-c3142be6e2ba",
+          "title": "1964–1993"
+        },
+        {
+          "title": "iTunes Festival: London 2011",
+          "id": "a3446cae-1c38-43ba-81f4-54717fc93e5c",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "primary-type": "EP",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2011-07-04"
+        },
+        {
+          "secondary-type-ids": [],
+          "title": "Father and Daughter",
+          "id": "a96c1f24-16c9-4ca5-af3f-b630a9f6cd3f",
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "2006-05-29"
+        },
+        {
+          "first-release-date": "2002",
+          "secondary-types": [
+            "Soundtrack"
+          ],
+          "disambiguation": "",
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "id": "ab88f0db-5191-3457-ae22-ee1eecf7fd1d",
+          "title": "Father and Daughter",
+          "secondary-type-ids": [
+            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+          ]
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "af869d4a-891f-3992-8b4f-0ac44c61e3ba",
+          "title": "Surprise",
+          "secondary-type-ids": [],
+          "first-release-date": "2006-05-09",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "2024-11-01",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "secondary-type-ids": [],
+          "title": "Bad Dream",
+          "id": "b1bff663-f62e-4ddd-9b87-f8a6eec296a6"
+        },
+        {
+          "first-release-date": "",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "b32f0351-6a2f-3934-ada1-6806b5adc1dd",
+          "title": "1992-03-04"
+        },
+        {
+          "first-release-date": "1997-11-18",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [],
+          "id": "b3d73cb7-594f-3245-ab4c-34d2c447beb6",
+          "title": "Songs From The Capeman"
+        },
+        {
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "1973",
+          "id": "b57fb9a7-9593-4c94-a3ab-e75689c19da1",
+          "title": "Kodachrome",
+          "secondary-type-ids": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single"
+        },
+        {
+          "first-release-date": "1991",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "b6fb07de-83f7-3cb5-80d5-215c4c9b0d68",
+          "title": "Born at the Right Time: The Best of Paul Simon",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ]
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "1999-06-13: Gorge Amphitheater, Columbia River Gorge, WA, USA",
+          "id": "b7d84224-ac57-42e4-9d2c-8323fa9e4544",
+          "first-release-date": "",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "primary-type-id": null,
+          "primary-type": null,
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "bda0968a-2a36-48b5-83eb-5024b6701f7a",
+          "title": "1967-06-16: Monterey Pop: Monterey, CA, USA",
+          "first-release-date": "1994",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "be9d4ca8-c985-471d-979a-f716fcf303d0",
+          "title": "1999-07-30: Jones Beach Amphitheatre, Wantagh, NY",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "first-release-date": "2000-07-13"
+        },
+        {
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "id": "bfe06dce-a220-425f-8be5-75652c815e4e",
+          "title": "In the Blue Light",
+          "secondary-type-ids": [],
+          "first-release-date": "2018-09-07",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "c002916a-34a1-4022-a5fb-f75a2972b202",
+          "title": "Live in New York City",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "first-release-date": "2012-09-18"
+        },
+        {
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "c0219393-4457-35f2-82c7-1048486f938b",
+          "title": "Paul Simon in Concert: Live Rhymin’",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "first-release-date": "1974-03"
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "2000-10-02",
+          "secondary-type-ids": [],
+          "title": "You’re the One",
+          "id": "c02e071e-3dc2-379f-bddd-2ad2d7827220",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "c45c6f6a-69f5-4ae2-9167-fa9e2e8d639d",
+          "title": "You're the One: In Concert From Paris",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "first-release-date": "2010",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "",
+          "secondary-type-ids": [],
+          "title": "Paul Simon Live Unlicensed",
+          "id": "cac5e408-d0a2-4899-b4a1-11e61eea71e1",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "2006-08-05",
+          "secondary-type-ids": [],
+          "id": "cb82ebf6-c757-4ff4-a584-72c04e6593a7",
+          "title": "That’s Me",
+          "primary-type": "Single",
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9"
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "first-release-date": "2004-07-12",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "id": "cc39a11f-20fd-4fe2-a971-eaef8128d49f",
+          "title": "The Studio Recordings 1972–2000",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "id": "cc4bd0c3-0a7c-4519-a736-6121ac38df27",
+          "title": "Live in Zimbabwe 1987, Part One",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2020-09-02"
+        },
+        {
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single",
+          "id": "ccee5e88-3a77-4970-ae46-3d984b90fe6e",
+          "title": "Me And Julio Down By The Schoolyard",
+          "secondary-type-ids": [],
+          "first-release-date": "1972",
+          "secondary-types": [],
+          "disambiguation": ""
+        },
+        {
+          "first-release-date": "1975-10-25",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [],
+          "title": "Still Crazy After All These Years",
+          "id": "cd0c17f4-ff8d-3b1d-ac36-397ebbb069e9"
+        },
+        {
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "1980-10-07",
+          "title": "Live ’n’ Late in the Evening: Tower Theater, Philadelphia PA 7th Oct 1980 – Remastered",
+          "id": "d3761354-3b2c-46da-a41e-07633e11772a",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "secondary-type-ids": [],
+          "title": "The Paul Simon Songbook",
+          "id": "d4214355-7f74-3afc-b407-bcfa743ee60b",
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "disambiguation": "",
+          "secondary-types": [],
+          "first-release-date": "1965"
+        },
+        {
+          "title": "The Concert in Hyde Park",
+          "id": "d6497acc-aab7-460d-adce-d3ed1a09de4d",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2017-06-09"
+        },
+        {
+          "first-release-date": "2016-12-27",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ],
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "id": "d72d7326-e2e5-495e-ad00-b81ea4ceb75b",
+          "title": "Live at Kaufman Astoria Studios, New York 1992"
+        },
+        {
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "2011-03-01",
+          "id": "dabde294-4b50-431d-a589-9dbafa9fcb44",
+          "title": "The Afterlife",
+          "secondary-type-ids": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "title": "Graceland: The African Concert",
+          "id": "dc5a97d4-1d6c-42f4-a6c0-d8fe41cf9074",
+          "first-release-date": "1999-06-01",
+          "disambiguation": "",
+          "secondary-types": [
+            "Live"
+          ]
+        },
+        {
+          "secondary-types": [
+            "Compilation"
+          ],
+          "disambiguation": "",
+          "first-release-date": "2002-11-05",
+          "id": "e070947b-5c56-378b-8e09-e8530d9b3466",
+          "title": "The Paul Simon Collection: On My Way, Don't Know Where I'm Goin'",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "first-release-date": "2015-04-10",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "The Ultimate Collection",
+          "id": "e996ecb2-4d9b-4ef0-8ea7-08f294a2f294",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "secondary-types": [],
+          "disambiguation": "",
+          "first-release-date": "1986",
+          "title": "You Can Call Me Al",
+          "id": "e9f35989-704d-46b5-8197-bd2fa6cbb5b3",
+          "secondary-type-ids": [],
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "primary-type": "Single"
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "id": "ee8c5366-9d11-4458-8929-f3d94b84f533",
+          "title": "The Library of Congress: Gershwin Prize for Popular Song",
+          "first-release-date": "2009",
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ]
+        },
+        {
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album",
+          "id": "efbe27d9-ee3d-41e1-b586-164f33f809df",
+          "title": "Medical Benefit Concert at the Madison Square Garden: New York, U.S.A. December 13, 1987, Part 2",
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "first-release-date": "1994",
+          "secondary-types": [
+            "Live"
+          ],
+          "disambiguation": ""
+        },
+        {
+          "disambiguation": "",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "first-release-date": "2015",
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "title": "Original Album Classics",
+          "id": "f0201a7f-7a98-4061-b751-71b5f4257c21",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "primary-type": "Album"
+        },
+        {
+          "first-release-date": "1973-05",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [],
+          "id": "fb1e90a8-4461-382b-9081-183abb3c8997",
+          "title": "There Goes Rhymin’ Simon"
+        },
+        {
+          "first-release-date": "2023-05-19",
+          "disambiguation": "",
+          "secondary-types": [],
+          "primary-type": "Album",
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "secondary-type-ids": [],
+          "title": "Seven Psalms",
+          "id": "fed97b51-2553-4573-8a55-8af5ffd7aebc"
+        }
+      ]
+    }
+  }
+}

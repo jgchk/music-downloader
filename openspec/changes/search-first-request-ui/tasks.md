@@ -4,7 +4,7 @@ All production code test-first (red before green), per `docs/development/testing
 
 ## 1. Catalog-search core (downloader)
 
-- [ ] 1.1 Record contract fixtures for the newly consumed MusicBrainz shapes: release-group/artist/recording entity search, release browse by release-group with media, release lookup with recordings (tracklist); extend the live recorder scripts and replay tests in `packages/downloader/test/contract`
+- [x] 1.1 Record contract fixtures for the newly consumed MusicBrainz shapes: release-group/artist/recording entity search, release browse by release-group with media, release lookup with recordings (tracklist); extend the live recorder scripts and replay tests in `packages/downloader/test/contract`
 - [x] 1.2 Add zod response schemas for the new MB shapes in `adapters/musicbrainz/schemas.ts` (tolerant readers, consumed fields only)
 - [x] 1.3 Port the prototype's ranking as pure functions with table-driven tests: pair score (artist-credit token coverage, subtitle-noise penalty, secondary-type penalty, type bonus, MB-score tiebreak), artist ranking with matched-name-length tie-break, recording ranking ("paul simon graceland" fixture must rank Graceland/Paul Simon first)
 - [x] 1.4 Implement intent ordering (exact artist name → artists; best recording > best album-shaped RG + margin, Singles excluded from album evidence → recordings; else release groups) with the three canonical query fixtures as tests
