@@ -1,8 +1,16 @@
+# cover-art Specification
+
 ## Purpose
-
 Cover-art lookup for release groups and releases via the Cover Art Archive, proxied and cached by the server, with a missing cover modeled as an expected outcome rather than an error.
+## Requirements
+### Requirement: Only an image type this application serves is echoed
 
-## ADDED Requirements
+Artwork is re-served from this application's own origin, so the system SHALL declare it as one of a closed set of image types and SHALL NOT echo a content type the archive names outside that set — a script-bearing document type in particular.
+
+#### Scenario: A script-bearing type is not echoed
+
+- **WHEN** the archive serves a front cover declaring `image/svg+xml`
+- **THEN** the bytes are served under this application's default image type, never under the declared one
 
 ### Requirement: Cover art is served by the application, not the browser
 
@@ -26,3 +34,4 @@ A release group or release without cover art SHALL be a modeled, expected outcom
 
 - **WHEN** the Cover Art Archive cannot be reached for a lookup
 - **THEN** the miss is not cached as "no cover", so a later request may still find the art
+

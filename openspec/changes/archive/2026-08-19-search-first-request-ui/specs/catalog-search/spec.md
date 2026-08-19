@@ -32,6 +32,20 @@ Search results SHALL be ordered by a ranking in which query tokens matched by a 
 - **WHEN** a query matches both a standard studio release group and same-titled live/remix/compilation release groups by the same artist
 - **THEN** the standard release group ranks first
 
+### Requirement: A search survives one kind failing
+
+A search asks the catalog about three entity kinds independently, so the system SHALL return the kinds that answered and name the kinds it could not read, rather than discarding a whole answer because one read failed. A search whose every read failed SHALL be reported as a fault.
+
+#### Scenario: One kind unreadable, the rest returned
+
+- **WHEN** the catalog answers for release groups and recordings but the artist read fails
+- **THEN** the release groups and recordings are returned, and artists is named as a kind that could not be read — so a client can say why that block is empty rather than showing it as "nothing matched"
+
+#### Scenario: Every kind unreadable is a fault
+
+- **WHEN** all three of a search's reads fail
+- **THEN** the search reports an infrastructure fault, not an empty result
+
 ### Requirement: Intent ordering of entity blocks
 
 The search response SHALL state which entity type leads: artists when the query exactly matches an artist name, recordings when the best recording match clearly outranks the best album-shaped release-group match, and release groups otherwise (the albums-first default).
@@ -71,12 +85,17 @@ The system SHALL expose a read that, given an artist identifier, returns the art
 
 ### Requirement: Edition listing grouped by tracklist
 
-The system SHALL expose a read that, given a release-group identifier, returns its editions — each with date, country, media formats, status, and total track count — grouped by track count, so a client can present "which tracklist" as the primary edition choice and individual editions as the secondary one.
+The system SHALL expose a read that, given a release-group identifier, returns its editions — each with date, country, media formats, status, and total track count where the catalog states one — grouped by track count, so a client can present "which tracklist" as the primary edition choice and individual editions as the secondary one. An edition the catalog states no track count for SHALL carry no count rather than a zero, and SHALL be grouped apart from counted editions and ordered behind them.
 
 #### Scenario: Editions grouped by track count
 
 - **WHEN** a client requests the editions of a release group whose releases have differing track counts
 - **THEN** editions are returned grouped by total track count, with each group's edition count derivable and each edition carrying its date, country, formats, and status
+
+#### Scenario: An uncounted edition is never the default
+
+- **WHEN** a release group has one edition the catalog states a track count for and one it does not
+- **THEN** the counted edition is the one named as the pipeline's default — an unstated count never wins the choice
 
 ### Requirement: Tracklist read
 
