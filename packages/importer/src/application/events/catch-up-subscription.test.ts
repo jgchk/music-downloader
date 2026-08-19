@@ -1,4 +1,4 @@
-import { err, ok } from 'neverthrow';
+import { ResultAsync, err, ok } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import { FakeCheckpointStore, silentLogger } from '../__fixtures__/fakes.js';
 import { catchUpSubscription } from './catch-up-subscription.js';
@@ -22,6 +22,7 @@ const event = (globalSeq: number): SeamEvent => ({
 function feedOf(options: {
   events?: readonly SeamEvent[];
   failure?: { readonly kind: string };
+  scannedTo?: number;
 }): SeamFeed & { reads: number[] } {
   const reads: number[] = [];
   return {
@@ -32,20 +33,25 @@ function feedOf(options: {
       const pending = (options.events ?? [])
         .filter((event) => event.globalSeq > from)
         .slice(0, limit);
-      const scannedTo = pending.length > 0 ? pending.at(-1)!.globalSeq : from;
-      return Promise.resolve(ok({ events: pending, scannedTo }));
+      const lastPublished = pending.length > 0 ? pending.at(-1)!.globalSeq : from;
+      return Promise.resolve(
+        ok({ events: pending, scannedTo: options.scannedTo ?? lastPublished }),
+      );
     },
   };
 }
+
+let checkpoints: FakeCheckpointStore;
 
 function subscriptionOver(
   feed: SeamFeed,
   handled: number[] = [],
 ): ReturnType<typeof catchUpSubscription> {
+  checkpoints = new FakeCheckpointStore();
   return catchUpSubscription({
     name: 'seam:acquisitions',
     feed,
-    checkpoints: new FakeCheckpointStore(),
+    checkpoints,
     handler: (delivered) => {
       handled.push(delivered.globalSeq);
       return Promise.resolve(ok(undefined));
@@ -60,16 +66,53 @@ function subscriptionOver(
 }
 
 describe('the catch-up subscription over the downloader feed', () => {
-  it("delivers the producer's events in position order, reading from the checkpoint", async () => {
+  it("delivers the producer's events and checkpoints each one at its own position", async () => {
+    // The checkpoint assertion is the point: the adapter's `positionOf` is what tells the drain
+    // WHERE each event sits, and a mapping that answered a constant would replay the producer's
+    // whole history on every restart while every delivery assertion stayed green.
     const handled: number[] = [];
-    const feed = feedOf({ events: [event(1), event(2)] });
-    const subscription = subscriptionOver(feed, handled);
+    const subscription = subscriptionOver(feedOf({ events: [event(1), event(2)] }), handled);
 
     await subscription.start();
 
     expect(handled).toEqual([1, 2]);
-    expect(feed.reads[0]).toBe(0); // a fresh consumer starts at the beginning
+    expect(checkpoints.peek('seam:acquisitions')).toBe(2);
     await subscription.stop();
+  });
+
+  it("carries the producer's scanned window through, so a gap it published nothing in is not re-read", async () => {
+    // `scannedTo` is the other half of the wire mapping. Dropped, the checkpoint would stall at the
+    // last delivered event and the drain would re-read the empty gap on every cycle forever.
+    const subscription = subscriptionOver(feedOf({ events: [event(1)], scannedTo: 50 }));
+
+    await subscription.start();
+
+    expect(checkpoints.peek('seam:acquisitions')).toBe(50);
+    await subscription.stop();
+  });
+
+  it("reports a rejecting checkpoint store in THIS module's error vocabulary", async () => {
+    // A store that rejects instead of answering with a Result is a defect, but it must still reach
+    // the caller as an `InfraError` — the drain's own error type never travels a channel this
+    // module declared as its own, or a caller narrowing on `kind` falls through at runtime.
+    const rejecting = {
+      load: (name: string) => checkpoints.load(name),
+      save: () => ResultAsync.fromSafePromise<void>(Promise.reject(new Error('store gone'))),
+    };
+    const subscription = catchUpSubscription({
+      name: 'seam:acquisitions',
+      feed: feedOf({}),
+      checkpoints: rejecting,
+      handler: () => Promise.resolve(ok(undefined)),
+      logger: silentLogger(),
+    });
+
+    const outcome = await subscription.reset(0);
+
+    expect(outcome._unsafeUnwrapErr()).toMatchObject({
+      kind: 'InfraError',
+      operation: 'checkpoint.reset',
+    });
   });
 
   it('halts on the permanent render kind the producer publishes', async () => {

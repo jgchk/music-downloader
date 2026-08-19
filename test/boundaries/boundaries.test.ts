@@ -1,3 +1,6 @@
+import { globSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import config from '../../eslint.config.js';
 
@@ -39,6 +42,15 @@ function zones(): readonly Zone[] {
 
 function hasZone(list: readonly Zone[], target: string, from: string): boolean {
   return list.some((zone) => zone.target === target && zone.from === from);
+}
+
+const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+/** Production TypeScript under `directory`, repo-relative. */
+function productionSourcesUnder(directory: string): readonly string[] {
+  return globSync(`${directory}/**/*.ts`, { cwd: REPO_ROOT }).filter(
+    (file) => !file.endsWith('.test.ts'),
+  );
 }
 
 describe('module boundary lint zones', () => {
@@ -104,6 +116,20 @@ describe('module boundary lint zones', () => {
     for (const pkg of ['downloader', 'importer', 'web']) {
       expect(hasZone(all, './packages/eventing', `./packages/${pkg}`)).toBe(true);
     }
+  });
+
+  it("keeps every context name out of the shared package's production source", () => {
+    // The leaf lint zones stop eventing IMPORTING a context. Nothing stops it naming one, and the
+    // name is how a mechanism package starts acquiring a model: a branch on a context, a default
+    // that suits one consumer, a message in one context's voice. That is the whole justification
+    // for amending "no shared kernel" to "no shared model", so it is pinned rather than asserted.
+    const sources = productionSourcesUnder('packages/eventing/src');
+    const offenders = sources.filter((file) =>
+      /\bdownloader\b|\bimporter\b/i.test(readFileSync(path.join(REPO_ROOT, file), 'utf8')),
+    );
+
+    expect(sources.length).toBeGreaterThan(0); // a discovery finding nothing would pass vacuously
+    expect(offenders).toEqual([]);
   });
 
   it('keeps packages/eventing out of every module domain layer', () => {

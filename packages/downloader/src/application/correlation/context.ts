@@ -3,6 +3,7 @@ import type {
   CommandContext,
   ContinuedOperation,
   CorrelationSource,
+  SubjectBindings,
   TriggeringEvent,
 } from '@music/eventing';
 import type { Logger } from '../logging/logger.js';
@@ -47,7 +48,7 @@ export interface OperationScope {
 export function operationScope(
   context: CommandContext,
   parent: Logger,
-  bindings: Record<string, unknown> = {},
+  bindings: SubjectBindings = {},
 ): OperationScope {
   return scopeOver(context, parent, bindings);
 }
@@ -68,5 +69,6 @@ export type {
   ContinuedOperation,
   CorrelationId,
   StoryOrigin,
+  SubjectBindings,
   TriggeringEvent,
 } from '@music/eventing';

@@ -4,7 +4,7 @@ One product, two bounded contexts, built as a modular monolith. Each context own
 
 ## Why two contexts
 
-The product is built as small, independently replaceable blocks: any one block can be rebuilt or swapped out with minimal blast radius. The seam discipline — producer-owned events, tolerant readers, no shared kernel, nothing from the other side trusted as truth — is what keeps a block swappable.
+The product is built as small, independently replaceable blocks: any one block can be rebuilt or swapped out with minimal blast radius. The seam discipline — producer-owned events, tolerant readers, no shared model, nothing from the other side trusted as truth — is what keeps a block swappable.
 
 The boundary is also linguistically honest, because the two models ask different questions with different evidence. The downloader asks _"is this copy the release that was requested?"_ — judged on structural, tag-blind evidence, cheaply at search time (match confidence) and authoritatively after download (validation). The importer asks _"what canonical album is this directory, and how should it enter the library?"_ — judged on tag agreement (beets' distance, decomposed into named penalties), a dialect that is beets-shaped by charter because beets is the library's system of record. Distance is request-blind: delivery hints pin its search, never its verdict. The two quality scalars share a [0,1] shape with opposite polarity and must never share a model.
 

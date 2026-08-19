@@ -164,16 +164,16 @@ jobs:
           # character class is deliberately narrow: a path is about to become a command argument,
           # and a filename containing shell metacharacters must not be able to redirect the scope.
           FILES="$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD \
-            | match -E '^packages/(downloader|importer)/src/[A-Za-z0-9._/-]+\.ts$' \
+            | match -E '^packages/(downloader|eventing|importer)/src/[A-Za-z0-9._/-]+\.ts$' \
             | match -vE '(\.test\.ts$|/__fixtures__/)' \
             | paste -sd, -)"
 
           # A path that is in scope by package but was dropped by the character class is a case
           # nobody intended; fail rather than silently mutate less than the diff.
           REJECTED="$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD \
-            | match -E '^packages/(downloader|importer)/src/' \
+            | match -E '^packages/(downloader|eventing|importer)/src/' \
             | match -vE '(\.test\.ts$|/__fixtures__/)' \
-            | match -vE '^packages/(downloader|importer)/src/[A-Za-z0-9._/-]+\.ts$')"
+            | match -vE '^packages/(downloader|eventing|importer)/src/[A-Za-z0-9._/-]+\.ts$')"
           if [ -n "$REJECTED" ]; then
             echo "::error::In-scope paths rejected by the safe-character filter: ${REJECTED}"
             exit 1

@@ -1,7 +1,14 @@
 import { CheckpointedDrain } from '@music/eventing';
-import type { DrainBatch, DrainFailure, DrainFeed, DrainTuning } from '@music/eventing';
+import type {
+  DrainBatch,
+  DrainDefect,
+  DrainFailure,
+  DrainFeed,
+  DrainTuning,
+} from '@music/eventing';
 import type { Result } from 'neverthrow';
 import type { Logger } from '../logging/logger.js';
+import { infraError } from '../ports/errors.js';
 import type { InfraError } from '../ports/errors.js';
 import type { CheckpointStore } from '../ports/event-store-port.js';
 
@@ -51,9 +58,15 @@ export type ConsumeFailure = DrainFailure;
 export type ConsumeHandler = (event: SeamEvent) => Promise<Result<void, ConsumeFailure>>;
 
 /**
- * The one error kind the producer's feed reports that retrying can never resolve: a payload the
- * producer cannot render (a mapping bug, or an event that cannot satisfy its own outbound schema).
- * Everything else is treated as transient and held for the next cycle.
+ * The error kind the producer's feed reports that retrying can never resolve: a payload the producer
+ * cannot render (a mapping bug, or an event that cannot satisfy its own outbound schema). Everything
+ * else is treated as transient and held for the next cycle.
+ *
+ * Note what this deliberately does NOT read: `InfraError` carries its own orthogonal `permanent`
+ * flag, and a fault the producer's adapter marked permanent still classifies transient here, so it
+ * holds rather than halts. That is the behaviour this seam has always had — the feed error crosses
+ * the boundary as `{ kind: string }` precisely so no producer error TYPE is imported — and changing
+ * it would change when a module reports itself down. Recorded rather than silently inherited.
  */
 const PERMANENT_FEED_ERROR = 'RenderError';
 
@@ -64,11 +77,14 @@ function drainFeedOver(feed: SeamFeed): DrainFeed<SeamEvent> {
       const batch = await feed.read(from, limit);
       return batch
         .map(({ events, scannedTo }) => ({ items: events, scannedTo }))
-        .mapErr((error): DrainFailure =>
-          error.kind === PERMANENT_FEED_ERROR
-            ? { kind: 'Permanent', reason: error.kind }
-            : { kind: 'Transient', reason: error.kind },
-        );
+        .mapErr((error): DrainFailure => ({
+          kind: error.kind === PERMANENT_FEED_ERROR ? 'Permanent' : 'Transient',
+          reason: error.kind,
+          // The producer's own error, intact. Classification decides what the drain DOES; the
+          // operator still needs what the producer SAID — which event type failed to render, which
+          // store call faulted — and this is the only frame that still has it.
+          cause: error,
+        }));
     },
     positionOf: (event) => event.globalSeq,
   };
@@ -99,6 +115,10 @@ export function catchUpSubscription(
     checkpoints: dependencies.checkpoints,
     step: dependencies.handler,
     logger: dependencies.logger,
+    // A store that rejects instead of answering with a Result is a defect, but it still reaches
+    // the caller through THIS module's error taxonomy — the drain's own error type never travels
+    // a channel this module declared as `InfraError`.
+    mapDefect: (defect: DrainDefect) => infraError(defect.operation, defect.message, defect.cause),
     wakeups: dependencies.wakeups,
     tuning: dependencies.tuning,
   });

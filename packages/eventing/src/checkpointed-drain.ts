@@ -19,17 +19,23 @@ import type { Result } from 'neverthrow';
  *
  * This module is generic mechanism by rule: it carries no vocabulary from any consumer, and every
  * identity it handles (the checkpoint key, an item's position) arrives as an opaque parameter. See
- * `openspec/changes/archive/*-extract-eventing-package/design.md` D1–D4 — in particular D4 for why
+ * `openspec/changes/extract-eventing-package/design.md` D1–D4 — in particular D4 for why
  * `halt` is the only poison policy and what a future per-stream `park` arm would attach to.
  */
 
 /**
  * How a failure is classified, by the consumer that produced it. This is the load-bearing wall of
  * the halt-only policy: `Transient` holds for redelivery forever, `Permanent` stops the drain.
+ *
+ * `cause` carries the consumer's OWN error through untouched, and a classifier that drops it is a
+ * defect: `kind` and `reason` tell an operator only what readiness already told them, while the
+ * field that names the actual fault — which event type failed to render, which store call faulted —
+ * lives in the error the classifier was handed. A halted seam whose log says only "Permanent" has
+ * surfaced the stall and hidden the fix.
  */
 export type DrainFailure =
-  | { readonly kind: 'Transient'; readonly reason: string }
-  | { readonly kind: 'Permanent'; readonly reason: string };
+  | { readonly kind: 'Transient'; readonly reason: string; readonly cause?: unknown }
+  | { readonly kind: 'Permanent'; readonly reason: string; readonly cause?: unknown };
 
 export interface DrainBatch<TItem> {
   readonly items: readonly TItem[];
@@ -70,7 +76,7 @@ export interface DrainDefect {
 }
 
 /**
- * Everything that has never varied across this repo's drains. Production supplies none of it; a
+ * Everything that has never varied across this module's consumers. Production supplies none of it; a
  * test reaches determinism through `sleep`/`interval` here rather than through the interface every
  * caller must learn.
  */
@@ -108,6 +114,13 @@ export interface CheckpointedDrainDependencies<TItem, TError> {
   readonly checkpoints: DrainCheckpointStore<TError>;
   readonly step: (item: TItem) => Promise<Result<void, DrainFailure>>;
   readonly logger: DrainLogger;
+  /**
+   * Translate a defect — a store that REJECTS instead of answering with a Result — into the
+   * consumer's own error type. Required, not optional: without it this module's `DrainDefect` would
+   * travel a channel the consumer declared as its own error union, and a caller narrowing on that
+   * union would fall through at runtime on a variant its module never declared.
+   */
+  readonly mapDefect: (defect: DrainDefect) => TError;
   /** The producer's post-commit wakeup — a lossy hint, never the delivery guarantee. */
   readonly wakeups?: { subscribe(listener: () => void): () => void };
   readonly tuning?: Partial<DrainTuning>;
@@ -120,6 +133,25 @@ export interface CheckpointedDrainDependencies<TItem, TError> {
  * and swallowing the rejection *here* is what keeps the barrier from surfacing as an unhandled
  * rejection of its own.
  */
+/**
+ * The single place a classification decides the drain's behaviour. Exhaustive on purpose: D4 records
+ * that a future per-stream `park` arm attaches here, and an `if (kind === 'Permanent')` would route
+ * that new arm to hold-and-retry-forever in silence. Adding a variant breaks the build here instead.
+ */
+function isPermanent(failure: DrainFailure): boolean {
+  // Enumerated exhaustively with NO `default`: a new variant stops satisfying the declared `boolean`
+  // return and breaks the build here, which is the pin. A `default` arm would be the same claim
+  // written as an unreachable runtime branch that no test could ever cover.
+  switch (failure.kind) {
+    case 'Permanent': {
+      return true;
+    }
+    case 'Transient': {
+      return false;
+    }
+  }
+}
+
 const settled = async (work: Promise<unknown>): Promise<void> => {
   try {
     await work;
@@ -163,8 +195,9 @@ export class CheckpointedDrain<TItem, TError> {
     if (checkpoint.isErr()) {
       // The checkpoint is the only record of what this consumer has already seen, so a faulted read
       // knows nothing — collapsing it into "fresh consumer at 0" would assert a durable fact and
-      // redeliver the producer's entire history while readiness still read `up`. Halt on the unknown
-      // position instead: nothing is delivered and the durable checkpoint is left untouched.
+      // redeliver the producer's entire history while the consuming module still reported itself
+      // healthy. Halt on the unknown position instead: nothing is delivered and the durable
+      // checkpoint is left untouched.
       // Recovery is a restart once the store reads, or an explicit `reset` to a chosen position —
       // never a guess. The wakeup and poll wiring below still registers, so a `reset` that lands on
       // a recovered store resumes delivery without a restart.
@@ -212,7 +245,11 @@ export class CheckpointedDrain<TItem, TError> {
     this.stopWakeups = undefined;
     this.stopInterval?.();
     this.stopInterval = undefined;
-    await this.inflight;
+    // BOTH writers, not just the drain: a queued reset saves the checkpoint too, and with no cycle
+    // running `inflight` is undefined — so awaiting it alone would resolve while a reset's save was
+    // still in flight, against a handle the caller closes the moment this resolves. Neither promise
+    // rejects; both are settled barriers.
+    await Promise.all([this.inflight, this.resetQueue]);
   }
 
   /**
@@ -226,7 +263,7 @@ export class CheckpointedDrain<TItem, TError> {
    * durable checkpoint ahead of `toPosition` while this call reported `Ok`, which is exactly the
    * false "replay armed" the ordering above exists to prevent.
    */
-  reset(toPosition = 0): ResultAsync<void, TError | DrainDefect> {
+  reset(toPosition = 0): ResultAsync<void, TError> {
     // Queued, not flagged: a boolean gate would be cleared by whichever of two overlapping resets
     // finished first, re-admitting the drain while the other's save was still in flight — the same
     // falsified Ok this serialization exists to prevent. `fromPromise`, not `new ResultAsync`: the
@@ -234,12 +271,14 @@ export class CheckpointedDrain<TItem, TError> {
     this.resets += 1;
     const run = this.resetAfter(this.resetQueue, toPosition);
     this.resetQueue = settled(run);
-    return ResultAsync.fromPromise(run, (error): TError | DrainDefect => ({
-      kind: 'DrainDefect',
-      operation: 'checkpoint.reset',
-      message: 'checkpoint reset failed unexpectedly',
-      cause: error,
-    })).andThen((saved) => saved);
+    return ResultAsync.fromPromise(run, (error): TError =>
+      this.dependencies.mapDefect({
+        kind: 'DrainDefect',
+        operation: 'checkpoint.reset',
+        message: 'checkpoint reset failed unexpectedly',
+        cause: error,
+      }),
+    ).andThen((saved) => saved);
   }
 
   private async resetAfter(
@@ -300,11 +339,12 @@ export class CheckpointedDrain<TItem, TError> {
     for (;;) {
       const batch = await this.dependencies.feed.read(this.cursor, this.tuning.batchSize);
       if (batch.isErr()) {
-        if (batch.error.kind === 'Permanent') {
+        if (isPermanent(batch.error)) {
           // A permanent defect at the producer (a mapping bug, or an item that cannot satisfy its
           // schema): retrying can never resolve it, so a plain hold would block this position — and
-          // every item behind it — forever while readiness still read `up`. Halt loudly: the
-          // checkpoint is held (never skipped), surfacing it for the code fix a defect needs.
+          // every item behind it — forever while the consuming module still reported itself
+          // healthy. Halt loudly: the checkpoint is held (never skipped), surfacing it for the code
+          // fix a defect needs.
           this.halted = true;
           this.dependencies.logger.error(
             { subscription: this.dependencies.name, cursor: this.cursor, err: batch.error },
@@ -341,7 +381,7 @@ export class CheckpointedDrain<TItem, TError> {
       const outcome = await this.dependencies.step(item);
       if (outcome.isOk()) return this.advance(position);
       lastError = outcome.error;
-      if (outcome.error.kind === 'Permanent') {
+      if (isPermanent(outcome.error)) {
         // Deterministic failures gain nothing from repetition — straight to the poison policy.
         return this.poison(position, outcome.error.reason);
       }
@@ -375,8 +415,22 @@ export class CheckpointedDrain<TItem, TError> {
     return false;
   }
 
-  /** Persist the checkpoint; the cursor never advances past what the consumer has committed. */
+  /**
+   * Persist the checkpoint; the cursor never advances past what the consumer has committed — and
+   * never moves BACKWARD. A feed whose positions are not strictly ascending would otherwise drive the
+   * durable checkpoint down and redeliver the same window forever, and `drain`'s `cursor === before`
+   * exit would not catch it, because the cursor did move. That is a producer defect no retry can
+   * fix, so it halts on the same terms as a poison item rather than quietly re-reading.
+   */
   private async advance(toPosition: number): Promise<boolean> {
+    if (toPosition <= this.cursor) {
+      this.halted = true;
+      this.dependencies.logger.error(
+        { subscription: this.dependencies.name, cursor: this.cursor, position: toPosition },
+        'feed reported a position at or behind the checkpoint; drain halted (positions must ascend)',
+      );
+      return false;
+    }
     const saved = await this.dependencies.checkpoints.save(this.dependencies.name, toPosition);
     if (saved.isErr()) {
       this.dependencies.logger.error(

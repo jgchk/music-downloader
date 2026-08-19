@@ -15,12 +15,12 @@ Two-commit shape (design D7): groups 1–5 are commit 1 (`checkpointedDrain`), g
 
 ## 3. Downloader consumes the drain
 
-- [x] 3.1 Rewrite `seam:verdicts` as a `checkpointedDrain` whose step is the existing verdict consumer; delete `packages/downloader/src/application/events/catch-up-subscription.ts` and its drain tests, keeping step-level tests
+- [x] 3.1 Rewrite `seam:verdicts` as a `CheckpointedDrain` whose step is the existing verdict consumer; reduce `packages/downloader/src/application/events/catch-up-subscription.ts` to the per-context adapter and delete its drain tests, keeping translation-level tests
 - [x] 3.2 Trim `connectVerdictFeed` in the downloader's `runtime.ts` to the ~5 required fields; the constants it passed today become drain defaults, and the composition return type stops naming an application class
 
 ## 4. Importer consumes the drain
 
-- [x] 4.1 Rewrite `seam:acquisitions` the same way with the intake consumer as its step; delete the importer's `catch-up-subscription.ts` and its drain tests
+- [x] 4.1 Rewrite `seam:acquisitions` the same way with the intake consumer as its step; reduce the importer's `catch-up-subscription.ts` to its adapter and delete its drain tests
 - [x] 4.2 Trim `connectAcquisitionFeed` in the importer's `runtime.ts` the same way
 
 ## 5. Spec deltas and gate (commit 1 close)
@@ -31,7 +31,7 @@ Two-commit shape (design D7): groups 1–5 are commit 1 (`checkpointedDrain`), g
 ## 6. Correlation mechanics, test-first (commit 2)
 
 - [x] 6.1 Port the correlation suites (context, correlation-id, envelope attach/parse) into `packages/eventing` as one suite over `createCorrelation({contextName})`
-- [x] 6.2 Implement the shared correlation module: mint, adopt-vs-mint, causation chaining, branded `CorrelationId`, envelope schema — no module name in source, identity as an opaque parameter
+- [x] 6.2 Implement the shared correlation module: mint, adopt-vs-mint, causation chaining, the causation parser, branded `CorrelationId` — no module name in production source, identity as an opaque parameter (the wire envelope schemas stay per context)
 
 ## 7. Contexts consume correlation
 

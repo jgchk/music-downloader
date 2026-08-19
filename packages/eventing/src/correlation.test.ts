@@ -30,7 +30,7 @@ const STORY = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 const OTHER = '00112233445566778899aabbccddeeff';
 
 const triggeringEvent = (metadata: { readonly correlationId?: string }): TriggeringEvent => ({
-  streamId: 'imp-1',
+  streamId: 'stream-1',
   version: 3,
   metadata,
 });
@@ -73,40 +73,40 @@ describe('createCorrelation', () => {
   it('namespaces the causation it derives with the context name it was given', () => {
     // The ONE thing a consumer supplies: which store the coordinates address. A reference whose
     // context is not this one names a row in a DIFFERENT database and must never be resolved here.
-    const { context } = createCorrelation('importer').continueFrom(
+    const { context } = createCorrelation('ctx-a').continueFrom(
       triggeringEvent({ correlationId: STORY }),
       source(OTHER),
     );
 
     expect(context.causation).toEqual({
       kind: 'event',
-      context: 'importer',
-      streamId: 'imp-1',
+      context: 'ctx-a',
+      streamId: 'stream-1',
       version: 3,
     });
   });
 
   it('gives two consumers their own namespace from the one module', () => {
-    const downloader = createCorrelation('downloader').continueFrom(
+    const first = createCorrelation('ctx-b').continueFrom(
       triggeringEvent({ correlationId: STORY }),
       source(OTHER),
     );
-    const importer = createCorrelation('importer').continueFrom(
+    const second = createCorrelation('ctx-a').continueFrom(
       triggeringEvent({ correlationId: STORY }),
       source(OTHER),
     );
 
-    expect(downloader.context.causation).toMatchObject({ context: 'downloader' });
-    expect(importer.context.causation).toMatchObject({ context: 'importer' });
+    expect(first.context.causation).toMatchObject({ context: 'ctx-b' });
+    expect(second.context.causation).toMatchObject({ context: 'ctx-a' });
   });
 
   it('exposes the context name it was built with', () => {
-    expect(createCorrelation('importer').contextName).toBe('importer');
+    expect(createCorrelation('ctx-a').contextName).toBe('ctx-a');
   });
 });
 
 describe('continueFrom', () => {
-  const correlation = createCorrelation('importer');
+  const correlation = createCorrelation('ctx-a');
 
   it('copies the triggering event story verbatim and reports it as carried', () => {
     const { context, origin } = correlation.continueFrom(
@@ -141,11 +141,11 @@ describe('continueFrom', () => {
 
 describe('adoptStory', () => {
   it('adopts a story minted elsewhere verbatim under the given causation', () => {
-    const causation = causedBy('downloader', 'acq-9', 4);
+    const causation = causedBy('ctx-b', 'stream-9', 4);
 
     expect(adoptStory(toCorrelationId(STORY), causation)).toEqual({
       correlationId: STORY,
-      causation: { kind: 'event', context: 'downloader', streamId: 'acq-9', version: 4 },
+      causation: { kind: 'event', context: 'ctx-b', streamId: 'stream-9', version: 4 },
     });
   });
 });
@@ -233,10 +233,10 @@ describe('operationScope', () => {
     };
     const context = newOperation(source(STORY, 'command-1'));
 
-    const scope = operationScope(context, parent, { streamId: 'imp-1' });
+    const scope = operationScope(context, parent, { streamId: 'stream-1' });
 
     expect(scope.context).toBe(context);
-    expect(bound).toEqual([{ correlationId: STORY, streamId: 'imp-1' }]);
+    expect(bound).toEqual([{ correlationId: STORY, streamId: 'stream-1' }]);
   });
 
   it('binds the story alone when the unit of work has no subject identity yet', () => {

@@ -81,9 +81,26 @@ describe('no correlation id reaches user-visible copy', () => {
 
 /**
  * The per-context correlation twins this file used to pin string-for-string are gone: the mechanism
- * moved to `@music/eventing` (extract-eventing-package D1/D5), so there is no deliberate duplication
- * left to protect from drift. What remains per context is a thin binding — the context name stamped
- * onto derived coordinates, and that module's own logger type — and each package's own suite covers
- * it. The shared-kernel avoidance this block guarded was retired with the rule it served: the line
- * is now no shared MODEL, and correlation is mechanism.
+ * moved to `@music/eventing` (extract-eventing-package D1/D5), so the string-equality block has no
+ * subject left. What remains per context is a thin binding plus inert re-export shims, and a
+ * divergence in those is caught by the consuming package's own typecheck rather than by a grep.
+ *
+ * What did NOT move is the block below. The story format is still defined in TWO places that share
+ * no code — the shared constant, and the web BFF's own mint — because a story belongs to neither
+ * module (one request drives both), so the shell that spans them owns its mint. That is unchanged
+ * by the extraction, and so is the drift mode: if the BFF minted a shape the modules reject, both
+ * facades would discard every caller's story as malformed and mint their own, and NOTHING would log
+ * it — `adoptOrMint` hands back the `malformed` origin, but neither facade reads it. The only
+ * symptom would be that web log lines quietly stop joining module log lines.
  */
+describe('the story format agrees everywhere it is defined', () => {
+  it('the BFF mints a value the modules accept', async () => {
+    // Behavioural, not textual: the BFF builds its id from bytes rather than declaring a pattern,
+    // so the honest pin is that what it produces satisfies the shared predicate itself — not a
+    // hand-copied regex, which would drift in lockstep with the mint it is supposed to check.
+    const { mintCorrelationId } = await import('../../packages/web/src/lib/server/correlation.ts');
+    const { isCorrelationId } = await import('../../packages/eventing/src/correlation.ts');
+
+    expect(isCorrelationId(mintCorrelationId())).toBe(true);
+  });
+});

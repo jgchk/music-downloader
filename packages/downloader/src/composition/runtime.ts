@@ -113,15 +113,14 @@ export interface SeamWakeups {
 const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * The real `sleep` handed to the reactor and the inbound subscription. A named function, not an
- * inline arrow at each site, so that the "a delay is unobservable" waiver below can be attached to
- * the DELAY and to nothing else: written inline, one `disable next-line ArrowFunction` also covers
- * the `new Promise` executor, and an executor that never calls `resolve` wedges the caller forever
- * — the opposite of unobservable.
+ * The real `sleep` handed to the reactor. A named function, not an inline arrow at the call site, so
+ * that the "a delay is unobservable" waiver below can be attached to the DELAY and to nothing else:
+ * written inline, one `disable next-line ArrowFunction` also covers the `new Promise` executor, and
+ * an executor that never calls `resolve` wedges the caller forever — the opposite of unobservable.
  */
 // Stryker disable next-line BlockStatement: an emptied body resolves immediately instead of after
-// `ms`, and every caller only `await`s the result — so the mutant changes elapsed wall-clock and
-// nothing else: same attempts, same order, same checkpoint advances. Wall-clock is the one thing a
+// `ms`, and its one caller only `await`s the result — so the mutant changes elapsed wall-clock and
+// nothing else: same streams, same order, same dispatches. Wall-clock is the one thing a
 // behavioural assertion here may not pin (a faked timer would assert that a timer is used).
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

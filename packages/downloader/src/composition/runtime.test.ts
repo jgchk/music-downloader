@@ -510,8 +510,10 @@ describe('createDownloaderRuntime', () => {
     // The feed parks its first read, so a cycle is provably mid-drain when stop() is called.
     const gate = Promise.withResolvers<void>();
     let isFirstRead = true;
+    let reads = 0;
     const feed: SeamFeed = {
       read: async () => {
+        reads += 1;
         if (isFirstRead) {
           isFirstRead = false;
           await gate.promise;
@@ -524,7 +526,14 @@ describe('createDownloaderRuntime', () => {
     // Let start() get past its checkpoint load and into the gated read before stopping: the
     // barrier stop() waits on is the in-flight cycle, and until the cycle exists there is nothing
     // to wait for. (In production the composition root awaits start() before wiring shutdown.)
-    await new Promise((resolve) => setImmediate(resolve));
+    //
+    // Poll for the barrier rather than counting event-loop hops. One `setImmediate` happened to be
+    // enough before the drain moved behind `@music/eventing`; the number of hops between `start()`
+    // and the first gated read is an implementation detail of the drain, and a test that encodes it
+    // fails intermittently the moment that detail shifts — which is what it did (2 of 5 runs).
+    await vi.waitFor(() => {
+      expect(reads).toBeGreaterThan(0);
+    });
 
     const stopping = runtime.stop();
     gate.resolve();

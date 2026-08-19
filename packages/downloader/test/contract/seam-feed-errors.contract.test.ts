@@ -47,7 +47,7 @@ const PRODUCER = seamContractOf('importer');
 /** A subscription whose feed only ever fails, with the given kind. */
 function subscriptionOverFailingFeed(kind: string): CatchUpSubscription {
   return catchUpSubscription({
-    name: 'seam:test',
+    name: 'seam:verdicts',
     feed: {
       read: (): Promise<Result<SeamFeedBatch, { kind: string }>> => Promise.resolve(err({ kind })),
     },

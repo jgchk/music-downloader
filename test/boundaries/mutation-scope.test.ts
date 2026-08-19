@@ -31,6 +31,11 @@ import strykerConfig from '../../stryker.config.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
+/**
+ * `packages/eventing` is in scope alongside the two contexts: it carries the seam's delivery and
+ * correlation mechanism, so a mutant surviving there survives for BOTH contexts at once.
+ */
+
 /** Code-unit order, matching how `gate-coverage.test.ts` sorts the paths it reports. */
 function byPath(left: string, right: string): number {
   if (left === right) return 0;
@@ -81,7 +86,11 @@ function mutatedFiles(): string[] {
 const MUTATED = mutatedFiles();
 const MUTATED_SET = new Set(MUTATED);
 
-const CONTEXT_SOURCE_TREES = ['packages/downloader/src', 'packages/importer/src'];
+const CONTEXT_SOURCE_TREES = [
+  'packages/downloader/src',
+  'packages/eventing/src',
+  'packages/importer/src',
+];
 
 /**
  * Every production TypeScript source in the two context packages — the answer scope is compared
