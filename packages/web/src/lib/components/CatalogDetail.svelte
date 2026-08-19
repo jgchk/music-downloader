@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    activeEdition,
     editionSummary,
     groupHeading,
     pickedMbid,
@@ -7,7 +8,8 @@
     trackTime,
   } from '$lib/search/detail.js';
   import { artUrl } from '$lib/search/view.js';
-  import type { DetailState, TracklistState } from '$lib/search/detail.js';
+  import QualityFloorSelect from './QualityFloorSelect.svelte';
+  import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
 
   interface Properties {
     /** What is open, and what has been read about it so far; nothing when nothing is open. */
@@ -16,13 +18,20 @@
     tracklists: Record<string, TracklistState>;
     /** Ask for one edition's running order — read only when asked for. */
     onTracklist: (mbid: string) => void;
+    /**
+     * The edition chosen by hand, and the album it was chosen on. Held by the surface that owns
+     * the page's state rather than here, so this component stays a function of its props — and so
+     * the choice can be rendered on the server, where nothing can be clicked.
+     */
+    pin: EditionPin | undefined;
+    /** Choose a pressing to request, or (with nothing) go back to the system's own default. */
+    onPin: (pin: EditionPin | undefined) => void;
     onClose: () => void;
   }
 
-  let { detail, tracklists, onTracklist, onClose }: Properties = $props();
+  let { detail, tracklists, onTracklist, pin, onPin, onClose }: Properties = $props();
 
-  /** The edition to request: the one pinned here, else whatever the pipeline picks for itself. */
-  let pinned = $state<string | undefined>();
+  const activePin = $derived(activeEdition(detail, pin));
 
   /** An edition's own name, plus whatever the catalog says makes it different. */
   const editionTitle = (edition: { title: string; disambiguation?: string | undefined }): string =>
@@ -32,7 +41,19 @@
 </script>
 
 {#if detail !== undefined}
-  <aside class="detail" data-testid="detail" aria-label={detail.title}>
+  <!-- An overlay, so it says what it is and can be left the way an overlay is left. -->
+  <div
+    class="catalog-detail"
+    data-testid="detail"
+    role="dialog"
+    aria-modal="false"
+    aria-label={detail.title}
+    tabindex="-1"
+    {@attach (element: HTMLElement) => element.focus()}
+    onkeydown={(event) => {
+      if (event.key === 'Escape') onClose();
+    }}
+  >
     <header class="detail-head">
       <h2>{detail.title}</h2>
       <button type="button" class="detail-close" onclick={onClose}>Close</button>
@@ -60,7 +81,7 @@
       {/if}
 
       <ul class="edition-groups">
-        {#each detail.editions.groups as group, index (group.trackCount)}
+        {#each detail.editions.groups as group, index (group.representative.mbid)}
           {@const state = tracklists[group.representative.mbid]}
           <li>
             <details class="edition-group" open={index === 0}>
@@ -98,8 +119,13 @@
                     <button
                       type="button"
                       class="edition"
-                      aria-pressed={pinned === edition.mbid}
-                      onclick={() => (pinned = pinned === edition.mbid ? undefined : edition.mbid)}
+                      aria-pressed={activePin === edition.mbid}
+                      onclick={() =>
+                        onPin(
+                          activePin === edition.mbid
+                            ? undefined
+                            : { album: detail.mbid, edition: edition.mbid },
+                        )}
                     >
                       <span class="edition-title">{editionTitle(edition)}</span>
                       <span class="edition-summary">{editionSummary(edition)}</span>
@@ -108,7 +134,7 @@
                           the system’s default
                         </span>
                       {/if}
-                      {#if pinned === edition.mbid}
+                      {#if activePin === edition.mbid}
                         <span class="edition-pinned">chosen</span>
                       {/if}
                     </button>
@@ -121,26 +147,17 @@
       </ul>
 
       <form method="POST" action="/acquisitions/new" class="detail-request">
-        {#if pinned === undefined}
+        {#if activePin === undefined}
           <input type="hidden" name="kind" value="release-group" />
           <input type="hidden" name="mbid" value={detail.mbid} />
         {:else}
           <input type="hidden" name="kind" value="musicbrainz" />
           <input type="hidden" name="targetType" value="album" />
-          <input type="hidden" name="mbid" value={pinned} />
+          <input type="hidden" name="mbid" value={activePin} />
         {/if}
-        <label>
-          Quality floor
-          <select name="qualityFloor">
-            <option value="">Default</option>
-            <option value="LOSSLESS_HIRES">Hi-res lossless</option>
-            <option value="LOSSLESS">Lossless</option>
-            <option value="LOSSY_HIGH">High quality lossy</option>
-            <option value="LOSSY_STANDARD">Standard lossy</option>
-          </select>
-        </label>
+        <QualityFloorSelect />
         <button type="submit" class="btn primary">
-          {pinned === undefined ? 'Request download' : 'Request this edition'}
+          {activePin === undefined ? 'Request download' : 'Request this edition'}
         </button>
       </form>
     {:else if detail.kind === 'artist'}
@@ -163,18 +180,9 @@
         <input type="hidden" name="kind" value="musicbrainz" />
         <input type="hidden" name="targetType" value="track" />
         <input type="hidden" name="mbid" value={detail.mbid} />
-        <label>
-          Quality floor
-          <select name="qualityFloor">
-            <option value="">Default</option>
-            <option value="LOSSLESS_HIRES">Hi-res lossless</option>
-            <option value="LOSSLESS">Lossless</option>
-            <option value="LOSSY_HIGH">High quality lossy</option>
-            <option value="LOSSY_STANDARD">Standard lossy</option>
-          </select>
-        </label>
+        <QualityFloorSelect />
         <button type="submit" class="btn primary">Request this track</button>
       </form>
     {/if}
-  </aside>
+  </div>
 {/if}

@@ -1,7 +1,7 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import CatalogDetail from './CatalogDetail.svelte';
-import type { DetailState, TracklistState } from '$lib/search/detail.js';
+import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const PICK = '1b022e01-4da6-387b-8658-8678046e4cef';
@@ -11,16 +11,20 @@ const noop = (): void => {};
 const edition = (mbid: string, overrides: Record<string, unknown> = {}) => ({
   mbid,
   title: 'Graceland',
-  formats: 'CD',
+  formats: ['CD'],
   trackCount: 11,
   date: '1986-08-29',
   country: 'DE',
   ...overrides,
 });
 
-const body = (detail: DetailState, tracklists: Record<string, TracklistState> = {}): string =>
+const body = (
+  detail: DetailState,
+  tracklists: Record<string, TracklistState> = {},
+  pin?: EditionPin,
+): string =>
   render(CatalogDetail, {
-    props: { detail, tracklists, onTracklist: noop, onClose: noop },
+    props: { detail, tracklists, onTracklist: noop, pin, onPin: noop, onClose: noop },
   }).body;
 
 const releaseGroup = (bestMatch: {
@@ -37,20 +41,72 @@ const releaseGroup = (bestMatch: {
 });
 
 describe('CatalogDetail (SSR)', () => {
+  it('requests the chosen pressing, said in words, once one has been chosen', () => {
+    // The choice is rendered on the server too: it is the page's state, not something the browser
+    // discovers, so a reload with a pressing chosen must come back showing that pressing.
+    const html = body(releaseGroup({ kind: 'pick', mbid: PICK }), {}, { album: RG, edition: PICK });
+
+    expect(html).toContain('chosen');
+    expect(html).toContain('Request this edition');
+    expect(html).toContain('name="targetType" value="album"');
+    expect(html).toContain(`name="mbid" value="${PICK}"`);
+  });
+
+  it('ignores a pressing chosen on a different album', () => {
+    const html = body(
+      releaseGroup({ kind: 'pick', mbid: PICK }),
+      {},
+      { album: 'another-album', edition: PICK },
+    );
+
+    expect(html).toContain('Request download');
+    expect(html).toContain(`name="kind" value="release-group"`);
+  });
+
+  it('renders an edition the catalog has not named, and one it has not typed', () => {
+    const bare = { ...edition(PICK), title: '', disambiguation: undefined, formats: [] };
+    const html = body({
+      kind: 'release-group',
+      mbid: RG,
+      title: 'Graceland',
+      editions: {
+        groups: [{ trackCount: 11, representative: bare, editions: [bare] }],
+        bestMatch: { kind: 'pick', mbid: PICK },
+      },
+    });
+
+    expect(html).toContain('1986-08-29');
+    expect(html).toContain('11 tracks');
+  });
+
   it('renders nothing at all while nothing is open', () => {
     expect(
       render(CatalogDetail, {
-        props: { detail: undefined, tracklists: {}, onTracklist: noop, onClose: noop },
+        props: {
+          detail: undefined,
+          tracklists: {},
+          onTracklist: noop,
+          pin: undefined,
+          onPin: noop,
+          onClose: noop,
+        },
       }).body.trim(),
     ).not.toContain('<aside');
   });
 
   it('says it is reading the catalog while it has nothing to show', () => {
-    expect(body({ kind: 'loading', title: 'Graceland' })).toContain('Reading the catalog');
+    expect(body({ kind: 'loading', mbid: RG, title: 'Graceland' })).toContain(
+      'Reading the catalog',
+    );
   });
 
   it('reports a catalog it could not read as an alert, not as an empty list', () => {
-    const html = body({ kind: 'failed', title: 'Graceland', message: 'Could not be reached.' });
+    const html = body({
+      kind: 'failed',
+      mbid: RG,
+      title: 'Graceland',
+      message: 'Could not be reached.',
+    });
 
     expect(html).toContain('role="alert"');
     expect(html).toContain('Could not be reached.');

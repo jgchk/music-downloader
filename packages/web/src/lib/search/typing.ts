@@ -36,9 +36,8 @@ export const MIN_QUERY_LENGTH = 2;
 export const searchTyping: TypingDriver = debouncedTyping(SEARCH_DEBOUNCE_MS);
 
 /**
- * The typing policy the page's `$effect` delegates to, kept here as a pure unit so the whole
- * decision — too little to search on, search now, or search once the typing settles — is directly
- * testable and the effect shrinks to a one-line wiring that SSR compiles out.
+ * The typing policy the page delegates to, kept here as a pure unit so the whole decision — too
+ * little to search on, search now, or search once the typing settles — is directly testable.
  *
  * Returns the way to abandon a scheduled search, or undefined when there is nothing scheduled.
  */

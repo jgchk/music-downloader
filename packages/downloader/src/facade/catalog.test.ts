@@ -115,6 +115,8 @@ describe('lookupCatalog', () => {
       ok: true,
       value: { kind: 'recording', recording: { title: 'The Boy in the Bubble' } },
     });
+    if (!result.ok) return;
+    expect(catalogLookupResultSchema.safeParse(roundTrip(result.value)).success).toBe(true);
   });
 
   it('resolves an identifier that names an artist', async () => {
@@ -128,6 +130,8 @@ describe('lookupCatalog', () => {
       ok: true,
       value: { kind: 'artist', artist: { name: 'Paul Simon' } },
     });
+    if (!result.ok) return;
+    expect(catalogLookupResultSchema.safeParse(roundTrip(result.value)).success).toBe(true);
   });
 
   it('carries a track that sits on no release, without inventing one', async () => {
@@ -147,6 +151,17 @@ describe('lookupCatalog', () => {
     if (!result.ok) return;
     expect(result.value.recording?.release).toBeUndefined();
   });
+});
+
+describe('the lookup answer’s wire shape', () => {
+  it.each([['release-group'], ['artist'], ['recording']])(
+    'refuses a %s answer whose payload never arrived',
+    (kind) => {
+      // The tag is what a reader branches on, so a tag without its payload would send a reader
+      // down a branch and hand it nothing — a page rendering an empty record as a real one.
+      expect(catalogLookupResultSchema.safeParse({ kind }).success).toBe(false);
+    },
+  );
 });
 
 describe('the identifier every catalog read takes', () => {

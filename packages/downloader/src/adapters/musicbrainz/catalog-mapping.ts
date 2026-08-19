@@ -21,10 +21,12 @@ import type {
 /**
  * Pure JSON → catalog mapping for the search read, the presentation-side twin of `mapping.ts`.
  *
- * The governing rule is that a hit only survives if a person could act on it: an entry the catalog
- * gives no usable identifier or no name is dropped rather than rendered as a blank row you cannot
- * request. Everything else degrades softly — an unknown year, type, or credit is simply absent,
- * because MusicBrainz reporting "unknown" is data, not drift.
+ * The governing rule is that a SEARCH HIT only survives if a person could act on it: an entry the
+ * catalog gives no usable identifier or no name is dropped rather than rendered as a blank row you
+ * cannot request. Editions and tracks are kept on identifier alone — they are read inside a thing
+ * the person already chose, where an unnamed row is still positional context. Everything else
+ * degrades softly: an unknown year, type, or credit is simply absent, because MusicBrainz reporting
+ * "unknown" is data, not drift.
  */
 
 /** Join a credit the way the catalog renders it, so `A & B` survives as one line. */
@@ -130,10 +132,8 @@ const ALBUM_FIRST = new Set(['Album']);
  * means — then everything else, newest first inside each band so the recent work leads.
  */
 export function toDiscography(json: MbReleaseGroupSearch): readonly CatalogReleaseGroup[] {
-  // The ordering keys are read off each release group ONCE, before sorting, rather than inside the
-  // comparator: a comparator is called in an engine-chosen order, so reading "is it an album" there
-  // would make which groups get asked — and which of these readings ever run — an implementation
-  // detail of the sort.
+  // Keys are read once per group rather than on every comparison, which a comparator would do
+  // O(n log n) times.
   return toReleaseGroups(json)
     .map((group) => ({
       group,
@@ -149,20 +149,25 @@ function trackCountOf(release: { media?: readonly { 'track-count'?: number }[] }
   return (release.media ?? []).reduce((sum, medium) => sum + (medium['track-count'] ?? 0), 0);
 }
 
-/** The distinct media formats of one edition, joined for display (`CD + DVD`). */
-function formatsOf(release: { media?: readonly { format?: string | null }[] }): string {
+/**
+ * The distinct media formats of one edition. A list rather than a joined string: the separator is a
+ * presentation choice, and a consumer that wants to filter or badge by format should not have to
+ * split one back apart.
+ */
+function formatsOf(release: { media?: readonly { format?: string | null }[] }): readonly string[] {
   const formats = (release.media ?? [])
     .map((medium) => medium.format)
     .filter((format): format is string => typeof format === 'string' && format !== '');
-  return [...new Set(formats)].join(' + ');
+  return [...new Set(formats)];
 }
 
 /**
  * A release group's editions, grouped by the choice that actually changes the download — which
  * tracklist — with the most-published tracklist first so the canonical album leads. The default is
  * not decided here: it is asked of {@link releaseGroupEditionIds}, the pipeline's own picker, so the
- * preview and the behavior it previews cannot drift apart. A group whose editions admit no
- * automatic pick says so rather than nominating one.
+ * POLICY cannot drift from the behavior it previews. The inputs can differ in one edge case — the
+ * preview drops releases whose id is not a well-formed mbid, where the pipeline keeps them. A group
+ * whose editions admit no automatic pick says so rather than nominating one.
  */
 export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionListing {
   const releases = json.releases ?? [];
@@ -229,8 +234,12 @@ export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionList
 }
 
 /**
- * One edition's running order. Positions come from the catalog where it states them and otherwise
- * from the reading order itself, so a sparse medium still numbers 1, 2, 3 the way a person expects.
+ * One edition's running order, numbered by reading order across every medium.
+ *
+ * The catalog numbers tracks WITHIN a medium, so a two-disc release states 1…11 and then 1…10
+ * again. This type means one continuous running order — the thing a person reads down — so the
+ * position is assigned here rather than passed through: passing it through would hand every
+ * consumer two tracks numbered 1 and no way to tell them apart.
  */
 export function toTracks(release: MbRelease): readonly CatalogTrack[] {
   const tracks: CatalogTrack[] = [];
@@ -240,11 +249,7 @@ export function toTracks(release: MbRelease): readonly CatalogTrack[] {
     for (const track of mediumTracks) {
       const title = nameOf(track.title) ?? nameOf(track.recording?.title) ?? '';
       const length = track.length ?? track.recording?.length ?? undefined;
-      tracks.push({
-        position: track.position ?? tracks.length + 1,
-        title,
-        durationMs: length ?? undefined,
-      });
+      tracks.push({ position: tracks.length + 1, title, durationMs: length ?? undefined });
     }
   }
   return tracks;

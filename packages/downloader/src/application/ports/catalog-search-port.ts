@@ -73,8 +73,8 @@ export interface CatalogEdition {
   readonly disambiguation: string | undefined;
   readonly date: string | undefined;
   readonly country: string | undefined;
-  /** The edition's distinct media formats, joined for display (e.g. `CD + DVD`); empty if unknown. */
-  readonly formats: string;
+  /** The edition's distinct media formats (e.g. `['CD', 'DVD']`); empty when the catalog is silent. */
+  readonly formats: readonly string[];
   readonly status: string | undefined;
   readonly trackCount: number;
 }
@@ -95,9 +95,11 @@ export interface CatalogEditionGroup {
 }
 
 /**
- * Which edition the acquisition pipeline's own picker would resolve for this release group —
- * produced by that same picker, so the preview cannot drift from the behavior it previews. A group
- * with no official edition yields `selectionRequired`, mirroring the pipeline's `needsSelection`.
+ * The FIRST edition the acquisition pipeline's own picker would try for this release group —
+ * produced by that same picker, so the policy cannot drift from the behavior it previews. (The
+ * pipeline walks the picker's ordered ids and takes the first that yields a usable target, so it
+ * may skip past this one.) A group with no official edition yields `selectionRequired`, mirroring
+ * the pipeline's `needsSelection`.
  */
 export type BestMatchEdition =
   { readonly kind: 'pick'; readonly mbid: Mbid } | { readonly kind: 'selectionRequired' };
@@ -119,7 +121,7 @@ export interface CatalogSearchPort {
   search(query: string, scope: OperationScope): ResultAsync<CatalogSearchResults, InfraError>;
   /** Resolve one identifier to whichever entity kind it names. */
   lookup(mbid: Mbid, scope: OperationScope): ResultAsync<CatalogLookup, InfraError>;
-  /** An artist's release groups, albums first, newest first within a type. */
+  /** An artist's release groups: albums first, everything else after, newest first within a band. */
   discography(
     artist: Mbid,
     scope: OperationScope,

@@ -3,12 +3,12 @@
   import CatalogResults from './CatalogResults.svelte';
   import { httpCatalog } from '$lib/search/client.js';
   import { openDetail, readTracklist, runSearch } from '$lib/search/session.js';
+  import type { SearchOutcome } from '$lib/search/session.js';
   import { searchTyping, startTyping } from '$lib/search/typing.js';
   import type { CatalogClient } from '$lib/search/client.js';
-  import type { DetailState, TracklistState } from '$lib/search/detail.js';
+  import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
   import type { TypingDriver } from '$lib/search/typing.js';
-  import type { EntityFilter } from '$lib/search/view.js';
-  import type { CatalogSearchResultDto } from '@music/downloader';
+  import type { EntityFilter, EntityKind } from '$lib/search/view.js';
 
   interface Properties {
     /** Action-failure message from a rejected submission (the native fallback's path). */
@@ -23,14 +23,24 @@
 
   let query = $state('');
   let filter = $state<EntityFilter>('all');
-  let results = $state<CatalogSearchResultDto | undefined>();
+  let outcome = $state<SearchOutcome | undefined>();
   let failure = $state<string | undefined>();
   let searching = $state(false);
   let detail = $state<DetailState | undefined>();
+  /** What the person last asked to see; a read for anything else has been overtaken. */
+  let opening = $state<string | undefined>();
   let tracklists = $state<Record<string, TracklistState>>({});
+  /** The pressing chosen by hand, if any — see `activeEdition` for why it carries its album. */
+  let pin = $state<EditionPin | undefined>();
 
   /** The search in flight, abandoned as soon as a newer one starts. */
   let inFlight: AbortController | undefined;
+  /**
+   * The search the last keystroke scheduled. Enter does not change the query, so the effect that
+   * owns this teardown does not re-run — without cancelling it here, pressing Enter would search
+   * now and then search the same thing again when the debounce came due.
+   */
+  let cancelScheduled: (() => void) | undefined;
 
   const FILTERS: readonly { readonly value: EntityFilter; readonly label: string }[] = [
     { value: 'all', label: 'All' },
@@ -43,7 +53,7 @@
     inFlight?.abort();
     inFlight = undefined;
     searching = false;
-    results = undefined;
+    outcome = undefined;
     failure = undefined;
   }
 
@@ -54,21 +64,49 @@
     failure = undefined;
     void runSearch(catalog, text, controller.signal, {
       onSearching: (value) => (searching = value),
-      onResults: (value) => (results = value),
+      onOutcome: (value) => (outcome = value),
       onFailure: (message) => {
         failure = message;
-        results = undefined;
+        outcome = undefined;
       },
     });
   }
 
+  /**
+   * Open a result, and let the read know whether it is still the one being waited for: opening a
+   * second result, or closing the surface, must not be undone by the first read arriving late.
+   */
+  function openDetailFor(kind: EntityKind, mbid: string, title: string): void {
+    tracklists = {};
+    opening = mbid;
+    void openDetail(
+      catalog,
+      kind,
+      mbid,
+      title,
+      (opened) => (detail = opened),
+      () => opening === mbid,
+    );
+  }
+
   function searchNow(): void {
+    cancelScheduled?.();
+    cancelScheduled = undefined;
     startTyping(query, true, typing, { clear, search: run });
   }
 
-  // The whole timing decision lives in `startTyping`; this is its one-line wiring, which SSR
-  // compiles out — the server renders the pre-search page and the browser takes it from there.
-  $effect(() => startTyping(query, false, typing, { clear, search: run }));
+  // An expression body, deliberately: `startTyping` returns the way to abandon a scheduled search,
+  // and Svelte takes an effect's return value as its teardown — which is the only thing that
+  // cancels a pending debounce when the query changes. Wrapping this in braces would discard the
+  // canceller and break cancellation silently. (Effects do not run during SSR, so the server
+  // renders the pre-search page and the browser takes it from there.)
+  $effect(() => {
+    cancelScheduled = startTyping(query, false, typing, { clear, search: run });
+    return () => {
+      cancelScheduled?.();
+      cancelScheduled = undefined;
+    };
+  });
 </script>
 
 <div class="request-search">
@@ -113,15 +151,17 @@
 
   {#if failure !== undefined}
     <p class="error" role="alert" data-testid="search-error">{failure}</p>
-  {:else if results !== undefined}
+  {:else if outcome?.kind === 'unknown-id'}
+    <p class="empty-results" data-testid="unknown-id">
+      No release, artist, or track in the catalog carries that MusicBrainz ID. Check that it was
+      copied whole, or search for the record by name instead.
+    </p>
+  {:else if outcome?.kind === 'results'}
     <CatalogResults
-      {results}
+      results={outcome.results}
       {filter}
       {query}
-      onOpen={(kind, mbid, title) => {
-        tracklists = {};
-        void openDetail(catalog, kind, mbid, title, (opened) => (detail = opened));
-      }}
+      onOpen={openDetailFor}
       onFilter={(next) => (filter = next)}
     />
   {:else if !searching}
@@ -135,8 +175,13 @@
     {detail}
     {tracklists}
     onTracklist={(mbid) =>
-      void readTracklist(catalog, mbid, tracklists, (next) => (tracklists = next))}
-    onClose={() => (detail = undefined)}
+      void readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists)))}
+    {pin}
+    onPin={(chosen) => (pin = chosen)}
+    onClose={() => {
+      detail = undefined;
+      opening = undefined;
+    }}
   />
 
   <details class="native-request">

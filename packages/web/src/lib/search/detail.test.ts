@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { editionSummary, pickedMbid, trackTime } from './detail.js';
+import {
+  activeEdition,
+  editionSummary,
+  groupHeading,
+  pickedMbid,
+  releaseLine,
+  trackTime,
+} from './detail.js';
+import type { DetailState } from './detail.js';
 import type { CatalogEditionsResultDto } from '@music/downloader';
 
 const MBID = '1b022e01-4da6-387b-8658-8678046e4cef';
@@ -7,7 +15,7 @@ const MBID = '1b022e01-4da6-387b-8658-8678046e4cef';
 const edition = (overrides: Record<string, unknown> = {}) => ({
   mbid: MBID,
   title: 'Graceland',
-  formats: 'CD',
+  formats: ['CD'],
   trackCount: 11,
   date: '1986-08-29',
   country: 'DE',
@@ -28,7 +36,7 @@ describe('editionSummary', () => {
   });
 
   it('says nothing about a format the catalog does not name', () => {
-    expect(editionSummary(edition({ formats: '' }))).toBe('1986-08-29 · DE · 11 tracks');
+    expect(editionSummary(edition({ formats: [] }))).toBe('1986-08-29 · DE · 11 tracks');
   });
 });
 
@@ -60,5 +68,64 @@ describe('trackTime', () => {
 
   it('says nothing for a track the catalog has no timing for', () => {
     expect(trackTime(undefined)).toBe('');
+  });
+});
+
+describe('groupHeading', () => {
+  it('counts one tracklist and one pressing in the singular', () => {
+    expect(groupHeading({ trackCount: 1, editions: [edition()] })).toBe(
+      '1 track \u{00B7} 1 edition',
+    );
+  });
+
+  it('counts several in the plural', () => {
+    expect(groupHeading({ trackCount: 11, editions: [edition(), edition()] })).toBe(
+      '11 tracks \u{00B7} 2 editions',
+    );
+  });
+});
+
+describe('releaseLine', () => {
+  it('says when and of what kind, and nothing where the catalog is silent', () => {
+    expect(releaseLine({ year: 1986, primaryType: 'Album' })).toBe('1986 \u{00B7} Album');
+    expect(releaseLine({ year: undefined, primaryType: 'Album' })).toBe('Album');
+    expect(releaseLine({ year: 1986, primaryType: undefined })).toBe('1986');
+    expect(releaseLine({ year: undefined, primaryType: undefined })).toBe('');
+  });
+});
+
+describe('activeEdition', () => {
+  const album = (mbid: string): DetailState => ({
+    kind: 'release-group',
+    mbid,
+    title: 'Graceland',
+    editions: { groups: [], bestMatch: { kind: 'selection-required' } },
+  });
+
+  it('is the edition chosen on the album that is open', () => {
+    expect(activeEdition(album(MBID), { album: MBID, edition: 'chosen' })).toBe('chosen');
+  });
+
+  it('is nothing until an edition has been chosen', () => {
+    expect(activeEdition(album(MBID), undefined)).toBeUndefined();
+  });
+
+  it('is nothing once a different album is opened', () => {
+    // The surface is re-used, so a choice that outlived its album would request the first album's
+    // pressing under the second album's name — a wrong-record download, silently.
+    expect(activeEdition(album('other'), { album: MBID, edition: 'chosen' })).toBeUndefined();
+  });
+
+  it('is nothing for anything that is not an album', () => {
+    expect(
+      activeEdition(
+        { kind: 'recording', mbid: MBID, title: 'A Track' },
+        {
+          album: MBID,
+          edition: 'chosen',
+        },
+      ),
+    ).toBeUndefined();
+    expect(activeEdition(undefined, undefined)).toBeUndefined();
   });
 });

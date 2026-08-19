@@ -92,6 +92,25 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
     expect(results.artists[0]?.name).toBe('Paul Simon');
   });
 
+  it('asks each entity read with the parameters it was recorded with', async () => {
+    // Without this, dropping an `inc=` would stop the request matching its recording, fall back to
+    // the path-only route, and still be answered with a body that contains what the parameter asks
+    // for — a change that breaks production while this tier stays green.
+    await adapter().search(ARTIST_QUERY, testScope());
+    await adapter().search(TRACK_QUERY, testScope());
+
+    const artistRecording = byName('catalog-artist-search.json').request.query!;
+    const trackRecording = byName('catalog-recording-search.json').request.query!;
+    const artist = server.requests.find(
+      (request) => request.path === '/artist' && request.query.query === artistRecording.query,
+    )!;
+    const recording = server.requests.find(
+      (request) => request.path === '/recording' && request.query.query === trackRecording.query,
+    )!;
+    expect(artist.query).toEqual(artistRecording);
+    expect(recording.query).toEqual(trackRecording);
+  });
+
   it('leads with tracks when the query names one, and carries the release it sits on', async () => {
     const results = await unwrap(adapter().search(TRACK_QUERY, testScope()));
 
@@ -116,6 +135,8 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
     const found = await unwrap(adapter().lookup(mbid, testScope()));
 
     expect(found).toMatchObject({ kind: 'found', entity: { kind: 'artist' } });
+    const sent = server.requests.find((request) => request.path === `/artist/${mbid}`)!;
+    expect(sent.query).toEqual(byName('catalog-artist-lookup.json').request.query);
   });
 
   it('resolves a pasted recording identifier', async () => {
@@ -124,6 +145,8 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
     const found = await unwrap(adapter().lookup(mbid, testScope()));
 
     expect(found).toMatchObject({ kind: 'found', entity: { kind: 'recording' } });
+    const sent = server.requests.find((request) => request.path === `/recording/${mbid}`)!;
+    expect(sent.query).toEqual(byName('catalog-recording-lookup.json').request.query);
   });
 
   it('browses an artist’s work from the recorded browse, albums first', async () => {
@@ -132,9 +155,16 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
     const work = await unwrap(adapter().discography(artist, testScope()));
 
     expect(work.length).toBeGreaterThan(0);
-    const firstNonAlbum = work.findIndex((group) => group.primaryType !== 'Album');
-    const lastAlbum = work.map((group) => group.primaryType).lastIndexOf('Album');
-    if (firstNonAlbum !== -1) expect(lastAlbum).toBeLessThan(firstNonAlbum);
+    // Albums form an unbroken run at the front: asserted as a shape, so an albums-only recording
+    // cannot quietly reduce this to no assertion at all.
+    const albumFlags = work.map((group) => group.primaryType === 'Album');
+    expect(albumFlags).toEqual(albumFlags.toSorted((left, right) => Number(right) - Number(left)));
+    expect(albumFlags[0]).toBe(true);
+    // And within the albums, the newest is first.
+    const albumYears = work
+      .filter((group) => group.primaryType === 'Album')
+      .map((g) => g.year ?? 0);
+    expect(albumYears).toEqual(albumYears.toSorted((left, right) => right - left));
     const sent = server.requests.find((request) => request.path === '/release-group')!;
     expect(sent.query).toEqual(byName('catalog-artist-browse.json').request.query);
   });
@@ -162,9 +192,19 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
 
     expect(listing.groups.length).toBeGreaterThan(0);
     expect(listing.bestMatch.kind).toBe('pick');
-    const grouped = listing.groups.flatMap((group) =>
-      group.editions.map((edition) => edition.trackCount),
+    // Every edition in a group shares that group's tracklist — the property the grouping exists
+    // for, and one a broken grouping (everything in one bucket) would violate.
+    for (const group of listing.groups) {
+      expect(group.editions.map((edition) => edition.trackCount)).toEqual(
+        group.editions.map(() => group.trackCount),
+      );
+    }
+    // The pick is one of the editions listed, not a dangling identifier.
+    const listed = listing.groups.flatMap((group) => group.editions.map((edition) => edition.mbid));
+    expect(listed).toContain(
+      listing.bestMatch.kind === 'pick' ? listing.bestMatch.mbid : undefined,
     );
-    expect(new Set(grouped).size).toBeLessThanOrEqual(listing.groups.length);
+    const sent = server.requests.find((request) => request.path === '/release')!;
+    expect(sent.query).toEqual(byName('release-group-browse.json').request.query);
   });
 });

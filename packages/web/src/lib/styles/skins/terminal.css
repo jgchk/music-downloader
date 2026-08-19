@@ -130,7 +130,7 @@
 :root[data-skin='terminal'] .edition:hover {
   background: var(--surface-2);
 }
-:root[data-skin='terminal'] .detail {
+:root[data-skin='terminal'] .catalog-detail {
   border-left: 1px solid var(--accent);
   box-shadow: none;
 }

@@ -201,7 +201,8 @@ describe('MusicBrainzCatalogSearch.search', () => {
     const failure = await unwrapErr(port.search('graceland', testScope()));
 
     expect(failure.kind).toBe('InfraError');
-    expect(failure.operation).toBe('musicbrainz.catalog.search');
+    // Named per entity: an operator must be able to tell WHICH of a search's three reads failed.
+    expect(failure.operation).toBe('musicbrainz.catalog.search.release-group');
     expect(failure.permanent).toBeUndefined();
   });
 
@@ -217,6 +218,25 @@ describe('MusicBrainzCatalogSearch.search', () => {
       recordings: [],
       leading: 'release-group',
     });
+  });
+
+  it('searches for what was typed as words, not as query syntax', async () => {
+    const { port, sent } = searcher(SEARCH_ROUTES);
+
+    await unwrap(port.search("sgt. pepper's: live", testScope()));
+
+    // The provider parses this parameter as a query language; a searcher's punctuation must read
+    // as punctuation rather than as syntax it would refuse.
+    const query = new URL(sent[0]!.url).searchParams.get('query');
+    expect(query).toContain(String.raw`\:`);
+  });
+
+  it('reports a request the catalog refuses as permanent, since retrying reproduces it', async () => {
+    const { port } = searcher([{ match: '/release-group?query=', status: 400 }]);
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.permanent).toBe(true);
   });
 
   it('reports a catalog that could not be reached at all as a fault', async () => {
@@ -252,6 +272,29 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(client.sent).toHaveLength(3);
   });
 
+  it('lets a search that failed be made again, rather than remembering the failure', async () => {
+    // The shared in-flight entry must be cleared on the error channel too: otherwise one 503
+    // poisons that query for the life of the process.
+    let answered = 0;
+    const flaky: HttpClient = {
+      send: () => {
+        answered += 1;
+        return Promise.resolve(
+          answered <= 3
+            ? { status: 503, body: '' }
+            : { status: 200, body: JSON.stringify(GRACELAND) },
+        );
+      },
+    };
+    const port = new MusicBrainzCatalogSearch(flaky, { baseUrl: 'https://mb.test/ws/2' });
+
+    const failed = await port.search('graceland', testScope());
+    const retried = await port.search('graceland', testScope());
+
+    expect(failed.isErr()).toBe(true);
+    expect(retried.isOk()).toBe(true);
+  });
+
   it('reports a catalog whose shape drifted as permanent, since retrying cannot fix it', async () => {
     const { port } = searcher([
       {
@@ -269,6 +312,38 @@ describe('MusicBrainzCatalogSearch.search', () => {
 });
 
 describe('MusicBrainzCatalogSearch.lookup', () => {
+  it.each([
+    ['release-group', `/release-group/${RG_ID}`],
+    ['artist', `/artist/${ARTIST_ID}`],
+    ['recording', `/recording/${RECORDING_ID}`],
+  ])('says when the catalog answered about a %s it could not present', async (kind, route) => {
+    // A 200 carrying an entity with no usable name is drift, not absence — and the two are
+    // indistinguishable downstream, so the adapter is where it has to be said.
+    const { port } = searcher([
+      { match: route, json: { id: 'not-a-uuid', title: null, name: null } },
+    ]);
+    const mbid = { 'release-group': RG_ID, artist: ARTIST_ID, recording: RECORDING_ID }[kind]!;
+
+    expect(await unwrap(port.lookup(asMbid(mbid), testScope()))).toEqual({ kind: 'notFound' });
+  });
+
+  it('forgets the oldest answers rather than remembering every query ever typed', async () => {
+    const client = http(SEARCH_ROUTES);
+    const port = new MusicBrainzCatalogSearch(client, {
+      baseUrl: 'https://mb.test/ws/2',
+      cacheTtlMs: 600_000,
+    });
+
+    // More distinct queries than the cache will hold, then the first one again.
+    for (let index = 0; index < 90; index += 1) {
+      await unwrap(port.search(`query number ${index}`, testScope()));
+    }
+    const beforeRepeat = client.sent.length;
+    await unwrap(port.search('query number 0', testScope()));
+
+    expect(client.sent.length).toBeGreaterThan(beforeRepeat);
+  });
+
   it('resolves an identifier that names an album', async () => {
     const { port } = searcher([
       { match: `/release-group/${RG_ID}`, json: { id: RG_ID, title: 'Graceland' } },

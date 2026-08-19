@@ -309,7 +309,7 @@ describe('RequestSearch', () => {
     await page.getByRole('button', { name: 'Tracks' }).click();
     await expect.element(page.getByTestId('no-matches')).toBeVisible();
 
-    await page.getByRole('button', { name: /albums/ }).click();
+    await page.getByRole('button', { name: /album/ }).click();
 
     await expect.element(page.getByText('Graceland')).toBeVisible();
   });
@@ -360,10 +360,10 @@ describe('RequestSearch', () => {
                 representative: {
                   mbid: RELEASE,
                   title: 'Graceland',
-                  formats: 'CD',
+                  formats: ['CD'],
                   trackCount: 11,
                 },
-                editions: [{ mbid: RELEASE, title: 'Graceland', formats: 'CD', trackCount: 11 }],
+                editions: [{ mbid: RELEASE, title: 'Graceland', formats: ['CD'], trackCount: 11 }],
               },
             ],
             bestMatch: { kind: 'pick' as const, mbid: RELEASE },
@@ -388,6 +388,54 @@ describe('RequestSearch', () => {
     expect(catalog.tracklist).toHaveBeenCalledWith(RELEASE);
   });
 
+  it('carries a chosen pressing into the request the page would submit', async () => {
+    const catalog = catalogStub({
+      editions: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: {
+            groups: [
+              {
+                trackCount: 11,
+                representative: {
+                  mbid: RELEASE,
+                  title: 'Graceland',
+                  formats: ['CD'],
+                  trackCount: 11,
+                  country: 'DE',
+                },
+                editions: [
+                  {
+                    mbid: RELEASE,
+                    title: 'Graceland',
+                    formats: ['CD'],
+                    trackCount: 11,
+                    country: 'DE',
+                  },
+                ],
+              },
+            ],
+            bestMatch: { kind: 'pick' as const, mbid: RELEASE },
+          },
+        }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Graceland/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('detail')).toBeVisible();
+
+    await page.getByRole('button', { name: /DE · CD/ }).click();
+
+    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    expect(new FormData(form).get('kind')).toBe('musicbrainz');
+    expect(new FormData(form).get('mbid')).toBe(RELEASE);
+  });
+
   it('closes the detail when asked, leaving the results behind it', async () => {
     await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
     await page.getByTestId('catalog-query').fill('graceland');
@@ -404,7 +452,7 @@ describe('RequestSearch', () => {
     await expect.element(page.getByText('Graceland')).toBeVisible();
   });
 
-  it('says nothing matched when a pasted identifier names nothing', async () => {
+  it('says an identifier names nothing, rather than telling the searcher to paste one', async () => {
     const catalog = catalogStub({
       lookup: vi.fn(() =>
         Promise.resolve({ ok: true as const, value: { kind: 'not-found' as const } }),
@@ -415,7 +463,38 @@ describe('RequestSearch', () => {
     await page.getByTestId('catalog-query').fill(RG);
     await userEvent.keyboard('{Enter}');
 
-    await expect.element(page.getByTestId('no-matches')).toBeVisible();
+    await expect.element(page.getByTestId('unknown-id')).toBeVisible();
+    expect(document.querySelector('[data-testid="no-matches"]')).toBeNull();
+  });
+
+  it('searches once for one Enter, not again when the abandoned debounce comes due', async () => {
+    const catalog = catalogStub();
+    const typing = manualTyping();
+    await render(RequestSearch, { catalog, typing });
+
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    await expect.element(page.getByText('Graceland')).toBeVisible();
+    // What the last keystroke scheduled must have been abandoned by pressing Enter.
+    typing.settle_();
+
+    expect(catalog.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('says it is searching while it waits, and stops saying so once it has answered', async () => {
+    const answering = Promise.withResolvers<Awaited<ReturnType<CatalogClient['search']>>>();
+    const catalog = catalogStub({ search: vi.fn(() => answering.promise) });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    await expect.element(page.getByTestId('searching')).toBeVisible();
+    expect(document.querySelector('[data-testid="search-hint"]')).toBeNull();
+
+    answering.resolve({ ok: true, value: RESULTS });
+
+    await expect.element(page.getByText('Graceland')).toBeVisible();
+    expect(document.querySelector('[data-testid="searching"]')).toBeNull();
   });
 
   it('forgets a search once the box is emptied, rather than leaving stale results', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { lookupAsResults, openDetail, readTracklist, runSearch } from './session.js';
+import { lookupAsOutcome, openDetail, readTracklist, runSearch } from './session.js';
 import type { CatalogClient } from './client.js';
 import type { DetailState, TracklistState } from './detail.js';
 
@@ -42,7 +42,7 @@ function catalog(overrides: Partial<CatalogClient> = {}): CatalogClient {
 }
 
 function hooks() {
-  return { onSearching: vi.fn(), onResults: vi.fn(), onFailure: vi.fn() };
+  return { onSearching: vi.fn(), onOutcome: vi.fn(), onFailure: vi.fn() };
 }
 
 describe('runSearch', () => {
@@ -53,7 +53,7 @@ describe('runSearch', () => {
     await runSearch(client, 'graceland', new AbortController().signal, spies);
 
     expect(client.search).toHaveBeenCalledWith('graceland', expect.anything());
-    expect(spies.onResults).toHaveBeenCalledWith(RESULTS);
+    expect(spies.onOutcome).toHaveBeenCalledWith({ kind: 'results', results: RESULTS });
     expect(spies.onSearching).toHaveBeenLastCalledWith(false);
   });
 
@@ -72,11 +72,14 @@ describe('runSearch', () => {
 
     expect(client.lookup).toHaveBeenCalledWith(RG, expect.anything());
     expect(client.search).not.toHaveBeenCalled();
-    expect(spies.onResults).toHaveBeenCalledWith({
-      leading: 'release-group',
-      releaseGroups: [RELEASE_GROUP_HIT],
-      artists: [],
-      recordings: [],
+    expect(spies.onOutcome).toHaveBeenCalledWith({
+      kind: 'results',
+      results: {
+        leading: 'release-group',
+        releaseGroups: [RELEASE_GROUP_HIT],
+        artists: [],
+        recordings: [],
+      },
     });
   });
 
@@ -91,7 +94,7 @@ describe('runSearch', () => {
     await runSearch(client, 'graceland', new AbortController().signal, spies);
 
     expect(spies.onFailure).toHaveBeenCalledWith('Could not be reached.');
-    expect(spies.onResults).not.toHaveBeenCalled();
+    expect(spies.onOutcome).not.toHaveBeenCalled();
     expect(spies.onSearching).toHaveBeenLastCalledWith(false);
   });
 
@@ -107,35 +110,42 @@ describe('runSearch', () => {
 
     await runSearch(client, 'graceland', controller.signal, spies);
 
-    expect(spies.onResults).not.toHaveBeenCalled();
+    expect(spies.onOutcome).not.toHaveBeenCalled();
     expect(spies.onFailure).not.toHaveBeenCalled();
   });
 });
 
-describe('lookupAsResults', () => {
-  it('presents each kind of identifier as the only result of its kind', () => {
+describe('lookupAsOutcome', () => {
+  it('presents a named artist as the only result of its kind', () => {
     expect(
-      lookupAsResults({ kind: 'artist', artist: { mbid: ARTIST, name: 'Paul Simon' } }),
+      lookupAsOutcome({ kind: 'artist', artist: { mbid: ARTIST, name: 'Paul Simon' } }, ARTIST),
     ).toEqual({
-      leading: 'artist',
-      releaseGroups: [],
-      artists: [{ mbid: ARTIST, name: 'Paul Simon' }],
-      recordings: [],
+      kind: 'results',
+      results: {
+        leading: 'artist',
+        releaseGroups: [],
+        artists: [{ mbid: ARTIST, name: 'Paul Simon' }],
+        recordings: [],
+      },
     });
-    expect(
-      lookupAsResults({
-        kind: 'recording',
-        recording: { mbid: RECORDING, title: 'The Boy in the Bubble', artistCredit: 'Paul Simon' },
-      }).recordings,
-    ).toHaveLength(1);
   });
 
-  it('presents an identifier that names nothing as nothing found', () => {
-    expect(lookupAsResults({ kind: 'not-found' })).toEqual({
-      leading: 'release-group',
-      releaseGroups: [],
-      artists: [],
-      recordings: [],
+  it('presents a named track as the only result of its kind', () => {
+    const outcome = lookupAsOutcome(
+      {
+        kind: 'recording',
+        recording: { mbid: RECORDING, title: 'The Boy in the Bubble', artistCredit: 'Paul Simon' },
+      },
+      RECORDING,
+    );
+
+    expect(outcome).toMatchObject({ kind: 'results', results: { leading: 'recording' } });
+  });
+
+  it('says an identifier names nothing, rather than answering with an empty search', () => {
+    expect(lookupAsOutcome({ kind: 'not-found' }, RECORDING)).toEqual({
+      kind: 'unknown-id',
+      mbid: RECORDING,
     });
   });
 });
@@ -164,7 +174,7 @@ describe('openDetail', () => {
       opened.push(d);
     });
 
-    expect(opened[0]).toEqual({ kind: 'loading', title: 'Graceland' });
+    expect(opened[0]).toEqual({ kind: 'loading', mbid: RG, title: 'Graceland' });
     expect(opened[1]).toMatchObject({ kind: 'release-group', mbid: RG });
   });
 
@@ -182,6 +192,7 @@ describe('openDetail', () => {
 
     expect(opened.at(-1)).toEqual({
       kind: 'failed',
+      mbid: RG,
       title: 'Graceland',
       message: 'Could not be reached.',
     });
@@ -230,8 +241,10 @@ describe('readTracklist', () => {
     });
     const states: Record<string, TracklistState>[] = [];
 
-    await readTracklist(client, RELEASE, {}, (t) => {
-      states.push(t);
+    let held: Record<string, TracklistState> = {};
+    await readTracklist(client, RELEASE, held, (update) => {
+      held = update(held);
+      states.push(held);
     });
 
     expect(states[0]?.[RELEASE]).toEqual({ kind: 'loading' });
@@ -246,11 +259,76 @@ describe('readTracklist', () => {
     });
     const states: Record<string, TracklistState>[] = [];
 
-    await readTracklist(client, RELEASE, {}, (t) => {
-      states.push(t);
+    let held: Record<string, TracklistState> = {};
+    await readTracklist(client, RELEASE, held, (update) => {
+      held = update(held);
+      states.push(held);
     });
 
     expect(states.at(-1)?.[RELEASE]).toEqual({ kind: 'failed', message: 'Could not be reached.' });
+  });
+
+  it('reads a running order again after one that failed, since asking again is the point', async () => {
+    const client = catalog();
+    let held: Record<string, TracklistState> = { [RELEASE]: { kind: 'failed', message: 'gone' } };
+
+    await readTracklist(client, RELEASE, held, (update) => {
+      held = update(held);
+    });
+
+    expect(client.tracklist).toHaveBeenCalledTimes(1);
+    expect(held[RELEASE]).toMatchObject({ kind: 'loaded' });
+  });
+
+  it('leaves alone what another disclosure recorded while it was reading', async () => {
+    const other = '9b4c6e1a-1111-4111-8111-111111111111';
+    const client = catalog();
+    let held: Record<string, TracklistState> = {};
+
+    await readTracklist(client, RELEASE, held, (update) => {
+      // Something else finishes between this read starting and answering.
+      held = update({ ...held, [other]: { kind: 'loaded', tracklist: { tracks: [] } } });
+    });
+
+    expect(held[other]).toMatchObject({ kind: 'loaded' });
+    expect(held[RELEASE]).toMatchObject({ kind: 'loaded' });
+  });
+
+  it('says nothing once the surface it was opened from has moved on', async () => {
+    const client = catalog();
+    const opened: DetailState[] = [];
+
+    await openDetail(
+      client,
+      'release-group',
+      RG,
+      'Graceland',
+      (d) => {
+        opened.push(d);
+      },
+      () => false,
+    );
+
+    expect(opened.map((state) => state.kind)).toEqual(['loading']);
+  });
+
+  it('reads once when two clicks land before either has been recorded', async () => {
+    // Both calls see the same empty snapshot; only the one whose write lands first may proceed.
+    const client = catalog();
+    let held: Record<string, TracklistState> = {};
+    const snapshot = held;
+    const apply = (
+      update: (previous: Record<string, TracklistState>) => Record<string, TracklistState>,
+    ) => {
+      held = update(held);
+    };
+
+    await Promise.all([
+      readTracklist(client, RELEASE, snapshot, apply),
+      readTracklist(client, RELEASE, snapshot, apply),
+    ]);
+
+    expect(client.tracklist).toHaveBeenCalledTimes(1);
   });
 
   it('does not read a running order it already has', async () => {

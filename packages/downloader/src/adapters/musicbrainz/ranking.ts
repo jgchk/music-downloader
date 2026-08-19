@@ -13,11 +13,12 @@ import type {
  * "paul simon" on its artist credit. Ranking here re-reads each hit as a whole: query tokens the
  * artist credit accounts for count as matches, the tokens it does not account for are expected in
  * the title, and title words the searcher never typed are noise that costs. The provider's own
- * score survives only as the tie-break it deserves to be.
+ * score is down-weighted to a nudge — at most 10 points against a 100-point coverage term — not a
+ * tie-break; for an artist the query neither names nor contains, it remains the only signal.
  *
  * These are ranking heuristics, not domain rules — they order a human's choices and never decide
  * anything. Popularity is deliberately absent: two same-titled obscure releases still order by text
- * alone, which is a known limit recorded with the change rather than papered over here.
+ * alone.
  */
 
 /** A hit carrying the provider's relevance score, which ranking consumes and callers then drop. */
@@ -68,7 +69,8 @@ function tokens(value: string): readonly string[] {
  * the pair accounts for at all, how much of the artist credit the searcher actually typed (a full
  * artist match is strong evidence), whether the tokens the artist did not account for turn up in
  * the title, and how many title words the searcher never asked for. A query of only separators
- * explains nothing and scores flat, leaving such hits in provider order.
+ * explains nothing and scores flat HERE; callers still apply their own type and availability
+ * adjustments, so provider order survives untouched only for artists.
  */
 function pairScore(
   query: string,
@@ -127,10 +129,19 @@ function artistScore(query: string, hit: ScoredArtist): number {
   const provider = PROVIDER_WEIGHT * hit.score;
   if (normalizedName === '' || normalizedQuery === '') return provider;
   if (normalizedName === normalizedQuery) return EXACT_NAME_BONUS + provider;
-  if (normalizedQuery.includes(normalizedName)) {
+  if (isNamedIn(normalizedQuery, normalizedName)) {
     return CONTAINED_NAME_BONUS + CONTAINED_NAME_TOKEN_BONUS * tokens(hit.name).length + provider;
   }
   return provider;
+}
+
+/**
+ * Whether the query contains the name as WHOLE words, in order. A bare substring test would let an
+ * artist called `Head` — or `Rain` — score as though the searcher had named them, simply because
+ * "radiohead in rainbows" contains those letters.
+ */
+function isNamedIn(normalizedQuery: string, normalizedName: string): boolean {
+  return ` ${normalizedQuery} `.includes(` ${normalizedName} `);
 }
 
 /** Highest score first; equal scores keep provider order (`toSorted` is stable). */

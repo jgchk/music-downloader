@@ -51,15 +51,20 @@ import type {
  */
 
 const DEFAULT_BASE_URL = 'https://musicbrainz.org/ws/2';
-const DEFAULT_USER_AGENT = 'music-downloader/1.0 (https://github.com/jgchk/music-downloader)';
+const DEFAULT_USER_AGENT = 'music-downloader/0.0 (https://github.com/anthropics/music-downloader)';
 /** Per entity kind. Wide enough that ranking has real candidates to reorder, not a pre-cut list. */
 const DEFAULT_SEARCH_LIMIT = 25;
 /** Long enough to cover a person's typing and second thoughts, short enough to stay current. */
 const DEFAULT_CACHE_TTL_MS = 120_000;
-/** One release group's editions: MusicBrainz's own browse ceiling. */
-const EDITION_LIMIT = 100;
+/** MusicBrainz's browse ceiling, shared by the edition listing and the artist discography. */
+const BROWSE_LIMIT = 100;
+/** Beyond this the cache is a leak rather than a courtesy; the oldest keys go first. */
+const MAX_CACHED_READS = 256;
 
-const SEARCH_OPERATION = 'musicbrainz.catalog.search';
+/** Named per entity, so a failure says WHICH of a search's three reads could not be made. */
+const RELEASE_GROUP_SEARCH_OPERATION = 'musicbrainz.catalog.search.release-group';
+const ARTIST_SEARCH_OPERATION = 'musicbrainz.catalog.search.artist';
+const RECORDING_SEARCH_OPERATION = 'musicbrainz.catalog.search.recording';
 const LOOKUP_OPERATION = 'musicbrainz.catalog.lookup';
 const DISCOGRAPHY_OPERATION = 'musicbrainz.catalog.discography';
 const EDITIONS_OPERATION = 'musicbrainz.catalog.editions';
@@ -73,6 +78,16 @@ export interface CatalogSearchConfig {
 }
 
 const systemClock: Clock = { now: () => new Date() };
+
+/**
+ * What a person typed, as literal words rather than query syntax. MusicBrainz parses `query=` as
+ * Lucene, so an unbalanced quote or a stray `:` in a title — `Sgt. Pepper's`, `Album: Live` — is a
+ * syntax error to it, answered 400. Escaping the metacharacters means a searcher's punctuation
+ * searches for that punctuation instead of failing the read.
+ */
+export function luceneLiteral(query: string): string {
+  return query.replaceAll(/[+\-&|!(){}[\]^"~*?:\\/]/g, (character) => `\\${character}`);
+}
 
 const parseJson = Result.fromThrowable(
   (body: string): unknown => JSON.parse(body),
@@ -111,33 +126,43 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     if (trimmed === '') {
       return okAsync({ releaseGroups: [], artists: [], recordings: [], leading: 'release-group' });
     }
-    const encoded = encodeURIComponent(trimmed);
+    const encoded = encodeURIComponent(luceneLiteral(trimmed));
     const limit = this.searchLimit;
     return ResultAsync.combine([
       this.get(
         `${this.baseUrl}/release-group?query=${encoded}&fmt=json&limit=${limit}`,
         mbReleaseGroupSearchSchema,
-        SEARCH_OPERATION,
+        RELEASE_GROUP_SEARCH_OPERATION,
       ),
       this.get(
         `${this.baseUrl}/artist?query=${encoded}&fmt=json&limit=${limit}`,
         mbArtistSearchSchema,
-        SEARCH_OPERATION,
+        ARTIST_SEARCH_OPERATION,
       ),
       this.get(
         `${this.baseUrl}/recording?query=${encoded}&inc=releases&fmt=json&limit=${limit}`,
         mbCatalogRecordingSearchSchema,
-        SEARCH_OPERATION,
+        RECORDING_SEARCH_OPERATION,
       ),
     ]).map(([groupsJson, artistsJson, recordingsJson]) => {
       const releaseGroups = rankReleaseGroups(trimmed, toReleaseGroups(groupsJson ?? {}));
       const artists = rankArtists(trimmed, toArtists(artistsJson ?? {}));
       const recordings = rankRecordings(trimmed, toRecordings(recordingsJson ?? {}));
+      // Both sides are logged: "they answered 25 and we could present none of them" is a drift
+      // signal, and it is indistinguishable from a genuine no-match if only the presented count
+      // is written down.
       scope.logger.debug(
         {
-          releaseGroups: releaseGroups.length,
-          artists: artists.length,
-          recordings: recordings.length,
+          received: {
+            releaseGroups: (groupsJson?.['release-groups'] ?? []).length,
+            artists: (artistsJson?.artists ?? []).length,
+            recordings: (recordingsJson?.recordings ?? []).length,
+          },
+          presented: {
+            releaseGroups: releaseGroups.length,
+            artists: artists.length,
+            recordings: recordings.length,
+          },
         },
         'catalog search answered',
       );
@@ -164,6 +189,11 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       const [releaseGroup] = toReleaseGroups({
         'release-groups': group === undefined ? [] : [group],
       });
+      // The catalog answered with something we could not present. That is drift, not absence, and
+      // the two are indistinguishable downstream — so it is said here, once, where both are known.
+      if (group !== undefined && releaseGroup === undefined) {
+        scope.logger.warn({ mbid }, 'catalog release group could not be presented');
+      }
       if (releaseGroup !== undefined) {
         return okAsync<CatalogLookup>({
           kind: 'found',
@@ -181,6 +211,9 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       LOOKUP_OPERATION,
     ).andThen((found) => {
       const [artist] = toArtists({ artists: found === undefined ? [] : [found] });
+      if (found !== undefined && artist === undefined) {
+        scope.logger.warn({ mbid }, 'catalog artist could not be presented');
+      }
       if (artist !== undefined)
         return okAsync<CatalogLookup>({ kind: 'found', entity: { kind: 'artist', artist } });
       return this.lookupRecording(mbid, scope);
@@ -197,6 +230,9 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       LOOKUP_OPERATION,
     ).map((found) => {
       const [recording] = toRecordings({ recordings: found === undefined ? [] : [found] });
+      if (found !== undefined && recording === undefined) {
+        scope.logger.warn({ mbid }, 'catalog recording could not be presented');
+      }
       if (recording === undefined) {
         scope.logger.debug({ mbid }, 'catalog identifier names nothing');
         return { kind: 'notFound' } satisfies CatalogLookup;
@@ -210,7 +246,7 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     _scope: OperationScope,
   ): ResultAsync<readonly CatalogReleaseGroup[], InfraError> {
     return this.get(
-      `${this.baseUrl}/release-group?artist=${artist}&fmt=json&limit=${EDITION_LIMIT}`,
+      `${this.baseUrl}/release-group?artist=${artist}&fmt=json&limit=${BROWSE_LIMIT}`,
       mbReleaseGroupSearchSchema,
       DISCOGRAPHY_OPERATION,
     ).map((json) => toDiscography(json ?? {}));
@@ -221,7 +257,7 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     _scope: OperationScope,
   ): ResultAsync<CatalogEditionListing, InfraError> {
     return this.get(
-      `${this.baseUrl}/release?release-group=${releaseGroup}&inc=media&fmt=json&limit=${EDITION_LIMIT}`,
+      `${this.baseUrl}/release?release-group=${releaseGroup}&inc=media&fmt=json&limit=${BROWSE_LIMIT}`,
       mbReleaseGroupBrowseSchema,
       EDITIONS_OPERATION,
     ).map((json) => toEditionListing(json ?? {}));
@@ -258,7 +294,7 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
 
     const pending: ResultAsync<unknown, InfraError> = this.fetchJson(url, schema, operation)
       .map((value): unknown => {
-        this.cache.set(url, { at: this.clock.now().getTime(), value });
+        this.remember(url, value);
         return value;
       })
       .andTee(() => this.inFlight.delete(url))
@@ -266,6 +302,20 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
 
     this.inFlight.set(url, pending);
     return pending.map((value) => value as T | undefined);
+  }
+
+  /**
+   * Remember an answer, within a budget. Each pause in someone's typing mints new URLs, so an
+   * unbounded map would retain every query ever asked, with its parsed payload, for the life of the
+   * daemon. A Map iterates in insertion order, which makes the oldest key the first one out.
+   */
+  private remember(url: string, value: unknown): void {
+    this.cache.delete(url);
+    this.cache.set(url, { at: this.clock.now().getTime(), value });
+    for (const oldest of this.cache.keys()) {
+      if (this.cache.size <= MAX_CACHED_READS) break;
+      this.cache.delete(oldest);
+    }
   }
 
   private cached(url: string): CacheEntry | undefined {
@@ -292,6 +342,13 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     ).andThen((response): Result<T | undefined, InfraError> => {
       // The catalog saying "no such thing" is an answer, not a fault.
       if (response.status === 404) return ok(undefined);
+      if (response.status >= 400 && response.status < 500) {
+        // A refusal of the request we built — a query it cannot parse, an unsupported parameter.
+        // Retrying reproduces it exactly, so it is permanent rather than a passing fault.
+        return err(
+          permanentInfraError(operation, `the catalog refused the request (${response.status})`),
+        );
+      }
       if (response.status < 200 || response.status >= 300) {
         return err(infraError(operation, `the catalog responded ${response.status}`));
       }

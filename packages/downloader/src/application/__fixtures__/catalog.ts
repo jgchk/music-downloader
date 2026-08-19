@@ -52,7 +52,7 @@ const GRACELAND_EDITION = {
   disambiguation: undefined,
   date: '1986-08-29',
   country: 'DE',
-  formats: 'CD',
+  formats: ['CD'],
   status: 'Official',
   trackCount: 11,
 };
@@ -69,7 +69,7 @@ export const CATALOG_EDITIONS: CatalogEditionListing = {
           disambiguation: undefined,
           date: '1986-08-29',
           country: 'DE',
-          formats: 'CD',
+          formats: ['CD'],
           status: 'Official',
           trackCount: 11,
         },

@@ -27,7 +27,7 @@ function event(coverArt: CoverArtPort, params: Record<string, string>, size?: st
   return {
     params,
     url: new URL(`https://app.test/cover-art/x/y${size === undefined ? '' : `?size=${size}`}`),
-    locals: { coverArt },
+    locals: { coverArt, logger: { warn: vi.fn() } },
   } as never;
 }
 
@@ -46,7 +46,9 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
   it('lets the artwork be cached, since a cover does not change under its identifier', async () => {
     const response = await GET(event(port(foundAnswer), { entity: 'release', mbid: MBID }));
 
-    expect(response.headers.get('cache-control')).toContain('max-age=');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=2592000');
+    // Third-party bytes from our own origin: the declared type must be the only type.
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
   it('serves the larger size when the detail surface asks for it', async () => {
@@ -71,14 +73,31 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.headers.get('cache-control')).toContain('max-age=');
+    // Far shorter than the artwork's: the archive GAINING art is the change worth noticing.
+    expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
   });
 
   it('answers an unreachable archive as a fault the browser must not remember', async () => {
     const response = await GET(event(port('unavailable'), { entity: 'release-group', mbid: MBID }));
 
     expect(response.status).toBe(502);
-    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('writes down why the archive failed, so an outage is not just missing pictures', async () => {
+    const warn = vi.fn();
+    const request = {
+      params: { entity: 'release-group', mbid: MBID },
+      url: new URL('https://app.test/cover-art/x/y'),
+      locals: { coverArt: port('unavailable'), logger: { warn } },
+    } as never;
+
+    await GET(request);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ mbid: MBID, detail: 'down' }),
+      'cover art archive unavailable',
+    );
   });
 
   it('refuses an identifier that is not a catalog id, without asking the archive', async () => {

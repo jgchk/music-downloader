@@ -276,7 +276,7 @@ describe('toEditionListing', () => {
       disambiguation: 'UK limited edition gatefold',
       date: '1986-08-29',
       country: 'DE',
-      formats: 'CD + DVD',
+      formats: ['CD', 'DVD'],
       status: 'Official',
       trackCount: 11,
     });
@@ -293,7 +293,7 @@ describe('toEditionListing', () => {
       disambiguation: undefined,
       date: undefined,
       country: undefined,
-      formats: '',
+      formats: [],
       status: undefined,
       trackCount: 0,
     });
@@ -338,7 +338,7 @@ describe('toEditionListing', () => {
       releases: [official(RELEASE_ID, 11, { media: [{ 'track-count': 11, format: null }] })],
     });
 
-    expect(listing.groups[0]?.editions[0]?.formats).toBe('');
+    expect(listing.groups[0]?.editions[0]?.formats).toEqual([]);
   });
 
   it('counts a medium the catalog has not counted as adding no tracks', () => {
@@ -380,6 +380,31 @@ describe('toTracks', () => {
       { position: 2, title: 'Graceland', durationMs: 290_000 },
       { position: 3, title: 'Untimed', durationMs: undefined },
     ]);
+  });
+
+  it('numbers a multi-disc edition as one running order, not two that both start at 1', () => {
+    // MusicBrainz numbers tracks WITHIN a medium, so a two-disc release states 1,2 then 1,2 — and
+    // a reader that treats the position as the track's identity sees two tracks numbered 1.
+    const tracks = toTracks({
+      id: RELEASE_ID,
+      media: [
+        {
+          tracks: [
+            { position: 1, title: 'One' },
+            { position: 2, title: 'Two' },
+          ],
+        },
+        {
+          tracks: [
+            { position: 1, title: 'Three' },
+            { position: 2, title: 'Four' },
+          ],
+        },
+      ],
+    });
+
+    expect(tracks.map((track) => track.position)).toEqual([1, 2, 3, 4]);
+    expect(tracks.map((track) => track.title)).toEqual(['One', 'Two', 'Three', 'Four']);
   });
 
   it('reads a release with no media as no tracks', () => {

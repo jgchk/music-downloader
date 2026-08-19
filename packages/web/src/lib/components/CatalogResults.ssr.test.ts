@@ -52,9 +52,13 @@ describe('CatalogResults (SSR)', () => {
   it('renders every kind with the hooks the skins style, in the catalog’s own order', () => {
     const html = body();
 
-    expect(html.indexOf('data-kind="release-group"')).toBeLessThan(
-      html.indexOf('data-kind="artist"'),
-    );
+    // The sequence, not two indexes: an absent section indexes as -1, which sorts before anything.
+    expect(
+      html
+        .matchAll(/data-kind="([^"]+)"/g)
+        .map((match) => match[1])
+        .toArray(),
+    ).toEqual(['release-group', 'artist', 'recording']);
     expect(html).toContain('class="art-grid"');
     expect(html).toContain('class="artist-row"');
     expect(html).toContain('class="track-rows"');
@@ -92,11 +96,15 @@ describe('CatalogResults (SSR)', () => {
   it('falls back to naming an artist as an artist when the catalog offers nothing more', () => {
     const html = body({
       results: results({
+        releaseGroups: [],
+        recordings: [],
         artists: [{ mbid: ARTIST, name: 'Paul Simon', disambiguation: undefined }],
       }),
     });
 
-    expect(html).toContain('Artist');
+    // Asserted on the line that carries it: the section heading "Artists" would satisfy a bare
+    // substring check whether or not the fallback exists.
+    expect(html).toContain('class="result-detail">Artist<');
   });
 
   it('names the query and where else it matched, when the filtered kind matched nothing', () => {
@@ -104,8 +112,9 @@ describe('CatalogResults (SSR)', () => {
 
     expect(html).toContain('No tracks matched');
     expect(html).toContain('paul simon graceland');
-    expect(html).toContain('albums');
-    expect(html).toContain('artists');
+    // Counted in the singular when there is one — "1 albums" is the defect this pins.
+    expect(html).toContain('1 album');
+    expect(html).toContain('1 artist');
   });
 
   it('says plainly when nothing matched anywhere', () => {
