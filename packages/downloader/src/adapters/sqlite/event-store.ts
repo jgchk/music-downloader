@@ -3,7 +3,7 @@ import { parseCausation } from '../../application/correlation/context.js';
 import type { ResultAsync } from 'neverthrow';
 import type { Statement } from 'better-sqlite3';
 import type { DownloadEvent } from '../../domain/download/events.js';
-import { infraError } from '../../application/ports/errors.js';
+import { infraError, permanentInfraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
   AppendError,
@@ -15,7 +15,7 @@ import type {
   StoredEvent,
 } from '../../application/ports/event-store-port.js';
 import type { EventDatabase } from './schema.js';
-import { toModelType, toStoredToken } from './event-tokens.js';
+import { toModelType, toStoredToken, UnmappedEventType } from './event-tokens.js';
 import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION } from './upcaster.js';
 import type { UpcasterRegistry } from './upcaster.js';
 
@@ -125,6 +125,11 @@ export class SqliteEventStore implements EventStorePort {
     try {
       stored = this.runAppend(streamId, expectedVersion, events, metadata);
     } catch (error) {
+      if (error instanceof UnmappedEventType) {
+        // Permanent by construction: retrying cannot invent a token for an event type this build
+        // has no mapping for, so short-circuit the retry budget straight to a dead letter.
+        return errAsync(permanentInfraError('event-store.append', String(error), error));
+      }
       if (error instanceof ConcurrencyBreak || isUniqueViolation(error)) {
         return errAsync<readonly StoredEvent[], AppendError>({
           kind: 'ConcurrencyConflict',
