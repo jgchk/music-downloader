@@ -23,7 +23,7 @@ import type {
  *
  * The governing rule is that a SEARCH HIT only survives if a person could act on it: an entry the
  * catalog gives no usable identifier or no name is dropped rather than rendered as a blank row you
- * cannot request. Editions and tracks are kept on identifier alone — they are read inside a thing
+ * cannot request. Editions are kept on identifier alone — they are read inside a thing
  * the person already chose, where an unnamed row is still positional context. Everything else
  * degrades softly: an unknown year, type, or credit is simply absent, because MusicBrainz reporting
  * "unknown" is data, not drift.
@@ -104,8 +104,9 @@ export function toRecordings(json: MbCatalogRecordingSearch): readonly ScoredRec
     const mbid = mbidOf(hit.id);
     const title = nameOf(hit.title);
     if (mbid === undefined || title === undefined) continue;
-    // The first release the catalog names is the one shown for artwork and context; a recording
-    // that names none (or names one we cannot address) is still a requestable track.
+    // The first ADDRESSABLE release the catalog names is the one shown for artwork and context —
+    // an unaddressable one is walked past — and a recording that names none is still a
+    // requestable track.
     const release = (hit.releases ?? [])
       .map((candidate) => {
         const releaseMbid = mbidOf(candidate.id);
@@ -129,7 +130,7 @@ const ALBUM_FIRST = new Set(['Album']);
 
 /**
  * An artist's body of work as a person browses it: albums first — that is what "their records"
- * means — then everything else, newest first inside each band so the recent work leads.
+ * means — then everything else, newest first within each group so the recent work leads.
  */
 export function toDiscography(json: MbReleaseGroupSearch): readonly CatalogReleaseGroup[] {
   // Keys are read once per group rather than on every comparison, which a comparator would do
@@ -144,9 +145,19 @@ export function toDiscography(json: MbReleaseGroupSearch): readonly CatalogRelea
     .map((keyed) => keyed.group);
 }
 
-/** An edition's total track count: the sum of its media's counts (an unknown count adds nothing). */
-function trackCountOf(release: { media?: readonly { 'track-count'?: number }[] }): number {
-  return (release.media ?? []).reduce((sum, medium) => sum + (medium['track-count'] ?? 0), 0);
+/**
+ * An edition's total track count — the sum of its media's counts — or nothing at all when the
+ * catalog states no count for any medium. "The catalog does not say" is not "zero tracks": a
+ * pressing with no stated count still has a tracklist, and saying `0` would both print a falsehood
+ * and heap every uncounted pressing into one group.
+ */
+function trackCountOf(release: {
+  media?: readonly { 'track-count'?: number }[];
+}): number | undefined {
+  const counts = (release.media ?? [])
+    .map((medium) => medium['track-count'])
+    .filter((count): count is number => typeof count === 'number');
+  return counts.length === 0 ? undefined : counts.reduce((sum, count) => sum + count, 0);
 }
 
 /**
@@ -172,7 +183,7 @@ function formatsOf(release: { media?: readonly { format?: string | null }[] }): 
 export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionListing {
   const releases = json.releases ?? [];
   const editions: CatalogEdition[] = [];
-  const pickable: ReleaseGroupEdition[] = [];
+  const pickable: ReleaseGroupEdition<Mbid>[] = [];
 
   for (const release of releases) {
     const mbid = mbidOf(release.id);
@@ -192,44 +203,54 @@ export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionList
       id: mbid,
       status: release.status ?? undefined,
       date: release.date ?? undefined,
-      trackCount,
+      // The picker's own convention for an unknown count is the sentinel `0` (it ranks by modal
+      // count and an unknown must not win); the presentation keeps them apart. See mapping.ts.
+      trackCount: trackCount ?? 0,
     });
   }
 
   // A group is created by putting an edition in it, so the edition that created it IS its
   // representative — established here rather than inferred by indexing later, which is what lets
   // every reader treat a group as something that certainly has a tracklist to show.
+  // Keyed by the count as a FACT: every uncounted edition shares one key of its own rather than
+  // being filed under "zero tracks" alongside them.
   const byTrackCount = new Map<
-    number,
+    number | 'unstated',
     { readonly representative: CatalogEdition; readonly editions: CatalogEdition[] }
   >();
   for (const edition of editions) {
-    const group = byTrackCount.get(edition.trackCount);
+    const key = edition.trackCount ?? 'unstated';
+    const group = byTrackCount.get(key);
     if (group === undefined) {
-      byTrackCount.set(edition.trackCount, { representative: edition, editions: [edition] });
+      byTrackCount.set(key, { representative: edition, editions: [edition] });
     } else {
       group.editions.push(edition);
     }
   }
 
-  const groups: readonly CatalogEditionGroup[] = [...byTrackCount]
-    .map(([trackCount, grouped]) => ({
-      trackCount,
+  const groups: readonly CatalogEditionGroup[] = byTrackCount
+    .values()
+    .map((grouped) => ({
       representative: grouped.representative,
       editions: grouped.editions,
+      // Read once here rather than in the comparator, which would read it O(n log n) times. An
+      // unstated count sorts last: a group nobody can describe must never lead the listing.
+      order: grouped.representative.trackCount ?? Number.MAX_SAFE_INTEGER,
     }))
+    .toArray()
     // Most-published tracklist first (the canonical one); ties by track count keep the listing
     // stable rather than depending on which edition the catalog happened to return first.
     .toSorted(
-      (left, right) =>
-        right.editions.length - left.editions.length || left.trackCount - right.trackCount,
-    );
+      (left, right) => right.editions.length - left.editions.length || left.order - right.order,
+    )
+    .map(({ representative, editions: grouped }) => ({ representative, editions: grouped }));
 
+  // The picker carries the id type it was given, so the pick is an `Mbid` because the editions
+  // handed to it were — no assertion reinstating a brand nothing checked.
   const [pick] = releaseGroupEditionIds(pickable);
   return {
     groups,
-    bestMatch:
-      pick === undefined ? { kind: 'selectionRequired' } : { kind: 'pick', mbid: pick as Mbid },
+    bestMatch: pick === undefined ? { kind: 'selectionRequired' } : { kind: 'pick', mbid: pick },
   };
 }
 

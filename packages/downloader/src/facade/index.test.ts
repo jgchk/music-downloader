@@ -12,7 +12,7 @@ import {
 } from '../domain/download/__fixtures__/download-fixtures.js';
 import { asMbid } from '../domain/shared/__fixtures__/mbid.js';
 import { testWiring } from './__fixtures__/wiring.js';
-import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
+import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
   acquisitionListResultSchema,

@@ -13,13 +13,15 @@
   interface Properties {
     /** Action-failure message from a rejected submission (the native fallback's path). */
     error?: string;
+    /** What was submitted, echoed back so a rejected submission is corrected rather than retyped. */
+    values?: { artist?: string; title?: string; album?: string };
     /** The catalog conversation — injected so the surface can be driven without a server. */
     catalog?: CatalogClient;
     /** When typing becomes a search — injected so tests need not wait out a debounce. */
     typing?: TypingDriver;
   }
 
-  let { error, catalog = httpCatalog(), typing = searchTyping }: Properties = $props();
+  let { error, values, catalog = httpCatalog(), typing = searchTyping }: Properties = $props();
 
   let query = $state('');
   let filter = $state<EntityFilter>('all');
@@ -27,8 +29,6 @@
   let failure = $state<string | undefined>();
   let searching = $state(false);
   let detail = $state<DetailState | undefined>();
-  /** What the person last asked to see; a read for anything else has been overtaken. */
-  let opening = $state<string | undefined>();
   let tracklists = $state<Record<string, TracklistState>>({});
   /** The pressing chosen by hand, if any — see `activeEdition` for why it carries its album. */
   let pin = $state<EditionPin | undefined>();
@@ -78,14 +78,15 @@
    */
   function openDetailFor(kind: EntityKind, mbid: string, title: string): void {
     tracklists = {};
-    opening = mbid;
+    // What is open IS what was last asked for — `detail` is set synchronously to `loading` before
+    // any read starts — so the surface is asked rather than tracked a second time alongside it.
     void openDetail(
       catalog,
       kind,
       mbid,
       title,
       (opened) => (detail = opened),
-      () => opening === mbid,
+      () => detail?.mbid === mbid,
     );
   }
 
@@ -95,11 +96,12 @@
     startTyping(query, true, typing, { clear, search: run });
   }
 
-  // An expression body, deliberately: `startTyping` returns the way to abandon a scheduled search,
-  // and Svelte takes an effect's return value as its teardown — which is the only thing that
-  // cancels a pending debounce when the query changes. Wrapping this in braces would discard the
-  // canceller and break cancellation silently. (Effects do not run during SSR, so the server
-  // renders the pre-search page and the browser takes it from there.)
+  // `startTyping` returns the way to abandon the search it scheduled. It is kept in
+  // `cancelScheduled` so `searchNow` can abandon it — Enter does not change `query`, so this effect
+  // does not re-run — and ALSO returned as the effect's teardown, which is what abandons it when
+  // the query changes. Dropping either one leaves a debounce running that should not be.
+  // (Effects do not run during SSR, so the server renders the pre-search page and the browser
+  // takes it from there.)
   $effect(() => {
     cancelScheduled = startTyping(query, false, typing, { clear, search: run });
     return () => {
@@ -178,22 +180,21 @@
       void readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists)))}
     {pin}
     onPin={(chosen) => (pin = chosen)}
-    onClose={() => {
-      detail = undefined;
-      opening = undefined;
-    }}
+    onClose={() => (detail = undefined)}
   />
 
-  <details class="native-request">
+  <!-- Open when a submission was refused: the message names a field in a form that is otherwise
+       folded away, and pointing at something invisible is not pointing at anything. -->
+  <details class="native-request" open={error !== undefined}>
     <summary>Request by artist and title</summary>
     <form method="POST" data-testid="native-form">
       <label>
         Artist
-        <input name="artist" data-testid="native-artist" />
+        <input name="artist" data-testid="native-artist" value={values?.artist ?? ''} />
       </label>
       <label>
         Title
-        <input name="title" data-testid="native-title" />
+        <input name="title" data-testid="native-title" value={values?.title ?? ''} />
       </label>
       <input type="hidden" name="kind" value="descriptor" />
       <input type="hidden" name="targetType" value="album" />

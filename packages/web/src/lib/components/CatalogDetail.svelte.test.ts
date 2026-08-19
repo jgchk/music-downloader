@@ -29,12 +29,10 @@ const releaseGroupDetail = (bestMatch: {
   editions: {
     groups: [
       {
-        trackCount: 11,
         representative: edition(PICK),
         editions: [edition(PICK), edition(OTHER, { country: 'US' })],
       },
       {
-        trackCount: 19,
         representative: edition('9b4c6e1a-1111-4111-8111-111111111111', { trackCount: 19 }),
         editions: [edition('9b4c6e1a-1111-4111-8111-111111111111', { trackCount: 19 })],
       },

@@ -2,12 +2,7 @@ import { isCatalogId } from './view.js';
 import type { CatalogClient } from './client.js';
 import type { DetailState, TracklistState } from './detail.js';
 import type { EntityKind } from './view.js';
-import type {
-  CatalogDiscographyResultDto,
-  CatalogEditionsResultDto,
-  CatalogLookupResultDto,
-  CatalogSearchResultDto,
-} from '@music/downloader';
+import type { CatalogLookupResultDto, CatalogSearchResultDto } from '@music/downloader';
 
 /**
  * The request page's conversation, as plain functions over injected hooks.
@@ -39,16 +34,42 @@ export type SearchOutcome =
  * makes for a search.
  */
 export function lookupAsOutcome(found: CatalogLookupResultDto, mbid: string): SearchOutcome {
-  if (found.kind === 'not-found') return { kind: 'unknown-id', mbid };
-  return {
+  const nothing = { releaseGroups: [], artists: [], recordings: [] };
+  const one = (leading: EntityKind, results: Partial<CatalogSearchResultDto>): SearchOutcome => ({
     kind: 'results',
-    results: {
-      leading: found.kind,
-      releaseGroups: found.releaseGroup === undefined ? [] : [found.releaseGroup],
-      artists: found.artist === undefined ? [] : [found.artist],
-      recordings: found.recording === undefined ? [] : [found.recording],
-    },
-  };
+    results: { ...nothing, leading, ...results },
+  });
+  // Narrowed on the TAG, never on which fields happen to be present: the tag is what the producer
+  // decided the answer is, and reading by presence would render a stray payload as a second block
+  // of results under the wrong heading. Named arms rather than a default, so a fourth entity kind
+  // is a compile error here rather than a lookup that silently renders as nothing.
+  //
+  // A tag whose payload is missing is refused by the wire schema before it reaches here, so it can
+  // only arrive from a caller that built the DTO by hand — and "the answer names something we
+  // cannot show" is, to a person, the same as an id that names nothing.
+  switch (found.kind) {
+    case 'not-found': {
+      return { kind: 'unknown-id', mbid };
+    }
+    case 'release-group': {
+      const { releaseGroup } = found;
+      return releaseGroup === undefined
+        ? { kind: 'unknown-id', mbid }
+        : one(found.kind, { releaseGroups: [releaseGroup] });
+    }
+    case 'artist': {
+      const { artist } = found;
+      return artist === undefined
+        ? { kind: 'unknown-id', mbid }
+        : one(found.kind, { artists: [artist] });
+    }
+    case 'recording': {
+      const { recording } = found;
+      return recording === undefined
+        ? { kind: 'unknown-id', mbid }
+        : one(found.kind, { recordings: [recording] });
+    }
+  }
 }
 
 /**
@@ -63,23 +84,23 @@ export async function runSearch(
   hooks: SearchHooks,
 ): Promise<void> {
   hooks.onSearching(true);
-  // Which read was made is carried, not recovered by sniffing the answer's shape: these DTOs may
-  // grow fields additively, and a lookup that happened to gain a `leading` field would otherwise
-  // start rendering as a search that matched nothing.
-  const mbid = text.trim();
-  const isLooked = isCatalogId(text);
-  const answer = isLooked ? await catalog.lookup(mbid, signal) : await catalog.search(text, signal);
-  if (signal.aborted) return;
-  hooks.onSearching(false);
-  if (!answer.ok) {
-    hooks.onFailure(answer.message);
+  // The two reads are awaited in their OWN branches rather than in one expression: each answer
+  // then keeps its own type, so which read was made is carried by the compiler instead of by a
+  // boolean and a pair of assertions that a third read, or a swap, would quietly invalidate.
+  if (isCatalogId(text)) {
+    const mbid = text.trim();
+    const answer = await catalog.lookup(mbid, signal);
+    if (signal.aborted) return;
+    hooks.onSearching(false);
+    if (answer.ok) hooks.onOutcome(lookupAsOutcome(answer.value, mbid));
+    else hooks.onFailure(answer.message);
     return;
   }
-  hooks.onOutcome(
-    isLooked
-      ? lookupAsOutcome(answer.value as CatalogLookupResultDto, mbid)
-      : { kind: 'results', results: answer.value as CatalogSearchResultDto },
-  );
+  const answer = await catalog.search(text, signal);
+  if (signal.aborted) return;
+  hooks.onSearching(false);
+  if (answer.ok) hooks.onOutcome({ kind: 'results', results: answer.value });
+  else hooks.onFailure(answer.message);
 }
 
 /**
@@ -99,22 +120,32 @@ export async function openDetail(
     return;
   }
   onDetail({ kind: 'loading', mbid, title });
-  const answer =
-    kind === 'release-group' ? await catalog.editions(mbid) : await catalog.discography(mbid);
-  // Something else was opened, or everything was closed, while this was being read. Rendering it
-  // now would reopen a surface the person dismissed, or put one album's editions under another's
-  // title — so a read that lost its race says nothing at all.
-  if (!isCurrent()) return;
-  if (!answer.ok) {
-    onDetail({ kind: 'failed', mbid, title, message: answer.message });
+  // Each read is awaited in its own branch, so its answer keeps its own type — see `runSearch`.
+  // "Something else was opened, or everything was closed, while this was being read" is checked
+  // after every await: rendering then would reopen a surface the person dismissed, or put one
+  // album's editions under another's title.
+  if (kind === 'release-group') {
+    const answer = await catalog.editions(mbid);
+    if (!isCurrent()) return;
+    onDetail(
+      answer.ok
+        ? { kind: 'release-group', mbid, title, editions: answer.value }
+        : { kind: 'failed', mbid, title, message: answer.message },
+    );
     return;
   }
+  const answer = await catalog.discography(mbid);
+  if (!isCurrent()) return;
   onDetail(
-    kind === 'release-group'
-      ? { kind: 'release-group', mbid, title, editions: answer.value as CatalogEditionsResultDto }
-      : { kind: 'artist', mbid, title, discography: answer.value as CatalogDiscographyResultDto },
+    answer.ok
+      ? { kind: 'artist', mbid, title, discography: answer.value }
+      : { kind: 'failed', mbid, title, message: answer.message },
   );
 }
+
+/** Already read, or being read — either way, not something to ask for again. */
+const isAlreadyRead = (state: TracklistState | undefined): boolean =>
+  state?.kind === 'loading' || state?.kind === 'loaded';
 
 /**
  * Read one edition's running order. A tracklist already read, or being read, is not asked for
@@ -122,10 +153,6 @@ export async function openDetail(
  * request for fresher bytes. One that FAILED is asked for again, because the second click there is
  * exactly a request to try once more.
  */
-/** Already read, or being read — either way, not something to ask for again. */
-const isAlreadyRead = (state: TracklistState | undefined): boolean =>
-  state?.kind === 'loading' || state?.kind === 'loaded';
-
 export async function readTracklist(
   catalog: CatalogClient,
   mbid: string,

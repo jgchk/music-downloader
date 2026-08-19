@@ -11,14 +11,18 @@ import type {
 } from '../application/ports/catalog-search-port.js';
 
 /**
- * The wire shapes of the catalog-search reads.
+ * The wire shapes of the catalog-search reads, plus the identifier rule a caller needs to tell a
+ * search from a lookup. Reachable on its own subpath (`@music/downloader/catalog-dto`) because a
+ * browser bundle imports these schemas as VALUES: through the main barrel that would pull the
+ * facade — and the application layer behind it — into the page.
  *
  * These are DTOs, not domain types, so they follow the wire's rules rather than the domain's: a
  * discriminating tag beside optional fields (never a union a serializer would flatten), identifiers
  * as plain strings, and every field a caller does not need omitted. What the catalog does not know
- * — a year, a type, a duration — is an absent field, never a sentinel. Two exceptions are
- * deliberate: an unnamed edition or track carries `''` and an uncounted edition carries `0`,
- * because a detail surface renders them unconditionally as positional context.
+ * — a year, a type, a duration, a track count — is an absent field, never a sentinel. One
+ * exception is deliberate: a name the catalog does not state (an edition's, a track's, an artist
+ * credit) carries `''`, because a reader renders those unconditionally as positional context and
+ * an absent name would leave a hole where a row's shape should be.
  */
 
 export const catalogReleaseGroupDtoSchema = z.object({
@@ -67,14 +71,20 @@ export const catalogLookupResultSchema = z
     /** Present exactly when `kind` is `recording`. */
     recording: catalogRecordingDtoSchema.optional(),
   })
-  .refine(
-    (result) =>
-      (result.kind === 'release-group' && result.releaseGroup !== undefined) ||
-      (result.kind === 'artist' && result.artist !== undefined) ||
-      (result.kind === 'recording' && result.recording !== undefined) ||
-      result.kind === 'not-found',
-    'the payload named by the tag must be present',
-  );
+  .refine((result) => {
+    // Both directions: the tagged payload present, and no OTHER payload alongside it. A reader
+    // that narrows on the tag would ignore a stray payload; one that reads by field presence —
+    // and the page's lookup does — would render it as a second block of results under the wrong
+    // heading. Only the tag decides what a lookup found.
+    const carried = (['releaseGroup', 'artist', 'recording'] as const).filter(
+      (payload) => result[payload] !== undefined,
+    );
+    if (result.kind === 'not-found') return carried.length === 0;
+    const expected = { 'release-group': 'releaseGroup', artist: 'artist', recording: 'recording' }[
+      result.kind
+    ];
+    return carried.length === 1 && carried[0] === expected;
+  }, 'exactly the payload named by the tag must be present');
 
 export const catalogDiscographyResultSchema = z.object({
   releaseGroups: z.array(catalogReleaseGroupDtoSchema),
@@ -88,32 +98,56 @@ export const catalogEditionDtoSchema = z.object({
   country: z.string().optional(),
   formats: z.array(z.string()),
   status: z.string().optional(),
-  trackCount: z.number(),
+  /** Absent when the catalog states no count — which is not the same fact as a count of zero. */
+  trackCount: z.number().optional(),
 });
 
-export const catalogEditionsResultSchema = z.object({
-  groups: z.array(
-    z.object({
-      trackCount: z.number(),
-      /** The edition the group's tracklist is read from — always present, never inferred. */
-      representative: catalogEditionDtoSchema,
-      editions: z.array(catalogEditionDtoSchema),
-    }),
-  ),
-  /** `pick` carries the edition the pipeline would choose; `selection-required` carries none. */
-  bestMatch: z
-    .object({
-      kind: z.enum(['pick', 'selection-required']),
-      /** Present exactly when `kind` is `pick`. */
-      mbid: z.string().optional(),
-    })
-    // A `pick` with no edition would be read as "selection required" and tell the person the
-    // opposite of what the pipeline would do.
-    .refine(
-      (best) => best.kind === 'selection-required' || best.mbid !== undefined,
-      'a pick must name the edition it picked',
+export const catalogEditionsResultSchema = z
+  .object({
+    /**
+     * Ordered most-editions-first, so the most-published tracklist leads. The order is part of
+     * this contract, not an accident of iteration: a reader labels the first group as the common
+     * one, and would relabel the wrong tracklist if a producer re-sorted without saying so.
+     */
+    groups: z.array(
+      z.object({
+        /**
+         * The edition the group's tracklist is read from — always present, never inferred. Its
+         * `trackCount` IS the group's; carried once so the two can never disagree.
+         */
+        representative: catalogEditionDtoSchema,
+        editions: z.array(catalogEditionDtoSchema),
+      }),
     ),
-});
+    /**
+     * `pick` carries the FIRST edition the pipeline would try (it walks its picker's ordered ids
+     * and takes the first that yields a usable target, so it may skip past this one);
+     * `selection-required` carries none.
+     */
+    bestMatch: z
+      .object({
+        kind: z.enum(['pick', 'selection-required']),
+        /** Present exactly when `kind` is `pick`. */
+        mbid: z.string().optional(),
+      })
+      // A `pick` with no edition would be read as "selection required" and tell the person the
+      // opposite of what the pipeline would do.
+      .refine(
+        (best) => best.kind === 'selection-required' || best.mbid !== undefined,
+        'a pick must name the edition it picked',
+      ),
+  })
+  // A pick naming an edition that is not in the listing renders as NEITHER a badge nor the
+  // "no default" notice — the surface would say nothing at all about what the pipeline would do,
+  // which is the one thing it exists to preview.
+  .refine(
+    (result) =>
+      result.bestMatch.kind !== 'pick' ||
+      result.groups.some((group) =>
+        group.editions.some((edition) => edition.mbid === result.bestMatch.mbid),
+      ),
+    'a pick must name one of the editions listed',
+  );
 
 export const catalogTracklistResultSchema = z.object({
   tracks: z.array(
@@ -205,7 +239,6 @@ function editionToDto(edition: CatalogEdition): z.infer<typeof catalogEditionDto
 export function editionsToDto(listing: CatalogEditionListing): CatalogEditionsResultDto {
   return {
     groups: listing.groups.map((group) => ({
-      trackCount: group.trackCount,
       representative: editionToDto(group.representative),
       editions: group.editions.map((edition) => editionToDto(edition)),
     })),
@@ -225,3 +258,10 @@ export function tracklistToDto(tracks: readonly CatalogTrack[]): CatalogTracklis
     })),
   };
 }
+
+/**
+ * Whether text names a catalog entity rather than describing one. Re-exported from the domain that
+ * owns the format, so a page deciding "search" from "look up" does not carry its own copy of the
+ * rule — three spellings of one regex is three chances to disagree.
+ */
+export { isMbidShaped } from '../domain/shared/mbid.js';

@@ -1,11 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { testScope } from '../../application/__fixtures__/correlation.js';
+import { createLogger } from '../../application/logging/logger.js';
+import { testContext, testScope } from '../../application/__fixtures__/correlation.js';
 import { asMbid } from '../../domain/shared/__fixtures__/mbid.js';
 import { MusicBrainzCatalogSearch } from './catalog-search.js';
 import type { HttpClient, HttpRequest } from '../support/http.js';
-import type { Clock } from '../../application/ports/system-ports.js';
+import type { OperationScope } from '../../application/correlation/context.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { ResultAsync } from 'neverthrow';
+
+/**
+ * A scope whose warnings the test can read. Drift is only ever OBSERVABLE as a log line — the
+ * answer itself looks like an ordinary empty one — so a test that does not read the lines cannot
+ * tell the two apart either.
+ */
+function watchedScope(): { readonly scope: OperationScope; readonly warnings: string[] } {
+  const warnings: string[] = [];
+  const logger = createLogger({
+    level: 'warn',
+    destination: { write: (line: string) => void warnings.push(line) },
+  });
+  return { scope: { context: testContext(), logger }, warnings };
+}
 
 /** Await a port read and take its value — the reads under test are expected to succeed. */
 async function unwrap<T>(pending: ResultAsync<T, InfraError>): Promise<T> {
@@ -78,27 +93,16 @@ const SEARCH_ROUTES: readonly Route[] = [
   { match: '/recording?query=', json: BUBBLE },
 ];
 
-function movableClock(startMs = 1_000_000): Clock & { advance: (ms: number) => void } {
-  let current = startMs;
-  return {
-    now: () => new Date(current),
-    advance: (ms: number) => {
-      current += ms;
-    },
-  };
-}
-
-function searcher(
-  routes: readonly Route[],
-  clock: Clock = movableClock(),
-): { readonly port: MusicBrainzCatalogSearch; readonly sent: HttpRequest[] } {
+function searcher(routes: readonly Route[]): {
+  readonly port: MusicBrainzCatalogSearch;
+  readonly sent: HttpRequest[];
+} {
   const client = http(routes);
   return {
-    port: new MusicBrainzCatalogSearch(
-      client,
-      { baseUrl: 'https://mb.test/ws/2', userAgent: 'test-agent/1.0', cacheTtlMs: 60_000 },
-      clock,
-    ),
+    port: new MusicBrainzCatalogSearch(client, {
+      baseUrl: 'https://mb.test/ws/2',
+      userAgent: 'test-agent/1.0',
+    }),
     sent: client.sent,
   };
 }
@@ -162,39 +166,6 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(sent).toHaveLength(3); // one per entity kind — never one per result
   });
 
-  it('serves a repeated search from cache instead of asking the catalog again', async () => {
-    const { port, sent } = searcher(SEARCH_ROUTES);
-
-    await port.search('graceland', testScope());
-    const repeat = await unwrap(port.search('graceland', testScope()));
-
-    expect(sent).toHaveLength(3);
-    expect(repeat.releaseGroups).toHaveLength(1);
-  });
-
-  it('shares one upstream read between searches that are in flight together', async () => {
-    const { port, sent } = searcher(SEARCH_ROUTES);
-
-    const [first, second] = await Promise.all([
-      port.search('graceland', testScope()),
-      port.search('graceland', testScope()),
-    ]);
-
-    expect(sent).toHaveLength(3);
-    expect(first._unsafeUnwrap().releaseGroups).toEqual(second._unsafeUnwrap().releaseGroups);
-  });
-
-  it('asks again once the cached answer is stale', async () => {
-    const clock = movableClock();
-    const { port, sent } = searcher(SEARCH_ROUTES, clock);
-
-    await port.search('graceland', testScope());
-    clock.advance(60_001);
-    await port.search('graceland', testScope());
-
-    expect(sent).toHaveLength(6);
-  });
-
   it('reports a catalog that refuses the request as an infrastructure fault, not as no matches', async () => {
     const { port } = searcher([{ match: '/release-group?query=', status: 503 }]);
 
@@ -231,6 +202,17 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(query).toContain(String.raw`\:`);
   });
 
+  it('searches for text no URL encoder will take, rather than throwing on the way out', async () => {
+    // A lone surrogate reaches `encodeURIComponent` as a URIError — a throw escaping a method that
+    // promises a Result. The search box admits any text at all, so it must survive any text.
+    const { port, sent } = searcher(SEARCH_ROUTES);
+
+    const results = await unwrap(port.search('grace\u{D800}land', testScope()));
+
+    expect(results.releaseGroups).toHaveLength(1);
+    expect(sent).toHaveLength(3);
+  });
+
   it('reports a request the catalog refuses as permanent, since retrying reproduces it', async () => {
     const { port } = searcher([{ match: '/release-group?query=', status: 400 }]);
 
@@ -261,40 +243,6 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(failure.permanent).toBe(true);
   });
 
-  it('keeps its own time when none is given, so the cache still expires in production', async () => {
-    // Constructed the way composition does — no injected clock — and still answers.
-    const client = http(SEARCH_ROUTES);
-    const port = new MusicBrainzCatalogSearch(client, { baseUrl: 'https://mb.test/ws/2' });
-
-    await unwrap(port.search('graceland', testScope()));
-    await unwrap(port.search('graceland', testScope()));
-
-    expect(client.sent).toHaveLength(3);
-  });
-
-  it('lets a search that failed be made again, rather than remembering the failure', async () => {
-    // The shared in-flight entry must be cleared on the error channel too: otherwise one 503
-    // poisons that query for the life of the process.
-    let answered = 0;
-    const flaky: HttpClient = {
-      send: () => {
-        answered += 1;
-        return Promise.resolve(
-          answered <= 3
-            ? { status: 503, body: '' }
-            : { status: 200, body: JSON.stringify(GRACELAND) },
-        );
-      },
-    };
-    const port = new MusicBrainzCatalogSearch(flaky, { baseUrl: 'https://mb.test/ws/2' });
-
-    const failed = await port.search('graceland', testScope());
-    const retried = await port.search('graceland', testScope());
-
-    expect(failed.isErr()).toBe(true);
-    expect(retried.isOk()).toBe(true);
-  });
-
   it('reports a catalog whose shape drifted as permanent, since retrying cannot fix it', async () => {
     const { port } = searcher([
       {
@@ -311,38 +259,93 @@ describe('MusicBrainzCatalogSearch.search', () => {
   });
 });
 
+describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
+  it('refuses an answer whose hits carry no identifier, rather than presenting none of them', async () => {
+    // A renamed `id` parses clean under a tolerant reader and empties every result silently. An
+    // identifier is the one field a hit cannot be shown without, so its absence is drift.
+    const { port } = searcher([
+      { match: '/release-group?query=', json: { 'release-groups': [{ title: 'Graceland' }] } },
+      { match: '/artist?query=', json: PAUL_SIMON },
+      { match: '/recording?query=', json: BUBBLE },
+    ]);
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.permanent).toBe(true);
+  });
+
+  it('says out loud when the catalog answered with hits it could present none of', async () => {
+    // Every id well-formed, every TITLE gone: tolerable field by field, and yet the page would
+    // say "Nothing matched" for a query the catalog answered 3 hits to.
+    const { port } = searcher([
+      {
+        match: '/release-group?query=',
+        json: { 'release-groups': [{ id: RG_ID, score: 49, title: null }] },
+      },
+      { match: '/artist?query=', json: { artists: [{ id: ARTIST_ID, score: 100, name: null }] } },
+      {
+        match: '/recording?query=',
+        json: { recordings: [{ id: RECORDING_ID, score: 90, title: null }] },
+      },
+    ]);
+    const watched = watchedScope();
+
+    const results = await unwrap(port.search('graceland', watched.scope));
+
+    expect(results.releaseGroups).toHaveLength(0);
+    expect(watched.warnings.join('')).toContain(
+      'catalog answered with hits none of which could be presented',
+    );
+  });
+
+  it('stays quiet when a query genuinely matches nothing', async () => {
+    const { port } = searcher([
+      { match: '/release-group?query=', json: { 'release-groups': [] } },
+      { match: '/artist?query=', json: { artists: [] } },
+      { match: '/recording?query=', json: { recordings: [] } },
+    ]);
+    const watched = watchedScope();
+
+    await unwrap(port.search('asdfghjkl', watched.scope));
+
+    expect(watched.warnings).toEqual([]);
+  });
+
+  it('says out loud when a release group’s editions could none of them be presented', async () => {
+    const { port } = searcher([
+      { match: '/release?release-group=', json: { releases: [{ id: 'not-a-uuid' }] } },
+    ]);
+    const watched = watchedScope();
+
+    const listing = await unwrap(port.editions(asMbid(RG_ID), watched.scope));
+
+    expect(listing.groups).toEqual([]);
+    expect(watched.warnings.join('')).toContain(
+      'catalog listed editions none of which could be presented',
+    );
+  });
+});
+
 describe('MusicBrainzCatalogSearch.lookup', () => {
   it.each([
-    ['release-group', `/release-group/${RG_ID}`],
-    ['artist', `/artist/${ARTIST_ID}`],
-    ['recording', `/recording/${RECORDING_ID}`],
-  ])('says when the catalog answered about a %s it could not present', async (kind, route) => {
-    // A 200 carrying an entity with no usable name is drift, not absence — and the two are
-    // indistinguishable downstream, so the adapter is where it has to be said.
-    const { port } = searcher([
-      { match: route, json: { id: 'not-a-uuid', title: null, name: null } },
-    ]);
-    const mbid = { 'release-group': RG_ID, artist: ARTIST_ID, recording: RECORDING_ID }[kind]!;
+    ['release-group', `/release-group/${RG_ID}`, 'catalog release group could not be presented'],
+    ['artist', `/artist/${ARTIST_ID}`, 'catalog artist could not be presented'],
+    ['recording', `/recording/${RECORDING_ID}`, 'catalog recording could not be presented'],
+  ])(
+    'says when the catalog answered about a %s it could not present',
+    async (kind, route, said) => {
+      // A 200 carrying an entity with no usable name is drift, not absence — and the two are
+      // indistinguishable downstream, so the adapter is where it has to be said.
+      const { port } = searcher([
+        { match: route, json: { id: 'not-a-uuid', title: null, name: null } },
+      ]);
+      const mbid = { 'release-group': RG_ID, artist: ARTIST_ID, recording: RECORDING_ID }[kind]!;
+      const watched = watchedScope();
 
-    expect(await unwrap(port.lookup(asMbid(mbid), testScope()))).toEqual({ kind: 'notFound' });
-  });
-
-  it('forgets the oldest answers rather than remembering every query ever typed', async () => {
-    const client = http(SEARCH_ROUTES);
-    const port = new MusicBrainzCatalogSearch(client, {
-      baseUrl: 'https://mb.test/ws/2',
-      cacheTtlMs: 600_000,
-    });
-
-    // More distinct queries than the cache will hold, then the first one again.
-    for (let index = 0; index < 90; index += 1) {
-      await unwrap(port.search(`query number ${index}`, testScope()));
-    }
-    const beforeRepeat = client.sent.length;
-    await unwrap(port.search('query number 0', testScope()));
-
-    expect(client.sent.length).toBeGreaterThan(beforeRepeat);
-  });
+      expect(await unwrap(port.lookup(asMbid(mbid), watched.scope))).toEqual({ kind: 'notFound' });
+      expect(watched.warnings.join('')).toContain(said);
+    },
+  );
 
   it('resolves an identifier that names an album', async () => {
     const { port } = searcher([
@@ -450,7 +453,7 @@ describe('MusicBrainzCatalogSearch.editions', () => {
 
     const listing = await unwrap(port.editions(asMbid(RG_ID), testScope()));
 
-    expect(listing.groups[0]?.trackCount).toBe(11);
+    expect(listing.groups[0]?.representative.trackCount).toBe(11);
     expect(listing.bestMatch).toEqual({ kind: 'pick', mbid: RELEASE_ID });
   });
 });

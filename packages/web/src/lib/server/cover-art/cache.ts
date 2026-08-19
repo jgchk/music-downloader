@@ -11,9 +11,10 @@ import type { CoverArtAnswer, CoverArtEntity, CoverArtPort, CoverArtSize } from 
  * what actually grows: covers vary from a few kilobytes to a few hundred, so an entry count is no
  * budget at all. Art is always re-fetchable, so eviction is safe at any moment.
  *
- * The budget bounds the IMAGES. An absence costs only its key and is therefore not bounded by it —
- * absences leave only on expiry. That is fine while the key space is one household's browsing, and
- * would need revisiting if this were ever put in front of a crawler.
+ * The byte budget bounds the IMAGES; a separate entry ceiling bounds everything, because an
+ * absence costs no bytes at all and would otherwise accumulate a key per identifier ever asked
+ * about — millions of release groups have no art, and a grid asks about twenty-five at a time.
+ * Both are ceilings on the same insertion-ordered map, so the oldest key goes first either way.
  */
 
 export interface CoverArtCacheConfig {
@@ -21,10 +22,14 @@ export interface CoverArtCacheConfig {
   readonly ttlMs?: number;
   /** The byte budget for cached images. Absences cost nothing but their key. */
   readonly maxBytes?: number;
+  /** The ceiling on entries of any kind — what actually bounds remembered absences. */
+  readonly maxEntries?: number;
 }
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
+/** Generous for one household's browsing, and finite, which is the point. */
+const DEFAULT_MAX_ENTRIES = 4096;
 
 interface Entry {
   readonly answer: CoverArtAnswer;
@@ -45,6 +50,7 @@ export function cachingCoverArt(
 ): CoverArtPort {
   const ttlMs = config.ttlMs ?? DEFAULT_TTL_MS;
   const maxBytes = config.maxBytes ?? DEFAULT_MAX_BYTES;
+  const maxEntries = config.maxEntries ?? DEFAULT_MAX_ENTRIES;
   // Insertion order is recency order: a hit re-inserts, so the oldest key is the least recently
   // used one — which is exactly what a Map's iteration order gives for free.
   const entries = new Map<string, Entry>();
@@ -66,7 +72,7 @@ export function cachingCoverArt(
     entries.set(key, { answer, bytes, at: now() });
     heldBytes += bytes;
     for (const [oldest] of entries) {
-      if (heldBytes <= maxBytes) break;
+      if (heldBytes <= maxBytes && entries.size <= maxEntries) break;
       forget(oldest);
     }
   };

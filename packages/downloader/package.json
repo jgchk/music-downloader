@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/facade/index.ts",
+    "./catalog-dto": "./src/facade/catalog-dto.ts",
     "./runtime": "./src/composition/runtime.ts"
   },
   "dependencies": {

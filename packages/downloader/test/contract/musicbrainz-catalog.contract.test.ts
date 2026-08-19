@@ -26,6 +26,12 @@ const USER_AGENT = 'music-downloader-contract-test/0.0';
 const ALBUM_QUERY = 'paul simon graceland';
 const ARTIST_QUERY = 'paul simon';
 const TRACK_QUERY = 'paul simon the boy in the bubble';
+/**
+ * The editions read builds the same URL the resolution tier's release-group browse does, so one
+ * recording serves both consumers and is named here rather than reached for inline. A change to
+ * either adapter's browse query is therefore a visible break in both tiers, not a mystery in one.
+ */
+const SHARED_BROWSE_RECORDING = 'release-group-browse.json';
 
 const fixtures = loadFixtures('musicbrainz');
 const byName = (name: string): ContractFixture => {
@@ -174,37 +180,34 @@ describe('MusicBrainz catalog-search contract (tier 1)', () => {
 
     const tracks = await unwrap(adapter().tracklist(release, testScope()));
 
-    expect(tracks.length).toBeGreaterThan(0);
-    expect(typeof tracks[0]?.position).toBe('number');
-    expect(typeof tracks[0]?.title).toBe('string');
+    // The recorded bytes are fixed, so the running order is knowable rather than merely typed.
+    expect(tracks[0]).toMatchObject({ position: 1, title: 'Silence Is Golden' });
+    expect(tracks.map((track) => track.position)).toEqual(tracks.map((_track, index) => index + 1));
     const sent = server.requests.find((request) => request.path === `/release/${release}`)!;
     expect(sent.query).toEqual(byName('catalog-tracklist.json').request.query);
   });
 
   it('groups a release group’s editions by tracklist and names the pipeline’s own pick', async () => {
-    // Reuses the release-group browse the resolution tier records — the same URL the editions read
-    // builds, so one recording serves both consumers.
     const releaseGroup = recordedMbid(
-      byName('release-group-browse.json').request.query!['release-group']!,
+      byName(SHARED_BROWSE_RECORDING).request.query!['release-group']!,
     );
 
     const listing = await unwrap(adapter().editions(releaseGroup, testScope()));
 
     expect(listing.groups.length).toBeGreaterThan(0);
-    expect(listing.bestMatch.kind).toBe('pick');
-    // Every edition in a group shares that group's tracklist — the property the grouping exists
-    // for, and one a broken grouping (everything in one bucket) would violate.
+    // Every edition in a group shares its representative's tracklist — the property the grouping
+    // exists for, and one a broken grouping (everything in one bucket) would violate.
     for (const group of listing.groups) {
       expect(group.editions.map((edition) => edition.trackCount)).toEqual(
-        group.editions.map(() => group.trackCount),
+        group.editions.map(() => group.representative.trackCount),
       );
     }
     // The pick is one of the editions listed, not a dangling identifier.
+    if (listing.bestMatch.kind !== 'pick')
+      throw new Error('the recorded group has an official edition');
     const listed = listing.groups.flatMap((group) => group.editions.map((edition) => edition.mbid));
-    expect(listed).toContain(
-      listing.bestMatch.kind === 'pick' ? listing.bestMatch.mbid : undefined,
-    );
+    expect(listed).toContain(listing.bestMatch.mbid);
     const sent = server.requests.find((request) => request.path === '/release')!;
-    expect(sent.query).toEqual(byName('release-group-browse.json').request.query);
+    expect(sent.query).toEqual(byName(SHARED_BROWSE_RECORDING).request.query);
   });
 });

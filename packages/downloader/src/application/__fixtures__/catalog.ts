@@ -60,7 +60,6 @@ const GRACELAND_EDITION = {
 export const CATALOG_EDITIONS: CatalogEditionListing = {
   groups: [
     {
-      trackCount: 11,
       representative: GRACELAND_EDITION,
       editions: [
         {

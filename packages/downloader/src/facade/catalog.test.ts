@@ -154,6 +154,8 @@ describe('lookupCatalog', () => {
 });
 
 describe('the lookup answer’s wire shape', () => {
+  const ARTIST = { mbid: RG_ID, name: 'Paul Simon' };
+
   it.each([['release-group'], ['artist'], ['recording']])(
     'refuses a %s answer whose payload never arrived',
     (kind) => {
@@ -162,6 +164,29 @@ describe('the lookup answer’s wire shape', () => {
       expect(catalogLookupResultSchema.safeParse({ kind }).success).toBe(false);
     },
   );
+
+  it('refuses an answer carrying a payload its tag did not name', () => {
+    // A reader that fills its blocks from whichever fields are present — which is how a lookup is
+    // rendered through the search surface — would show an Albums block under an artist lookup.
+    expect(
+      catalogLookupResultSchema.safeParse({
+        kind: 'artist',
+        artist: ARTIST,
+        releaseGroup: {
+          mbid: RG_ID,
+          title: 'Graceland',
+          artistCredit: 'Paul Simon',
+          secondaryTypes: [],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses an answer that found nothing but carries something anyway', () => {
+    expect(catalogLookupResultSchema.safeParse({ kind: 'not-found', artist: ARTIST }).success).toBe(
+      false,
+    );
+  });
 });
 
 describe('the identifier every catalog read takes', () => {
@@ -217,7 +242,9 @@ describe('listEditions', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(catalogEditionsResultSchema.safeParse(roundTrip(result.value)).success).toBe(true);
-    expect(result.value.groups[0]?.trackCount).toBe(CATALOG_EDITIONS.groups[0]?.trackCount);
+    expect(result.value.groups[0]?.representative.trackCount).toBe(
+      CATALOG_EDITIONS.groups[0]?.representative.trackCount,
+    );
     expect(result.value.bestMatch).toEqual({ kind: 'pick', mbid: RELEASE_ID });
   });
 

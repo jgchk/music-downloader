@@ -50,6 +50,7 @@ import { OutboundFeed } from '../application/events/outbound-feed.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
 import { MusicBrainzCatalogSearch } from '../adapters/musicbrainz/catalog-search.js';
+import { cachingHttpClient } from '../adapters/support/caching-http.js';
 import { createDownloaderFacade } from '../facade/index.js';
 import type { DownloaderFacade } from '../facade/index.js';
 import type { CatalogSearchPort } from '../application/ports/catalog-search-port.js';
@@ -357,9 +358,10 @@ export async function createDownloaderRuntime(
   const catalog =
     overrides.catalog ??
     new MusicBrainzCatalogSearch(
-      fetchHttpClient,
+      // Its own cache instance: the entries are keyed by URL, and this adapter's requests carry
+      // headers no other adapter's do.
+      cachingHttpClient(fetchHttpClient, {}, clock),
       { baseUrl: config.musicbrainz.baseUrl, userAgent: config.musicbrainz.userAgent },
-      clock,
     );
   const facade = createDownloaderFacade(dependencies, { catalog, logger });
   const feed = new OutboundFeed(store, publishedEventMapping);

@@ -110,7 +110,7 @@
           </li>
         {/each}
       </ul>
-    {:else}
+    {:else if kind === 'recording'}
       <ul class="track-rows">
         {#each results.recordings as recording (recording.mbid)}
           <li class="result">

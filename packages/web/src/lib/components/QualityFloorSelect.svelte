@@ -5,10 +5,13 @@
 <!--
   The quality floor a request may raise, as the request contract names them.
 
-  The options are written out rather than mapped over the floor table: the compiler's `<option>`
-  helpers wrap an interpolated label in a nullish guard that no test can reach, and an unreachable
-  branch is worse than a repeated word. Drift is caught by a test asserting these values are exactly
-  the contract's own, which is the check that actually matters.
+  The options are written out rather than mapped over `QUALITY_FLOORS`: the compiler compiles a
+  mapped `<option {value}>` to `option.value = (option.__value = value()) ?? ''`, and that `?? ''`
+  is a branch no test can reach. The values here are pinned against the contract's own keys by
+  "offers every quality floor the request contract accepts, and no other" in
+  `CatalogDetail.svelte.test.ts`; the LABELS are duplicated from `view.ts` and asserted by nothing,
+  which is the price of the guard and worth naming. If this select is ever used outside
+  `CatalogDetail`, move that test with it.
 -->
 <label>
   Quality floor

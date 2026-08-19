@@ -20,8 +20,18 @@ export type CoverArtEntity = 'release-group' | 'release';
 /** The sizes the request page asks for: a grid thumbnail and a detail-surface image. */
 export type CoverArtSize = 250 | 500;
 
+/**
+ * The image types this application will re-serve from its own origin. A closed set rather than a
+ * `string`, because the route hands this field straight to a browser as the response's own
+ * `Content-Type`: `image/svg+xml` — which the archive's user-contributed content could name — is
+ * a script-bearing document, and `nosniff` does not help when the declared type IS the dangerous
+ * one. Making it a union puts that decision in the port every implementation must satisfy, rather
+ * than in one adapter a second implementation could quietly not repeat.
+ */
+export type ServableImageType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+
 export interface CoverArtImage {
-  readonly contentType: string;
+  readonly contentType: ServableImageType;
   readonly bytes: Uint8Array;
 }
 

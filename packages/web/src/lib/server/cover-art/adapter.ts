@@ -7,6 +7,7 @@ import type {
   CoverArtPort,
   CoverArtSize,
   CoverArtUnavailable,
+  ServableImageType,
 } from './port.js';
 
 /**
@@ -28,7 +29,7 @@ import type {
 /** The same identity the catalog adapter presents; both providers ask to be able to contact us. */
 const USER_AGENT = 'music-downloader/0.0 (https://github.com/anthropics/music-downloader)';
 const DEFAULT_BASE_URL = 'https://coverartarchive.org';
-const DEFAULT_CONTENT_TYPE = 'image/jpeg';
+const DEFAULT_CONTENT_TYPE: ServableImageType = 'image/jpeg';
 /**
  * Finite, because the archive is volunteer-run and does black-hole connections. An unbounded fetch
  * here would hold a request — and its handle — open for as long as the far end stays silent, one
@@ -42,8 +43,24 @@ const REQUEST_TIMEOUT_MS = 10_000;
  * this server at any address it liked, and we would re-serve whatever came back from our own origin.
  */
 const IMAGE_HOSTS = new Set(['coverartarchive.org', 'archive.org']);
-/** Only an image may be re-served as one; anything else is served as the default rather than echoed. */
-const IMAGE_CONTENT_TYPE_PREFIX = 'image/';
+/**
+ * The types that may be echoed back. Not a prefix test: `image/svg+xml` starts with `image/` and is
+ * a script-bearing document served from our own origin. Anything else — including an SVG, and
+ * including a type the archive invents — is served as the default rather than echoed.
+ */
+const SERVABLE_IMAGE_TYPES = new Set<string>([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+]);
+
+/** The declared type if we are willing to serve it under our own origin, else the default. */
+function servableType(declared: string): ServableImageType {
+  // The parameters (`; charset=…`) are the archive's to send and not ours to echo.
+  const media = declared.replace(/;.*$/, '').trim().toLowerCase();
+  return SERVABLE_IMAGE_TYPES.has(media) ? (media as ServableImageType) : DEFAULT_CONTENT_TYPE;
+}
 
 function unavailable(detail: string): CoverArtUnavailable {
   return { kind: 'cover-art-unavailable', detail };
@@ -92,9 +109,17 @@ export class CoverArtArchive implements CoverArtPort {
     return this.manifest(entity, mbid).andThen((answer) => {
       if (answer.kind === 'absent') return okAsync<CoverArtAnswer>({ kind: 'absent' });
       const front = (answer.manifest.images ?? []).find((image) => image.front === true);
-      const source = front?.thumbnails?.[String(size) as '250' | '500'] ?? front?.image;
       // Art that exists but has no front cover is, for a picker, no art at all.
-      if (source === undefined) return okAsync<CoverArtAnswer>({ kind: 'absent' });
+      if (front === undefined) return okAsync<CoverArtAnswer>({ kind: 'absent' });
+      const source = front.thumbnails?.[String(size) as '250' | '500'] ?? front.image;
+      if (source === undefined) {
+        // A front cover that names no image at all is the archive off-contract — a renamed field,
+        // most likely. Reported as absence it would be remembered for a day and served to the
+        // browser as a 404, blanking every cover in the grid with nothing said anywhere.
+        return errAsync<CoverArtAnswer, CoverArtUnavailable>(
+          unavailable('the cover art archive listed a front cover with no image to fetch'),
+        );
+      }
       const url = imageUrl(source);
       if (url === undefined) {
         return errAsync<CoverArtAnswer, CoverArtUnavailable>(
@@ -154,15 +179,12 @@ export class CoverArtArchive implements CoverArtPort {
       return ResultAsync.fromPromise(image.arrayBuffer(), () =>
         unavailable('the cover art image could not be read to the end'),
       ).map((bytes) => {
-        // Re-served from our own origin, so only an image type is echoed; anything else would let
-        // the archive choose how this application's responses are interpreted.
-        const declared = image.headers.get('content-type') ?? '';
+        // Re-served from our own origin, so only a type we are willing to serve is echoed;
+        // anything else would let the archive choose how our responses are interpreted.
         return {
           kind: 'found' as const,
           image: {
-            contentType: declared.startsWith(IMAGE_CONTENT_TYPE_PREFIX)
-              ? declared
-              : DEFAULT_CONTENT_TYPE,
+            contentType: servableType(image.headers.get('content-type') ?? ''),
             bytes: new Uint8Array(bytes),
           },
         };

@@ -6,4 +6,4 @@
 </script>
 
 <h1>Request a download</h1>
-<RequestSearch error={form?.message} />
+<RequestSearch error={form?.message} values={form?.values} />

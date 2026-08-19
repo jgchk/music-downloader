@@ -331,9 +331,14 @@ export function releaseCandidateIds(
   return [...winner.members].toSorted(compareReleases(wanted)).map((m) => m.id);
 }
 
-/** One edition (release) of a known release group, reduced to the fields the picker needs. */
-export interface ReleaseGroupEdition {
-  readonly id: string;
+/**
+ * One edition (release) of a known release group, reduced to the fields the picker needs. Generic
+ * in its identifier so a caller holding parsed ids gets parsed ids back: the picker only ever
+ * chooses among what it was handed, so re-asserting a brand on the way out would be a claim
+ * nothing checked.
+ */
+export interface ReleaseGroupEdition<Id extends string = string> {
+  readonly id: Id;
   readonly status: string | undefined;
   readonly date: string | undefined;
   readonly trackCount: number;
@@ -383,9 +388,9 @@ function modalTrackCount(counts: readonly number[]): number {
  * reports *unresolved* when there are none. The caller fetches the ids in order and takes the first
  * that yields a valid target, so an edition with unusable metadata falls through to the next.
  */
-export function releaseGroupEditionIds(
-  editions: readonly ReleaseGroupEdition[],
-): readonly string[] {
+export function releaseGroupEditionIds<Id extends string>(
+  editions: readonly ReleaseGroupEdition<Id>[],
+): readonly Id[] {
   const official = editions.filter((edition) => edition.status === 'Official');
   // No early return for an empty `official`: `modalTrackCount` is total (0 for an empty input) and
   // the filter below then runs over the same empty list, so the function already answers []. The

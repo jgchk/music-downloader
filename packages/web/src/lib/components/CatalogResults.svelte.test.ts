@@ -90,7 +90,10 @@ describe('CatalogResults', () => {
 
     // Every request action is in the document and visible from the start: a hover-revealed
     // primary action is unreachable on a touch screen.
+    // Counted first: an empty list would make the loop below assert nothing at all, and report
+    // green on a page whose primary action had vanished entirely.
     const requests = page.getByRole('button', { name: 'Request' }).all();
+    expect(requests).toHaveLength(2);
     for (const button of requests) {
       await expect.element(button).toBeVisible();
     }

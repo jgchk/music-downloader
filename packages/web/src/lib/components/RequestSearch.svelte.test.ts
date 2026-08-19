@@ -356,7 +356,6 @@ describe('RequestSearch', () => {
           value: {
             groups: [
               {
-                trackCount: 11,
                 representative: {
                   mbid: RELEASE,
                   title: 'Graceland',
@@ -396,7 +395,6 @@ describe('RequestSearch', () => {
           value: {
             groups: [
               {
-                trackCount: 11,
                 representative: {
                   mbid: RELEASE,
                   title: 'Graceland',

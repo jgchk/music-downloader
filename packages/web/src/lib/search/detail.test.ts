@@ -35,6 +35,10 @@ describe('editionSummary', () => {
     expect(editionSummary(edition({ trackCount: 1 }))).toContain('1 track');
   });
 
+  it('says nothing about a length the catalog does not state', () => {
+    expect(editionSummary(edition({ trackCount: undefined }))).toBe('1986-08-29 · DE · CD');
+  });
+
   it('says nothing about a format the catalog does not name', () => {
     expect(editionSummary(edition({ formats: [] }))).toBe('1986-08-29 · DE · 11 tracks');
   });
@@ -73,15 +77,21 @@ describe('trackTime', () => {
 
 describe('groupHeading', () => {
   it('counts one tracklist and one pressing in the singular', () => {
-    expect(groupHeading({ trackCount: 1, editions: [edition()] })).toBe(
-      '1 track \u{00B7} 1 edition',
-    );
+    expect(
+      groupHeading({ representative: edition({ trackCount: 1 }), editions: [edition()] }),
+    ).toBe('1 track \u{00B7} 1 edition');
   });
 
   it('counts several in the plural', () => {
-    expect(groupHeading({ trackCount: 11, editions: [edition(), edition()] })).toBe(
+    expect(groupHeading({ representative: edition(), editions: [edition(), edition()] })).toBe(
       '11 tracks \u{00B7} 2 editions',
     );
+  });
+
+  it('says a tracklist is not stated rather than calling it zero tracks', () => {
+    expect(
+      groupHeading({ representative: edition({ trackCount: undefined }), editions: [edition()] }),
+    ).toBe('Tracklist not stated \u{00B7} 1 edition');
   });
 });
 

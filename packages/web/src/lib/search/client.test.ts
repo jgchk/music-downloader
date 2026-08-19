@@ -94,12 +94,45 @@ describe('httpCatalog', () => {
     expect(answer).toEqual({ ok: false, message: UNREACHABLE });
   });
 
-  it('forwards the caller’s abandon signal to the request it makes', async () => {
-    const stub = fetchStub(Response.json(BODIES.search));
+  it('refuses a refusal whose message is not words a person could read', async () => {
+    // The message is rendered verbatim; a proxy answering with a shape of its own would otherwise
+    // reach the page as "[object Object]".
+    const stub = fetchStub(Response.json({ message: { code: 42 } }, { status: 400 }));
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+  });
+
+  it('gives up on a server that accepts the request and never answers', async () => {
+    // A silent connection is the least actionable state there is: the search would spin forever
+    // and a person cannot tell it from a slow catalog.
+    const stub = vi.fn(
+      (_path: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('timed out')));
+        }),
+    ) as never;
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: UNREACHABLE });
+  }, 20_000);
+
+  it('abandons the request when the caller abandons the search', async () => {
+    // The page abandons a search the moment a newer keystroke starts one; the request must go
+    // with it rather than run to completion against a page that has moved on.
+    const stub = vi.fn(
+      (_path: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('abandoned')));
+        }),
+    ) as never;
     const controller = new AbortController();
 
-    await httpCatalog(stub).search('graceland', controller.signal);
+    const answer = httpCatalog(stub).search('graceland', controller.signal);
+    controller.abort();
 
-    expect(stub.mock.calls[0]?.[1]).toMatchObject({ signal: controller.signal });
+    expect(await answer).toEqual({ ok: false, message: UNREACHABLE });
   });
 });
