@@ -1,5 +1,4 @@
-import { okAsync } from 'neverthrow';
-import type { ResultAsync } from 'neverthrow';
+import { ResultAsync, okAsync } from 'neverthrow';
 import type {
   CoverArtAnswer,
   CoverArtEntity,
@@ -103,16 +102,20 @@ export function cachingCoverArt(
       // the SAME pending request, so every concurrent caller is served by one archive round trip.
       if (existing !== undefined) return existing.map((answer) => answer);
 
-      const pending = inner
-        .front(entity, mbid, size)
-        .map((answer) => {
-          remember(key, answer);
+      // Built over a plain promise so the entry is cleared however the read ends — including a
+      // REJECTION, which `andTee`/`orTee` never see: neverthrow propagates one straight through.
+      // An entry left behind would make one failure this cover's answer for the life of the
+      // process, and hand every later caller a rejection where the port promises a Result.
+      const settled = (async () => {
+        try {
+          const answer = await inner.front(entity, mbid, size);
+          if (answer.isOk()) remember(key, answer.value);
           return answer;
-        })
-        // Cleared however the read ends: an entry left behind on the error channel would make one
-        // outage this cover's answer for the life of the process.
-        .andTee(() => inFlight.delete(key))
-        .orTee(() => inFlight.delete(key));
+        } finally {
+          inFlight.delete(key);
+        }
+      })();
+      const pending = new ResultAsync(settled);
       inFlight.set(key, pending);
       return pending;
     },

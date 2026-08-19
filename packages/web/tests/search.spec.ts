@@ -39,20 +39,20 @@ test.describe('request page search', () => {
     await expect(page.getByTestId('no-matches')).toHaveCount(0);
   });
 
-  test('answers for artwork itself rather than sending the browser to a third party', async ({
-    page,
+  test('answers for artwork from this application, never by redirecting to the archive', async ({
     request,
   }) => {
-    await page.goto('/acquisitions/new');
-
-    // The archive is unreachable in this tier, so the answer is knowable: this application says
-    // it could not reach it, and says so in a way no browser will remember.
+    // What is deterministic in this tier is WHO answers, not what they say: whether the archive is
+    // reachable from the test network is not this application's behaviour. So the assertion is
+    // that the answer is ours and final — every status this route can return is cached under a
+    // directive of its own, and none of them is a redirect to a third party.
     const response = await request.get(
       '/cover-art/release-group/19847822-1430-3380-9cf1-bc45545b34ac?size=250',
     );
 
-    expect(response.status()).toBe(502);
-    expect(response.headers()['cache-control']).toBe('no-store');
+    expect(response.url()).toContain('/cover-art/release-group/');
+    expect(response.url()).not.toContain('coverartarchive.org');
+    expect(response.headers()['cache-control']).toMatch(/^(private, max-age=\d+|no-store)$/);
   });
 
   test('names no third-party host in the page it serves', async ({ page }) => {

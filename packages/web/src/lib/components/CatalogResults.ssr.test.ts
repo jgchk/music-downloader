@@ -49,14 +49,43 @@ const body = (overrides: Record<string, unknown> = {}): string =>
   }).body;
 
 describe('CatalogResults (SSR)', () => {
-  it('says a block could not be read, rather than heading it or hiding it', () => {
+  it('says a kind could not be read, rather than letting it read as nothing matching', () => {
     // An empty block means "nothing matched" OR "nobody could ask"; a person told the first will
     // change their spelling, and the spelling was never the problem.
     const html = body({
-      results: results({ releaseGroups: [], artists: [], recordings: [], unavailable: ['artist'] }),
+      results: results({
+        artists: [],
+        unavailable: [{ kind: 'artist', reason: 'unreachable' }],
+      }),
     });
 
-    expect(html).toContain('could not be reached for these');
+    expect(html).toContain('could not be reached for artists');
+  });
+
+  it('says a kind whose answer could not be READ is a bug, not a connection to check', () => {
+    // Drift is not unreachability: the catalog answered, in a shape this page cannot present, and
+    // no amount of retrying by this person will change that.
+    const html = body({
+      results: results({ artists: [], unavailable: [{ kind: 'artist', reason: 'unreadable' }] }),
+    });
+
+    expect(html).toContain('could not read');
+    expect(html).toContain('That is a bug, not your search');
+  });
+
+  it('says so even when the unreadable kind is not the one being looked at', () => {
+    // Filtered to albums, which matched nothing, while the artist read failed: a notice living
+    // inside the artists section would not be on screen to be read.
+    const html = body({
+      filter: 'release-group',
+      results: results({
+        releaseGroups: [],
+        artists: [],
+        unavailable: [{ kind: 'artist', reason: 'unreachable' }],
+      }),
+    });
+
+    expect(html).toContain('could not be reached for artists');
   });
 
   it('renders every kind with the hooks the skins style, in the catalog’s own order', () => {

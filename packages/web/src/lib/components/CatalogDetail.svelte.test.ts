@@ -1,6 +1,7 @@
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { holdSubmissions } from '../../../test/stubs/app-forms.js';
 import CatalogDetail from './CatalogDetail.svelte';
 import { QUALITY_FLOORS } from '$lib/search/view.js';
 import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
@@ -308,6 +309,16 @@ describe('CatalogDetail', () => {
     const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
     expect(new FormData(form).get('targetType')).toBe('track');
     await expect.element(page.getByLabelText('Quality floor')).toBeVisible();
+  });
+
+  it('will not send a second request while the first is still going', async () => {
+    const submission = holdSubmissions();
+    onTestFinished(() => submission.release());
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    await page.getByRole('button', { name: 'Request download' }).click();
+
+    await expect.element(page.getByRole('button', { name: 'Request download' })).toBeDisabled();
   });
 
   it('closes when asked', async () => {

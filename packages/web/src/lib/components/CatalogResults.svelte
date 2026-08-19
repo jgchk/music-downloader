@@ -6,7 +6,7 @@
     artUrl,
     countOf,
     emptyLead,
-    isUnavailable,
+    unavailableNotice,
     orderedKinds,
     otherMatches,
     trackDetail,
@@ -30,6 +30,21 @@
   let { results, filter, query, onOpen, onFilter }: Properties = $props();
 
   const kinds = $derived(orderedKinds(results, filter));
+  const notice = $derived(unavailableNotice(results));
+  /** How many requests are in flight, so a submitted form cannot be submitted again. */
+  let requesting = $state(0);
+
+  /**
+   * Enhanced submission keeps the page — which also keeps the button live for the whole round
+   * trip, so without this a second click sends a second download.
+   */
+  const oneAtATime = () => {
+    requesting += 1;
+    return async ({ update }: { update: (options: { reset: boolean }) => Promise<void> }) => {
+      await update({ reset: false });
+      requesting -= 1;
+    };
+  };
   const elsewhere = $derived(otherMatches(results, filter));
 
   const HEADINGS: Record<EntityKind, string> = {
@@ -45,6 +60,12 @@
       .map((word) => word.charAt(0).toUpperCase())
       .join('');
 </script>
+
+{#if notice !== undefined}
+  <!-- Above the blocks, not inside one: a person who filtered to albums would never see a notice
+       that lived in the artists section, and would be told to check a spelling that is fine. -->
+  <p class="error" role="alert" data-testid="kind-unavailable">{notice}</p>
+{/if}
 
 {#if kinds.length === 0}
   <p class="empty-results" data-testid="no-matches">
@@ -62,14 +83,6 @@
 {#each kinds as kind (kind)}
   <section class="results" data-kind={kind}>
     <h2><span>{HEADINGS[kind]}</span> <span class="count">{countOf(results, kind)}</span></h2>
-
-    {#if isUnavailable(results, kind)}
-      <!-- An empty block means one of two different things. Saying which is the whole point: a
-           person told "nothing matched" will change their spelling, and the spelling is fine. -->
-      <p class="error" role="alert" data-testid="kind-unavailable">
-        The catalog could not be reached for these. The rest of the results are below.
-      </p>
-    {/if}
 
     {#if kind === 'release-group'}
       <ul class="art-grid">
@@ -93,10 +106,17 @@
               <span class="result-title">{group.title}</span>
               <span class="result-detail">{albumDetail(group)}</span>
             </button>
-            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
+            <form
+              method="POST"
+              action="/acquisitions/new"
+              class="request-form"
+              use:enhance={oneAtATime}
+            >
               <input type="hidden" name="kind" value="release-group" />
               <input type="hidden" name="mbid" value={group.mbid} />
-              <button type="submit" class="btn primary request">Request</button>
+              <button type="submit" class="btn primary request" disabled={requesting > 0}>
+                {requesting > 0 ? 'Requesting…' : 'Request'}
+              </button>
             </form>
           </li>
         {/each}
@@ -145,11 +165,18 @@
               <span class="result-title">{recording.title}</span>
               <span class="result-detail">{trackDetail(recording)}</span>
             </button>
-            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
+            <form
+              method="POST"
+              action="/acquisitions/new"
+              class="request-form"
+              use:enhance={oneAtATime}
+            >
               <input type="hidden" name="kind" value="musicbrainz" />
               <input type="hidden" name="targetType" value="track" />
               <input type="hidden" name="mbid" value={recording.mbid} />
-              <button type="submit" class="btn primary request">Request</button>
+              <button type="submit" class="btn primary request" disabled={requesting > 0}>
+                {requesting > 0 ? 'Requesting…' : 'Request'}
+              </button>
             </form>
           </li>
         {/each}

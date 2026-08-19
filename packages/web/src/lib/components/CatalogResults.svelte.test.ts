@@ -1,6 +1,7 @@
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { holdSubmissions } from '../../../test/stubs/app-forms.js';
 import CatalogResults from './CatalogResults.svelte';
 import type { CatalogSearchResultDto } from '@music/downloader';
 
@@ -45,11 +46,23 @@ const props = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('CatalogResults', () => {
+  it('will not send a second request while the first is still going', async () => {
+    // The enhanced submit keeps the page, which also keeps the button live for the whole round
+    // trip — so without this a double click is two downloads.
+    const submission = holdSubmissions();
+    onTestFinished(() => submission.release());
+    await render(CatalogResults, props());
+
+    await page.getByRole('button', { name: 'Request' }).first().click();
+
+    await expect.element(page.getByRole('button', { name: 'Requesting…' }).first()).toBeVisible();
+  });
+
   it('tells a person a block could not be read, rather than letting it read as no matches', async () => {
     await render(
       CatalogResults,
       props({
-        results: results({ artists: [], unavailable: ['artist'] }),
+        results: results({ artists: [], unavailable: [{ kind: 'artist', reason: 'unreachable' }] }),
         filter: 'artist',
       }),
     );

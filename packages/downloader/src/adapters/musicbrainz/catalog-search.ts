@@ -160,16 +160,29 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
         { kind: 'artist' as const, attempt: artists },
         { kind: 'recording' as const, attempt: recordings },
       ];
-      const unread = attempts.filter((one) => one.attempt.kind === 'unread');
+      const unread = attempts.flatMap((one) =>
+        one.attempt.kind === 'unread' ? [{ kind: one.kind, fault: one.attempt.fault }] : [],
+      );
       // EVERY kind failing is not a partial answer — it is the catalog being unreachable, and a
       // page rendering "nothing matched" for that would claim to know something it does not.
-      const [first] = unread;
-      if (unread.length === attempts.length && first?.attempt.kind === 'unread') {
-        return err(first.attempt.fault);
+      const [firstFault] = unread;
+      if (firstFault !== undefined && unread.length === attempts.length) {
+        return err(firstFault.fault);
       }
-      const unavailable = unread.map((one) => one.kind);
-      if (unavailable.length > 0) {
-        scope.logger.warn({ unavailable }, 'catalog search answered for some kinds and not others');
+      const unavailable = unread.map((one) => ({
+        kind: one.kind,
+        // A permanent fault here is drift: the catalog answered and we could not read it. The
+        // distinction reaches the page, which otherwise tells a person the catalog "could not be
+        // reached" about a catalog that answered perfectly well.
+        reason: one.fault.permanent === true ? ('unreadable' as const) : ('unreachable' as const),
+      }));
+      if (unread.length > 0) {
+        // WITH the faults: below this line they are gone, and a permanent drift on one kind would
+        // otherwise leave one line naming the kind and nothing about what changed.
+        scope.logger.warn(
+          { unavailable, faults: unread.map((one) => one.fault) },
+          'catalog search answered for some kinds and not others',
+        );
       }
       const groupsJson = groups.kind === 'read' ? groups.value : undefined;
       const artistsJson = artists.kind === 'read' ? artists.value : undefined;
@@ -213,7 +226,7 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       } else {
         scope.logger.debug({ received, presented }, 'catalog search answered');
       }
-      return ok({
+      return ok<CatalogSearchResults, InfraError>({
         releaseGroups,
         artists: presentedArtists,
         recordings: presentedRecordings,

@@ -54,11 +54,20 @@ export const catalogSearchResultSchema = z.object({
   artists: z.array(catalogArtistDtoSchema),
   recordings: z.array(catalogRecordingDtoSchema),
   /**
-   * The blocks the catalog could not be read for. A search asks about three kinds independently,
-   * so an empty block means one of two different things — nothing matched, or nobody could ask —
-   * and only this list tells a reader which. Optional so an older producer's answer still parses.
+   * The blocks the catalog could not be read for, and why. A search asks about three kinds
+   * independently, so an empty block means one of two different things — nothing matched, or
+   * nobody could ask — and only this list tells a reader which. The reason separates a catalog
+   * that could not be REACHED (a retry may work) from one whose answer could not be READ (it has
+   * changed shape; retrying will not help). Optional so an older producer's answer still parses.
    */
-  unavailable: z.array(z.enum(['release-group', 'artist', 'recording'])).optional(),
+  unavailable: z
+    .array(
+      z.object({
+        kind: z.enum(['release-group', 'artist', 'recording']),
+        reason: z.enum(['unreachable', 'unreadable']),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -207,7 +216,7 @@ function recordingToDto(recording: CatalogRecording): z.infer<typeof catalogReco
 export function searchResultsToDto(results: CatalogSearchResults): CatalogSearchResultDto {
   return {
     leading: results.leading,
-    unavailable: [...results.unavailable],
+    unavailable: results.unavailable.map((one) => ({ kind: one.kind, reason: one.reason })),
     releaseGroups: results.releaseGroups.map((group) => releaseGroupToDto(group)),
     artists: results.artists.map((artist) => artistToDto(artist)),
     recordings: results.recordings.map((recording) => recordingToDto(recording)),

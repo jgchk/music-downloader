@@ -33,7 +33,34 @@ export function countOf(results: CatalogSearchResultDto, kind: EntityKind): numb
 
 /** Whether the catalog could not be read for this kind at all — an empty block with a reason. */
 export function isUnavailable(results: CatalogSearchResultDto, kind: EntityKind): boolean {
-  return (results.unavailable ?? []).includes(kind);
+  return (results.unavailable ?? []).some((one) => one.kind === kind);
+}
+
+const KIND_WORDS: Record<EntityKind, string> = {
+  'release-group': 'albums',
+  artist: 'artists',
+  recording: 'tracks',
+};
+
+/**
+ * What to say about the kinds a search could not be read for, or nothing when it read them all.
+ *
+ * Said ONCE, above the blocks, because a notice inside a block is invisible exactly when it
+ * matters most: a person filtered to albums, the album read matched nothing, and the artist read
+ * failed — the artists block is not on screen to carry the news, and the page would otherwise tell
+ * them to check their spelling.
+ *
+ * The two reasons get different words on purpose. A catalog that could not be REACHED may answer
+ * on a retry; one whose answer could not be READ has changed shape, and no amount of retrying by
+ * this person will fix it.
+ */
+export function unavailableNotice(results: CatalogSearchResultDto): string | undefined {
+  const unavailable = results.unavailable ?? [];
+  if (unavailable.length === 0) return undefined;
+  const words = unavailable.map((one) => KIND_WORDS[one.kind]).join(' and ');
+  return unavailable.every((one) => one.reason === 'unreadable')
+    ? `The catalog answered about ${words} in a way this page could not read. That is a bug, not your search.`
+    : `The catalog could not be reached for ${words}. Anything else it answered is below.`;
 }
 
 /**
