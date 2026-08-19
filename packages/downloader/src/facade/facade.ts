@@ -1,4 +1,6 @@
+import { err, ok as okResult } from 'neverthrow';
 import { z } from 'zod';
+import type { Result } from 'neverthrow';
 import type { CommandError } from '../application/download/command-handler.js';
 import { adoptOrMint } from '../application/correlation/context.js';
 import type { CommandContext } from '../application/correlation/context.js';
@@ -12,6 +14,14 @@ import {
   submitAcquisition as submitDownloadUseCase,
 } from '../application/download/use-cases.js';
 import type { UseCaseDependencies } from '../application/download/use-cases.js';
+import { operationScope } from '../application/correlation/context.js';
+import {
+  discographyToDto,
+  editionsToDto,
+  lookupToDto,
+  searchResultsToDto,
+  tracklistToDto,
+} from './catalog-dto.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 import { submitAcquisitionRequestSchema } from './schemas.js';
 import type {
@@ -19,6 +29,17 @@ import type {
   AcquisitionStatusResponseDto,
   ProgressResponseDto,
 } from './schemas.js';
+import type {
+  CatalogDiscographyResultDto,
+  CatalogEditionsResultDto,
+  CatalogLookupResultDto,
+  CatalogSearchResultDto,
+  CatalogTracklistResultDto,
+} from './catalog-dto.js';
+import type { CatalogSearchPort } from '../application/ports/catalog-search-port.js';
+import type { Logger } from '../application/logging/logger.js';
+import type { OperationScope } from '../application/correlation/context.js';
+import type { Mbid } from '../domain/shared/mbid.js';
 
 /**
  * The downloader module's wire-shaped facade (module-architecture D2): the single entry point any
@@ -79,6 +100,10 @@ export const selectEditionInputSchema = z.object({
   releaseMbid: z.string().min(1),
 });
 
+/** The catalog reads: a free-text query, or one identifier naming a thing in the catalog. */
+export const catalogSearchInputSchema = z.object({ query: z.string() });
+export const catalogIdInputSchema = z.object({ mbid: z.string().min(1) });
+
 export const submitAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
 export const cancelAcquisitionResultSchema = z.object({ acquisitionId: z.string() });
 export const selectEditionResultSchema = z.object({ acquisitionId: z.string() });
@@ -86,6 +111,25 @@ export const selectEditionResultSchema = z.object({ acquisitionId: z.string() })
 export type SubmitAcquisitionResult = z.infer<typeof submitAcquisitionResultSchema>;
 export type CancelAcquisitionResult = z.infer<typeof cancelAcquisitionResultSchema>;
 export type SelectEditionResult = z.infer<typeof selectEditionResultSchema>;
+
+/**
+ * Parse a catalog identifier at the boundary. A malformed id is a validation failure rather than
+ * a lookup that answers "nothing": the caller asked something that cannot be true of any catalog.
+ */
+function catalogMbid(input: unknown): Result<Mbid, DownloaderFacadeError> {
+  const parsed = catalogIdInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return err({
+      kind: 'ValidationFailed',
+      message: parsed.error.issues.map((issue) => issue.message).join('; '),
+    });
+  }
+  const mbid = parseMbid(parsed.data.mbid);
+  if (mbid.isErr()) {
+    return err({ kind: 'ValidationFailed', message: 'not a MusicBrainz identifier' });
+  }
+  return okResult(mbid.value);
+}
 
 // --- The facade --------------------------------------------------------------------------------
 
@@ -107,9 +151,33 @@ export interface DownloaderFacade {
   /** Infallible collection read: returns the DTO directly, no result envelope. */
   listAcquisitions(): AcquisitionListResponseDto;
   getAcquisitionProgress(input: unknown): FacadeResult<ProgressResponseDto>;
+  /**
+   * The catalog reads a person formulates a request with. Unlike the projection reads above these
+   * are asynchronous and carry a story, because they leave the process: they ask the upstream
+   * catalog, and a catalog that cannot be reached is a fault the caller must be able to tell apart
+   * from a search that simply matched nothing.
+   */
+  searchCatalog(input: unknown, story: StoryId): Promise<FacadeResult<CatalogSearchResultDto>>;
+  lookupCatalog(input: unknown, story: StoryId): Promise<FacadeResult<CatalogLookupResultDto>>;
+  browseArtist(input: unknown, story: StoryId): Promise<FacadeResult<CatalogDiscographyResultDto>>;
+  listEditions(input: unknown, story: StoryId): Promise<FacadeResult<CatalogEditionsResultDto>>;
+  getTracklist(input: unknown, story: StoryId): Promise<FacadeResult<CatalogTracklistResultDto>>;
 }
 
-export function createDownloaderFacade(dependencies: UseCaseDependencies): DownloaderFacade {
+/**
+ * The catalog reads' own dependencies, kept apart from {@link UseCaseDependencies}: the catalog is
+ * a read the FACADE offers, not a collaborator of the acquisition use-cases, and folding it into
+ * their dependency object would tell every command about a port none of them may touch.
+ */
+export interface CatalogDependencies {
+  readonly catalog: CatalogSearchPort;
+  readonly logger: Logger;
+}
+
+export function createDownloaderFacade(
+  dependencies: UseCaseDependencies,
+  catalogDependencies: CatalogDependencies,
+): DownloaderFacade {
   /**
    * Turn a caller's story into this module's command context. The degrade rule itself lives in the
    * correlation module — it is policy, not wire shaping, and a second interface (MCP, HTTP) would
@@ -117,6 +185,10 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
    */
   const contextFor = (story: StoryId): CommandContext =>
     adoptOrMint(story, dependencies.correlation).context;
+
+  /** The scope a catalog read runs under, so its lines join the caller's story. */
+  const scopeFor = (story: StoryId): OperationScope =>
+    operationScope(contextFor(story), catalogDependencies.logger);
 
   return {
     async submitAcquisition(input, story) {
@@ -194,6 +266,56 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
       const progress = getProgressUseCase(dependencies, parsed.data.id);
       if (progress === undefined) return fail({ kind: 'NotFound' });
       return ok(progressToDto(progress));
+    },
+
+    async searchCatalog(input, story) {
+      const parsed = catalogSearchInputSchema.safeParse(input);
+      if (!parsed.success) return validationFailed(parsed.error);
+      const result = await catalogDependencies.catalog.search(parsed.data.query, scopeFor(story));
+      return result.match(
+        (results) => ok(searchResultsToDto(results)),
+        (error) => fail(toFacadeError(error)),
+      );
+    },
+
+    async lookupCatalog(input, story) {
+      const mbid = catalogMbid(input);
+      if (mbid.isErr()) return fail(mbid.error);
+      const result = await catalogDependencies.catalog.lookup(mbid.value, scopeFor(story));
+      return result.match(
+        (lookup) => ok(lookupToDto(lookup)),
+        (error) => fail(toFacadeError(error)),
+      );
+    },
+
+    async browseArtist(input, story) {
+      const mbid = catalogMbid(input);
+      if (mbid.isErr()) return fail(mbid.error);
+      const result = await catalogDependencies.catalog.discography(mbid.value, scopeFor(story));
+      return result.match(
+        (groups) => ok(discographyToDto(groups)),
+        (error) => fail(toFacadeError(error)),
+      );
+    },
+
+    async listEditions(input, story) {
+      const mbid = catalogMbid(input);
+      if (mbid.isErr()) return fail(mbid.error);
+      const result = await catalogDependencies.catalog.editions(mbid.value, scopeFor(story));
+      return result.match(
+        (listing) => ok(editionsToDto(listing)),
+        (error) => fail(toFacadeError(error)),
+      );
+    },
+
+    async getTracklist(input, story) {
+      const mbid = catalogMbid(input);
+      if (mbid.isErr()) return fail(mbid.error);
+      const result = await catalogDependencies.catalog.tracklist(mbid.value, scopeFor(story));
+      return result.match(
+        (tracks) => ok(tracklistToDto(tracks)),
+        (error) => fail(toFacadeError(error)),
+      );
     },
   };
 }

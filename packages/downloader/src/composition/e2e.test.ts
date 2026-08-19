@@ -14,6 +14,7 @@ import type { EffectPorts, InterpreterDependencies } from '../application/downlo
 import { Reactor } from '../application/download/reactor.js';
 import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import { fixedClock, sequentialIds, silentLogger } from '../application/__fixtures__/fakes.js';
+import { fakeCatalog } from '../application/__fixtures__/catalog.js';
 import { deliverDownloadOutcome } from '../application/download/download-outcome-consumer.js';
 import type {
   TransferProgress,
@@ -217,7 +218,10 @@ afterEach(async () => {
 async function startApp(options: E2EOptions) {
   const w = wire(options);
   await w.reactor.start();
-  const facade = createDownloaderFacade(w.deps);
+  const facade = createDownloaderFacade(w.deps, {
+    catalog: fakeCatalog(),
+    logger: silentLogger(),
+  });
   cleanups.push(
     () => w.reactor.stop(),
     () => {

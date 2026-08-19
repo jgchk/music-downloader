@@ -10,7 +10,7 @@ All production code test-first (red before green), per `docs/development/testing
 - [x] 1.4 Implement intent ordering (exact artist name → artists; best recording > best album-shaped RG + margin, Singles excluded from album evidence → recordings; else release groups) with the three canonical query fixtures as tests
 - [x] 1.5 Define the catalog-search port (search, resolve-by-id, browse artist, list editions, get tracklist) and implement the MusicBrainz adapter over the shared User-Agent-identified client, with short-TTL query caching and in-flight sharing (no pacing queue — it would serialize a search's entity reads; see the corrected stewardship requirement)
 - [x] 1.6 Implement the best-match preview by reusing `releaseGroupEditionIds` on the browse result (head of its output, or the explicit no-automatic-pick outcome); test that preview and pipeline agree on shared fixtures
-- [ ] 1.7 Expose the facade read verbs (`searchCatalog`, `browseArtist`, `listEditions`, `getTracklist`) with zod boundaries, modeled failures distinct from empty results, and wire them in composition
+- [x] 1.7 Expose the facade read verbs (`searchCatalog`, `browseArtist`, `listEditions`, `getTracklist`) with zod boundaries, modeled failures distinct from empty results, and wire them in composition
 
 ## 2. Cover art (downloader + web)
 

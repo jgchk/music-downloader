@@ -3,3 +3,4 @@
 export * from './facade.js';
 export * from './schemas.js';
 export * from './mapping.js';
+export * from './catalog-dto.js';
