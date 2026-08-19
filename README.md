@@ -44,6 +44,7 @@ All configuration comes from the environment (12-factor); invalid config fails s
 | `LOG_LEVEL`              | no       | `info`                   | pino level (`debug`/`info`/`warn`/`error`).                                                                                    |
 | `MUSICBRAINZ_BASE_URL`   | no       | public MusicBrainz       | Metadata API base URL.                                                                                                         |
 | `MUSICBRAINZ_USER_AGENT` | no       | built-in                 | User-Agent sent to MusicBrainz.                                                                                                |
+| `COVER_ART_BASE_URL`     | no       | public Cover Art Archive | Cover-art archive base URL — point it at a stub or proxy where the archive is unreachable.                                     |
 | `SLSKD_BASE_URL`         | no       | `http://localhost:5030`  | slskd API base URL.                                                                                                            |
 | `SLSKD_API_KEY`          | no       | —                        | slskd API key (secret; never commit).                                                                                          |
 | `SESSION_SECRET`         | yes      | —                        | Signs session cookies; ≥32 chars or startup fails (rotating it signs everyone out).                                            |

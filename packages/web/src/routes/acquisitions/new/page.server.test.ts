@@ -25,7 +25,10 @@ describe('the request action, which keeps the page', () => {
       .mockResolvedValue({ ok: true, value: { acquisitionId: 'acq-9' } });
 
     const answer = await actions.request!(
-      event({ kind: 'release-group', mbid: 'mb-1', title: 'Graceland' }, { submitAcquisition }),
+      event(
+        { kind: 'release-group', mbid: 'mb-1', displayTitle: 'Graceland' },
+        { submitAcquisition },
+      ),
     );
 
     // A redirect here would throw away the query, its results, and whatever was open — the whole

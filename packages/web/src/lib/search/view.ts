@@ -125,10 +125,26 @@ const KIND_WORDS: Record<EntityKind, string> = {
 export function unavailableNotice(results: CatalogSearchResultDto): string | undefined {
   const unavailable = results.unavailable ?? [];
   if (unavailable.length === 0) return undefined;
-  const words = unavailable.map((one) => KIND_WORDS[one.kind]).join(' and ');
-  return unavailable.every((one) => one.reason === 'unreadable')
-    ? `The catalog answered about ${words} in a way this page could not read. That is a bug, not your search.`
-    : `The catalog could not be reached for ${words}. Anything else it answered is below.`;
+  const wordsFor = (reason: 'unreachable' | 'unreadable'): string =>
+    unavailable
+      .filter((one) => one.reason === reason)
+      .map((one) => KIND_WORDS[one.kind])
+      .join(' and ');
+  const unreached = wordsFor('unreachable');
+  const drifted = wordsFor('unreadable');
+
+  // Said separately, because the two need opposite advice. Collapsing a mixed answer into the
+  // retry sentence tells someone to try again about a kind that answered perfectly well and will
+  // answer the same way every time.
+  return [
+    unreached === '' ? undefined : `The catalog could not be reached for ${unreached}.`,
+    drifted === ''
+      ? undefined
+      : `The catalog answered about ${drifted} in a way this page could not read. That is a bug, not your search.`,
+    'Anything else it answered is below.',
+  ]
+    .filter((part) => part !== undefined)
+    .join(' ');
 }
 
 /**

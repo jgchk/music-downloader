@@ -71,11 +71,14 @@ export const downloaderFacadeErrorSchema = z.discriminatedUnion('kind', [
     operation: z.string(),
     message: z.string(),
     /**
-     * Whether retrying is futile — the adapter's own classification (schema drift, a refusal it
-     * recognized) rather than a guess. Additive and optional: an older producer simply does not
-     * say, and a reader that cannot tell must treat the fault as possibly-transient.
+     * What kind of fault this was, in this module's own words — the same two the partial-failure
+     * path already publishes. `unreachable` may pass on a retry; `unreadable` means the upstream
+     * answered and we could not read it, which no amount of retrying by a reader will fix.
+     *
+     * Additive and optional: absent means this module did not classify the fault, which a reader
+     * must NOT read as either one.
      */
-    permanent: z.boolean().optional(),
+    reason: z.enum(['unreachable', 'unreadable']).optional(),
   }),
 ]);
 
@@ -102,7 +105,9 @@ function toFacadeError(error: CommandError): DownloaderFacadeError {
       kind: 'InfraError',
       operation: error.operation,
       message: error.message,
-      permanent: error.permanent,
+      // The adapter classified the fault for its own retry budget; said outward, that judgement
+      // is what tells a reader whether trying again is worth anything.
+      reason: error.permanent === true ? 'unreadable' : 'unreachable',
     };
   }
   return error;

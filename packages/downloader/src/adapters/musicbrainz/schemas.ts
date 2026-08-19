@@ -140,7 +140,7 @@ const artistEntitySchema = z.object({
   score: z.number().optional(),
   name: z.string().nullable().optional(),
   disambiguation: z.string().nullable().optional(),
-  type: z.string().nullable().optional(), // Person/Group/… — shown when there is no disambiguation
+  type: z.string().nullable().optional(), // Person/Group/… — carried as its own fact, beside the disambiguation
 });
 
 const catalogRecordingSchema = z.object({

@@ -72,8 +72,8 @@ function servableType(declared: string): ServableImageType {
  */
 const THUMBNAIL_KEYS: Record<CoverArtSize, '250' | '500'> = { 250: '250', 500: '500' };
 
-function unavailable(detail: string): CoverArtUnavailable {
-  return { kind: 'cover-art-unavailable', detail };
+function unavailable(detail: string, scope: CoverArtUnavailable['scope']): CoverArtUnavailable {
+  return { kind: 'cover-art-unavailable', detail, scope };
 }
 
 /**
@@ -133,13 +133,19 @@ export class CoverArtArchive implements CoverArtPort {
         // most likely. Reported as absence it would be remembered for a day and served to the
         // browser as a 404, blanking every cover in the grid with nothing said anywhere.
         return errAsync<CoverArtAnswer, CoverArtUnavailable>(
-          unavailable('the cover art archive listed a front cover with no image to fetch'),
+          unavailable(
+            'the cover art archive listed a front cover with no image to fetch',
+            'record',
+          ),
         );
       }
       const url = imageUrl(source);
       if (url === undefined) {
         return errAsync<CoverArtAnswer, CoverArtUnavailable>(
-          unavailable('the cover art archive named an image somewhere we will not fetch from'),
+          unavailable(
+            'the cover art archive named an image somewhere we will not fetch from',
+            'record',
+          ),
         );
       }
       return this.image(url);
@@ -155,23 +161,29 @@ export class CoverArtArchive implements CoverArtPort {
         headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }),
-      (cause) => unavailable(`the cover art archive could not be reached: ${String(cause)}`),
+      (cause) =>
+        unavailable(`the cover art archive could not be reached: ${String(cause)}`, 'archive'),
     ).andThen((response) => {
       // The archive saying it holds no art for this thing is an answer a caller may remember.
       if (response.status === 404) return okAsync<ManifestAnswer>({ kind: 'absent' });
       if (!response.ok) {
+        // A refusal in the 4xx range is about the thing we asked for; a 5xx is the archive
+        // itself. Only the second is a reason to stop asking on everyone else's behalf.
         return errAsync<ManifestAnswer, CoverArtUnavailable>(
-          unavailable(`the cover art archive responded ${response.status}`),
+          unavailable(
+            `the cover art archive responded ${response.status}`,
+            response.status < 500 ? 'record' : 'archive',
+          ),
         );
       }
       return ResultAsync.fromPromise(response.json(), () =>
-        unavailable('the cover art archive answered with something other than JSON'),
+        unavailable('the cover art archive answered with something other than JSON', 'archive'),
       ).andThen((json) => {
         const parsed = coverArtManifestSchema.safeParse(json);
         return parsed.success
           ? okAsync<ManifestAnswer>({ kind: 'manifest', manifest: parsed.data })
           : errAsync<ManifestAnswer, CoverArtUnavailable>(
-              unavailable('the cover art archive’s shape has drifted'),
+              unavailable('the cover art archive’s shape has drifted', 'archive'),
             );
       });
     });
@@ -183,17 +195,18 @@ export class CoverArtArchive implements CoverArtPort {
         headers: { 'User-Agent': USER_AGENT },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }),
-      (cause) => unavailable(`the cover art image could not be fetched: ${String(cause)}`),
+      (cause) =>
+        unavailable(`the cover art image could not be fetched: ${String(cause)}`, 'record'),
     ).andThen((image) => {
       if (!image.ok) {
         // The manifest promised an image the archive would not serve. That is the archive failing,
         // not the record lacking art — remembering it as absence would hide the art for good.
         return errAsync<CoverArtAnswer, CoverArtUnavailable>(
-          unavailable(`the cover art archive served ${image.status} for its own image`),
+          unavailable(`the cover art archive served ${image.status} for its own image`, 'record'),
         );
       }
       return ResultAsync.fromPromise(image.arrayBuffer(), () =>
-        unavailable('the cover art image could not be read to the end'),
+        unavailable('the cover art image could not be read to the end', 'record'),
       ).map((bytes) => {
         // Re-served from our own origin, so only a type we are willing to serve is echoed;
         // anything else would let the archive choose how our responses are interpreted.

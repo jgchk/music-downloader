@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chosenEdition,
   bestMatchSummary,
+  chosenEdition,
   editionSummary,
   formatCategory,
   groupHeading,
   narrowedToFormat,
   pickedMbid,
-  releaseLine,
   trackTime,
 } from './detail.js';
 import type { DetailState } from './detail.js';
@@ -98,15 +97,6 @@ describe('groupHeading', () => {
   });
 });
 
-describe('releaseLine', () => {
-  it('says when and of what kind, and nothing where the catalog is silent', () => {
-    expect(releaseLine({ year: 1986, primaryType: 'Album' })).toBe('1986 \u{00B7} Album');
-    expect(releaseLine({ year: undefined, primaryType: 'Album' })).toBe('Album');
-    expect(releaseLine({ year: 1986, primaryType: undefined })).toBe('1986');
-    expect(releaseLine({ year: undefined, primaryType: undefined })).toBe('');
-  });
-});
-
 describe('chosenEdition', () => {
   const album = (mbid: string): DetailState => ({
     kind: 'release-group',
@@ -148,6 +138,8 @@ describe('formatCategory', () => {
     [['CD'], 'cd'],
     [['12" Vinyl'], 'vinyl'],
     [['Digital Media'], 'digital'],
+    // The archive says both; a person browsing for a download means the same thing by each.
+    [['Digital File'], 'digital'],
     [['Cassette'], 'other'],
     [[], 'other'],
   ] as const)('files %s under %s', (formats, category) => {

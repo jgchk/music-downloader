@@ -38,8 +38,8 @@ const SOURCES = import.meta.glob<string>('/src/**/*.svelte', {
 
 /**
  * The opening tags of every `<button>` in a source. Scanned rather than matched with one regex
- * because an attribute value can hold a `>` of its own (`disabled={requesting > 0}`), which ends
- * the tag early for anything that just looks for the next angle bracket.
+ * because an attribute value can hold a `>` of its own (`onclick={() => a > b}`), which ends the
+ * tag early for anything that just looks for the next angle bracket.
  */
 function endOfTag(source: string, start: number): number {
   let depth = 0;

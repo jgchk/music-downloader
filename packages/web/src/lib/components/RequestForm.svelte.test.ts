@@ -23,8 +23,10 @@ describe('RequestForm', () => {
     const data = new FormData(form);
     expect(data.get('kind')).toBe('release-group');
     expect(data.get('mbid')).toBe('mb-1');
-    // The title rides along so the answer can name what was asked for without re-reading it.
-    expect(data.get('title')).toBe('Graceland');
+    // Under its own name: `title` is the submit contract's field for a descriptor request, and
+    // an echo sharing it would be read as one.
+    expect(data.get('displayTitle')).toBe('Graceland');
+    expect(data.get('title')).toBeNull();
   });
 
   it('confirms at the form that submitted, with a way to open what was made', async () => {
@@ -51,17 +53,58 @@ describe('RequestForm', () => {
     await expect.element(page.getByRole('button', { name: 'Request' })).toBeEnabled();
   });
 
-  it('leaves a refused request to the page, rather than confirming one that was not made', async () => {
-    answerWith({ type: 'failure', data: { message: 'Invalid input: no target' } });
+  it('says why it was refused, beside the button that was pressed', async () => {
+    answerWith({ type: 'failure', data: { message: 'That acquisition already exists.' } });
     onTestFinished(resetAnswer);
     await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
 
     await page.getByRole('button', { name: 'Request' }).click();
 
-    // No confirmation, and the button comes back: the refusal renders where the page renders
-    // refusals, and this form is ready to be corrected and sent again.
+    // A refusal at the top of a scrolled grid — or behind the detail view — is one nobody sees,
+    // which is indistinguishable from a click that did not register. So they click again.
+    await expect
+      .element(page.getByRole('alert'))
+      .toHaveTextContent('That acquisition already exists.');
     expect(document.querySelector('[role="status"]')).toBeNull();
     await expect.element(page.getByRole('button', { name: 'Request' })).toBeEnabled();
+  });
+
+  it('still says something when a refusal arrives with no words of its own', async () => {
+    answerWith({ type: 'failure' });
+    onTestFinished(resetAnswer);
+    await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
+
+    await page.getByRole('button', { name: 'Request' }).click();
+
+    await expect.element(page.getByRole('alert')).toBeVisible();
+  });
+
+  it('clears the last outcome when asked again, rather than stacking answers', async () => {
+    answerWith({ type: 'failure', data: { message: 'That acquisition already exists.' } });
+    onTestFinished(resetAnswer);
+    await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
+    await page.getByRole('button', { name: 'Request' }).click();
+    await expect.element(page.getByRole('alert')).toBeVisible();
+
+    answerWith({ type: 'success', data: { requested: { acquisitionId: ACQUISITION } } });
+    await page.getByRole('button', { name: 'Request' }).click();
+
+    // A refusal sitting above a confirmation of the retry that fixed it is a page telling a
+    // person two contradictory things about one button.
+    await expect.element(page.getByRole('status')).toBeVisible();
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('ignores an answer whose shape it does not recognise', async () => {
+    answerWith({ type: 'success', data: { requested: { acquisitionId: '' } } });
+    onTestFinished(resetAnswer);
+    await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
+
+    await page.getByRole('button', { name: 'Request' }).click();
+
+    // Better to say the request did not land than to link someone to /acquisitions/undefined.
+    expect(document.querySelector('[role="status"]')).toBeNull();
+    await expect.element(page.getByRole('alert')).toBeVisible();
   });
 
   it('goes busy while its own request is in flight', async () => {
@@ -78,6 +121,6 @@ describe('RequestForm', () => {
     await render(RequestForm, { fields: { kind: 'release-group', mbid: 'mb-1' } });
 
     const form = document.querySelector<HTMLFormElement>('form.request-form')!;
-    expect(new FormData(form).get('title')).toBeNull();
+    expect(new FormData(form).get('displayTitle')).toBeNull();
   });
 });

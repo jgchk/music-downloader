@@ -260,12 +260,23 @@ describe('CoverArtArchive.front', () => {
     expect(failure.kind).toBe('cover-art-unavailable');
   });
 
-  it('reports an archive that errors as unavailable', async () => {
+  it('reports an archive that errors as the archive being unavailable', async () => {
     const stub = fetchStub(new Response('boom', { status: 503 }));
 
     const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
 
     expect(failure.kind).toBe('cover-art-unavailable');
+    // A 5xx is the archive itself, so a caller may reasonably stop asking on everyone's behalf.
+    expect(failure.scope).toBe('archive');
+  });
+
+  it('reports a refusal of one request as being about that record, not the archive', async () => {
+    const stub = fetchStub(new Response('no', { status: 400 }));
+
+    const failure = await unwrapError(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    // Otherwise one identifier the archive dislikes would blank every cover in the house.
+    expect(failure.scope).toBe('record');
   });
 
   it('reports an off-contract manifest as unavailable rather than guessing at it', async () => {

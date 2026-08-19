@@ -14,7 +14,8 @@
 
 /**
  * A round trip a test holds open, so what the page does WHILE a request is in flight can be
- * asserted at all. Without it the stub's update resolves before an assertion can run, and the
+ * asserted at all. It delays the ANSWER — the framework would be posting the form here — which is
+ * what "in flight" means; without it the answer lands before an assertion can run, and the
  * in-flight state would be untestable rather than merely brief.
  */
 let held: Promise<void> | undefined;
@@ -65,9 +66,12 @@ export function enhance(form: HTMLFormElement, submit?: SubmitFunction): { destr
   const onSubmit = (event: Event): void => {
     event.preventDefault();
     const result = submit?.({ formData: new FormData(form) });
-    // The framework would post the form here; the stub resolves the update immediately — or when
-    // a test releases it, so the in-flight state has a moment long enough to be seen.
-    void result?.({ result: answer, update: () => held ?? Promise.resolve() });
+    if (result === undefined) return;
+    // The framework would post the form here. The stub answers immediately — or when a test
+    // releases it, so the in-flight state has a moment long enough to be seen.
+    void (held ?? Promise.resolve()).then(() =>
+      result({ result: answer, update: () => Promise.resolve() }),
+    );
   };
   form.addEventListener('submit', onSubmit);
   return { destroy: () => form.removeEventListener('submit', onSubmit) };

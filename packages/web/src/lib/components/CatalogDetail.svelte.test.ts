@@ -92,6 +92,101 @@ describe('CatalogDetail', () => {
     expect(document.querySelector('.format-filter')).toBeNull();
   });
 
+  it('greets the next album unfiltered, whatever shelf the last one was left on', async () => {
+    const panel = await render(
+      CatalogDetail,
+      props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+    );
+    await page.getByRole('button', { name: 'Vinyl', exact: true }).click();
+    await expect.element(page.getByTestId('no-editions-in-format')).toBeVisible();
+
+    await panel.rerender(
+      props({
+        ...releaseGroupDetail({ kind: 'pick', mbid: PICK }),
+        mbid: 'a9b0f4c2-1111-4111-8111-111111111111',
+        title: 'Another Album',
+      }),
+    );
+
+    // The view is mounted once and reused, so a filter chosen on one album would otherwise greet
+    // the next already narrowed — and on a CD-only record, narrowed to nothing.
+    expect(document.querySelector('[data-testid="no-editions-in-format"]')).toBeNull();
+    await expect
+      .element(page.getByRole('button', { name: 'All', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('opens the group holding the pick, not only the largest one', async () => {
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'release-group',
+        mbid: RG,
+        title: 'Graceland',
+        editions: {
+          groups: [
+            {
+              representative: edition(OTHER, { trackCount: 11 }),
+              editions: [edition(OTHER), edition('3c1e0a5b-2222-4222-8222-222222222222')],
+            },
+            {
+              representative: edition(PICK, { trackCount: 19 }),
+              editions: [edition(PICK, { trackCount: 19 })],
+            },
+          ],
+          bestMatch: { kind: 'pick', mbid: PICK },
+        },
+      }),
+    );
+
+    // The largest group leads, but the pick is the modal count among OFFICIAL pressings — the two
+    // come apart, and a pick behind a closed disclosure is one nobody can check.
+    const groups = [...document.querySelectorAll<HTMLDetailsElement>('.edition-group')];
+    expect(groups.map((group) => group.open)).toEqual([true, true]);
+  });
+
+  it('says which pressing is chosen, and which control is the system’s', async () => {
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      chosen: { album: RG, edition: OTHER },
+    });
+
+    // For someone who cannot see the border, the pressed state is the only signal of which of the
+    // two — the summary or a row — is currently in force.
+    await expect.element(page.getByTestId('best-match')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('recounts a group’s heading against the pressings the filter left', async () => {
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'release-group',
+        mbid: RG,
+        title: 'Graceland',
+        editions: {
+          groups: [
+            {
+              representative: edition(PICK),
+              editions: [
+                edition(PICK),
+                edition(OTHER, { formats: ['12" Vinyl'] }),
+                edition('3c1e0a5b-2222-4222-8222-222222222222', { formats: ['12" Vinyl'] }),
+              ],
+            },
+          ],
+          bestMatch: { kind: 'pick', mbid: PICK },
+        },
+      }),
+    );
+    await expect.element(page.getByText('3 editions', { exact: false })).toBeVisible();
+
+    await page.getByRole('button', { name: 'CD', exact: true }).click();
+
+    // A heading claiming pressings that are no longer under it is worse than one fewer heading.
+    expect(document.querySelectorAll('.editions .edition')).toHaveLength(1);
+    await expect.element(page.getByText('1 edition', { exact: false })).toBeVisible();
+  });
+
   it('states what the system would take, above everything and outside the filter', async () => {
     await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
 

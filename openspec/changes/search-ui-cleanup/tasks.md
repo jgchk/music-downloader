@@ -91,10 +91,11 @@ creates and extends its layout tests).
 ## 8. Blast radius, gate, and ship
 
 - [x] 8.1 Audited `test/e2e` and the Playwright parity specs BEFORE the merge checkpoint. Both
-      exercise the no-JS artist-and-title form, which keeps the DEFAULT action and its redirect —
-      `test/e2e/helpers.ts` posts to `/acquisitions/new` with no action name, and
-      `tests/parity.spec.ts` clicks the native form's own button — so the named-action change
-      reaches neither. `tests/search.spec.ts` scrapes `search-hint` for 'MusicBrainz ID' (kept,
+      exercise the no-JS artist-and-title form. That form keeps the landing-on-the-download
+      behaviour, but the audit found the change had broken it anyway: SvelteKit forbids a
+      `default` action beside named ones, so BOTH had to be named and both callers updated —
+      `test/e2e/helpers.ts` now posts to `?/submit`, and `tests/parity.spec.ts` clicks the native
+      form's own button, which the form's own action attribute now names. `tests/search.spec.ts` scrapes `search-hint` for 'MusicBrainz ID' (kept,
       with an example appended) and `search-error` for an unreachable catalog (now a 502, still
       the same testid and the same copy). Full `pnpm test:e2e` run green before the PR
 - [x] 8.2 Side-by-side re-verification against prototype D (`proto-d-hybrid.html`) in a real
@@ -104,5 +105,5 @@ creates and extends its layout tests).
       put under a format filter, the chips narrowing to vinyl, and a request confirming in place
       with the query, its results and the page all intact. That last check is what caught the
       confirmation not naming what it confirmed
-- [ ] 8.3 Full gate (`pnpm check`) green; 100% coverage without new waivers;
+- [x] 8.3 Full gate (`pnpm check`) green; 100% coverage without new waivers;
       `pnpm version:prep` minor bump (`feat`); one PR

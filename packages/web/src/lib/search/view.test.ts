@@ -177,6 +177,19 @@ describe('topResults', () => {
       })),
     });
 
+  it.each([
+    ['release-group' as const, 10],
+    ['artist' as const, 6],
+    ['recording' as const, 6],
+  ])('shows only the leading slice of %s', (kind, expected) => {
+    // Each kind's own number, because each is a different thing to scan: albums are what most
+    // searches are for; artists and tracks are there to be recognised.
+    const twentyFive = Array.from({ length: 25 }, () => ({}) as never);
+
+    expect(topResults(twentyFive, kind, 'all')).toHaveLength(expected);
+    expect(TOP_RESULTS[kind]).toBe(expected);
+  });
+
   it('shows a person the leading slice rather than the whole ranked pool', () => {
     // Past the head, ranking positions are token coincidence: a wall of them buries the other
     // kinds and costs an artwork request each.
