@@ -59,7 +59,7 @@
             },
             "distance": 0.7777777777777777,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/01 Jam One.mp3",
             "title": "They Know Me Very Well"
           },
           {
@@ -71,7 +71,7 @@
             },
             "distance": 0.8333333333333334,
             "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/02 Jam Two.mp3",
             "title": "Drunk"
           }
         ]
@@ -137,7 +137,7 @@
             },
             "distance": 0.4166666666666667,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/01 Jam One.mp3",
             "title": "I Am One"
           },
           {
@@ -149,7 +149,7 @@
             },
             "distance": 0.8333333333333334,
             "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/02 Jam Two.mp3",
             "title": "Bury Me"
           }
         ]
@@ -211,7 +211,7 @@
             },
             "distance": 0.7564102564102564,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/01 Jam One.mp3",
             "title": "Channel Affair"
           },
           {
@@ -223,7 +223,7 @@
             },
             "distance": 0.7797619047619048,
             "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/02 Jam Two.mp3",
             "title": "Channel Affair (The Love I Lost Mix)"
           }
         ]
@@ -293,7 +293,7 @@
             },
             "distance": 0.7619047619047619,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/01 Jam One.mp3",
             "title": "Beach Babe Bogan"
           },
           {
@@ -305,7 +305,7 @@
             },
             "distance": 0.7708333333333334,
             "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/02 Jam Two.mp3",
             "title": "I\u2019m in Love"
           }
         ]
@@ -451,7 +451,7 @@
             },
             "distance": 0.7745098039215685,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/01 Jam One.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/01 Jam One.mp3",
             "title": "Million Dollar Bash"
           },
           {
@@ -463,7 +463,7 @@
             },
             "distance": 0.6041666666666666,
             "index": 18,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/mystery/02 Jam Two.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/mystery/02 Jam Two.mp3",
             "title": "Open the Door Homer"
           }
         ]
@@ -473,8 +473,8 @@
     "status": "proposal"
   },
   "provenance": {
-    "beets": "2.12.0",
-    "capturedAt": "2026-07-23",
+    "beets": "2.13.1",
+    "capturedAt": "2026-08-19",
     "recorder": "test/contract/record-bridge-fixtures.sh",
     "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
   },

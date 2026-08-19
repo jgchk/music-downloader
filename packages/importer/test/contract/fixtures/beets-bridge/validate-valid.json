@@ -1,9 +1,9 @@
 {
   "name": "validate-valid",
   "output": {
-    "beets_version": "2.12.0",
-    "library_database": "/tmp/tmp.5AUSmTvULo/beets/library.db",
-    "library_directory": "/tmp/tmp.5AUSmTvULo/library",
+    "beets_version": "2.13.1",
+    "library_database": "/tmp/tmp.rrdeP9exsY/beets/library.db",
+    "library_directory": "/tmp/tmp.rrdeP9exsY/library",
     "overlay": {
       "import": {
         "detail": false,
@@ -26,8 +26,8 @@
     "status": "valid"
   },
   "provenance": {
-    "beets": "2.12.0",
-    "capturedAt": "2026-07-23",
+    "beets": "2.13.1",
+    "capturedAt": "2026-08-19",
     "recorder": "test/contract/record-bridge-fixtures.sh",
     "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
   },

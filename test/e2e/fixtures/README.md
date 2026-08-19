@@ -11,7 +11,7 @@ review-queued assertion fails loudly when this calibration drifts; that failure 
 | `track.flac`             | clean match (auto-apply)         | identical                                           | 0.0000            |
 | `track-review-band.flac` | review-band match (human review) | album `Basement Sessions`, title `Track One (Live)` | 0.3028            |
 
-Calibration provenance: **beets 2.12.0** (the image's `requirements.txt` pin), measured through
+Calibration provenance: **beets 2.13.1** (the image's `requirements.txt` pin), measured through
 the production bridge's `propose` verb with the hint pinned to the stub release, exactly as the
 importer invokes it. The harness runs `AUTO_APPLY_THRESHOLD=0.15`; the review band is
 `distance > 0.15` (a hinted candidate is returned at any distance, so tag deviation cannot
