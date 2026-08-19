@@ -76,14 +76,14 @@ creates and extends its layout tests).
 
 ## 7. Dismissal and copy (web)
 
-- [ ] 7.1 Non-modal dismissal (red first): page-level Escape closes the open detail view from
+- [x] 7.1 Non-modal dismissal (red first): page-level Escape closes the open detail view from
       anywhere; activating anything outside it closes it; no scrim; `aria-modal` stays false;
       focus returns to the originating result on close; the panel contains its own overscroll
-- [ ] 7.2 Failure-copy mapping (red first): a 502 refusal from a catalog read renders the
+- [x] 7.2 Failure-copy mapping (red first): a 502 refusal from a catalog read renders the
       retry-guiding copy (naming the catalog; pause, or press Enter to retry); a 500 renders the
       that-is-a-bug register; 4xx modeled refusals keep the server's words;
       unreachable-vs-unreadable and the partial-degradation notice untouched
-- [ ] 7.3 Copy and focus details (red first where a behavior is asserted): the pre-search hint
+- [x] 7.3 Copy and focus details (red first where a behavior is asserted): the pre-search hint
       regains a pasteable example identifier; the artist card subline falls back
       disambiguation → type → "Artist" (consuming 1.1); the search input autofocuses on arrival;
       a filter tab returns focus to the input

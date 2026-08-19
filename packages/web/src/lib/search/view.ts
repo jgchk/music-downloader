@@ -201,6 +201,18 @@ export function albumDetail(group: {
     .join(' · ');
 }
 
+/**
+ * What to say under an artist's name. The catalog's own tie-breaker first — it is written for
+ * exactly this purpose — then what kind of act they are, and only then the word that says nothing
+ * but keeps the card's shape.
+ */
+export function artistDetail(artist: {
+  readonly disambiguation?: string | undefined;
+  readonly type?: string | undefined;
+}): string {
+  return artist.disambiguation ?? artist.type ?? 'Artist';
+}
+
 export function trackDetail(recording: {
   readonly artistCredit: string;
   readonly release?: { readonly title: string } | undefined;

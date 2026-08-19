@@ -44,6 +44,8 @@
   let { detail, tracklists, onTracklist, chosen, onChoose, values, onClose }: Properties = $props();
 
   const chosenHere = $derived(chosenEdition(detail, chosen));
+  /** The panel itself, so "outside it" is a question that can be asked of the DOM. */
+  let panel = $state<HTMLElement | undefined>();
   /** Which shelf of pressings is being looked at. Narrowing is a view of the same listing. */
   let format = $state<FormatCategory>('all');
   const FORMAT_LABELS: Record<FormatCategory, string> = {
@@ -61,10 +63,28 @@
       : `${edition.title} (${edition.disambiguation})`;
 </script>
 
+<!-- A panel, and honestly so: the page behind it stays interactive, so `aria-modal` stays false
+     and there is no scrim promising a modality the semantics do not deliver. What a person
+     expects of a thing like this is what it does — Escape from anywhere on the page, a click
+     outside, and a close control that is always there. The listeners sit at the window because
+     "anywhere" is the point; they answer for nothing while nothing is open. -->
+<svelte:window
+  onkeydown={(event) => {
+    if (detail !== undefined && event.key === 'Escape') onClose();
+  }}
+  onpointerdown={(event) => {
+    // Asked of the panel rather than tracked as a flag: a pointer landing on something the panel
+    // removed mid-gesture would otherwise read as "outside".
+    const target = event.target;
+    if (detail !== undefined && target instanceof Node && panel?.contains(target) === false) {
+      onClose();
+    }
+  }}
+/>
+
 {#if detail !== undefined}
   <!-- Who made it, when, and what kind — from what the result card already had on screen. -->
   {@const subtitle = detailSubtitle(detail)}
-  <!-- An overlay, so it says what it is and can be left the way an overlay is left. -->
   <div
     class="catalog-detail"
     data-testid="detail"
@@ -72,10 +92,8 @@
     aria-modal="false"
     aria-label={detail.title}
     tabindex="-1"
+    bind:this={panel}
     {@attach (element: HTMLElement) => element.focus()}
-    onkeydown={(event) => {
-      if (event.key === 'Escape') onClose();
-    }}
   >
     <header class="detail-head">
       <h2>{detail.title}</h2>

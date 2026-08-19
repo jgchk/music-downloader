@@ -186,12 +186,13 @@ describe('CatalogResults', () => {
 
     // The card hands over what it already had on screen, so the view can name its subject
     // without a second read of a record the person is already looking at.
-    expect(onOpen).toHaveBeenCalledWith('release-group', RG, {
-      title: 'Graceland',
-      artistCredit: 'Paul Simon',
-      year: 1986,
-      primaryType: 'Album',
-    });
+    expect(onOpen).toHaveBeenCalledWith(
+      'release-group',
+      RG,
+      { title: 'Graceland', artistCredit: 'Paul Simon', year: 1986, primaryType: 'Album' },
+      // The card itself, so closing the view can put the cursor back on it.
+      document.querySelector('.art-grid .result-open'),
+    );
   });
 
   it('hands a track the release it came from, for its context and its artwork', async () => {
@@ -203,11 +204,16 @@ describe('CatalogResults', () => {
       .first()
       .click();
 
-    expect(onOpen).toHaveBeenCalledWith('recording', RECORDING, {
-      title: 'The Boy in the Bubble',
-      artistCredit: 'Paul Simon',
-      release: { mbid: RELEASE, title: 'Graceland' },
-    });
+    expect(onOpen).toHaveBeenCalledWith(
+      'recording',
+      RECORDING,
+      {
+        title: 'The Boy in the Bubble',
+        artistCredit: 'Paul Simon',
+        release: { mbid: RELEASE, title: 'Graceland' },
+      },
+      document.querySelector('.track-rows .result-open'),
+    );
   });
 
   it('sends an artist to their releases rather than requesting them all', async () => {
