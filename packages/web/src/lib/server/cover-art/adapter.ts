@@ -72,6 +72,10 @@ function servableType(declared: string): ServableImageType {
  */
 const THUMBNAIL_KEYS: Record<CoverArtSize, '250' | '500'> = { 250: '250', 500: '500' };
 
+/** Whether a refused status is the archive's word about itself rather than about one record. */
+const isAboutTheArchive = (status: number): boolean =>
+  status >= 500 || status === 429 || status === 408 || status === 403;
+
 function unavailable(detail: string, scope: CoverArtUnavailable['scope']): CoverArtUnavailable {
   return { kind: 'cover-art-unavailable', detail, scope };
 }
@@ -172,7 +176,11 @@ export class CoverArtArchive implements CoverArtPort {
         return errAsync<ManifestAnswer, CoverArtUnavailable>(
           unavailable(
             `the cover art archive responded ${response.status}`,
-            response.status < 500 ? 'record' : 'archive',
+            // A 4xx is usually about the thing we asked for. The exceptions are the provider
+            // talking about ITSELF — asking for less (429), asking for the same again (408), or
+            // refusing us outright (403) — and answering those with 25 more requests makes the
+            // situation worse for every tile on the page.
+            isAboutTheArchive(response.status) ? 'archive' : 'record',
           ),
         );
       }
@@ -195,8 +203,11 @@ export class CoverArtArchive implements CoverArtPort {
         headers: { 'User-Agent': USER_AGENT },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }),
+      // The image lives on a different host from the manifest (archive.org storage), which goes
+      // down on its own — so a transport failure here is an archive being unreachable, not this
+      // record lacking art.
       (cause) =>
-        unavailable(`the cover art image could not be fetched: ${String(cause)}`, 'record'),
+        unavailable(`the cover art image could not be fetched: ${String(cause)}`, 'archive'),
     ).andThen((image) => {
       if (!image.ok) {
         // The manifest promised an image the archive would not serve. That is the archive failing,

@@ -164,6 +164,28 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
     expect(art.front).not.toHaveBeenCalled();
   });
 
+  it('tells an operator whether one record failed or the whole archive did', async () => {
+    const wrote = logger();
+    const oneRecord: CoverArtPort = {
+      front: vi.fn(() =>
+        errAsync({
+          kind: 'cover-art-unavailable' as const,
+          detail: 'that record’s manifest names an image we will not fetch',
+          scope: 'record' as const,
+        }),
+      ),
+    };
+
+    await GET(event(oneRecord, { entity: 'release-group', mbid: MBID }, { logger: wrote }));
+
+    // The difference between one placeholder and a grid of them — and whether the cache has
+    // stopped asking on everyone else's behalf.
+    expect(wrote.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'record' }),
+      'cover art unavailable for this record',
+    );
+  });
+
   it('says out loud that it refused a URL this application emitted', async () => {
     const wrote = logger();
 

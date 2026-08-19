@@ -101,14 +101,11 @@ function validationFailed<T>(error: z.ZodError): FacadeResult<T> {
 /** Command failures pass through as values; the infra fault drops its non-serializable `cause`. */
 function toFacadeError(error: CommandError): DownloaderFacadeError {
   if (error.kind === 'InfraError') {
-    return {
-      kind: 'InfraError',
-      operation: error.operation,
-      message: error.message,
-      // The adapter classified the fault for its own retry budget; said outward, that judgement
-      // is what tells a reader whether trying again is worth anything.
-      reason: error.permanent === true ? 'unreadable' : 'unreachable',
-    };
+    // No `reason` here. This maps EVERY infrastructure fault the module has, including its own
+    // event store's — and "the catalog could not be reached" is not a thing to say about a disk.
+    // The catalog read names its own faults; everything else says nothing, which a reader must
+    // not read as either one.
+    return { kind: 'InfraError', operation: error.operation, message: error.message };
   }
   return error;
 }
@@ -224,7 +221,14 @@ export function createDownloaderFacade(
       { read, operation: error.operation, permanent: error.permanent, cause: error.cause },
       error.message,
     );
-    return fail(toFacadeError(error));
+    // The one path where this vocabulary is true: it IS the catalog we could not reach, or whose
+    // answer we could not read. The adapter already made that call for its own retry budget.
+    return fail({
+      kind: 'InfraError',
+      operation: error.operation,
+      message: error.message,
+      reason: error.permanent === true ? 'unreadable' : 'unreachable',
+    });
   };
 
   return {

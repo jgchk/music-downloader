@@ -100,10 +100,10 @@ describe('httpCatalog', () => {
   });
 
   it('tells someone a catalog it could not reach is worth trying again', async () => {
-    // 502 is the server saying the thing behind it did not answer. That may pass, so the words
-    // are about waiting and retrying — not about this application being broken.
+    // The module said it could not reach the catalog. That may pass, so the words are about
+    // waiting and retrying — not about this application being broken.
     const stub = fetchStub(
-      Response.json({ message: 'Something went wrong. Try again.' }, { status: 502 }),
+      Response.json({ message: 'Something went wrong.', reason: 'unreachable' }, { status: 502 }),
     );
 
     const answer = await httpCatalog(stub).search('graceland');
@@ -112,16 +112,26 @@ describe('httpCatalog', () => {
   });
 
   it('does not blame the reader for a catalog whose answer could not be read', async () => {
-    // 500 is this application failing to understand an answer it did get. Retrying, checking the
-    // connection, and retyping the query are all useless, and saying otherwise wastes their time.
+    // The module said it could not READ the answer. Retrying, checking the connection and
+    // retyping the query are all useless, and saying otherwise wastes their time.
     const stub = fetchStub(
-      Response.json({ message: 'Something went wrong. Try again.' }, { status: 500 }),
+      Response.json({ message: 'Something went wrong.', reason: 'unreadable' }, { status: 500 }),
     );
 
     const answer = await httpCatalog(stub).search('graceland');
 
     expect(answer).toEqual({ ok: false, message: DRIFTED });
     expect(DRIFTED).not.toMatch(/connection|try again/i);
+  });
+
+  it('does not invent a diagnosis for a fault nobody classified', async () => {
+    // A 500 also covers "this module does not tell one fault from another" and "the route threw".
+    // Asserting drift from that is the mirror image of asserting transience from it.
+    const stub = fetchStub(Response.json({ message: 'Something went wrong.' }, { status: 500 }));
+
+    const answer = await httpCatalog(stub).search('graceland');
+
+    expect(answer).toEqual({ ok: false, message: 'Something went wrong.' });
   });
 
   it('refuses a refusal whose message is not words a person could read', async () => {

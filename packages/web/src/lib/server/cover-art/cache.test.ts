@@ -133,6 +133,22 @@ describe('an archive that cannot be reached', () => {
     expect(odd.calls()).toBe(2);
   });
 
+  it('keeps the stale bytes of the very read that discovers the outage', async () => {
+    // The first read past the TTL is usually the one that finds the archive down. Forgetting its
+    // bytes before asking empties the cache exactly when it cannot be refilled.
+    const time = clock();
+    const cache = cachingCoverArt(archive(found(4), 'unavailable'), { ttlMs: 1000 }, time.now);
+
+    await cache.front('release-group', MBID, 250);
+    time.advance(1001);
+    const discovering = await cache.front('release-group', MBID, 250);
+    const afterwards = await cache.front('release-group', MBID, 250);
+
+    // The read itself fails — it asked and was refused — but the copy survives for the next one.
+    expect(discovering.isErr()).toBe(true);
+    expect(afterwards.isOk()).toBe(true);
+  });
+
   it('keeps serving art it already holds while the archive is down', async () => {
     // The only copy, dropped at the moment it cannot be replaced, turns a passing outage into a
     // cover that is gone for good.

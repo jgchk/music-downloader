@@ -104,7 +104,15 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
     (failure) => {
       // The one place that knows WHY the archive failed. Unlogged, an operator sees a grid of
       // placeholders and cannot tell an outage from a shape change.
-      locals.logger.warn({ entity, mbid, detail: failure.detail }, 'cover art archive unavailable');
+      // The scope is the single most useful fact here: it says whether this is one odd record or
+      // the archive, which is the difference between one placeholder and a grid of them — and
+      // whether the cache has stopped asking on everyone else's behalf.
+      locals.logger.warn(
+        { entity, mbid, detail: failure.detail, scope: failure.scope },
+        failure.scope === 'archive'
+          ? 'cover art archive unavailable'
+          : 'cover art unavailable for this record',
+      );
       return new Response(undefined, { status: 502, headers: { 'Cache-Control': 'no-store' } });
     },
   );

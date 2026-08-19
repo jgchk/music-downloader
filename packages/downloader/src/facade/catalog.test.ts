@@ -105,7 +105,7 @@ describe('searchCatalog', () => {
       STORY,
     );
 
-    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ ok: false, error: { kind: 'InfraError' } });
     if (!result.ok && result.error.kind === 'InfraError') {
       expect(result.error.reason).toBe('unreadable');
       // And it survives serialization — this is a value a BFF reads on the other side of a wire.

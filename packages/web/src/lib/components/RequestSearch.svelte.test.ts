@@ -247,6 +247,41 @@ describe('RequestSearch', () => {
     expect(catalog.editions).not.toHaveBeenCalled();
   });
 
+  it('digs into a discography entry the way it digs into any album', async () => {
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { releaseGroups: [RESULTS.releaseGroups[0]!] },
+        }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('back-to-results')).toBeVisible();
+
+    await page
+      .getByRole('button', { name: /Graceland/ })
+      .first()
+      .click();
+
+    // The browse view wires its own `onOpen`, so this is a second call site that could be
+    // mis-wired without any results-area test noticing.
+    await expect.element(page.getByTestId('detail')).toBeVisible();
+    expect(catalog.editions).toHaveBeenCalledWith(RG);
+  });
+
   it('goes back to the results it was holding, without searching again', async () => {
     const catalog = catalogStub({
       search: vi.fn(() =>
@@ -398,6 +433,10 @@ describe('RequestSearch', () => {
 
     await page.getByTestId('back-to-results').click();
     late.reject(new Error('boom'));
+    // Waited on the rejection actually being HANDLED, not on a tick: the catch is two microtask
+    // hops away and the DOM flush a third, so a bare tick asserts against a page that has not
+    // re-rendered either way.
+    await expect.poll(() => consoleError.mock.calls.length).toBe(1);
     await tick();
 
     expect(document.querySelector('[data-testid="browse-error"]')).toBeNull();
@@ -419,6 +458,7 @@ describe('RequestSearch', () => {
 
     await page.getByRole('button', { name: 'Close' }).click();
     late.reject(new Error('boom'));
+    await expect.poll(() => consoleError.mock.calls.length).toBe(1);
     await tick();
 
     expect(document.querySelector('[data-testid="detail"]')).toBeNull();

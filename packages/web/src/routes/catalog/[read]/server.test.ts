@@ -104,11 +104,13 @@ describe('GET /catalog/[read]', () => {
 
     const response = await GET(event('search', 'q=graceland', downloader));
 
-    // 502, not 500: the catalog could not be REACHED, which may pass. The page's copy turns on
-    // this, so collapsing the two here would put "that is a bug" in front of an outage.
+    // 502, not 500: the catalog could not be REACHED, which may pass. And the module's own word
+    // travels with the refusal, because the page's copy turns on it — inferring it from a status
+    // that also covers "nobody classified this" is how a bug gets asserted where none was named.
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       message: 'Something went wrong. Try again.',
+      reason: 'unreachable',
     });
   });
 

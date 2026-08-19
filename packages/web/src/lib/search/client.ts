@@ -50,6 +50,9 @@ export const UNREADABLE =
  * Kept apart from {@link UNREADABLE} on purpose: telling someone to sign in again cannot possibly
  * help with a producer and consumer that disagree, and they would go and do it.
  */
+/** What a refusal says about the fault behind it, when the module that failed named one. */
+const faultSchema = z.object({ reason: z.enum(['unreachable', 'unreadable']).optional() });
+
 /** Shown when the page's own conversation with the catalog broke in a way it does not model. */
 export const UNEXPECTED =
   'Something went wrong on this page. Reload it — if it keeps happening, this is a bug.';
@@ -149,9 +152,16 @@ export function httpCatalog(
     }
     // Infrastructure faults get this page's own words, because the server's are deliberately
     // generic (`messageOf` serves every consumer) and the two cases need opposite advice. The
-    // status carries the distinction the module drew: 502 could not reach, 500 could not read.
-    if (response.status === 502) return { ok: false, message: UNREACHABLE };
-    if (response.status === 500) return { ok: false, message: DRIFTED };
+    // REASON is read, not the status: a status is lossy by design — 500 covers "could not read"
+    // and "nobody classified this" alike — and telling someone a specific bug is at fault when
+    // nothing said so is the same mistake as telling them to retry a fault that will never pass.
+    const named = body.parsed ? faultSchema.safeParse(body.value) : undefined;
+    if (named?.success === true && named.data.reason === 'unreachable') {
+      return { ok: false, message: UNREACHABLE };
+    }
+    if (named?.success === true && named.data.reason === 'unreadable') {
+      return { ok: false, message: DRIFTED };
+    }
     // A refusal that carries no readable body is normal: its status already said what happened.
     // What it DOES carry is parsed rather than trusted — the words are rendered to a person, and
     // a proxy's non-string `message` would otherwise reach them as "[object Object]".

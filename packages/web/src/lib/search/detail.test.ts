@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bestMatchSummary,
   chosenEdition,
+  detailSubtitle,
   editionSummary,
   formatCategory,
   groupHeading,
@@ -130,6 +131,22 @@ describe('chosenEdition', () => {
       ),
     ).toBeUndefined();
     expect(chosenEdition(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('detailSubtitle', () => {
+  it.each([
+    [
+      { title: 'Graceland', artistCredit: 'Paul Simon', year: 1986, primaryType: 'Album' },
+      'Paul Simon · 1986 · Album',
+    ],
+    [{ title: 'Graceland', artistCredit: 'Paul Simon' }, 'Paul Simon'],
+    [{ title: 'Graceland', year: 1986 }, '1986'],
+    [{ title: 'Graceland' }, ''],
+  ])('says only what the catalog said', (context, expected) => {
+    // Exactly, separators included: a filter that stopped dropping absent parts would render
+    // "Paul Simon ·  · " and every softer assertion would still pass.
+    expect(detailSubtitle(context)).toBe(expected);
   });
 });
 
