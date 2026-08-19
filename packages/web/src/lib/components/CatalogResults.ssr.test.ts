@@ -103,6 +103,22 @@ describe('CatalogResults (SSR)', () => {
     expect(html).toContain('class="track-rows"');
   });
 
+  it('states the trim in the server-rendered heading, before any script runs', () => {
+    const rendered = body({
+      results: results({
+        releaseGroups: Array.from({ length: 25 }, (_unused, index) => ({
+          mbid: String(index).padStart(8, '0') + RG.slice(8),
+          title: `Album ${index}`,
+          artistCredit: 'Paul Simon',
+          secondaryTypes: [],
+        })),
+      }),
+    });
+
+    // Without JavaScript the count is still honest about what it is holding back.
+    expect(rendered).toContain('10 of 25');
+  });
+
   it('renders each result’s request as a real form, so it works before any script runs', () => {
     const html = body();
 

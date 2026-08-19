@@ -25,10 +25,10 @@ creates and extends its layout tests).
 
 ## 3. Top results and honest counts (web)
 
-- [ ] 3.1 Top-results trim as pure view logic (red first): constants (10 release groups /
+- [x] 3.1 Top-results trim as pure view logic (red first): constants (10 release groups /
       6 artists / 6 recordings) beside the ordering logic in `lib/search/view.ts`; the mixed view
       renders the slice, a kind's filter tab renders everything fetched
-- [ ] 3.2 Heading affordance (red first): a trimmed section's count renders link-styled as
+- [x] 3.2 Heading affordance (red first): a trimmed section's count renders link-styled as
       "shown of matched" and activating it applies that kind's filter; an untrimmed section shows
       its plain count
 

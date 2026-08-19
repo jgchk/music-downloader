@@ -46,6 +46,49 @@ const props = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('CatalogResults', () => {
+  /** A search that matched far more than a person wants to scan at once. */
+  const wall = (count: number) =>
+    results({
+      releaseGroups: Array.from({ length: count }, (_unused, index) => ({
+        mbid: String(index).padStart(8, '0') + RG.slice(8),
+        title: `Album ${index}`,
+        artistCredit: 'Paul Simon',
+        year: 1986,
+        primaryType: 'Album',
+        secondaryTypes: [],
+      })),
+    });
+
+  it('lists the top results and says how many it is holding back', async () => {
+    await render(CatalogResults, props({ results: wall(25) }));
+
+    expect(document.querySelectorAll('.art-grid > .result')).toHaveLength(10);
+    await expect.element(page.getByRole('button', { name: '10 of 25' })).toBeVisible();
+  });
+
+  it('takes a person to the rest of that kind from the count itself', async () => {
+    const onFilter = vi.fn();
+    await render(CatalogResults, props({ results: wall(25), onFilter }));
+
+    await page.getByRole('button', { name: '10 of 25' }).click();
+
+    expect(onFilter).toHaveBeenCalledWith('release-group');
+  });
+
+  it('lists everything once a kind is what is being looked at', async () => {
+    await render(CatalogResults, props({ results: wall(25), filter: 'release-group' }));
+
+    expect(document.querySelectorAll('.art-grid > .result')).toHaveLength(25);
+  });
+
+  it('states a plain count when it is holding nothing back', async () => {
+    await render(CatalogResults, props({ results: wall(3) }));
+
+    // No affordance where there is nothing behind it — a link to "everything" that is already on
+    // screen teaches a person the link means nothing.
+    expect(document.querySelector('.results[data-kind="release-group"] .linkish')).toBeNull();
+  });
+
   it('will not send a second request while the first is still going', async () => {
     // The enhanced submit keeps the page, which also keeps the button live for the whole round
     // trip — so without this a double click is two downloads.
