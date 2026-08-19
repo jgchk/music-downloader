@@ -95,6 +95,24 @@ describe('module boundary lint zones', () => {
     }
   });
 
+  // The shared mechanism package is only legitimate while it stays generic (module-architecture
+  // "No shared model"). Both halves are pinned here because both are load-bearing: the leaf rule is
+  // what stops it acquiring a context's language, and the domain rule is what stops the pure core
+  // acquiring a delivery mechanism.
+  it('keeps packages/eventing a leaf — it imports from no other workspace package', () => {
+    const all = zones();
+    for (const pkg of ['downloader', 'importer', 'web']) {
+      expect(hasZone(all, './packages/eventing', `./packages/${pkg}`)).toBe(true);
+    }
+  });
+
+  it('keeps packages/eventing out of every module domain layer', () => {
+    const all = zones();
+    for (const pkg of ['downloader', 'importer']) {
+      expect(hasZone(all, `./packages/${pkg}/src/domain`, './packages/eventing')).toBe(true);
+    }
+  });
+
   it('keeps the dependency rule intact per package', () => {
     const all = zones();
     for (const pkg of ['downloader', 'importer']) {

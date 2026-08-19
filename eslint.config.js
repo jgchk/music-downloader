@@ -120,6 +120,24 @@ const moduleBoundaryZones = [
     except: ['./facade', './composition/runtime.ts'],
     message: `Interface packages import a module only via its facade (@music/${package_}).`,
   })),
+  // The shared mechanism package is a LEAF (module-architecture "No shared model",
+  // extract-eventing-package D1/D2): it may know nothing about any consumer, so it imports from no
+  // other workspace package. Without this, the one thing that makes sharing it legitimate — that it
+  // carries no context's language — decays the first time a type is "just borrowed" from a module.
+  ...['downloader', 'importer', 'web'].map((package_) => ({
+    target: './packages/eventing',
+    from: `./packages/${package_}`,
+    message:
+      'packages/eventing is a leaf: generic mechanism only, so it imports from no other workspace package.',
+  })),
+  // …and it is shell mechanism, so the pure core never reaches it. The domain depends on no
+  // machinery at all — the same rule the layer zones state for every other outward direction.
+  ...modulePackages.map((package_) => ({
+    target: `./packages/${package_}/src/domain`,
+    from: './packages/eventing',
+    message:
+      'The domain layer imports no delivery mechanism — @music/eventing belongs to the shell (application and outward).',
+  })),
 ];
 
 /**

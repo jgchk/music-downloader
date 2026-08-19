@@ -8,6 +8,7 @@
     "./runtime": "./src/composition/runtime.ts"
   },
   "dependencies": {
+    "@music/eventing": "workspace:*",
     "better-sqlite3": "^12.0.0",
     "neverthrow": "^8.2.0",
     "pino": "^10.0.0",

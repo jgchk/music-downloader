@@ -26,7 +26,8 @@ import {
   StalledReadModel,
   seedStalledReadModel,
 } from '../application/projections/read-models.js';
-import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
+import { catchUpSubscription } from '../application/events/catch-up-subscription.js';
+import type { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
@@ -64,21 +65,6 @@ export interface ImporterRuntimeConfig {
 
 /** Dead-lettered (stalled) entries are pruned at boot once older than this (30 days). */
 const DEFAULT_STALLED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-
-/**
- * The real `sleep` handed to the inbound subscription. A named function, not an inline arrow at the
- * call site, so that the "a delay is unobservable" waiver can be attached to the DELAY and to
- * nothing else: written inline, one `disable next-line ArrowFunction` also covers the `new Promise`
- * executor, and an executor that never calls `resolve` wedges the subscription forever — the
- * opposite of unobservable.
- */
-// Stryker disable next-line BlockStatement: an emptied body resolves immediately instead of after
-// `ms`, and the only caller `await`s the result — so the mutant changes elapsed wall-clock and
-// nothing else: same attempts, same order, same checkpoint advances, same hold/halt decisions.
-// Wall-clock is the one thing a behavioural assertion here may not pin.
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export interface ImporterRuntimeOverrides {
   readonly tagger?: TaggerPort;
@@ -281,27 +267,17 @@ export async function createImporterRuntime(
     feed,
     wakeups,
     connectAcquisitionFeed(acquisitionFeed, options, acquisitionWakeups) {
-      acquisitions = new CatchUpSubscription({
+      acquisitions = catchUpSubscription({
         name: 'seam:acquisitions',
         feed: acquisitionFeed,
         checkpoints,
-        deadLetters,
         handler: intakeEventConsumer(dependencies, {
           sourceRoot: options.sourceRoot,
           intakeRoot: config.intakeRoot,
           directoryExists: overrides.directoryExists ?? realDirectoryExists,
           warn: logger.warn.bind(logger),
         }),
-        policy: 'halt',
         logger,
-        clock,
-        retry: { attempts: 3, baseDelayMs: 250 },
-        batchSize: 100,
-        pollIntervalMs: 5000,
-        // The subscription only ever `await`s this value (retry backoff, and the yield between
-        // batches), so the delay is elapsed wall-clock and nothing else: same attempts, same order,
-        // same checkpoint advances, same hold/halt decisions. {@link delay} carries the waiver.
-        sleep: delay,
         wakeups: acquisitionWakeups,
       });
       return acquisitions;

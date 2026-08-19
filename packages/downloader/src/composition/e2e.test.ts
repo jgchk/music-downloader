@@ -33,7 +33,7 @@ import {
 } from '../domain/download/__fixtures__/download-fixtures.js';
 import type { Candidate, CandidateIdentity } from '../domain/candidate/candidate.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
-import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
+import { catchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamEvent } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
@@ -331,24 +331,21 @@ describe('download E2E', () => {
     const consumerDatabase = openEventDatabase(':memory:');
     const received: SeamEvent[] = [];
     const subscriptionOf = (database: typeof consumerDatabase) =>
-      new CatchUpSubscription({
+      catchUpSubscription({
         name: 'seam:acquisitions',
         feed: new OutboundFeed(w.store, publishedEventMapping),
         checkpoints: new SqliteCheckpointStore(database),
-        deadLetters: new SqliteDeadLetterStore(database),
         handler: (event) => {
           received.push(event);
           return Promise.resolve(ok(undefined));
         },
-        policy: 'halt',
         logger: silentLogger(),
-        clock: fixedClock(),
-        retry: { attempts: 1, baseDelayMs: 0 },
-        batchSize: 100,
-        pollIntervalMs: 60_000,
-        sleep: () => Promise.resolve(),
         wakeups: { subscribe: (listener) => w.bus.subscribe(() => listener()) },
-        interval: () => () => {},
+        tuning: {
+          retry: { attempts: 1, baseDelayMs: 0 },
+          sleep: () => Promise.resolve(),
+          interval: () => () => {},
+        },
       });
     const subscription = subscriptionOf(consumerDatabase);
     await subscription.start();
@@ -414,20 +411,17 @@ describe('download E2E', () => {
         return Promise.resolve(ok({ events, scannedTo }));
       },
     };
-    const subscription = new CatchUpSubscription({
+    const subscription = catchUpSubscription({
       name: 'seam:verdicts',
       feed,
       checkpoints: w.checkpoints, // the downloader's OWN store holds this consumer's checkpoint
-      deadLetters: new SqliteDeadLetterStore(w.db),
       handler: verdictEventConsumer(w.deps, { warn: () => {} }),
-      policy: 'halt',
       logger: silentLogger(),
-      clock: fixedClock(),
-      retry: { attempts: 3, baseDelayMs: 0 },
-      batchSize: 100,
-      pollIntervalMs: 60_000,
-      sleep: () => Promise.resolve(),
-      interval: () => () => {},
+      tuning: {
+        retry: { attempts: 3, baseDelayMs: 0 },
+        sleep: () => Promise.resolve(),
+        interval: () => () => {},
+      },
     });
     await subscription.start();
     cleanups.push(() => subscription.stop());

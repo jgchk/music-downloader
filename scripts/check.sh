@@ -41,9 +41,11 @@ NAMES=(
   format
   lint
   typecheck:downloader
+  typecheck:eventing
   typecheck:importer
   typecheck:tiers
   build:downloader
+  build:eventing
   build:importer
   web
   test
@@ -55,9 +57,11 @@ declare -A COMMANDS=(
   ["format"]="pnpm run format"
   ["lint"]="pnpm run lint"
   ["typecheck:downloader"]="pnpm exec tsc --noEmit -p packages/downloader/tsconfig.json"
+  ["typecheck:eventing"]="pnpm exec tsc --noEmit -p packages/eventing/tsconfig.json"
   ["typecheck:importer"]="pnpm exec tsc --noEmit -p packages/importer/tsconfig.json"
   ["typecheck:tiers"]="pnpm run typecheck:tiers"
   ["build:downloader"]="pnpm exec tsc --noCheck -p packages/downloader/tsconfig.build.json"
+  ["build:eventing"]="pnpm exec tsc --noCheck -p packages/eventing/tsconfig.build.json"
   ["build:importer"]="pnpm exec tsc --noCheck -p packages/importer/tsconfig.build.json"
   ["web"]="pnpm --dir packages/web run check:svelte && pnpm --dir packages/web run build"
   ["test"]="pnpm run test:cov"

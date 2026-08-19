@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     projects: [
       'packages/downloader',
+      'packages/eventing',
       'packages/importer',
       'packages/web/vitest.server.config.ts',
       'packages/web/vitest.ssr.config.ts',
