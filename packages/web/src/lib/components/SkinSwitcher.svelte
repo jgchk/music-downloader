@@ -27,7 +27,12 @@
 
 <div class="segmented skin-switch" role="group" aria-label="Theme">
   {#each SKINS as skin (skin)}
-    <button type="button" aria-pressed={active === skin} onclick={() => choose(skin)}>
+    <button
+      type="button"
+      class="segment"
+      aria-pressed={active === skin}
+      onclick={() => choose(skin)}
+    >
       {skin}
     </button>
   {/each}

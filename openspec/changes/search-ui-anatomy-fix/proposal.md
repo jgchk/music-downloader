@@ -38,12 +38,15 @@ chrome is opt-in via a class.
   grids have. Browser-mode component tests assert the computed geometry — the register this
   regression actually lives in — under every shipped skin's hook.
 - **The detail view's width joins the token layer**: `--detail-size` defaulting to
-  `clamp(340px, 26rem, 30rem)` (rem-preferred so it tracks each skin's type scale, a pixel floor
-  no skin can crush — today's forum skin renders it at 286px, below every design system's
-  side-panel band — and a ceiling), applied as `min(var(--detail-size), 75vw, 100vw)` so the
-  panel cannot dominate a small window. Skins may remap the token but never have to.
+  `max(340px, 26rem)` (rem so it tracks each skin's type scale, with a pixel floor no skin can
+  crush — today's forum skin renders it at 286px, below every design system's side-panel band),
+  applied as `min(var(--detail-size), 75vw)` so the panel cannot dominate a small window. Skins
+  may remap the token but never have to.
 - **Non-goals:** every interaction change (artist browse, request confirmation, dismissal, result
-  caps, drawer context) — those are the `search-ui-cleanup` change, which builds on this one.
+  caps, detail-view context) — those are the `search-ui-cleanup` change, which builds on this one.
+  That change also restates the live `web-ui` requirement wholesale, which is where its three
+  remaining uses of the retired word "detail surface" get corrected; this change deliberately
+  does not touch that requirement, to avoid conflicting with a delta already drafted against it.
 
 ## Capabilities
 
@@ -56,7 +59,8 @@ chrome is opt-in via a class.
 
 ## Impact
 
-- **Code:** `packages/web` only — `base.css` (reset/layers/chrome inversion, width token),
+- **Code:** `packages/web` only — `tokens.css` (the layer order and the width token), `base.css`
+  (reset/layers/chrome inversion),
   the three skin files (wrapped in the theme layer; chrome moved from `button` to `.btn`;
   container surfaces and links themed deliberately), a mechanical class sweep over existing push
   buttons in the Svelte components, `.track-rows` flex direction, the detail-view artwork

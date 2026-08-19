@@ -59,13 +59,18 @@ for new container buttons (none exist today; the inversion protects future ones 
    paint the broken-image glyph. The detail view's artwork adopts the same placeholder-under-image
    structure the grids use. *Alternative rejected:* CSS-only suppression — no reliable selector
    for an errored image exists.
-5. **The width is a token with a self-defending default.** `--detail-size:
-   clamp(340px, 26rem, 30rem)` — rem-preferred so the panel keeps participating in each skin's
-   type scale (the accessibility argument for rem chrome in a root-font-remapping architecture),
-   floored at 340px so no skin can shrink it below the industry minimum again, ceilinged at 30rem.
-   Applied as `min(var(--detail-size), 75vw, 100vw)`: the 75vw guard keeps the panel from
-   dominating a 700–1000px window. Skins may remap the token; none has to. The ~640px bottom-sheet
-   switch stays — it sits comfortably inside precedent (Material <600, Polaris/Primer 768).
+5. **The width is a token with a self-defending default.** `--detail-size: max(340px, 26rem)` in
+   `tokens.css` — rem so the panel keeps participating in each skin's type scale (the
+   accessibility argument for rem chrome in a root-font-remapping architecture), floored at 340px
+   so no skin can shrink it below the industry minimum again. Applied as
+   `min(var(--detail-size), 75vw)`: the viewport share is what keeps the panel from dominating a
+   700–1000px window, and it is the ONLY thing that caps the panel — a skin may remap the token
+   as wide as it likes. *Two operands were tried and dropped as unreachable:* a `30rem` clamp
+   ceiling could never bind (a rem ceiling above a rem preferred value never applies, whatever
+   the root size), and `100vw` under `75vw` is dead by arithmetic. Both looked like guarantees
+   and computed to nothing; the tests that appeared to hold them could not fail. Skins may remap
+   the token; none has to. The ~640px bottom-sheet switch stays — it sits comfortably inside
+   precedent (Material <600, Polaris/Primer 768).
 
 ## Risks / Trade-offs
 

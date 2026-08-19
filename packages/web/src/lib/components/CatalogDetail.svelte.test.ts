@@ -56,6 +56,16 @@ const props = (
 });
 
 describe('CatalogDetail', () => {
+  it('asks the archive for the album cover, at the size the panel renders', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    // Without this the panel can quietly stop asking: the slot still reserves its square and the
+    // initials still show, so a missing request looks exactly like a record with no cover.
+    expect(document.querySelector('.art-detail img')?.getAttribute('src')).toBe(
+      `/cover-art/release-group/${RG}?size=500`,
+    );
+  });
+
   it('renders nothing at all while nothing is open', async () => {
     await render(CatalogDetail, {
       detail: undefined,
