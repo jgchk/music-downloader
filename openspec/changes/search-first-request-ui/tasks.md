@@ -19,18 +19,18 @@ All production code test-first (red before green), per `docs/development/testing
 
 ## 3. Request page (web)
 
-- [ ] 3.1 Build the search page skeleton: SSR native-form baseline (no-JS submission still creates an acquisition through the existing action), minimal-plus-hint pre-search state with MBID teach, semantic-token-only styles
-- [ ] 3.2 Implement search-as-you-type: 600 ms debounce, Enter searches immediately, in-flight abort, spinner; search-failed state distinct from zero results
-- [ ] 3.3 Render mixed results in per-entity layouts (release-group art grid, artist disc row, compact recording rows) in the read's intent order, with entity filter tabs and the zero-results state (named query, entity-switch links, MBID escape hatch)
-- [ ] 3.4 Wire one-click Request on every result to the existing submit contract with default policies, confirming with the acquisition identifier; MBID paste renders the resolved entity as the sole result
-- [ ] 3.5 Build the detail drawer (bottom sheet under 640 px, CSS only): release-group view with tracklist-grouped editions, format filter chips, lazy tracklist peek, best-match row showing the pipeline's pick (or the selection-required message), quality-floor options, request with optional pinned edition; artist discography view; recording view
-- [ ] 3.6 Decide and implement edition pinning against the existing facade schema (additive only): initial submit carrying the release, or immediate `selectEdition` follow-up
-- [ ] 3.7 Component test tiers for every page state (`*.ssr.test.ts` + `*.svelte.test.ts`): empty, loading, results per entity order, filtered-empty with switch, zero results, search failed, drawer states, no-JS baseline
-- [ ] 3.8 Retire the mode-select `AcquisitionForm` surface once parity scenarios pass; keep the reshaper serving the native fallback path
+- [x] 3.1 Build the search page skeleton: SSR native-form baseline (no-JS submission still creates an acquisition through the existing action), minimal-plus-hint pre-search state with MBID teach, semantic-token-only styles
+- [x] 3.2 Implement search-as-you-type: 600 ms debounce, Enter searches immediately, in-flight abort, spinner; search-failed state distinct from zero results
+- [x] 3.3 Render mixed results in per-entity layouts (release-group art grid, artist disc row, compact recording rows) in the read's intent order, with entity filter tabs and the zero-results state (named query, entity-switch links, MBID escape hatch)
+- [x] 3.4 Wire one-click Request on every result to the existing submit contract with default policies, confirming with the acquisition identifier; MBID paste renders the resolved entity as the sole result
+- [x] 3.5 Build the detail drawer (bottom sheet under 640 px, CSS only): release-group view with tracklist-grouped editions, format filter chips, lazy tracklist peek, best-match row showing the pipeline's pick (or the selection-required message), quality-floor options, request with optional pinned edition; artist discography view; recording view
+- [x] 3.6 Edition pinning rides the EXISTING submit contract with no schema change: unpinned submits the release group, a pinned edition submits that release as a `musicbrainz` album request
+- [x] 3.7 Component test tiers for every page state (`*.ssr.test.ts` + `*.svelte.test.ts`): empty, loading, results per entity order, filtered-empty with switch, zero results, search failed, drawer states, no-JS baseline
+- [x] 3.8 Retire the mode-select `AcquisitionForm` surface once parity scenarios pass; keep the reshaper serving the native fallback path
 
 ## 4. Integration, audit, gate
 
-- [ ] 4.1 Playwright specs for the spec's scenarios: type→results→one-click request; dig-in with pinned edition; pasted MBID; filter + zero-result switch
-- [ ] 4.2 Audit `test/e2e` and any UI-scraping parity specs for dependence on the old form's copy/flow before the merge checkpoint (e2e runs only on main)
-- [ ] 4.3 Define the catalog-search anatomy once in `base.css` plus new semantic tokens, then deliberately theme it in all three skins (forum, glass, terminal); verify no skin leaves it browser-default and the detail surface becomes a bottom sheet at phone width
-- [ ] 4.4 `pnpm check` green (format, lint, typecheck, build, all tiers, 100% coverage); update `openspec/specs` via archive flow when shipped
+- [x] 4.1 Playwright specs for the spec's scenarios: type→results→one-click request; dig-in with pinned edition; pasted MBID; filter + zero-result switch
+- [x] 4.2 Audit `test/e2e` and any UI-scraping parity specs for dependence on the old form's copy/flow before the merge checkpoint (e2e runs only on main)
+- [x] 4.3 Define the catalog-search anatomy once in `base.css` plus new semantic tokens, then deliberately theme it in all three skins (forum, glass, terminal); verify no skin leaves it browser-default and the detail surface becomes a bottom sheet at phone width
+- [x] 4.4 `pnpm check` green (format, lint, typecheck, build, all tiers, 100% coverage); update `openspec/specs` via archive flow when shipped

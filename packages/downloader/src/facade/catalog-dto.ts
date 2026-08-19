@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type {
   CatalogArtist,
+  CatalogEdition,
   CatalogEditionListing,
   CatalogLookup,
   CatalogRecording,
@@ -73,7 +74,12 @@ export const catalogEditionDtoSchema = z.object({
 
 export const catalogEditionsResultSchema = z.object({
   groups: z.array(
-    z.object({ trackCount: z.number(), editions: z.array(catalogEditionDtoSchema) }),
+    z.object({
+      trackCount: z.number(),
+      /** The edition the group's tracklist is read from — always present, never inferred. */
+      representative: catalogEditionDtoSchema,
+      editions: z.array(catalogEditionDtoSchema),
+    }),
   ),
   /** `pick` carries the edition the pipeline would choose; `selection-required` carries none. */
   bestMatch: z.object({
@@ -94,7 +100,9 @@ export type CatalogDiscographyResultDto = z.infer<typeof catalogDiscographyResul
 export type CatalogEditionsResultDto = z.infer<typeof catalogEditionsResultSchema>;
 export type CatalogTracklistResultDto = z.infer<typeof catalogTracklistResultSchema>;
 
-function releaseGroupToDto(group: CatalogReleaseGroup): z.infer<typeof catalogReleaseGroupDtoSchema> {
+function releaseGroupToDto(
+  group: CatalogReleaseGroup,
+): z.infer<typeof catalogReleaseGroupDtoSchema> {
   return {
     mbid: group.mbid,
     title: group.title,
@@ -152,20 +160,25 @@ export function discographyToDto(
   return { releaseGroups: groups.map((group) => releaseGroupToDto(group)) };
 }
 
+function editionToDto(edition: CatalogEdition): z.infer<typeof catalogEditionDtoSchema> {
+  return {
+    mbid: edition.mbid,
+    title: edition.title,
+    disambiguation: edition.disambiguation,
+    date: edition.date,
+    country: edition.country,
+    formats: edition.formats,
+    status: edition.status,
+    trackCount: edition.trackCount,
+  };
+}
+
 export function editionsToDto(listing: CatalogEditionListing): CatalogEditionsResultDto {
   return {
     groups: listing.groups.map((group) => ({
       trackCount: group.trackCount,
-      editions: group.editions.map((edition) => ({
-        mbid: edition.mbid,
-        title: edition.title,
-        disambiguation: edition.disambiguation,
-        date: edition.date,
-        country: edition.country,
-        formats: edition.formats,
-        status: edition.status,
-        trackCount: edition.trackCount,
-      })),
+      representative: editionToDto(group.representative),
+      editions: group.editions.map((edition) => editionToDto(edition)),
     })),
     bestMatch:
       listing.bestMatch.kind === 'pick'

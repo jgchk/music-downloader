@@ -97,3 +97,52 @@
   background: color-mix(in oklab, var(--warn) 30%, transparent);
   border-radius: 4px;
 }
+
+/* Catalog-search anatomy in glass: translucent result cards on the cool ground,
+   generous artwork, a filter that reads as a quiet segmented control, and a
+   detail panel that floats rather than abuts. */
+:root[data-skin='glass'] .art-grid {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+:root[data-skin='glass'] .art-grid > .result,
+:root[data-skin='glass'] .artist-row > .result,
+:root[data-skin='glass'] .track-rows {
+  background: var(--surface);
+  backdrop-filter: blur(var(--surface-blur));
+  box-shadow: var(--shadow);
+}
+:root[data-skin='glass'] .results h2 {
+  font-family: var(--font-head);
+  letter-spacing: var(--tracking-label);
+}
+:root[data-skin='glass'] .entity-filter {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: var(--step-0);
+  backdrop-filter: blur(var(--surface-blur));
+  width: fit-content;
+}
+:root[data-skin='glass'] .entity-filter button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+}
+:root[data-skin='glass'] .detail {
+  inset: var(--step-4) var(--step-4) var(--step-4) auto;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(var(--surface-blur));
+}
+@media (max-width: 40rem) {
+  :root[data-skin='glass'] .detail {
+    inset: auto 0 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+}
+:root[data-skin='glass'] .edition {
+  background: var(--surface-2);
+}
+:root[data-skin='glass'] .edition[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+}

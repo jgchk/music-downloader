@@ -91,3 +91,55 @@
 :root[data-skin='terminal'] .track-diff tr.unchanged {
   opacity: 0.6;
 }
+
+/* Catalog-search anatomy on the CRT: bracketed section headers, hairline cells,
+   no rounding, and a detail panel that reads as a second pane rather than an
+   overlay. Artwork stays, dimmed to sit inside the phosphor palette. */
+:root[data-skin='terminal'] .results h2::before {
+  content: '[ ';
+  color: var(--accent);
+}
+:root[data-skin='terminal'] .results h2::after {
+  content: ' ]';
+  color: var(--accent);
+}
+:root[data-skin='terminal'] .results h2 {
+  text-transform: var(--tt-label);
+  letter-spacing: var(--tracking-label);
+}
+:root[data-skin='terminal'] .art-grid {
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+}
+:root[data-skin='terminal'] .art-grid > .result,
+:root[data-skin='terminal'] .artist-row > .result {
+  border-radius: 0;
+}
+:root[data-skin='terminal'] .art img {
+  filter: saturate(0.72) contrast(1.05);
+}
+:root[data-skin='terminal'] .art-artist {
+  border-radius: 0;
+}
+:root[data-skin='terminal'] .entity-filter button[aria-pressed='true'] {
+  background: none;
+  color: var(--accent);
+  border-color: var(--accent);
+  text-shadow: 0 0 6px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+:root[data-skin='terminal'] .track-rows > .result:hover,
+:root[data-skin='terminal'] .edition:hover {
+  background: var(--surface-2);
+}
+:root[data-skin='terminal'] .detail {
+  border-left: 1px solid var(--accent);
+  box-shadow: none;
+}
+:root[data-skin='terminal'] .detail-head h2::before {
+  content: '> ';
+  color: var(--accent);
+}
+:root[data-skin='terminal'] .edition-default,
+:root[data-skin='terminal'] .edition-pinned {
+  text-transform: var(--tt-label);
+  letter-spacing: var(--tracking-label);
+}

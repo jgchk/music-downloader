@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CATALOG_EDITIONS,
   CATALOG_RELEASE_GROUP,
+  CATALOG_RESULTS,
   UNREACHABLE_CATALOG_FAULT,
   fakeCatalog,
 } from '../application/__fixtures__/catalog.js';
@@ -54,10 +55,9 @@ describe('searchCatalog', () => {
   });
 
   it('reports an unreachable catalog as a fault, not as an empty result', async () => {
-    const result = await facadeWith(fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT })).searchCatalog(
-      { query: 'graceland' },
-      STORY,
-    );
+    const result = await facadeWith(
+      fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT }),
+    ).searchCatalog({ query: 'graceland' }, STORY);
 
     expect(result).toMatchObject({
       ok: false,
@@ -72,7 +72,10 @@ describe('searchCatalog', () => {
 
     const result = await facadeWith(empty).searchCatalog({ query: 'zzzz' }, STORY);
 
-    expect(result).toMatchObject({ ok: true, value: { releaseGroups: [], artists: [], recordings: [] } });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { releaseGroups: [], artists: [], recordings: [] },
+    });
   });
 });
 
@@ -98,11 +101,87 @@ describe('lookupCatalog', () => {
     expect(result).toMatchObject({ ok: true, value: { kind: 'not-found' } });
   });
 
-  it('refuses an identifier that is not a well-formed catalog id', async () => {
-    const result = await facadeWith(fakeCatalog()).lookupCatalog({ mbid: 'not-an-mbid' }, STORY);
+  it('resolves an identifier that names a track, carrying the release it sits on', async () => {
+    const found = fakeCatalog({
+      lookup: {
+        kind: 'found',
+        entity: { kind: 'recording', recording: CATALOG_RESULTS.recordings[0]! },
+      },
+    });
 
-    expect(result).toMatchObject({ ok: false, error: { kind: 'ValidationFailed' } });
+    const result = await facadeWith(found).lookupCatalog({ mbid: RG_ID }, STORY);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { kind: 'recording', recording: { title: 'The Boy in the Bubble' } },
+    });
   });
+
+  it('resolves an identifier that names an artist', async () => {
+    const found = fakeCatalog({
+      lookup: { kind: 'found', entity: { kind: 'artist', artist: CATALOG_RESULTS.artists[0]! } },
+    });
+
+    const result = await facadeWith(found).lookupCatalog({ mbid: RG_ID }, STORY);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { kind: 'artist', artist: { name: 'Paul Simon' } },
+    });
+  });
+
+  it('carries a track that sits on no release, without inventing one', async () => {
+    const found = fakeCatalog({
+      lookup: {
+        kind: 'found',
+        entity: {
+          kind: 'recording',
+          recording: { ...CATALOG_RESULTS.recordings[0]!, release: undefined },
+        },
+      },
+    });
+
+    const result = await facadeWith(found).lookupCatalog({ mbid: RG_ID }, STORY);
+
+    expect(result).toMatchObject({ ok: true, value: { kind: 'recording' } });
+    if (!result.ok) return;
+    expect(result.value.recording?.release).toBeUndefined();
+  });
+});
+
+describe('the identifier every catalog read takes', () => {
+  it.each([['lookupCatalog'], ['browseArtist'], ['listEditions'], ['getTracklist']])(
+    'refuses %s an identifier that is not a catalog id',
+    async (verb) => {
+      const facade = facadeWith(fakeCatalog());
+
+      const result = await facade[verb as 'lookupCatalog']({ mbid: 'not-an-mbid' }, STORY);
+
+      expect(result).toMatchObject({ ok: false, error: { kind: 'ValidationFailed' } });
+    },
+  );
+
+  it.each([['lookupCatalog'], ['browseArtist'], ['listEditions'], ['getTracklist']])(
+    'refuses %s a request that names no identifier at all',
+    async (verb) => {
+      const facade = facadeWith(fakeCatalog());
+
+      const result = await facade[verb as 'lookupCatalog']({}, STORY);
+
+      expect(result).toMatchObject({ ok: false, error: { kind: 'ValidationFailed' } });
+    },
+  );
+
+  it.each([['lookupCatalog'], ['browseArtist'], ['listEditions']])(
+    'reports an unreachable catalog from %s as a fault',
+    async (verb) => {
+      const facade = facadeWith(fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT }));
+
+      const result = await facade[verb as 'lookupCatalog']({ mbid: RG_ID }, STORY);
+
+      expect(result).toMatchObject({ ok: false, error: { kind: 'InfraError' } });
+    },
+  );
 });
 
 describe('browseArtist', () => {
@@ -134,7 +213,10 @@ describe('listEditions', () => {
 
     const result = await facadeWith(catalog).listEditions({ mbid: RG_ID }, STORY);
 
-    expect(result).toMatchObject({ ok: true, value: { bestMatch: { kind: 'selection-required' } } });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { bestMatch: { kind: 'selection-required' } },
+    });
   });
 });
 
@@ -151,9 +233,10 @@ describe('getTracklist', () => {
   });
 
   it('reports an unreachable catalog while reading a tracklist as a fault', async () => {
-    const result = await facadeWith(
-      fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT }),
-    ).getTracklist({ mbid: RELEASE_ID }, STORY);
+    const result = await facadeWith(fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT })).getTracklist(
+      { mbid: RELEASE_ID },
+      STORY,
+    );
 
     expect(result).toMatchObject({ ok: false, error: { kind: 'InfraError' } });
   });

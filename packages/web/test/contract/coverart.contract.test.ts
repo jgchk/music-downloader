@@ -33,13 +33,13 @@ let server: FixtureServer;
  * thumbnail host the manifest names.
  */
 function fetchWithStubbedImages(): typeof fetch {
-  return ((input: string | URL | Request, init?: RequestInit) => {
+  return (input: string | URL | Request, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
     if (url.startsWith(server.baseUrl)) return fetch(url, init);
     return Promise.resolve(
       new Response(IMAGE_BYTES, { status: 200, headers: { 'Content-Type': 'image/jpeg' } }),
     );
-  });
+  };
 }
 
 beforeEach(async () => {
@@ -85,9 +85,7 @@ describe('CoverArtArchive contract (tier 1)', () => {
     const answer = result._unsafeUnwrap();
 
     expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/jpeg' } });
-    const sent = server.requests.find(
-      (request) => request.path === `/release-group/${WITH_ART}`,
-    )!;
+    const sent = server.requests.find((request) => request.path === `/release-group/${WITH_ART}`)!;
     expect(sent.method).toBe('GET');
     expect(sent.headers['user-agent']).toContain('music-downloader');
   });

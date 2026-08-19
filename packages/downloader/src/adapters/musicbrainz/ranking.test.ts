@@ -107,6 +107,36 @@ describe('rankReleaseGroups', () => {
     expect(titles(ranked)[0]).toBe('Vespertine');
   });
 
+  it('judges a hit the catalog credits to nobody on its title alone', () => {
+    const ranked = rankReleaseGroups('graceland', [
+      releaseGroup('Something Else', ''),
+      releaseGroup('Graceland', ''),
+    ]);
+
+    expect(titles(ranked)[0]).toBe('Graceland');
+  });
+
+  it('counts a query the artist alone explains as fully explained', () => {
+    // Every query token is the artist's name, so there is nothing left for the title to match —
+    // which must read as "the title has nothing to answer for", not as a title that failed.
+    const ranked = rankReleaseGroups('paul simon', [
+      releaseGroup('Hearts and Bones', 'Paul Simon'),
+      releaseGroup('A Tribute', 'Someone Else'),
+    ]);
+
+    expect(titles(ranked)[0]).toBe('Hearts and Bones');
+  });
+
+  it('neither rewards nor punishes a release whose type the catalog does not name', () => {
+    const ranked = rankReleaseGroups('graceland', [
+      releaseGroup('Graceland', 'Paul Simon', { primaryType: 'Broadcast' }),
+      releaseGroup('Graceland', 'Paul Simon', { primaryType: undefined }),
+      releaseGroup('Graceland', 'Paul Simon', { primaryType: 'Album' }),
+    ]);
+
+    expect(ranked.map((item) => item.primaryType)).toEqual(['Album', 'Broadcast', undefined]);
+  });
+
   it('returns nothing for no hits, and leaves a blank query in provider order', () => {
     expect(rankReleaseGroups('graceland', [])).toEqual([]);
     expect(
@@ -134,6 +164,15 @@ describe('rankArtists', () => {
     ]);
 
     expect(ranked.map((item) => item.name)[0]).toBe('Paul Simon');
+  });
+
+  it('leaves a nameless artist to the provider score', () => {
+    const ranked = rankArtists('paul simon', [
+      artist('', { score: 90 }),
+      artist('Nobody', { score: 10 }),
+    ]);
+
+    expect(ranked.map((item) => item.score)).toEqual([90, 10]);
   });
 
   it('orders unmatched names by the provider score', () => {

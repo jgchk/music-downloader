@@ -14,9 +14,7 @@ const coverArtImageSchema = z.object({
   /** The full-size image, used when the archive has no thumbnail at the asked-for size. */
   image: z.string().optional(),
   /** Keyed by pixel width. Absent sizes are normal — not every image is thumbnailed. */
-  thumbnails: z
-    .object({ '250': z.string().optional(), '500': z.string().optional() })
-    .optional(),
+  thumbnails: z.object({ '250': z.string().optional(), '500': z.string().optional() }).optional(),
 });
 
 export const coverArtManifestSchema = z.object({

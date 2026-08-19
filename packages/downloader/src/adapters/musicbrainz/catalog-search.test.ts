@@ -145,7 +145,12 @@ describe('MusicBrainzCatalogSearch.search', () => {
 
     const results = await unwrap(port.search(' '.repeat(3), testScope()));
 
-    expect(results).toEqual({ releaseGroups: [], artists: [], recordings: [], leading: 'release-group' });
+    expect(results).toEqual({
+      releaseGroups: [],
+      artists: [],
+      recordings: [],
+      leading: 'release-group',
+    });
     expect(sent).toHaveLength(0);
   });
 
@@ -200,9 +205,59 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(failure.permanent).toBeUndefined();
   });
 
+  it('reads a catalog that holds none of what was asked as empty, not as a fault', async () => {
+    // Every entity read 404s: the catalog saying "no such thing" is an answer.
+    const { port } = searcher([]);
+
+    const results = await unwrap(port.search('nothing at all', testScope()));
+
+    expect(results).toEqual({
+      releaseGroups: [],
+      artists: [],
+      recordings: [],
+      leading: 'release-group',
+    });
+  });
+
+  it('reports a catalog that could not be reached at all as a fault', async () => {
+    const port = new MusicBrainzCatalogSearch(
+      { send: () => Promise.reject(new Error('connection reset')) },
+      { baseUrl: 'https://mb.test/ws/2', userAgent: 'test-agent/1.0' },
+    );
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.message).toContain('could not be reached');
+  });
+
+  it('reports a catalog that answers with something other than JSON as permanent', async () => {
+    const notJson: HttpClient = {
+      send: () => Promise.resolve({ status: 200, body: '<html>maintenance</html>' }),
+    };
+    const port = new MusicBrainzCatalogSearch(notJson, { baseUrl: 'https://mb.test/ws/2' });
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.permanent).toBe(true);
+  });
+
+  it('keeps its own time when none is given, so the cache still expires in production', async () => {
+    // Constructed the way composition does — no injected clock — and still answers.
+    const client = http(SEARCH_ROUTES);
+    const port = new MusicBrainzCatalogSearch(client, { baseUrl: 'https://mb.test/ws/2' });
+
+    await unwrap(port.search('graceland', testScope()));
+    await unwrap(port.search('graceland', testScope()));
+
+    expect(client.sent).toHaveLength(3);
+  });
+
   it('reports a catalog whose shape drifted as permanent, since retrying cannot fix it', async () => {
     const { port } = searcher([
-      { match: '/release-group?query=', json: { 'release-groups': [{ id: RG_ID, score: 'high' }] } },
+      {
+        match: '/release-group?query=',
+        json: { 'release-groups': [{ id: RG_ID, score: 'high' }] },
+      },
       { match: '/artist?query=', json: PAUL_SIMON },
       { match: '/recording?query=', json: BUBBLE },
     ]);
@@ -263,6 +318,12 @@ describe('MusicBrainzCatalogSearch.lookup', () => {
 });
 
 describe('MusicBrainzCatalogSearch.discography', () => {
+  it('reads an artist the catalog does not know as no work at all', async () => {
+    const { port } = searcher([]);
+
+    expect(await unwrap(port.discography(asMbid(ARTIST_ID), testScope()))).toEqual([]);
+  });
+
   it('reads an artist’s work with albums first', async () => {
     const { port, sent } = searcher([
       {
@@ -284,6 +345,15 @@ describe('MusicBrainzCatalogSearch.discography', () => {
 });
 
 describe('MusicBrainzCatalogSearch.editions', () => {
+  it('reads a release group the catalog does not know as no editions to choose from', async () => {
+    const { port } = searcher([]);
+
+    expect(await unwrap(port.editions(asMbid(RG_ID), testScope()))).toEqual({
+      groups: [],
+      bestMatch: { kind: 'selectionRequired' },
+    });
+  });
+
   it('reads the editions grouped by tracklist with the pipeline’s own default named', async () => {
     const { port } = searcher([
       {

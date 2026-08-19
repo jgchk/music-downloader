@@ -70,7 +70,12 @@ function tokens(value: string): readonly string[] {
  * the title, and how many title words the searcher never asked for. A query of only separators
  * explains nothing and scores flat, leaving such hits in provider order.
  */
-function pairScore(query: string, title: string, artistCredit: string, providerScore: number): number {
+function pairScore(
+  query: string,
+  title: string,
+  artistCredit: string,
+  providerScore: number,
+): number {
   const queryTokens = tokens(query);
   if (queryTokens.length === 0) return 0;
   const titleTokens = tokens(title);
@@ -123,9 +128,7 @@ function artistScore(query: string, hit: ScoredArtist): number {
   if (normalizedName === '' || normalizedQuery === '') return provider;
   if (normalizedName === normalizedQuery) return EXACT_NAME_BONUS + provider;
   if (normalizedQuery.includes(normalizedName)) {
-    return (
-      CONTAINED_NAME_BONUS + CONTAINED_NAME_TOKEN_BONUS * tokens(hit.name).length + provider
-    );
+    return CONTAINED_NAME_BONUS + CONTAINED_NAME_TOKEN_BONUS * tokens(hit.name).length + provider;
   }
   return provider;
 }

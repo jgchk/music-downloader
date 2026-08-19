@@ -8,6 +8,7 @@ import type { createImporterRuntime, ImporterRuntime } from '@music/importer/run
 import { PlexTvAccess } from './plex/adapter.js';
 import {
   accessOf,
+  coverArtOf,
   bootRuntimes,
   facadesOf,
   loggerOf,
@@ -382,6 +383,8 @@ describe('bootRuntimes', () => {
     });
     const access = accessOf();
     expect(access.sessionSecret).toBe('runtime-test-secret-0123456789abcd');
+    // The artwork port is composed here too, cached, so one archive client serves the process.
+    expect(typeof coverArtOf().front).toBe('function');
     // The one concretion behind the PlexAccess port is constructed HERE (design D6): no fake, no
     // null strategy, nothing an environment value could select instead (design D7).
     expect(access.plex).toBeInstanceOf(PlexTvAccess);
@@ -393,6 +396,10 @@ describe('bootRuntimes', () => {
 
   it('accessOf refuses before boot', () => {
     expect(() => accessOf()).toThrow(/init hook/);
+  });
+
+  it('coverArtOf refuses before boot', () => {
+    expect(() => coverArtOf()).toThrow(/init hook/);
   });
 
   it('loggerOf refuses before boot', () => {
