@@ -33,8 +33,14 @@ export interface CatalogReleaseGroup {
 export interface CatalogArtist {
   readonly mbid: Mbid;
   readonly name: string;
-  /** The catalog's own tie-breaker between same-named artists ("UK house project", "Group"). */
+  /** The catalog's own tie-breaker between same-named artists ("UK house project"). */
   readonly disambiguation: string | undefined;
+  /**
+   * What kind of act this is in the catalog's own word — `Person`, `Group`, `Orchestra`, … Kept
+   * apart from the disambiguation because they are different facts: a reader may want either, and
+   * a read that folded one into the other would have decided that for every reader at once.
+   */
+  readonly type: string | undefined;
 }
 
 export interface CatalogRecording {

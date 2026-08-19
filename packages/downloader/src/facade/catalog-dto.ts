@@ -38,6 +38,8 @@ export const catalogArtistDtoSchema = z.object({
   mbid: z.string(),
   name: z.string(),
   disambiguation: z.string().optional(),
+  /** `Person` | `Group` | … — what kind of act, when the catalog says. Additive; older answers omit it. */
+  type: z.string().optional(),
 });
 
 export const catalogRecordingDtoSchema = z.object({
@@ -198,7 +200,12 @@ function releaseGroupToDto(
 }
 
 function artistToDto(artist: CatalogArtist): z.infer<typeof catalogArtistDtoSchema> {
-  return { mbid: artist.mbid, name: artist.name, disambiguation: artist.disambiguation };
+  return {
+    mbid: artist.mbid,
+    name: artist.name,
+    disambiguation: artist.disambiguation,
+    type: artist.type,
+  };
 }
 
 function recordingToDto(recording: CatalogRecording): z.infer<typeof catalogRecordingDtoSchema> {

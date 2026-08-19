@@ -6,11 +6,11 @@ creates and extends its layout tests).
 
 ## 1. Catalog-search read (downloader)
 
-- [ ] 1.1 Artist `type` (red first): additive DTO field read tolerantly from the artist search
+- [x] 1.1 Artist `type` (red first): additive DTO field read tolerantly from the artist search
       response beside `disambiguation`; a recorded contract fixture proves the consumed field is
       present (extend the recorder if the current fixture lacks it); facade schema growth
       additive-only under the contract tier
-- [ ] 1.2 `pnpm check` in `packages/downloader`; recorded-fixture replay green
+- [x] 1.2 `pnpm check` in `packages/downloader`; recorded-fixture replay green
 
 ## 2. Wire semantics (web server)
 

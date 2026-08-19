@@ -99,21 +99,40 @@ describe('toReleaseGroups', () => {
 describe('toArtists', () => {
   it('reads an artist with the catalog’s own disambiguation', () => {
     const [artist] = toArtists({
-      artists: [{ id: ARTIST_ID, score: 100, name: 'Paul Simon', disambiguation: 'US singer' }],
+      artists: [
+        {
+          id: ARTIST_ID,
+          score: 100,
+          name: 'Paul Simon',
+          disambiguation: 'US singer',
+          type: 'Person',
+        },
+      ],
     });
 
     expect(artist).toEqual({
       mbid: ARTIST_ID,
       name: 'Paul Simon',
       disambiguation: 'US singer',
+      type: 'Person',
       score: 100,
     });
   });
 
-  it('falls back to the artist type when there is no disambiguation', () => {
+  it('carries what kind of act it is separately from the disambiguation', () => {
+    // Two different facts about an artist. Collapsing them here would decide, for every reader at
+    // once, that a type is a disambiguation — a presentation call the catalog read has no business
+    // making, and one that cannot be undone downstream.
     const [artist] = toArtists({ artists: [{ id: ARTIST_ID, name: 'Radiohead', type: 'Group' }] });
 
-    expect(artist?.disambiguation).toBe('Group');
+    expect(artist?.type).toBe('Group');
+    expect(artist?.disambiguation).toBeUndefined();
+  });
+
+  it('says nothing about a kind the catalog does not state', () => {
+    const [artist] = toArtists({ artists: [{ id: ARTIST_ID, name: 'Nobody' }] });
+
+    expect(artist?.type).toBeUndefined();
   });
 
   it('drops an artist with no usable identity', () => {
