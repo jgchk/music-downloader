@@ -3,7 +3,17 @@ import { describe, expect, it } from 'vitest';
 import RequestedNotice from './RequestedNotice.svelte';
 
 describe('RequestedNotice (SSR)', () => {
-  it('names a way to open what was just requested', () => {
+  it('names what was requested, and a way to open it', () => {
+    const { body } = render(RequestedNotice, {
+      props: { requested: { acquisitionId: 'acq-9', title: 'Graceland' } },
+    });
+
+    // A page of identical "Requested" lines says which button was pressed only by where it sits.
+    expect(body).toContain('Requested Graceland');
+    expect(body).toContain('/acquisitions/acq-9');
+  });
+
+  it('still confirms when nothing named it', () => {
     const { body } = render(RequestedNotice, { props: { requested: { acquisitionId: 'acq-9' } } });
 
     expect(body).toContain('Requested');
