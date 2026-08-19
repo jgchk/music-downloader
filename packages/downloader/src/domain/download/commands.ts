@@ -16,7 +16,7 @@ import type {
  */
 export type DownloadCommand =
   | {
-      readonly type: 'SubmitAcquisition';
+      readonly type: 'SubmitDownload';
       readonly request: DownloadRequest;
       readonly policies: DownloadPolicies;
     }
@@ -36,11 +36,11 @@ export type DownloadCommand =
   | {
       // The source accepted the enqueue: the transfer is live. Reports may repeat or arrive
       // late; `decide` absorbs duplicates and reports naming a candidate no longer in flight.
-      readonly type: 'RecordDownloadStarted';
+      readonly type: 'RecordTryStarted';
       readonly candidate: CandidateIdentity;
     }
   | {
-      readonly type: 'RecordDownloadCompleted';
+      readonly type: 'RecordTryCompleted';
       readonly files: readonly DownloadedFile[];
       // The candidate this outcome settles. Reports of a download's outcome may arrive late or
       // repeat (they are records of external work, not synchronous returns), so every producer
@@ -49,7 +49,7 @@ export type DownloadCommand =
       readonly candidate: CandidateIdentity;
     }
   | {
-      readonly type: 'RecordDownloadFailed';
+      readonly type: 'RecordTryFailed';
       readonly reason: TryFailureReason;
       // The already-completed staged files of the abandoned/aborted candidate, reported by the
       // adapter so `decide` can stamp them onto the rejection for cleanup (design D2). Optional:
@@ -74,6 +74,6 @@ export type DownloadCommand =
       readonly candidate: CandidateReference;
       readonly reasons: readonly string[];
     }
-  | { readonly type: 'CancelAcquisition' };
+  | { readonly type: 'CancelDownload' };
 
 export type DownloadCommandType = DownloadCommand['type'];

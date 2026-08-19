@@ -189,7 +189,7 @@ export const resolveReviewRequestSchema = z.discriminatedUnion('verb', [
     /**
      * Reject the delivered copy as unusable: files deleted, import terminal `rejected`, AND a
      * release verdict recorded (the fact that the delivered copy was rejected as unusable, echoing
-     * back the acquisition id and delivered candidate as opaque provenance, plus the reviewer's own
+     * back the originating download id and delivered copy as opaque provenance, plus the reviewer's own
      * reasons). Only for imports that retain a delivered candidate's identity; otherwise refused
      * with `NoRetainedCopy` (plain `reject` remains available). Use `reject` for "wrong thing
      * to have", this verb for "right thing, bad copy".

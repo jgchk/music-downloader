@@ -70,8 +70,8 @@ stay untouched).
 - `run.sh` — builds (or reuses via `E2E_SKIP_BUILD=1`) `music-downloader:e2e`, runs it plus three
   WireMock containers **on the host network** (no docker network creation → no NAT kernel-module
   dependency; localhost is the same everywhere), and documents the full mount/path topology in
-  its header comment. Notably `LIBRARY_ROOT` (the downloader's deposit root) and `INTAKE_ROOT`
-  are the same directory, exercising `INTAKE_SOURCE_ROOT`'s default (= `LIBRARY_ROOT`) as an
+  its header comment. Notably `DEPOSIT_ROOT` (the downloader's deposit root) and `INTAKE_ROOT`
+  are the same directory, exercising `INTAKE_SOURCE_ROOT`'s default (= `DEPOSIT_ROOT`) as an
   identity re-root.
 - `helpers.ts` — a browserless HTTP client over the same web routes the UI serves (form-encoded
   actions, HTML parsed via the components' `data-testid` markers) plus read-only host-side peeks

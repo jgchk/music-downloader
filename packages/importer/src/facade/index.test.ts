@@ -275,7 +275,7 @@ describe('createImporterFacade', () => {
     });
 
     it('exposes each pending review’s permitted verb set, gated on a retained candidate', async () => {
-      // A manually submitted import (no source, no retained candidate): the retry verb is withheld,
+      // A manually submitted import (no source, no retained delivered copy): the retry verb is withheld,
       // plain reject still offered.
       const manual = testWiring();
       await submitAndPropose(manual, manual.facade);

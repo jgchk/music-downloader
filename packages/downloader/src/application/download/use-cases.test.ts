@@ -87,7 +87,7 @@ describe('selectEdition', () => {
     return d;
   }
 
-  it('appends the selection for an download awaiting one', async () => {
+  it('appends the selection for a download awaiting one', async () => {
     const d = await awaitingDependencies();
     const result = await selectEdition(d, 'acq-1', asMbid('boot-1'), testContext());
     expect(result.isOk()).toBe(true);
@@ -108,7 +108,7 @@ describe('selectEdition', () => {
     );
   });
 
-  it('surfaces the modeled rejection for an download not awaiting selection', async () => {
+  it('surfaces the modeled rejection for a download not awaiting selection', async () => {
     const d = dependencies();
     const submitAcquisitionResult2 = await submitAcquisition(
       d,
@@ -209,7 +209,7 @@ describe('queries', () => {
     expect(listAcquisitions(requested())).toHaveLength(1);
   });
 
-  it('reads the latest download progress for an download', () => {
+  it('reads the latest download progress for a download', () => {
     const d = requested();
     d.progress.update('acq-1', { percent: 10, bytesTransferred: 1, bytesTotal: 10 });
     expect(getAcquisitionProgress(d, 'acq-1')?.percent).toBe(10);

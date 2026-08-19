@@ -233,7 +233,7 @@ export const acquisitionTargetSchema = z.object({
   title: z.string(),
 });
 
-/** One edition on offer while an download awaits manual selection (wire copy of the domain value). */
+/** One edition on offer while a download awaits manual selection (wire copy of the domain value). */
 export const editionCandidateSchema = z.object({
   releaseMbid: z.string(),
   title: z.string().optional(),
@@ -249,7 +249,7 @@ export const acquisitionStatusResponseSchema = z.object({
   status: acquisitionStatusSchema,
   // Present once metadata has resolved the request into an artist/title (absent while Pending).
   target: acquisitionTargetSchema.optional(),
-  // The request as the user gave it (additive echo): lets a consumer describe an download whose
+  // The request as the user gave it (additive echo): lets a consumer describe a download whose
   // metadata never resolved — where `target` stays absent — by what was asked for.
   requestedTarget: requestedTargetEchoSchema.optional(),
   // When the request was recorded — the stated fact a consumer orders acquisitions by recency on,

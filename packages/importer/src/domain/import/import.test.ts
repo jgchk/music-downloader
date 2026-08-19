@@ -537,7 +537,7 @@ describe('resolving a review', () => {
     expect(events[1]).toMatchObject({ type: 'ReleaseVerdictRecorded', reasons: [] });
   });
 
-  it('refuses reject-unusable-delivery without a retained candidate', () => {
+  it('refuses reject-unusable-delivery without a retained delivered copy', () => {
     // A manual import has no source at all; a legacy intake import has a source but no candidate.
     expect(
       given(awaitingMatchReview())
@@ -979,7 +979,7 @@ describe('the open review’s available actions', () => {
   it.each([
     // match-review, candidates present, no retained delivered candidate: no reject-and-retry.
     [
-      'match-review without a retained candidate',
+      'match-review without a retained delivered copy',
       awaitingMatchReview(),
       [
         'apply-candidate',
@@ -1004,7 +1004,7 @@ describe('the open review’s available actions', () => {
     expect(given(history).snapshot.openReview?.availableActions).toEqual(expected);
   });
 
-  it('joins reject-unusable-delivery when a delivered candidate is retained', () => {
+  it('joins reject-unusable-delivery when a delivered copy is retained', () => {
     expect(given(awaitingReviewWithCandidate()).snapshot.openReview?.availableActions).toContain(
       'reject-unusable-delivery',
     );

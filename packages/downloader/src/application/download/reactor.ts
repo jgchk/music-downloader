@@ -42,7 +42,9 @@ type DispatchOutcome =
  * `globalSeq`), bound once per dispatch in `scopeFor` and inherited by everything below it; the
  * pure `react`/`decide`/`evolve` stay log-free.
  */
-export const REACTOR_CONSUMER = 'acquisition-reactor';
+export // Frozen: this is a durable checkpoint key. Renaming it replays the entire log from zero,
+// exactly like renaming a stored event token — see `adapters/sqlite/event-tokens.ts`.
+const REACTOR_CONSUMER = 'acquisition-reactor';
 
 export interface ReactorDependencies {
   readonly store: EventStorePort;

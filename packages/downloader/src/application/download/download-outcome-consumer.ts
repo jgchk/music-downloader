@@ -42,12 +42,12 @@ export function deliverDownloadOutcome(
     acquisitionId,
     result.kind === 'completed'
       ? {
-          type: 'RecordDownloadCompleted',
+          type: 'RecordTryCompleted',
           candidate,
           files: result.files,
         }
       : {
-          type: 'RecordDownloadFailed',
+          type: 'RecordTryFailed',
           candidate,
           reason: result.reason,
           files: result.files,

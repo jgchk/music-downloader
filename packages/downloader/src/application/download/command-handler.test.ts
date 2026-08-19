@@ -25,7 +25,7 @@ describe('applyCommand correlation metadata', () => {
     const result = await applyCommand(
       d,
       'acq-1',
-      { type: 'SubmitAcquisition', request: sampleRequest, policies: defaultPolicies() },
+      { type: 'SubmitDownload', request: sampleRequest, policies: defaultPolicies() },
       testContext(),
     );
 
@@ -42,7 +42,7 @@ describe('applyCommand correlation metadata', () => {
     const result = await applyCommand(
       d,
       'acq-1',
-      { type: 'CancelAcquisition' },
+      { type: 'CancelDownload' },
       testContext(OTHER_STORY),
     );
 
@@ -76,7 +76,7 @@ describe('applyCommand', () => {
     const result = await applyCommand(
       d,
       'acq-1',
-      { type: 'SubmitAcquisition', request: sampleRequest, policies: defaultPolicies() },
+      { type: 'SubmitDownload', request: sampleRequest, policies: defaultPolicies() },
       testContext(),
     );
     const appended = result._unsafeUnwrap();
@@ -96,7 +96,7 @@ describe('applyCommand', () => {
       d,
       'acq-1',
       {
-        type: 'RecordDownloadFailed',
+        type: 'RecordTryFailed',
         reason: 'Stalled',
         candidate: matchingCandidate('a').identity,
       },
@@ -117,7 +117,7 @@ describe('applyCommand', () => {
     const result = await applyCommand(
       d,
       'acq-1',
-      { type: 'RecordDownloadCompleted', files: [], candidate: matchingCandidate('a').identity },
+      { type: 'RecordTryCompleted', files: [], candidate: matchingCandidate('a').identity },
       testContext(),
     );
     expect(result._unsafeUnwrap()).toEqual([]);
@@ -233,7 +233,7 @@ describe('applyCommand', () => {
       d,
       'acq-1',
       {
-        type: 'RecordDownloadCompleted',
+        type: 'RecordTryCompleted',
         files: [],
         candidate: matchingCandidate('a').identity,
       },
@@ -246,7 +246,7 @@ describe('applyCommand', () => {
   it('propagates an infrastructure read failure', async () => {
     const d = dependencies();
     d.store.failReads = true;
-    const result = await applyCommand(d, 'acq-1', { type: 'CancelAcquisition' }, testContext());
+    const result = await applyCommand(d, 'acq-1', { type: 'CancelDownload' }, testContext());
     expect(result._unsafeUnwrapErr()).toMatchObject({ kind: 'InfraError' });
   });
 });

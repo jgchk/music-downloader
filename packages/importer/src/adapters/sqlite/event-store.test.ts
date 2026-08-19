@@ -22,11 +22,13 @@ import { InProcessEventBus } from './event-bus.js';
 import { SqliteCheckpointStore, SqliteEventStore } from './event-store.js';
 import { legacyRejectResolvedData } from './__fixtures__/legacy-review-resolved.js';
 import { openEventDatabase, type EventDatabase } from './schema.js';
+import { toStoredToken } from './event-tokens.js';
 import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION, UpcasterRegistry } from './upcaster.js';
 
 const META: AppendMetadata = appendMetadata('imp-1', '2026-07-03T12:00:00.000Z');
 
 const APPLIED: ImportEvent = { type: 'ImportApplied', location: '/library/album' };
+const PROPOSED: ImportEvent = { type: 'MatchesProposed', candidates: [], duplicates: [] };
 const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'done', filesDeleted: true };
 
 const openDbs: EventDatabase[] = [];
@@ -182,6 +184,51 @@ describe('SqliteEventStore', () => {
     expect(row.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
+  it('writes the frozen storage token to both the type column and the data blob', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database);
+
+    await store.append('imp-1', 0, [PROPOSED], META);
+
+    // PROPOSED is the model's `MatchesProposed`; disk has always called it `CandidatesProposed`,
+    // and the blob must agree with the column it is indexed by.
+    const row = database
+      .prepare('SELECT type, data FROM events WHERE stream_id = ?')
+      .get('imp-1') as { type: string; data: string };
+    expect(row.type).toBe('CandidatesProposed');
+    expect((JSON.parse(row.data) as { type: string }).type).toBe('CandidatesProposed');
+  });
+
+  it('reads a row written before the rename as the current model type, upcasting by its token', async () => {
+    const database = freshDatabase();
+    // The upcaster is keyed by the STORED token — a renamed event proves the ordering matters.
+    const registry = new UpcasterRegistry().register(
+      'CandidatesProposed',
+      CURRENT_SCHEMA_VERSION,
+      (data) => ({ ...data, upcasted: true }),
+    );
+    const store = new SqliteEventStore(database, registry);
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'imp-1',
+        0,
+        'CandidatesProposed',
+        CURRENT_SCHEMA_VERSION,
+        '{"type":"CandidatesProposed","candidates":[]}',
+        '{}',
+      );
+
+    const readResult = await store.readStream('imp-1');
+    const read = readResult._unsafeUnwrap();
+
+    expect(read[0]!.type).toBe('MatchesProposed');
+    expect(read[0]!.event).toMatchObject({ type: 'MatchesProposed', upcasted: true });
+  });
+
   it('upcasts stored events on read', async () => {
     // Registered at the version `append` stamps, so a freshly-stored row is lifted on read-back.
     const registry = new UpcasterRegistry().register(
@@ -228,7 +275,15 @@ describe('SqliteEventStore', () => {
     );
     for (const [version, event] of nativeEvents.entries()) {
       const data = event.type === 'ReviewResolved' ? legacyRejectResolvedData(reasons) : event;
-      insert.run('imp-legacy', version, event.type, JSON.stringify(data), JSON.stringify(META));
+      // The column holds STORED tokens — writing the model name here would build a stream that
+      // could never exist on disk, and the legacy-fidelity claim would be vacuous.
+      insert.run(
+        'imp-legacy',
+        version,
+        toStoredToken(event.type),
+        JSON.stringify(data),
+        JSON.stringify(META),
+      );
     }
     const legacyStore = new SqliteEventStore(legacyDatabase, buildUpcasterRegistry());
     const legacyReadResult = await legacyStore.readStream('imp-legacy');

@@ -36,7 +36,7 @@ function degradeCommand(effect: Effect): DownloadCommand | undefined {
       // consumer, never through this landing. The candidate is named so a landing that fires
       // after the ladder has already moved on is absorbed as stale, not mis-attached.
       return {
-        type: 'RecordDownloadFailed',
+        type: 'RecordTryFailed',
         reason: 'Stalled',
         candidate: effect.candidate.identity,
       };
@@ -44,7 +44,7 @@ function degradeCommand(effect: Effect): DownloadCommand | undefined {
     case 'AbortDownload': {
       // The abort's settlement: reject the pending candidate as the interpreter would have.
       return {
-        type: 'RecordDownloadFailed',
+        type: 'RecordTryFailed',
         // Stryker disable next-line StringLiteral: equivalent — an unread argument. This effect is
         // emitted only by the `DownloadCancelled` reaction, so the stream is in the terminal
         // `Cancelled` phase whenever the degrade lands (redelivery included), and that arm of

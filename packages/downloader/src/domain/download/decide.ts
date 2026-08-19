@@ -122,7 +122,7 @@ function rejectAndAdvance(
 }
 
 /**
- * A download aborted by a cancellation has settled: reject the pending candidate so its staged files
+ * A transfer aborted by a cancellation has settled: reject the pending candidate so its staged files
  * are cleaned up (via `react`), leaving the download cancelled. Fires exactly once — a later
  * duplicate settlement folds to no `pending` and is absorbed by the terminal-state tolerance above.
  */
@@ -135,7 +135,7 @@ function settleCancelled(
 
 export function decide(command: DownloadCommand, state: DownloadState): Decision {
   switch (command.type) {
-    case 'SubmitAcquisition': {
+    case 'SubmitDownload': {
       if (state.phase !== 'Empty') return err({ kind: 'AlreadyExists' });
       return ok([
         { type: 'DownloadRequested', request: command.request, policies: command.policies },
@@ -206,7 +206,7 @@ export function decide(command: DownloadCommand, state: DownloadState): Decision
       return ok(events);
     }
 
-    case 'RecordDownloadStarted': {
+    case 'RecordTryStarted': {
       if (isTerminal(state)) return ok([]); // e.g. a cancellation won the race with the enqueue
       if (state.phase === 'Validating' || state.phase === 'Importing') {
         // The outcome outran the start report (a re-attach found the transfers already settled):
@@ -220,7 +220,7 @@ export function decide(command: DownloadCommand, state: DownloadState): Decision
       return ok([{ type: 'TryStarted', candidate: state.current.identity }]);
     }
 
-    case 'RecordDownloadCompleted': {
+    case 'RecordTryCompleted': {
       if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight') {
         return ok(
           isNaming(command.candidate, state.staging.pending.identity)
@@ -236,7 +236,7 @@ export function decide(command: DownloadCommand, state: DownloadState): Decision
       ]);
     }
 
-    case 'RecordDownloadFailed': {
+    case 'RecordTryFailed': {
       if (state.phase === 'Cancelled' && state.staging.kind === 'in-flight') {
         return ok(
           isNaming(command.candidate, state.staging.pending.identity)
@@ -348,7 +348,7 @@ export function decide(command: DownloadCommand, state: DownloadState): Decision
       ]);
     }
 
-    case 'CancelAcquisition': {
+    case 'CancelDownload': {
       if (isTerminal(state)) return ok([]);
       return ok([{ type: 'DownloadCancelled', files: stagedFilesOf(state) }]);
     }

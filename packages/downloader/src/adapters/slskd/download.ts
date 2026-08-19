@@ -30,7 +30,7 @@ import { aggregate, enqueueRejectionReason, recogniseRejection } from './transfe
 import type { OwnedTransfer } from './transfers.js';
 
 /**
- * The slskd `TransferPort` adapter — the download supervisor (nonblocking-download-observation
+ * The slskd `TransferPort` adapter — the transfer supervisor (nonblocking-download-observation
  * D1). `start` reconciles/re-attaches against the ownership ledger, enqueues when the source
  * holds nothing, registers an in-memory watch, and returns promptly; the watch then observes the
  * transfers on its own cadence — never inside a reactor dispatch — and reports one candidate-level
@@ -308,7 +308,7 @@ export class SlskdDownload implements TransferPort {
    * Shutdown latch: every watch exits at its next wake without delivering, so nothing keeps
    * polling the source or retrying deliveries against torn-down infrastructure. Deliberately not
    * a drain — the startup re-drive re-drives an unfinished candidate (re-attaching where the
-   * source still holds its transfers, repeating the download where teardown already removed
+   * source still holds its transfers, repeating the transfer where teardown already removed
    * them), so a latched-away outcome costs at most a repeat transfer, never the download.
    */
   stop(): void {

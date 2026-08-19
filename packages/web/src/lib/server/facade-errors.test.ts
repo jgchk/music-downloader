@@ -77,7 +77,7 @@ describe('messageOf', () => {
     ['UnknownImport', 'No such import'],
     ['NoOpenReview', 'already been settled'],
     ['InvalidResolution', 'Invalid resolution'],
-    ['UnknownMatch', 'Unknown candidate'],
+    ['UnknownMatch', 'Unknown match'],
     ['NoRetainedCopy', 'tracked download'],
     ['CycleInFlight', 'still in progress'],
     ['ConcurrencyConflict', 'reload'],

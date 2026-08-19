@@ -4,12 +4,12 @@ import { adoptOrMint } from '../application/correlation/context.js';
 import type { CommandContext } from '../application/correlation/context.js';
 import { parseMbid } from '../domain/shared/mbid.js';
 import {
-  cancelAcquisition as cancelAcquisitionUseCase,
-  getAcquisition as getAcquisitionUseCase,
+  cancelAcquisition as cancelDownloadUseCase,
+  getAcquisition as getDownloadUseCase,
   getAcquisitionProgress as getProgressUseCase,
-  listAcquisitions as listAcquisitionsUseCase,
+  listAcquisitions as listDownloadsUseCase,
   selectEdition as selectEditionUseCase,
-  submitAcquisition as submitAcquisitionUseCase,
+  submitAcquisition as submitDownloadUseCase,
 } from '../application/download/use-cases.js';
 import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
@@ -131,7 +131,7 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
       }
       const policies = resolvePolicies(parsed.data);
       if (policies.isErr()) return fail({ kind: 'InvalidPolicy' });
-      const result = await submitAcquisitionUseCase(
+      const result = await submitDownloadUseCase(
         dependencies,
         { request: request.value, policies: policies.value },
         contextFor(story),
@@ -145,11 +145,7 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
     async cancelAcquisition(input, story) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const result = await cancelAcquisitionUseCase(
-        dependencies,
-        parsed.data.id,
-        contextFor(story),
-      );
+      const result = await cancelDownloadUseCase(dependencies, parsed.data.id, contextFor(story));
       return result.match(
         () => ok({ acquisitionId: parsed.data.id }),
         (error) => fail(toFacadeError(error)),
@@ -181,14 +177,14 @@ export function createDownloaderFacade(dependencies: UseCaseDependencies): Downl
     getAcquisition(input) {
       const parsed = acquisitionIdInputSchema.safeParse(input);
       if (!parsed.success) return validationFailed(parsed.error);
-      const view = getAcquisitionUseCase(dependencies, parsed.data.id);
+      const view = getDownloadUseCase(dependencies, parsed.data.id);
       if (view === undefined) return fail({ kind: 'NotFound' });
       return ok(statusViewToDto(view));
     },
 
     listAcquisitions() {
       return {
-        acquisitions: listAcquisitionsUseCase(dependencies).map((item) => statusViewToDto(item)),
+        acquisitions: listDownloadsUseCase(dependencies).map((item) => statusViewToDto(item)),
       };
     },
 

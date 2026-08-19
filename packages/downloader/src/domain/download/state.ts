@@ -28,7 +28,7 @@ export type DownloadPhase =
   | 'MetadataFailed' // terminal, absorbing
   | 'Conflicted'; // terminal, absorbing
 
-// --- Shared payload bases: fields accrete as an download advances through its phases. ---
+// --- Shared payload bases: fields accrete as a download advances through its phases. ---
 
 /** History facts carried by every phase past `Empty`. */
 interface Progress {
@@ -388,6 +388,12 @@ export function evolve(state: DownloadState, event: DownloadEvent): DownloadStat
       return { phase: 'Cancelled', staging: { kind: 'none' }, ...progressOf(state) };
     }
   }
+  // A tag outside the union can only reach here from a log written by a newer version of this
+  // module — the storage seam passes an unrecognized token through rather than losing the event.
+  // Ignoring it keeps replay total, which the aggregate's contract requires. The switch above is
+  // still exhaustively checked: a union member with no case would not narrow to `never` here.
+  event satisfies never;
+  return state;
 }
 
 /** Fold a whole history into state — the replay path and a convenient test builder. */

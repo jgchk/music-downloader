@@ -160,7 +160,8 @@ export class SqliteEventStore implements EventStorePort {
   private toStored(row: EventRow): StoredEvent {
     // Upcasting runs first and is keyed by the STORED token, because legacy shapes were registered
     // under the names the log actually holds. Only once the payload is current does the token
-    // become the model's name, so nothing above this adapter ever sees storage vocabulary.
+    // become the model's name, so storage vocabulary stops here — except for a token this
+    // binary cannot name, which `toModelType` documents and passes through untranslated.
     const modelType = toModelType(row.type);
     const upcast = this.upcasters.upcast(
       row.type,

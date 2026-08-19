@@ -105,7 +105,7 @@ describe('deliverDownloadOutcome', () => {
   });
 
   it('records and skips an outcome the decision path rejects as out-of-protocol', async () => {
-    // Delivered after the download already settled (phase Validating): decide answers with an
+    // Delivered after the try already settled (phase Validating): decide answers with an
     // IllegalTransition — the consumer records the rejection and resolves, never retrying it.
     const store = await seeded(validatingHistory([candidate]));
     const before = types(store);

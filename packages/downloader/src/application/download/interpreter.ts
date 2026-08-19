@@ -90,9 +90,9 @@ export function interpretEffect(
             dependencies,
             acquisitionId,
             started.kind === 'started'
-              ? { type: 'RecordDownloadStarted', candidate: effect.candidate.identity }
+              ? { type: 'RecordTryStarted', candidate: effect.candidate.identity }
               : {
-                  type: 'RecordDownloadFailed',
+                  type: 'RecordTryFailed',
                   reason: started.reason,
                   candidate: effect.candidate.identity,
                 },
@@ -151,7 +151,7 @@ export function interpretEffect(
           dependencies,
           acquisitionId,
           {
-            type: 'RecordDownloadFailed',
+            type: 'RecordTryFailed',
             // Stryker disable next-line StringLiteral: equivalent — an unread argument. This effect
             // is emitted only by the `DownloadCancelled` reaction, so the stream is in the
             // terminal `Cancelled` phase whenever the command lands (redelivery included), and that
