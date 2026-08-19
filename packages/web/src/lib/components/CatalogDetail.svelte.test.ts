@@ -1,8 +1,9 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import { describe, expect, it, vi } from 'vitest';
 import CatalogDetail from './CatalogDetail.svelte';
-import type { DetailState, TracklistState } from '$lib/search/detail.js';
+import { QUALITY_FLOORS } from '$lib/search/view.js';
+import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const PICK = '1b022e01-4da6-387b-8658-8678046e4cef';
@@ -11,7 +12,7 @@ const OTHER = 'ef6e0c0a-9f1f-41af-820a-e3ca91560c13';
 const edition = (mbid: string, overrides: Record<string, unknown> = {}) => ({
   mbid,
   title: 'Graceland',
-  formats: 'CD',
+  formats: ['CD'],
   trackCount: 11,
   date: '1986-08-29',
   country: 'DE',
@@ -42,10 +43,16 @@ const releaseGroupDetail = (bestMatch: {
   },
 });
 
-const props = (detail: DetailState, tracklists: Record<string, TracklistState> = {}) => ({
+const props = (
+  detail: DetailState,
+  tracklists: Record<string, TracklistState> = {},
+  pin?: EditionPin,
+) => ({
   detail,
   tracklists,
   onTracklist: vi.fn(),
+  pin,
+  onPin: vi.fn(),
   onClose: vi.fn(),
 });
 
@@ -55,6 +62,8 @@ describe('CatalogDetail', () => {
       detail: undefined,
       tracklists: {},
       onTracklist: vi.fn(),
+      pin: undefined,
+      onPin: vi.fn(),
       onClose: vi.fn(),
     });
 
@@ -62,7 +71,7 @@ describe('CatalogDetail', () => {
   });
 
   it('says it is reading the catalog before it has anything to show', async () => {
-    await render(CatalogDetail, props({ kind: 'loading', title: 'Graceland' }));
+    await render(CatalogDetail, props({ kind: 'loading', mbid: RG, title: 'Graceland' }));
 
     await expect.element(page.getByTestId('detail-loading')).toBeVisible();
   });
@@ -70,7 +79,12 @@ describe('CatalogDetail', () => {
   it('reports a catalog it could not read, rather than an empty edition list', async () => {
     await render(
       CatalogDetail,
-      props({ kind: 'failed', title: 'Graceland', message: 'The catalog could not be reached.' }),
+      props({
+        kind: 'failed',
+        mbid: RG,
+        title: 'Graceland',
+        message: 'The catalog could not be reached.',
+      }),
     );
 
     await expect.element(page.getByTestId('detail-error')).toBeVisible();
@@ -101,29 +115,86 @@ describe('CatalogDetail', () => {
     expect(document.querySelector('[data-testid="system-pick"]')).toBeNull();
   });
 
-  it('requests the album itself until a pressing is chosen, then that pressing', async () => {
+  it('requests the album itself until a pressing is chosen', async () => {
     await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
-
-    const form = () => document.querySelector<HTMLFormElement>('form.detail-request')!;
-    expect(new FormData(form()).get('kind')).toBe('release-group');
-    expect(new FormData(form()).get('mbid')).toBe(RG);
-
-    await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
-
-    expect(new FormData(form()).get('kind')).toBe('musicbrainz');
-    expect(new FormData(form()).get('mbid')).toBe(OTHER);
-    await expect.element(page.getByRole('button', { name: 'Request this edition' })).toBeVisible();
-  });
-
-  it('lets a chosen pressing be unchosen, back to the system’s own default', async () => {
-    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
-
-    const chooseUs = page.getByRole('button', { name: /1986-08-29 · US/ });
-    await chooseUs.click();
-    await chooseUs.click();
 
     const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
     expect(new FormData(form).get('kind')).toBe('release-group');
+    expect(new FormData(form).get('mbid')).toBe(RG);
+    await expect.element(page.getByRole('button', { name: 'Request download' })).toBeVisible();
+  });
+
+  it('asks for the pressing that was clicked, named with the album it was clicked on', async () => {
+    const chosen = props(releaseGroupDetail({ kind: 'pick', mbid: PICK }));
+    await render(CatalogDetail, chosen);
+
+    await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
+
+    expect(chosen.onPin).toHaveBeenCalledWith({ album: RG, edition: OTHER });
+  });
+
+  it('lets a chosen pressing be unchosen, back to the system’s own default', async () => {
+    const chosen = props(
+      releaseGroupDetail({ kind: 'pick', mbid: PICK }),
+      {},
+      {
+        album: RG,
+        edition: OTHER,
+      },
+    );
+    await render(CatalogDetail, chosen);
+
+    await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
+
+    expect(chosen.onPin).toHaveBeenCalledWith(undefined);
+  });
+
+  it('shows the chosen pressing as the one that would be requested', async () => {
+    await render(
+      CatalogDetail,
+      props(releaseGroupDetail({ kind: 'pick', mbid: PICK }), {}, { album: RG, edition: OTHER }),
+    );
+
+    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    expect(new FormData(form).get('kind')).toBe('musicbrainz');
+    expect(new FormData(form).get('mbid')).toBe(OTHER);
+    await expect.element(page.getByRole('button', { name: 'Request this edition' })).toBeVisible();
+  });
+
+  it('can be dismissed from the keyboard, as an overlay should be', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, {
+      ...props({ kind: 'loading', mbid: RG, title: 'Graceland' }),
+      onClose,
+    });
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('offers every quality floor the request contract accepts, and no other', async () => {
+    // The options are written out in markup, so this is what keeps them from drifting away from
+    // the contract's own buckets — in either direction.
+    await render(CatalogDetail, props({ kind: 'recording', mbid: PICK, title: 'A Track' }));
+
+    const options = [...document.querySelectorAll('select[name="qualityFloor"] option')].map(
+      (option) => (option as HTMLOptionElement).value,
+    );
+
+    expect(options).toEqual(['', ...Object.keys(QUALITY_FLOORS)]);
+  });
+
+  it('stays open for any other key, so typing is not a way to lose the page', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, {
+      ...props({ kind: 'loading', mbid: RG, title: 'Graceland' }),
+      onClose,
+    });
+
+    await userEvent.keyboard('a');
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('asks for a tracklist only when a person asks to see one', async () => {
@@ -243,7 +314,10 @@ describe('CatalogDetail', () => {
 
   it('closes when asked', async () => {
     const onClose = vi.fn();
-    await render(CatalogDetail, { ...props({ kind: 'loading', title: 'Graceland' }), onClose });
+    await render(CatalogDetail, {
+      ...props({ kind: 'loading', mbid: RG, title: 'Graceland' }),
+      onClose,
+    });
 
     await page.getByRole('button', { name: 'Close' }).click();
 

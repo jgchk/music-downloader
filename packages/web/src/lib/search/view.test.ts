@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { countOf, isCatalogId, orderedKinds, otherMatches } from './view.js';
+import {
+  albumDetail,
+  alternativeLabel,
+  artUrl,
+  countOf,
+  emptyLead,
+  isCatalogId,
+  orderedKinds,
+  otherMatches,
+  trackDetail,
+} from './view.js';
 import type { CatalogSearchResultDto } from '@music/downloader';
 
 const MBID = '19847822-1430-3380-9cf1-bc45545b34ac';
@@ -77,5 +87,61 @@ describe('isCatalogId', () => {
   it('does not mistake ordinary searching for an identifier', () => {
     expect(isCatalogId('paul simon graceland')).toBe(false);
     expect(isCatalogId('19847822-1430-3380-9cf1')).toBe(false);
+  });
+});
+
+describe('alternativeLabel', () => {
+  it('counts one of a kind in the singular', () => {
+    expect(alternativeLabel({ kind: 'release-group', count: 1, joiner: '' })).toBe('1 album');
+    expect(alternativeLabel({ kind: 'artist', count: 1, joiner: '' })).toBe('1 artist');
+    expect(alternativeLabel({ kind: 'recording', count: 1, joiner: '' })).toBe('1 track');
+  });
+
+  it('counts more than one in the plural', () => {
+    expect(alternativeLabel({ kind: 'release-group', count: 3, joiner: '' })).toBe('3 albums');
+  });
+});
+
+describe('emptyLead', () => {
+  it('names the kind that matched nothing and the query it was asked for', () => {
+    expect(
+      emptyLead('recording', 'graceland', [{ kind: 'release-group', count: 1, joiner: '' }]),
+    ).toBe('No tracks matched \u{201C}graceland\u{201D} \u{2014} but');
+  });
+
+  it('says nothing matched anywhere, and how to go straight to a record', () => {
+    expect(emptyLead('recording', 'zzz', [])).toContain('Nothing matched');
+    expect(emptyLead('recording', 'zzz', [])).toContain('paste a MusicBrainz ID');
+  });
+
+  it('never asks for the name of a filter that is not a kind', () => {
+    // `all` has no plain name; asking for one would render "No undefined matched".
+    expect(emptyLead('all', 'zzz', [{ kind: 'artist', count: 2, joiner: '' }])).toContain(
+      'Nothing matched',
+    );
+  });
+});
+
+describe('albumDetail and trackDetail', () => {
+  it('joins what the catalog knows, and leaves no separator where it knows nothing', () => {
+    expect(albumDetail({ artistCredit: 'Paul Simon', year: 1986 })).toBe(
+      'Paul Simon \u{00B7} 1986',
+    );
+    expect(albumDetail({ artistCredit: 'Paul Simon', year: undefined })).toBe('Paul Simon');
+    expect(albumDetail({ artistCredit: '', year: 1986 })).toBe('1986');
+  });
+
+  it('names the release a track sits on, when it sits on one', () => {
+    expect(trackDetail({ artistCredit: 'Paul Simon', release: { title: 'Graceland' } })).toBe(
+      'Paul Simon \u{00B7} Graceland',
+    );
+    expect(trackDetail({ artistCredit: 'Paul Simon', release: undefined })).toBe('Paul Simon');
+  });
+});
+
+describe('artUrl', () => {
+  it('asks this application for artwork, at the size being rendered', () => {
+    expect(artUrl('release-group', 'rg-1', 250)).toBe('/cover-art/release-group/rg-1?size=250');
+    expect(artUrl('release', 'rel-1', 500)).toBe('/cover-art/release/rel-1?size=500');
   });
 });

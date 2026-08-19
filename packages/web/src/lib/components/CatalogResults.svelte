@@ -46,7 +46,7 @@
 
 {#if kinds.length === 0}
   <p class="empty-results" data-testid="no-matches">
-    <span>{emptyLead(filter, query, elsewhere.length > 0)}</span>
+    <span>{emptyLead(filter, query, elsewhere)}</span>
     {#each elsewhere as other (other.kind)}
       <span>{other.joiner}</span>
       <button type="button" class="linkish" onclick={() => onFilter(other.kind)}>

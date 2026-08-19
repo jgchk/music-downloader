@@ -16,7 +16,9 @@ import type {
  * These are DTOs, not domain types, so they follow the wire's rules rather than the domain's: a
  * discriminating tag beside optional fields (never a union a serializer would flatten), identifiers
  * as plain strings, and every field a caller does not need omitted. What the catalog does not know
- * — a year, a type, a duration — is an absent field, never a sentinel.
+ * — a year, a type, a duration — is an absent field, never a sentinel. Two exceptions are
+ * deliberate: an unnamed edition or track carries `''` and an uncounted edition carries `0`,
+ * because a detail surface renders them unconditionally as positional context.
  */
 
 export const catalogReleaseGroupDtoSchema = z.object({
@@ -49,13 +51,30 @@ export const catalogSearchResultSchema = z.object({
   recordings: z.array(catalogRecordingDtoSchema),
 });
 
-/** Tag plus optional fields: one shape a caller can narrow on, including the "nothing" answer. */
-export const catalogLookupResultSchema = z.object({
-  kind: z.enum(['release-group', 'artist', 'recording', 'not-found']),
-  releaseGroup: catalogReleaseGroupDtoSchema.optional(),
-  artist: catalogArtistDtoSchema.optional(),
-  recording: catalogRecordingDtoSchema.optional(),
-});
+/**
+ * Tag plus optional fields: one shape a caller can narrow on, including the "nothing" answer. The
+ * refinement is what keeps that shape honest — a tag whose payload is absent would otherwise reach
+ * a reader as a found entity carrying nothing, and render as "nothing matched" for something the
+ * server said it found.
+ */
+export const catalogLookupResultSchema = z
+  .object({
+    kind: z.enum(['release-group', 'artist', 'recording', 'not-found']),
+    /** Present exactly when `kind` is `release-group`. */
+    releaseGroup: catalogReleaseGroupDtoSchema.optional(),
+    /** Present exactly when `kind` is `artist`. */
+    artist: catalogArtistDtoSchema.optional(),
+    /** Present exactly when `kind` is `recording`. */
+    recording: catalogRecordingDtoSchema.optional(),
+  })
+  .refine(
+    (result) =>
+      (result.kind === 'release-group' && result.releaseGroup !== undefined) ||
+      (result.kind === 'artist' && result.artist !== undefined) ||
+      (result.kind === 'recording' && result.recording !== undefined) ||
+      result.kind === 'not-found',
+    'the payload named by the tag must be present',
+  );
 
 export const catalogDiscographyResultSchema = z.object({
   releaseGroups: z.array(catalogReleaseGroupDtoSchema),
@@ -67,7 +86,7 @@ export const catalogEditionDtoSchema = z.object({
   disambiguation: z.string().optional(),
   date: z.string().optional(),
   country: z.string().optional(),
-  formats: z.string(),
+  formats: z.array(z.string()),
   status: z.string().optional(),
   trackCount: z.number(),
 });
@@ -82,10 +101,18 @@ export const catalogEditionsResultSchema = z.object({
     }),
   ),
   /** `pick` carries the edition the pipeline would choose; `selection-required` carries none. */
-  bestMatch: z.object({
-    kind: z.enum(['pick', 'selection-required']),
-    mbid: z.string().optional(),
-  }),
+  bestMatch: z
+    .object({
+      kind: z.enum(['pick', 'selection-required']),
+      /** Present exactly when `kind` is `pick`. */
+      mbid: z.string().optional(),
+    })
+    // A `pick` with no edition would be read as "selection required" and tell the person the
+    // opposite of what the pipeline would do.
+    .refine(
+      (best) => best.kind === 'selection-required' || best.mbid !== undefined,
+      'a pick must name the edition it picked',
+    ),
 });
 
 export const catalogTracklistResultSchema = z.object({
@@ -148,7 +175,9 @@ export function lookupToDto(lookup: CatalogLookup): CatalogLookupResultDto {
     case 'artist': {
       return { kind: 'artist', artist: artistToDto(entity.artist) };
     }
-    default: {
+    // Named rather than defaulted, so a fourth catalog entity kind is a compile error here rather
+    // than a DTO that claims to be a recording and carries none.
+    case 'recording': {
       return { kind: 'recording', recording: recordingToDto(entity.recording) };
     }
   }
@@ -167,7 +196,7 @@ function editionToDto(edition: CatalogEdition): z.infer<typeof catalogEditionDto
     disambiguation: edition.disambiguation,
     date: edition.date,
     country: edition.country,
-    formats: edition.formats,
+    formats: [...edition.formats],
     status: edition.status,
     trackCount: edition.trackCount,
   };

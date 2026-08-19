@@ -127,7 +127,7 @@
   border-radius: var(--radius-sm);
   background: none;
 }
-:root[data-skin='glass'] .detail {
+:root[data-skin='glass'] .catalog-detail {
   inset: var(--step-4) var(--step-4) var(--step-4) auto;
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
@@ -135,7 +135,7 @@
   backdrop-filter: blur(var(--surface-blur));
 }
 @media (max-width: 40rem) {
-  :root[data-skin='glass'] .detail {
+  :root[data-skin='glass'] .catalog-detail {
     inset: auto 0 0 0;
     border-radius: var(--radius) var(--radius) 0 0;
   }

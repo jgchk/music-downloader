@@ -970,6 +970,10 @@ li.timeline-date {
   height: 100%;
   object-fit: cover;
   display: block;
+  /* Above the placeholder it is drawn over: both are positioned, and the placeholder comes later
+     in the DOM, so without this the initials would paint on top of every cover that loaded. An
+     image that never loads paints nothing, leaving the placeholder visible — which is the point. */
+  z-index: 1;
 }
 .art-placeholder {
   position: absolute;
@@ -1004,9 +1008,11 @@ li.timeline-date {
   color: var(--text-muted);
 }
 
-/* The detail surface: a side panel where there is room, a bottom sheet where
-   there is not. Same DOM either way — only the CSS changes. */
-.detail {
+/* The catalog detail surface: a side panel where there is room, a bottom sheet where there is not.
+   Same DOM either way — only the CSS changes. Named `catalog-detail` rather than `detail`, which
+   the acquisitions master-detail layout already owns: a `position: fixed` rule under that name
+   would have collapsed that pane into a drawer on every route it lays out. */
+.catalog-detail {
   position: fixed;
   inset: 0 0 0 auto;
   width: min(26rem, 100vw);
@@ -1021,7 +1027,7 @@ li.timeline-date {
   gap: var(--stack-gap);
 }
 @media (max-width: 40rem) {
-  .detail {
+  .catalog-detail {
     inset: auto 0 0 0;
     width: 100%;
     max-height: 82dvh;

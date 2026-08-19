@@ -175,6 +175,17 @@ describe('rankArtists', () => {
     expect(ranked.map((item) => item.score)).toEqual([90, 10]);
   });
 
+  it('matches a name on whole words, so a fragment of one does not pass as the artist', () => {
+    // "radiohead in rainbows" contains the letters of both `Head` and `Rain`; neither was named.
+    const ranked = rankArtists('radiohead in rainbows', [
+      artist('Head', { score: 90 }),
+      artist('Rain', { score: 90 }),
+      artist('Radiohead', { score: 60 }),
+    ]);
+
+    expect(ranked.map((item) => item.name)[0]).toBe('Radiohead');
+  });
+
   it('orders unmatched names by the provider score', () => {
     const ranked = rankArtists('something else', [
       artist('Alpha', { score: 10 }),
@@ -252,6 +263,19 @@ describe('leadingKind', () => {
         recordings: [boyInTheBubble],
       }),
     ).toBe('recording');
+  });
+
+  it('keeps albums leading when a track only narrowly outscores the best album', () => {
+    // The margin is what "clearly outranks" means: a near-tie is not evidence of a track search.
+    const nearTie = recording('Graceland', 'Paul Simon');
+
+    expect(
+      leadingKind('paul simon graceland', {
+        releaseGroups: [graceland],
+        artists: [],
+        recordings: [nearTie],
+      }),
+    ).toBe('release-group');
   });
 
   it('leads with albums by default, including when there is nothing to compare', () => {

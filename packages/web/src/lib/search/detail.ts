@@ -10,8 +10,13 @@ import type {
  */
 
 export type DetailState =
-  | { readonly kind: 'loading'; readonly title: string }
-  | { readonly kind: 'failed'; readonly title: string; readonly message: string }
+  | { readonly kind: 'loading'; readonly mbid: string; readonly title: string }
+  | {
+      readonly kind: 'failed';
+      readonly mbid: string;
+      readonly title: string;
+      readonly message: string;
+    }
   | {
       readonly kind: 'release-group';
       readonly mbid: string;
@@ -35,7 +40,7 @@ export type TracklistState =
 interface EditionLike {
   readonly date?: string | undefined;
   readonly country?: string | undefined;
-  readonly formats: string;
+  readonly formats: readonly string[];
   readonly trackCount: number;
 }
 
@@ -48,7 +53,8 @@ export function editionSummary(edition: EditionLike): string {
   return [
     edition.date,
     edition.country,
-    edition.formats === '' ? undefined : edition.formats,
+    // Joined here, at the one place it is read aloud — the separator is presentation, not contract.
+    edition.formats.length === 0 ? undefined : edition.formats.join(' + '),
     `${edition.trackCount} ${edition.trackCount === 1 ? 'track' : 'tracks'}`,
   ]
     .filter((part) => part !== undefined && part !== '')
@@ -76,7 +82,8 @@ export function groupHeading(group: {
   readonly editions: readonly unknown[];
 }): string {
   const editions = group.editions.length;
-  return `${group.trackCount} tracks \u{00B7} ${editions} ${editions === 1 ? 'edition' : 'editions'}`;
+  const tracks = `${group.trackCount} ${group.trackCount === 1 ? 'track' : 'tracks'}`;
+  return `${tracks} \u{00B7} ${editions} ${editions === 1 ? 'edition' : 'editions'}`;
 }
 
 /** A running time as a sleeve prints it; nothing at all when the catalog has no timing. */
@@ -85,4 +92,24 @@ export function trackTime(durationMs: number | undefined): string {
   const totalSeconds = Math.round(durationMs / 1000);
   const seconds = totalSeconds % 60;
   return `${Math.floor(totalSeconds / 60)}:${String(seconds).padStart(2, '0')}`;
+}
+
+/** An edition chosen by hand, and the album it was chosen on — the pair is what keeps it honest. */
+export interface EditionPin {
+  readonly album: string;
+  readonly edition: string;
+}
+
+/**
+ * The chosen edition, but only while the album it was chosen on is the one still open. The detail
+ * surface is mounted once and re-used, so a choice that remembered only an edition would survive
+ * closing one album and opening another — and then quietly request the first album's pressing under
+ * the second album's name.
+ */
+export function activeEdition(
+  detail: DetailState | undefined,
+  pin: EditionPin | undefined,
+): string | undefined {
+  if (detail?.kind !== 'release-group') return undefined;
+  return pin?.album === detail.mbid ? pin.edition : undefined;
 }

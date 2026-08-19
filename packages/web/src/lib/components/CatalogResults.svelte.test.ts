@@ -194,7 +194,7 @@ describe('CatalogResults', () => {
 
     await expect.element(page.getByTestId('no-matches')).toBeVisible();
     await expect.element(page.getByText('paul simon graceland', { exact: false })).toBeVisible();
-    await page.getByRole('button', { name: /albums/ }).click();
+    await page.getByRole('button', { name: /album/ }).click();
 
     expect(onFilter).toHaveBeenCalledWith('release-group');
   });

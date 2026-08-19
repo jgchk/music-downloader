@@ -347,7 +347,7 @@
   font-weight: 700;
   box-shadow: inset 0 2px 0 #7fd0f0;
 }
-:root[data-skin='forum'] .detail {
+:root[data-skin='forum'] .catalog-detail {
   border-left: 1px solid #01405c;
 }
 :root[data-skin='forum'] .detail-head {

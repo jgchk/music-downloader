@@ -10,6 +10,10 @@ import type { CoverArtAnswer, CoverArtEntity, CoverArtPort, CoverArtSize } from 
  * hide a cover permanently. And the cache is bounded in BYTES rather than entries, because that is
  * what actually grows: covers vary from a few kilobytes to a few hundred, so an entry count is no
  * budget at all. Art is always re-fetchable, so eviction is safe at any moment.
+ *
+ * The budget bounds the IMAGES. An absence costs only its key and is therefore not bounded by it —
+ * absences leave only on expiry. That is fine while the key space is one household's browsing, and
+ * would need revisiting if this were ever put in front of a crawler.
  */
 
 export interface CoverArtCacheConfig {
@@ -73,7 +77,6 @@ export function cachingCoverArt(
       const entry = entries.get(key);
       if (entry !== undefined) {
         if (now() - entry.at <= ttlMs) {
-          // Re-insert so this key counts as the most recently used one.
           entries.delete(key);
           entries.set(key, entry);
           return okAsync(entry.answer);

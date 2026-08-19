@@ -105,6 +105,22 @@ describe('cachingCoverArt', () => {
     expect(inner.calls()).toBe(3);
   });
 
+  it('forgets what was used longest ago, not what arrived first', async () => {
+    // Three keys, one of them re-read: a cache that evicted by arrival order would drop the wrong
+    // one, and every assertion about "least recently used" would still pass.
+    const third = 'ef6e0c0a-9f1f-41af-820a-e3ca91560c13';
+    const inner = archive(found(40), found(40), found(40), found(40));
+    const cached = cachingCoverArt(inner, { maxBytes: 100 }, clock().now);
+
+    await cached.front('release-group', MBID, 250);
+    await cached.front('release-group', OTHER_MBID, 250);
+    await cached.front('release-group', MBID, 250); // a hit: MBID is now the most recent
+    await cached.front('release-group', third, 250); // over budget: OTHER_MBID should go
+    await cached.front('release-group', MBID, 250);
+
+    expect(inner.calls()).toBe(3);
+  });
+
   it('keeps serving art larger than the whole budget without caching it', async () => {
     const inner = archive(found(500), found(500));
     const cached = cachingCoverArt(inner, { maxBytes: 100 }, clock().now);
