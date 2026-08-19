@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.21.1](https://github.com/jgchk/music-downloader/compare/v3.21.0...v3.21.1) (2026-08-19)
+
+### Bug Fixes
+
+* **web:** close the review cycle's findings on the chrome inversion ([e9574f8](https://github.com/jgchk/music-downloader/commit/e9574f86263e9d862947723a2f228245d6ce9832))
+* **web:** close the second review cycle — two dead operands and a vacuous skin row ([5597861](https://github.com/jgchk/music-downloader/commit/5597861d5779e653d051be73cc787caaac88e2b1))
+* **web:** close the third review cycle — two tests that could not fail, and the sweep's missing guard ([659f209](https://github.com/jgchk/music-downloader/commit/659f209dcb48681d53f0af22b9b17cea49eb696e))
+* **web:** make widget-button chrome opt-in so the request page's surfaces survive it ([9968149](https://github.com/jgchk/music-downloader/commit/99681499403852fb6d8b1b3e5f75560f9413776c))
+* **web:** stop the detail view's artwork collapsing in its scrolling column ([119858c](https://github.com/jgchk/music-downloader/commit/119858c9ed8c133207fbc4c224b449cdd13d3a26))
 ## [3.21.0](https://github.com/jgchk/music-downloader/compare/v3.20.1...v3.21.0) (2026-08-19)
 
 ### Features
