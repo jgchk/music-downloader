@@ -18,6 +18,48 @@ function event(fields: Record<string, string>, facade: Record<string, unknown>) 
   } as never;
 }
 
+describe('the request action, which keeps the page', () => {
+  it('answers with the new download instead of navigating away from the search', async () => {
+    const submitAcquisition = vi
+      .fn()
+      .mockResolvedValue({ ok: true, value: { acquisitionId: 'acq-9' } });
+
+    const answer = await actions.request!(
+      event({ kind: 'release-group', mbid: 'mb-1', title: 'Graceland' }, { submitAcquisition }),
+    );
+
+    // A redirect here would throw away the query, its results, and whatever was open — the whole
+    // reason someone can ask for five records in a row.
+    expect(answer).toEqual({ requested: { acquisitionId: 'acq-9', title: 'Graceland' } });
+  });
+
+  it('names the download by what was asked for, when the form said', async () => {
+    const submitAcquisition = vi
+      .fn()
+      .mockResolvedValue({ ok: true, value: { acquisitionId: 'acq-9' } });
+
+    const answer = await actions.request!(
+      event({ kind: 'release-group', mbid: 'mb-1' }, { submitAcquisition }),
+    );
+
+    // No title on the form is not a reason to say nothing: the identifier is still an answer.
+    expect(answer).toEqual({ requested: { acquisitionId: 'acq-9', title: undefined } });
+  });
+
+  it('refuses the way the page\u{2019}s own form does, so one failure path is rendered', async () => {
+    const submitAcquisition = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: { kind: 'ValidationFailed', message: 'no target' } });
+
+    const answer = (await actions.request!(
+      event({ kind: 'release-group' }, { submitAcquisition }),
+    )) as { status: number; data: { message: string } };
+
+    expect(answer.status).toBe(400);
+    expect(answer.data.message).toContain('no target');
+  });
+});
+
 describe('submit acquisition action', () => {
   it('dispatches the facade submit command and redirects to the new acquisition', async () => {
     const submitAcquisition = vi

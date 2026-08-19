@@ -224,7 +224,7 @@ describe.each(SKIN_ROWS)('request-page anatomy under skin %s', (_label, skin) =>
 
     const thumb = boxOf('.track-rows .art');
     const title = boxOf('.track-rows .result-title');
-    const request = boxOf('.track-rows .request');
+    const request = boxOf('.track-rows .request-form .btn');
     const row = boxOf('.track-rows > .result');
 
     expect(thumb.right).toBeLessThanOrEqual(title.left + 1);

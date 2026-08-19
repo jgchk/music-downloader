@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
   import {
     albumDetail,
     alternativeLabel,
@@ -15,6 +14,7 @@
     trimmedCount,
   } from '$lib/search/view.js';
   import CoverArt from './CoverArt.svelte';
+  import RequestForm from './RequestForm.svelte';
   import type { DetailContext } from '$lib/search/detail.js';
   import type { EntityFilter, EntityKind } from '$lib/search/view.js';
   import type { CatalogSearchResultDto } from '@music/downloader';
@@ -55,20 +55,6 @@
     trimmedCount(countOf(results, kind), listedOf[kind]()),
   );
   const notice = $derived(unavailableNotice(results));
-  /** How many requests are in flight, so a submitted form cannot be submitted again. */
-  let requesting = $state(0);
-
-  /**
-   * Enhanced submission keeps the page — which also keeps the button live for the whole round
-   * trip, so without this a second click sends a second download.
-   */
-  const oneAtATime = () => {
-    requesting += 1;
-    return async ({ update }: { update: (options: { reset: boolean }) => Promise<void> }) => {
-      await update({ reset: false });
-      requesting -= 1;
-    };
-  };
   const elsewhere = $derived(otherMatches(results, filter));
 
   const HEADINGS: Record<EntityKind, string> = {
@@ -135,18 +121,7 @@
               <span class="result-title">{group.title}</span>
               <span class="result-detail">{albumDetail(group)}</span>
             </button>
-            <form
-              method="POST"
-              action="/acquisitions/new"
-              class="request-form"
-              use:enhance={oneAtATime}
-            >
-              <input type="hidden" name="kind" value="release-group" />
-              <input type="hidden" name="mbid" value={group.mbid} />
-              <button type="submit" class="btn primary request" disabled={requesting > 0}>
-                {requesting > 0 ? 'Requesting…' : 'Request'}
-              </button>
-            </form>
+            <RequestForm fields={{ kind: 'release-group', mbid: group.mbid }} title={group.title} />
           </li>
         {/each}
       </ul>
@@ -191,19 +166,10 @@
               <span class="result-title">{recording.title}</span>
               <span class="result-detail">{trackDetail(recording)}</span>
             </button>
-            <form
-              method="POST"
-              action="/acquisitions/new"
-              class="request-form"
-              use:enhance={oneAtATime}
-            >
-              <input type="hidden" name="kind" value="musicbrainz" />
-              <input type="hidden" name="targetType" value="track" />
-              <input type="hidden" name="mbid" value={recording.mbid} />
-              <button type="submit" class="btn primary request" disabled={requesting > 0}>
-                {requesting > 0 ? 'Requesting…' : 'Request'}
-              </button>
-            </form>
+            <RequestForm
+              fields={{ kind: 'musicbrainz', targetType: 'track', mbid: recording.mbid }}
+              title={recording.title}
+            />
           </li>
         {/each}
       </ul>

@@ -122,7 +122,10 @@ describe('CatalogResults (SSR)', () => {
   it('renders each result’s request as a real form, so it works before any script runs', () => {
     const html = body();
 
-    expect(html).toContain('action="/acquisitions/new"');
+    // The named action, which answers with the download instead of navigating away. Without
+    // scripting the browser still posts it — the page re-renders rather than staying put, which
+    // is what no-JS always meant here.
+    expect(html).toContain('action="?/request"');
     expect(html).toContain('name="mbid" value="19847822-1430-3380-9cf1-bc45545b34ac"');
     expect(html).toContain('value="release-group"');
   });

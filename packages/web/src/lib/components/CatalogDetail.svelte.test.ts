@@ -211,7 +211,7 @@ describe('CatalogDetail', () => {
   it('requests the album itself until a pressing is chosen', async () => {
     await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
 
-    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    const form = document.querySelector<HTMLFormElement>('.catalog-detail form.request-form')!;
     expect(new FormData(form).get('kind')).toBe('release-group');
     expect(new FormData(form).get('mbid')).toBe(RG);
     await expect.element(page.getByRole('button', { name: 'Request download' })).toBeVisible();
@@ -248,7 +248,7 @@ describe('CatalogDetail', () => {
       props(releaseGroupDetail({ kind: 'pick', mbid: PICK }), {}, { album: RG, edition: OTHER }),
     );
 
-    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    const form = document.querySelector<HTMLFormElement>('.catalog-detail form.request-form')!;
     expect(new FormData(form).get('kind')).toBe('musicbrainz');
     expect(new FormData(form).get('mbid')).toBe(OTHER);
     await expect.element(page.getByRole('button', { name: 'Request this edition' })).toBeVisible();
@@ -346,7 +346,7 @@ describe('CatalogDetail', () => {
       props({ kind: 'recording', mbid: PICK, title: 'The Boy in the Bubble' }),
     );
 
-    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    const form = document.querySelector<HTMLFormElement>('.catalog-detail form.request-form')!;
     expect(new FormData(form).get('targetType')).toBe('track');
     await expect.element(page.getByLabelText('Quality floor')).toBeVisible();
   });
@@ -358,7 +358,9 @@ describe('CatalogDetail', () => {
 
     await page.getByRole('button', { name: 'Request download' }).click();
 
-    await expect.element(page.getByRole('button', { name: 'Request download' })).toBeDisabled();
+    // The same words and the same disabling every request action in the app uses — the panel's
+    // request is not a different kind of request.
+    await expect.element(page.getByRole('button', { name: 'Requesting…' })).toBeDisabled();
   });
 
   it('closes when asked', async () => {
