@@ -53,12 +53,12 @@ Before the first keystroke the page SHALL show only the search box plus a short 
 - **WHEN** a request from one result is in flight
 - **THEN** that form alone is disabled against a second submission while the other results' request actions remain usable
 
-#### Scenario: Dig-in request with a chosen edition
+#### Scenario: Dig-in request with a pinned edition
 
 - **WHEN** a user opens a release group's detail view, designates a chosen edition from its tracklist-grouped editions, and requests
 - **THEN** the submit command carries that edition choice and the UI confirms the new download
 
-#### Scenario: The best-match summary is always visible and clears the choice
+#### Scenario: The default edition is visible before requesting
 
 - **WHEN** a user opens a release group's detail view
 - **THEN** the pipeline's pick is presented as an always-visible summary stating its distinguishing details — even when the edition group containing it is collapsed and under any format filter — or the view states that no automatic pick exists and selection is required; activating the summary clears any chosen edition, letting the system choose
