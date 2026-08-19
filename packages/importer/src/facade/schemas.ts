@@ -191,7 +191,7 @@ export const resolveReviewRequestSchema = z.discriminatedUnion('verb', [
      * release verdict recorded (the fact that the delivered copy was rejected as unusable, echoing
      * back the acquisition id and delivered candidate as opaque provenance, plus the reviewer's own
      * reasons). Only for imports that retain a delivered candidate's identity; otherwise refused
-     * with `NoRetainedCandidate` (plain `reject` remains available). Use `reject` for "wrong thing
+     * with `NoRetainedCopy` (plain `reject` remains available). Use `reject` for "wrong thing
      * to have", this verb for "right thing, bad copy".
      */
     verb: z.literal('reject-unusable-delivery'),

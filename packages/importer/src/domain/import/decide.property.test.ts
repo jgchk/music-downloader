@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { assertProperty, propertyRun } from '../../__fixtures__/property.js';
-import { candidateReferenceKey } from './events.js';
+import { matchReferenceKey } from './events.js';
 import { decide } from './decide.js';
 import type { DomainError } from './decide.js';
 import type { ImportCommandType } from './commands.js';
@@ -44,8 +44,8 @@ const DOMAIN_ERROR_KIND_TABLE: Record<DomainError['kind'], true> = {
   UnknownImport: true,
   NoOpenReview: true,
   InvalidResolution: true,
-  UnknownCandidate: true,
-  NoRetainedCandidate: true,
+  UnknownMatch: true,
+  NoRetainedCopy: true,
   CycleInFlight: true,
 };
 const DOMAIN_ERROR_KINDS: readonly DomainError['kind'][] = Object.keys(
@@ -212,7 +212,7 @@ describe('no reachable state violates an import invariant', () => {
             expect(
               offered.some(
                 (candidate) =>
-                  candidateReferenceKey(candidate.ref) === candidateReferenceKey(event.ref) &&
+                  matchReferenceKey(candidate.ref) === matchReferenceKey(event.ref) &&
                   candidate.distance === best,
               ),
             ).toBe(true);

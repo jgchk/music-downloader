@@ -2,7 +2,7 @@ import type { OperationScope } from '../../application/correlation/context.js';
 import { fileURLToPath } from 'node:url';
 import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import type { z } from 'zod';
-import type { ApplyMode, ProposedCandidate } from '../../domain/import/events.js';
+import type { ApplyMode, MetadataMatch } from '../../domain/import/events.js';
 import { branded } from '../../domain/shared/brand.js';
 import type { Distance } from '../../domain/shared/distance.js';
 import type { Logger } from '../../application/logging/logger.js';
@@ -71,7 +71,7 @@ function applyArguments(mode: ApplyMode): readonly string[] {
 }
 
 /** Translate one validated bridge candidate to the domain shape (anti-corruption, snake→camel). */
-function candidateToDomain(candidate: BridgeCandidate): ProposedCandidate {
+function candidateToDomain(candidate: BridgeCandidate): MetadataMatch {
   const fields = candidate.album_fields;
   return {
     ref: { dataSource: candidate.data_source, albumId: candidate.album_id },

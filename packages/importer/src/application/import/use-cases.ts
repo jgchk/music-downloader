@@ -9,7 +9,7 @@ import type {
 } from '../../domain/import/events.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
-import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../domain/shared/originating-download-id.js';
 import type {
   ImportStatusProjection,
   ImportStatusView,
@@ -108,7 +108,7 @@ export function getImportForAcquisition(
   dependencies: UseCaseDependencies,
   acquisitionId: string,
 ): ImportStatusView | undefined {
-  const importId = dependencies.status.importIdForAcquisition(toAcquisitionId(acquisitionId));
+  const importId = dependencies.status.importIdForAcquisition(toOriginatingDownloadId(acquisitionId));
   // RECORDED SURVIVOR, waiver withheld: forcing this ternary's condition false is equivalent. With
   // nothing indexed, `getImport` would look the missing id up in the projection's map, miss, and
   // answer `undefined` anyway. The guard states the absence rather than round-tripping a missing

@@ -3,7 +3,7 @@ import { appendMetadata, testContext } from '../../application/__fixtures__/corr
 import { describe, expect, it } from 'vitest';
 import type { SeamEvent } from '../../application/events/catch-up-subscription.js';
 import { importIdFor, submitImport } from '../../application/import/use-cases.js';
-import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../domain/shared/originating-download-id.js';
 import { testWiring } from '../../facade/__fixtures__/wiring.js';
 import type { TestWiring } from '../../facade/__fixtures__/wiring.js';
 import { intakeEventConsumer } from './intake-consumer.js';
@@ -107,7 +107,7 @@ describe('the intake event consumer', () => {
 
   // The review-resolution revival loop's last hop (e2e-review-resolution-loop): after a
   // reject-unusable-delivery verdict the downloader re-hunts and delivers a REPLACEMENT under
-  // the same acquisition — a NEW event at a later feed position. The acquisition-id convergence
+  // the same acquisition — a NEW event at a later feed position. The originating-download-id convergence
   // must not swallow it; everything at or before the cycle's watermark still converges. Pinned
   // out-of-process by test/e2e/review-resolution.e2e.test.ts.
 
@@ -269,7 +269,7 @@ describe('the intake event consumer', () => {
       wiring.deps,
       {
         directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
-        source: { acquisitionId: toAcquisitionId('acq-1') },
+        source: { acquisitionId: toOriginatingDownloadId('acq-1') },
       },
       testContext(),
     );
@@ -288,7 +288,7 @@ describe('the intake event consumer', () => {
       wiring.deps,
       {
         directory: `${INTAKE_ROOT}/Radiohead - Kid A`,
-        source: { acquisitionId: toAcquisitionId('acq-1') },
+        source: { acquisitionId: toOriginatingDownloadId('acq-1') },
       },
       testContext(),
     );

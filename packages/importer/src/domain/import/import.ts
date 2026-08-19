@@ -4,7 +4,7 @@ import { decide } from './decide.js';
 import type { DomainError } from './decide.js';
 import type {
   ImportEvent,
-  ProposedCandidate,
+  MetadataMatch,
   ResolutionKind,
   ReviewCause,
   ReviewKind,
@@ -32,7 +32,7 @@ export type { ImportPhase } from './state.js';
 /** The open review riding on this import, if any — what the pending-reviews queue projects. */
 export interface OpenReview {
   readonly cause: ReviewCause;
-  readonly candidates: readonly ProposedCandidate[];
+  readonly candidates: readonly MetadataMatch[];
   /**
    * The resolution verbs a human may take on this review — the importer's own curation, exposed so a
    * consumer offers exactly the legal verbs rather than re-deriving per-kind legality. Always at
@@ -46,7 +46,7 @@ export interface OpenReview {
  * The resolution verbs permitted for an open review — the importer's authoritative, curated set. A
  * remediation review resolves only through accept/retry-enrichment; the review kinds offer their
  * curated verb set, with `apply-candidate` present only when candidates exist and
- * `reject-unusable-delivery` only when a delivered candidate is retained (the `NoRetainedCandidate`
+ * `reject-unusable-delivery` only when a delivered candidate is retained (the `NoRetainedCopy`
  * precondition `decide` enforces). The curation is narrower than the raw `decide`-legal set on
  * purpose (e.g. a duplicate review offers no manual re-tag), and never wider — every verb it lists is
  * one `decide` would accept for that review.

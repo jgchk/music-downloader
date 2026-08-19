@@ -179,7 +179,7 @@ describe('Reactor', () => {
     await vi.waitFor(() => {
       expect(store.all().map((entry) => entry.type)).toEqual([
         'ImportRequested',
-        'CandidatesProposed',
+        'MatchesProposed',
         'AutoApplySelected',
         'ImportApplied',
       ]);
@@ -230,8 +230,8 @@ describe('Reactor', () => {
     { kind: 'UnknownImport' },
     { kind: 'NoOpenReview' },
     { kind: 'InvalidResolution', detail: 'a remediation verb on a match review' },
-    { kind: 'UnknownCandidate', candidate: 'Discogs:nope' },
-    { kind: 'NoRetainedCandidate' },
+    { kind: 'UnknownMatch', candidate: 'Discogs:nope' },
+    { kind: 'NoRetainedCopy' },
   ])('advances past a $kind follow-on, never parking or dead-lettering', async (error) => {
     await seed([requested()]);
     const interpret = vi.fn(() => errAsync(error));
@@ -352,7 +352,7 @@ describe('Reactor', () => {
             1,
             [
               {
-                type: 'CandidatesProposed',
+                type: 'MatchesProposed',
                 candidates: [candidate({ distance: asDistance(0.01) })],
                 duplicates: [],
               },
@@ -494,7 +494,7 @@ describe('Reactor', () => {
     await seed([
       requested(),
       {
-        type: 'CandidatesProposed',
+        type: 'MatchesProposed',
         candidates: [candidate({ distance: asDistance(0.01) })],
         duplicates: [],
       },
@@ -518,7 +518,7 @@ describe('Reactor', () => {
   it('checkpoints record-only events without firing effects', async () => {
     await seed([
       requested(),
-      { type: 'CandidatesProposed', candidates: [], duplicates: [] },
+      { type: 'MatchesProposed', candidates: [], duplicates: [] },
       { type: 'ReviewRequired', cause: { kind: 'no-match' } },
     ]);
     const interpret = vi.fn(() => okAsync([]));
@@ -606,7 +606,7 @@ describe('Reactor', () => {
     await seed([
       requested(),
       {
-        type: 'CandidatesProposed',
+        type: 'MatchesProposed',
         candidates: [candidate({ distance: asDistance(0.01) })],
         duplicates: [],
       },
@@ -927,8 +927,8 @@ describe('isRetryable', () => {
       error: { kind: 'InvalidResolution', detail: 'a remediation verb on a match review' },
       retryable: false,
     },
-    { error: { kind: 'UnknownCandidate', candidate: 'Discogs:nope' }, retryable: false },
-    { error: { kind: 'NoRetainedCandidate' }, retryable: false },
+    { error: { kind: 'UnknownMatch', candidate: 'Discogs:nope' }, retryable: false },
+    { error: { kind: 'NoRetainedCopy' }, retryable: false },
   ])('classifies $error.kind as retryable=$retryable, leaving no variant unclassified', (row) => {
     expect(isRetryable(row.error)).toBe(row.retryable);
   });

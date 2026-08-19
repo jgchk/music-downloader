@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toAcquisitionId } from '../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../shared/originating-download-id.js';
 import { asDistance } from '../shared/__fixtures__/distance.js';
 import {
   DELIVERED_CANDIDATE,
@@ -30,7 +30,7 @@ describe('isCycleStart', () => {
   const CONTINUING_EVENTS: {
     readonly [T in Exclude<ImportEventType, 'ImportRequested'>]: Extract<ImportEvent, { type: T }>;
   } = {
-    CandidatesProposed: { type: 'CandidatesProposed', candidates: [candidate()], duplicates: [] },
+    MatchesProposed: { type: 'MatchesProposed', candidates: [candidate()], duplicates: [] },
     AutoApplySelected: {
       type: 'AutoApplySelected',
       ref: { dataSource: 'MusicBrainz', albumId: 'album-1' },
@@ -43,7 +43,7 @@ describe('isCycleStart', () => {
     ImportRejected: { type: 'ImportRejected', reason: 'corrupt rip', filesDeleted: true },
     ReleaseVerdictRecorded: {
       type: 'ReleaseVerdictRecorded',
-      acquisitionId: toAcquisitionId('acq-1'),
+      acquisitionId: toOriginatingDownloadId('acq-1'),
       candidate: DELIVERED_CANDIDATE,
       reasons: ['corrupt rip'],
     },

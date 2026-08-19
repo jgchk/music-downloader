@@ -10,7 +10,7 @@ import type {
   PendingReviewView,
 } from '../application/projections/read-models.js';
 import { asDistance } from '../domain/shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../domain/shared/originating-download-id.js';
 import { toImportId } from '../domain/shared/import-id.js';
 import {
   hintsToDomain,
@@ -215,7 +215,7 @@ describe('statusViewToDto / pendingReviewToDto', () => {
       {
         kind: 'release-verdict-recorded',
         at: 't10',
-        acquisitionId: toAcquisitionId('acq-9'),
+        acquisitionId: toOriginatingDownloadId('acq-9'),
         reasons: ['unusable'],
       },
     ];

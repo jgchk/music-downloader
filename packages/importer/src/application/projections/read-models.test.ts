@@ -18,7 +18,7 @@ import {
   resolved,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
 import { asDistance } from '../../domain/shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../domain/shared/originating-download-id.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportEvent } from '../../domain/import/events.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
@@ -188,15 +188,15 @@ describe('ImportStatusProjection', () => {
   it('indexes acquisition-sourced requests and forgets them on rebuild', () => {
     const projection = new ImportStatusProjection();
     projection.apply(
-      storedAll('imp-a', [requested({ source: { acquisitionId: toAcquisitionId('acq-1') } })])[0]!,
+      storedAll('imp-a', [requested({ source: { acquisitionId: toOriginatingDownloadId('acq-1') } })])[0]!,
     );
     projection.apply(storedAll('imp-b', [requested()], 10)[0]!);
 
-    expect(projection.importIdForAcquisition(toAcquisitionId('acq-1'))).toBe('imp-a');
-    expect(projection.importIdForAcquisition(toAcquisitionId('acq-unknown'))).toBeUndefined();
+    expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-1'))).toBe('imp-a');
+    expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-unknown'))).toBeUndefined();
 
     projection.rebuild(storedAll('imp-b', [requested()]));
-    expect(projection.importIdForAcquisition(toAcquisitionId('acq-1'))).toBeUndefined();
+    expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-1'))).toBeUndefined();
   });
 
   it('follows applied events and serves get/list', () => {

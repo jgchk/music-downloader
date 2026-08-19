@@ -41,7 +41,7 @@ const eslint = new ESLint({ cwd: REPO_ROOT });
  * what a glob would paper over.
  */
 const PRODUCTION_FILES = [
-  'packages/downloader/src/domain/acquisition/decide.ts',
+  'packages/downloader/src/domain/download/decide.ts',
   'packages/downloader/src/application/events/catch-up-subscription.ts',
   'packages/downloader/src/adapters/sqlite/event-store.ts',
   'packages/downloader/src/interfaces/contracts/events/mapping.ts',

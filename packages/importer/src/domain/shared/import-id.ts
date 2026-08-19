@@ -4,7 +4,7 @@ import type { Brand } from './brand.js';
 /**
  * The importer's own aggregate/stream identifier: the deterministic id an import directory converges
  * on (D5). Branded (compile-time only, runtime-erased) so it can never be transposed with a foreign
- * {@link AcquisitionId} at their junction (`importIdForAcquisition`), and so a bare `string` cannot
+ * {@link OriginatingDownloadId} at their junction (`importIdForAcquisition`), and so a bare `string` cannot
  * be threaded through the facade/use-cases where an import is addressed.
  *
  * It carries no invariant richer than the event store's generic `streamId` already guarantees, so it

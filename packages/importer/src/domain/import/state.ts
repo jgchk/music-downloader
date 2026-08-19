@@ -5,7 +5,7 @@ import type {
   ImportHints,
   ImportPolicy,
   ImportSource,
-  ProposedCandidate,
+  MetadataMatch,
   Resolution,
   ReviewCause,
 } from './events.js';
@@ -61,7 +61,7 @@ export interface EmptyState {
 }
 export interface RequestedState extends Requested {
   readonly phase: 'requested';
-  readonly candidates: readonly ProposedCandidate[];
+  readonly candidates: readonly MetadataMatch[];
   /**
    * Never pinned: a pin can only arrive on the `supply-id` that moves the import to `proposing`.
    *
@@ -76,7 +76,7 @@ export interface RequestedState extends Requested {
 export interface ProposingState extends Requested {
   readonly phase: 'proposing';
   readonly pinnedId?: string;
-  readonly candidates: readonly ProposedCandidate[];
+  readonly candidates: readonly MetadataMatch[];
 }
 /**
  * The only resolutions that leave the review `awaiting-review` with work still owed: both reject
@@ -91,14 +91,14 @@ export type PendingRejection = Extract<
 export interface AwaitingReviewState extends Requested {
   readonly phase: 'awaiting-review';
   readonly cause: ReviewCause;
-  readonly candidates: readonly ProposedCandidate[];
+  readonly candidates: readonly MetadataMatch[];
   /** Set once a rejection is recorded; the deletion is still owed. Further resolutions are no-ops. */
   readonly settled?: PendingRejection;
 }
 export interface ApplyingState extends Requested {
   readonly phase: 'applying';
   readonly mode: ApplyMode;
-  readonly candidates: readonly ProposedCandidate[];
+  readonly candidates: readonly MetadataMatch[];
 }
 export interface AppliedState extends Requested {
   readonly phase: 'applied';
@@ -241,7 +241,7 @@ export function evolve(state: ImportState, event: ImportEvent): ImportState {
         candidates: [],
       };
     }
-    case 'CandidatesProposed': {
+    case 'MatchesProposed': {
       // The phase advances via the co-emitted `AutoApplySelected`/`ReviewRequired`; the proposed
       // list is recorded here so the following states carry it.
       if (state.phase !== 'requested' && state.phase !== 'proposing') return state;

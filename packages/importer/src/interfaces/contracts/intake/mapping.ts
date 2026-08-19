@@ -9,9 +9,9 @@ import type { CorrelationSource } from '../../../application/ports/system-ports.
 import { inboundCorrelationSchema } from './schemas.js';
 import { err, ok } from 'neverthrow';
 import type { Result } from 'neverthrow';
-import { toAcquisitionId } from '../../../domain/shared/acquisition-id.js';
-import type { AcquisitionId } from '../../../domain/shared/acquisition-id.js';
-import type { DeliveredCandidate, ImportHints } from '../../../domain/import/events.js';
+import { toOriginatingDownloadId } from '../../../domain/shared/originating-download-id.js';
+import type { OriginatingDownloadId } from '../../../domain/shared/originating-download-id.js';
+import type { DeliveredCopy, ImportHints } from '../../../domain/import/events.js';
 import type { AcquisitionFulfilledDto } from './schemas.js';
 
 /**
@@ -23,19 +23,19 @@ import type { AcquisitionFulfilledDto } from './schemas.js';
 
 /** What an accepted delivery translates to: the acquisition linkage plus the native submission. */
 export interface AcquisitionSubmission {
-  readonly acquisitionId: AcquisitionId;
+  readonly acquisitionId: OriginatingDownloadId;
   /** The release directory in the SENDER's namespace, to be re-rooted before use. */
   readonly location: string;
   readonly hints: ImportHints;
   /** The delivered candidate's identity, retained for a later release verdict (if readable). */
-  readonly candidate?: DeliveredCandidate;
+  readonly candidate?: DeliveredCopy;
 }
 
 export function fulfilledToSubmission(dto: AcquisitionFulfilledDto): AcquisitionSubmission {
   const { acquisitionId, location, target, candidate } = dto.data;
   return {
     // The seam schema has already proven this non-empty; lift the foreign id into its brand here.
-    acquisitionId: toAcquisitionId(acquisitionId),
+    acquisitionId: toOriginatingDownloadId(acquisitionId),
     location,
     hints: {
       mbReleaseId: target.musicbrainzReleaseId ?? undefined,

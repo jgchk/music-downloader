@@ -7,7 +7,7 @@ import {
   awaitingReviewWithCandidate,
   resolved,
 } from '../../../domain/import/__fixtures__/import-fixtures.js';
-import { toAcquisitionId } from '../../../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../../domain/shared/originating-download-id.js';
 import { OTHER_STORY, STORY } from '../../../application/__fixtures__/correlation.js';
 import { publishedEventMapping } from './mapping.js';
 
@@ -88,7 +88,7 @@ describe('publishedEventMapping.render — release.verdict', () => {
 
   it('refuses a payload that violates the outbound schema (it must never leave the process)', () => {
     const error = renderLast(
-      verdictHistory({ acquisitionId: toAcquisitionId('') }),
+      verdictHistory({ acquisitionId: toOriginatingDownloadId('') }),
     )._unsafeUnwrapErr();
     expect(error.kind).toBe('RenderError');
     expect(error.message).toContain('schema');

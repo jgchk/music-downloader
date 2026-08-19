@@ -69,7 +69,7 @@ describe('Propose', () => {
       SCOPE,
     );
     expect(result._unsafeUnwrap().map((entry) => entry.type)).toEqual([
-      'CandidatesProposed',
+      'MatchesProposed',
       'AutoApplySelected',
     ]);
     expect(store.all()[1]!.event).toMatchObject({ pinnedId: 'mb-1' });

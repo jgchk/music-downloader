@@ -2,7 +2,7 @@ import { test } from '@fast-check/vitest';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { assertProperty, propertyRun } from '../../__fixtures__/property.js';
-import { toAcquisitionId } from '../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../shared/originating-download-id.js';
 import type { ImportEvent } from './events.js';
 import { react } from './react.js';
 import type { Effect } from './react.js';
@@ -92,7 +92,7 @@ describe('evolve is total over every event a stream can contain', () => {
       fc.property(arbReachableStates, (states) => {
         const verdict: ImportEvent = {
           type: 'ReleaseVerdictRecorded',
-          acquisitionId: toAcquisitionId('acq-1'),
+          acquisitionId: toOriginatingDownloadId('acq-1'),
           candidate: { username: 'peer-a', path: 'peer-a/Repeater [FLAC]' },
           reasons: ['transcode'],
         };

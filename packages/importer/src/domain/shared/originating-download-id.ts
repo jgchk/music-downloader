@@ -12,12 +12,12 @@ import type { Brand } from './brand.js';
  * (a redundant `Result` would carry an unreachable failure). The id still serializes as a plain
  * string on events, unchanged.
  */
-export type AcquisitionId = Brand<string, 'AcquisitionId'>;
+export type OriginatingDownloadId = Brand<string, 'OriginatingDownloadId'>;
 
 /**
- * Lift a seam-validated acquisition id into an {@link AcquisitionId}. Trusted: call it only where the
+ * Lift a seam-validated acquisition id into an {@link OriginatingDownloadId}. Trusted: call it only where the
  * intake schema has already proven the value a non-empty string (the intake ACL mapping).
  */
-export function toAcquisitionId(value: string): AcquisitionId {
-  return branded<AcquisitionId>(value);
+export function toOriginatingDownloadId(value: string): OriginatingDownloadId {
+  return branded<OriginatingDownloadId>(value);
 }

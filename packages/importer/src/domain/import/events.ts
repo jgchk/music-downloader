@@ -1,4 +1,4 @@
-import type { AcquisitionId } from '../shared/acquisition-id.js';
+import type { OriginatingDownloadId } from '../shared/originating-download-id.js';
 import type { Distance } from '../shared/distance.js';
 import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
 import type { PositiveInt } from '../shared/positive-int.js';
@@ -26,7 +26,7 @@ export interface ImportPolicy {
  * opaque provenance so a later release verdict can echo back exactly which copy the importer judged;
  * the importer never interprets its contents. `sizeBytes` is corroborating detail that may be absent.
  */
-export interface DeliveredCandidate {
+export interface DeliveredCopy {
   readonly username: string;
   readonly path: string;
   readonly sizeBytes?: number;
@@ -40,8 +40,8 @@ export interface DeliveredCandidate {
  * cannot emit a release verdict.
  */
 export interface ImportSource {
-  readonly acquisitionId: AcquisitionId;
-  readonly candidate?: DeliveredCandidate;
+  readonly acquisitionId: OriginatingDownloadId;
+  readonly candidate?: DeliveredCopy;
   /**
    * The delivery's position in the intake seam's feed — this cycle's contribution to the
    * stream's convergence watermark (folded as a max across cycles in state). A delivery at or
@@ -58,17 +58,17 @@ export interface ImportSource {
  * sources are pluggable, so a bare MusicBrainz id is ambiguous — the pair is the stable key that
  * `apply` re-resolves deterministically.
  */
-export interface CandidateReference {
+export interface MatchReference {
   readonly dataSource: string;
   readonly albumId: string;
 }
 
-export function candidateReferenceKey(reference: CandidateReference): string {
+export function matchReferenceKey(reference: MatchReference): string {
   return `${reference.dataSource}:${reference.albumId}`;
 }
 
 /** One component of beets' distance breakdown (e.g. `tracks`, `missing_tracks`, `year`). */
-export interface CandidatePenalty {
+export interface MatchPenalty {
   readonly name: string;
   readonly amount: Distance;
 }
@@ -112,7 +112,7 @@ export interface MissingTrack {
 }
 
 /** The candidate's album-level fields, for the album-field diff against the files' current tags. */
-export interface CandidateAlbumFields {
+export interface MatchAlbumFields {
   readonly year: number;
   readonly media: string;
   readonly label: string;
@@ -123,20 +123,20 @@ export interface CandidateAlbumFields {
 
 /**
  * A proposed candidate: identity, headline naming, and the evidence behind its distance. The diff
- * evidence is additive and optional — a candidate on a `CandidatesProposed` recorded before this
+ * evidence is additive and optional — a candidate on a `MatchesProposed` recorded before this
  * capability carries none of it: the per-track before/after rides on `tracks[].current`/`distance`
  * (see {@link TrackMapping}), and `extraItems`/`missingTracks`/`albumFields` are the new top-level fields.
  */
-export interface ProposedCandidate {
-  readonly ref: CandidateReference;
+export interface MetadataMatch {
+  readonly ref: MatchReference;
   readonly artist: string;
   readonly album: string;
   readonly distance: Distance;
-  readonly penalties: readonly CandidatePenalty[];
+  readonly penalties: readonly MatchPenalty[];
   readonly tracks: readonly TrackMapping[];
   readonly extraItems?: readonly UnmatchedFile[];
   readonly missingTracks?: readonly MissingTrack[];
-  readonly albumFields?: CandidateAlbumFields;
+  readonly albumFields?: MatchAlbumFields;
 }
 
 /** An album already in the library that a candidate would duplicate. */
@@ -175,7 +175,7 @@ export type ReviewCause =
        * and no legacy history lacks it. (The wire DTO keeps `best` optional; that is a separate,
        * additive serialization altitude.)
        */
-      readonly best: CandidateReference;
+      readonly best: MatchReference;
     }
   | { readonly kind: 'no-match' }
   | {
@@ -210,7 +210,7 @@ export type DuplicateResolution = 'replace' | 'keep-both';
 export type Resolution =
   | {
       readonly kind: 'apply-candidate';
-      readonly ref: CandidateReference;
+      readonly ref: MatchReference;
       readonly duplicateAction?: DuplicateResolution;
     }
   | { readonly kind: 'supply-id'; readonly mbReleaseId: string }
@@ -228,7 +228,7 @@ export type ResolutionKind = Resolution['kind'];
 export type ApplyMode =
   | {
       readonly kind: 'candidate';
-      readonly ref: CandidateReference;
+      readonly ref: MatchReference;
       readonly duplicateAction?: DuplicateResolution;
     }
   | { readonly kind: 'as-is' }
@@ -243,14 +243,14 @@ export type ImportEvent =
       readonly source?: ImportSource;
     }
   | {
-      readonly type: 'CandidatesProposed';
-      readonly candidates: readonly ProposedCandidate[];
+      readonly type: 'MatchesProposed';
+      readonly candidates: readonly MetadataMatch[];
       readonly duplicates: readonly DuplicateIncumbent[];
       readonly pinnedId?: string;
     }
   | {
       readonly type: 'AutoApplySelected';
-      readonly ref: CandidateReference;
+      readonly ref: MatchReference;
       readonly distance: Distance;
     }
   | { readonly type: 'ReviewRequired'; readonly cause: ReviewCause }
@@ -267,8 +267,8 @@ export type ImportEvent =
        * `ReviewResolved`; drives no effect, no state.
        */
       readonly type: 'ReleaseVerdictRecorded';
-      readonly acquisitionId: AcquisitionId;
-      readonly candidate: DeliveredCandidate;
+      readonly acquisitionId: OriginatingDownloadId;
+      readonly candidate: DeliveredCopy;
       readonly reasons: readonly string[];
     };
 
@@ -292,7 +292,7 @@ export function isCycleStart(event: ImportEvent): boolean {
     case 'ImportRequested': {
       return true;
     }
-    case 'CandidatesProposed':
+    case 'MatchesProposed':
     case 'AutoApplySelected':
     case 'ReviewRequired':
     case 'ReviewResolved':

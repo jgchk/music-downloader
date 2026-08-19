@@ -9,7 +9,7 @@ import {
   remediationHistory,
 } from '../../domain/import/__fixtures__/import-fixtures.js';
 import type { ImportEvent } from '../../domain/import/events.js';
-import { toAcquisitionId } from '../../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../domain/shared/originating-download-id.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
 import { ImportStatusProjection, StalledReadModel } from '../projections/read-models.js';
@@ -105,7 +105,7 @@ describe('submitImport', () => {
       d,
       {
         directory: DIRECTORY,
-        source: { acquisitionId: toAcquisitionId('acq-1') },
+        source: { acquisitionId: toOriginatingDownloadId('acq-1') },
       },
       testContext(),
     );
