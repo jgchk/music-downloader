@@ -1,6 +1,6 @@
 # Context Map
 
-One product, two bounded contexts, built as a modular monolith. Each context owns its event store and its language; they integrate only through durable in-process catch-up subscriptions over each other's published events (producer-owned schemas, tolerant readers behind an anti-corruption layer). There is deliberately no shared kernel: a type needed by both is duplicated in each.
+One product, two bounded contexts, built as a modular monolith. Each context owns its event store and its language; they integrate only through durable in-process catch-up subscriptions over each other's published events (producer-owned schemas, tolerant readers behind an anti-corruption layer). There is deliberately no shared **model**: a type needed by both is duplicated in each. Generic mechanism is not model — the seam's delivery and correlation machinery lives once in `packages/eventing`, a lint-guarded leaf that knows nothing about either context (`extract-eventing-package` D1).
 
 ## Why two contexts
 
@@ -27,7 +27,7 @@ Doctrinal grounding, the canon's prior, and the pitfall checklist this split mus
 
 ## Seam vocabulary
 
-Named concepts of the integration mechanism (defined in `cross-module-delivery` / `operation-correlation` specs): **catch-up subscription**, consumer-owned **checkpoint**, **at-least-once ordered delivery**, **notify-then-poll** (the wakeup is a lossy latency hint; the poll alone guarantees delivery), **poison-event policy** (`halt` or `park`), **the event store is the outbox**, **tolerant reader**, **contract gate** (additive-only; a breaking change is a new event type), **frozen fixtures**.
+Named concepts of the integration mechanism (defined in `cross-module-delivery` / `operation-correlation` specs): **checkpointed drain** (the shared mechanism in `packages/eventing`), **catch-up subscription** (a checkpointed drain whose source is the other context's feed — each context's own binding of it), consumer-owned **checkpoint**, **at-least-once ordered delivery**, **notify-then-poll** (the wakeup is a lossy latency hint; the poll alone guarantees delivery), **poison-event policy** (**halt** — the only policy: bounded retries, then stop without advancing, and the fix-then-restart replays in order; see `docs/research/poison-event-halt-vs-park.md`), **the event store is the outbox**, **tolerant reader**, **contract gate** (additive-only; a breaking change is a new event type), **frozen fixtures**.
 
 ## Cross-context homonyms
 

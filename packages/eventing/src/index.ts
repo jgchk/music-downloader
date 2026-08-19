@@ -9,3 +9,28 @@ export type {
   DrainLogger,
   DrainTuning,
 } from './checkpointed-drain.js';
+
+export {
+  CORRELATION_ID_PATTERN,
+  adoptOrMint,
+  adoptStory,
+  causedBy,
+  createCorrelation,
+  isCorrelationId,
+  newOperation,
+  operationScope,
+  parseCausation,
+  toCorrelationId,
+} from './correlation.js';
+export type {
+  CausationReference,
+  ChildLogger,
+  CommandContext,
+  ContinuedOperation,
+  Correlation,
+  CorrelationId,
+  CorrelationSource,
+  OperationScope,
+  StoryOrigin,
+  TriggeringEvent,
+} from './correlation.js';
