@@ -6,14 +6,14 @@ import { authenticatedStorageState } from './auth.js';
 test.use({ storageState: authenticatedStorageState() });
 
 /**
- * Switch the request kind to `descriptor` and wait for its reactive fields. A selectOption that
- * fires before hydration changes only the DOM: Svelte then reasserts its own state (`bind:value`),
- * the select snaps back, and the descriptor fields never render. Re-select until they appear.
+ * Open the request page's artist-and-title form — the path that needs no catalog and no
+ * JavaScript, which is what makes it the right one for a boot smoke: this tier points MusicBrainz
+ * at a port that refuses, so searching cannot produce a result to request here.
  */
-async function chooseDescriptorKind(page: Page): Promise<void> {
+async function openNativeRequest(page: Page): Promise<void> {
   await expect(async () => {
-    await page.getByTestId('kind').selectOption('descriptor');
-    await expect(page.getByTestId('artist')).toBeVisible({ timeout: 1000 });
+    await page.getByText('Request by artist and title').click();
+    await expect(page.getByTestId('native-artist')).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 10_000 });
 }
 
@@ -46,9 +46,9 @@ test.describe('composed app boot smoke (not a11y/layout parity — deferred)', (
 
   test('serves a submitted acquisition onto its detail and into the list', async ({ page }) => {
     await page.goto('/acquisitions/new');
-    await chooseDescriptorKind(page);
-    await page.getByTestId('artist').fill('E2E Artist');
-    await page.locator('input[name="title"]').fill('E2E Album');
+    await openNativeRequest(page);
+    await page.getByTestId('native-artist').fill('E2E Artist');
+    await page.getByTestId('native-title').fill('E2E Album');
     await page.getByRole('button', { name: 'Request download' }).click();
 
     await expect(page).toHaveURL(/\/acquisitions\/[^/]+$/);
@@ -62,17 +62,18 @@ test.describe('composed app boot smoke (not a11y/layout parity — deferred)', (
     page,
   }) => {
     await page.goto('/acquisitions/new');
-    // MusicBrainz kind with no MBID: the facade's zod boundary refuses it.
+    await openNativeRequest(page);
+    // A descriptor request naming neither artist nor title: the facade's zod boundary refuses it.
     await page.getByRole('button', { name: 'Request download' }).click();
     await expect(page.getByTestId('form-error')).toBeVisible();
-    await expect(page.getByTestId('submit-form')).toBeVisible();
+    await expect(page.getByTestId('catalog-query')).toBeVisible();
   });
 
   test('serves a cancel from a cancellable acquisition detail page', async ({ page }) => {
     await page.goto('/acquisitions/new');
-    await chooseDescriptorKind(page);
-    await page.getByTestId('artist').fill('Cancel Me');
-    await page.locator('input[name="title"]').fill('Now');
+    await openNativeRequest(page);
+    await page.getByTestId('native-artist').fill('Cancel Me');
+    await page.getByTestId('native-title').fill('Now');
     await page.getByRole('button', { name: 'Request download' }).click();
     await expect(page).toHaveURL(/\/acquisitions\/[^/]+$/);
 

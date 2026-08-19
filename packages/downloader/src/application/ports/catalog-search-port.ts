@@ -63,7 +63,8 @@ export type CatalogEntity =
   | { readonly kind: 'recording'; readonly recording: CatalogRecording };
 
 /** An identifier that names nothing in the catalog is an outcome, not a fault. */
-export type CatalogLookup = { readonly kind: 'found'; readonly entity: CatalogEntity } | { readonly kind: 'notFound' };
+export type CatalogLookup =
+  { readonly kind: 'found'; readonly entity: CatalogEntity } | { readonly kind: 'notFound' };
 
 /** One concrete edition (a release) of a release group. */
 export interface CatalogEdition {
@@ -84,6 +85,12 @@ export interface CatalogEdition {
  */
 export interface CatalogEditionGroup {
   readonly trackCount: number;
+  /**
+   * The edition this group is read from — its tracklist is the group's tracklist. Modeled
+   * explicitly rather than left as "the first one", so no reader has to guard against a group
+   * with no editions, which grouping cannot produce.
+   */
+  readonly representative: CatalogEdition;
   readonly editions: readonly CatalogEdition[];
 }
 
@@ -93,8 +100,7 @@ export interface CatalogEditionGroup {
  * with no official edition yields `selectionRequired`, mirroring the pipeline's `needsSelection`.
  */
 export type BestMatchEdition =
-  | { readonly kind: 'pick'; readonly mbid: Mbid }
-  | { readonly kind: 'selectionRequired' };
+  { readonly kind: 'pick'; readonly mbid: Mbid } | { readonly kind: 'selectionRequired' };
 
 export interface CatalogEditionListing {
   /** Groups ordered most-editions-first, so the canonical tracklist leads. */

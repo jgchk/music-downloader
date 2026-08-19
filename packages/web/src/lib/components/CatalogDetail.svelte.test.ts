@@ -1,0 +1,252 @@
+import { page } from 'vitest/browser';
+import { render } from 'vitest-browser-svelte';
+import { describe, expect, it, vi } from 'vitest';
+import CatalogDetail from './CatalogDetail.svelte';
+import type { DetailState, TracklistState } from '$lib/search/detail.js';
+
+const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
+const PICK = '1b022e01-4da6-387b-8658-8678046e4cef';
+const OTHER = 'ef6e0c0a-9f1f-41af-820a-e3ca91560c13';
+
+const edition = (mbid: string, overrides: Record<string, unknown> = {}) => ({
+  mbid,
+  title: 'Graceland',
+  formats: 'CD',
+  trackCount: 11,
+  date: '1986-08-29',
+  country: 'DE',
+  ...overrides,
+});
+
+const releaseGroupDetail = (bestMatch: {
+  kind: 'pick' | 'selection-required';
+  mbid?: string;
+}): DetailState => ({
+  kind: 'release-group',
+  mbid: RG,
+  title: 'Graceland',
+  editions: {
+    groups: [
+      {
+        trackCount: 11,
+        representative: edition(PICK),
+        editions: [edition(PICK), edition(OTHER, { country: 'US' })],
+      },
+      {
+        trackCount: 19,
+        representative: edition('9b4c6e1a-1111-4111-8111-111111111111', { trackCount: 19 }),
+        editions: [edition('9b4c6e1a-1111-4111-8111-111111111111', { trackCount: 19 })],
+      },
+    ],
+    bestMatch,
+  },
+});
+
+const props = (detail: DetailState, tracklists: Record<string, TracklistState> = {}) => ({
+  detail,
+  tracklists,
+  onTracklist: vi.fn(),
+  onClose: vi.fn(),
+});
+
+describe('CatalogDetail', () => {
+  it('renders nothing at all while nothing is open', async () => {
+    await render(CatalogDetail, {
+      detail: undefined,
+      tracklists: {},
+      onTracklist: vi.fn(),
+      onClose: vi.fn(),
+    });
+
+    expect(document.querySelector('[data-testid="detail"]')).toBeNull();
+  });
+
+  it('says it is reading the catalog before it has anything to show', async () => {
+    await render(CatalogDetail, props({ kind: 'loading', title: 'Graceland' }));
+
+    await expect.element(page.getByTestId('detail-loading')).toBeVisible();
+  });
+
+  it('reports a catalog it could not read, rather than an empty edition list', async () => {
+    await render(
+      CatalogDetail,
+      props({ kind: 'failed', title: 'Graceland', message: 'The catalog could not be reached.' }),
+    );
+
+    await expect.element(page.getByTestId('detail-error')).toBeVisible();
+    await expect.element(page.getByText('The catalog could not be reached.')).toBeVisible();
+  });
+
+  it('groups the editions by tracklist, opening the most common one', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    const groups = [...document.querySelectorAll('details.edition-group')];
+    expect(groups).toHaveLength(2);
+    expect((groups[0] as HTMLDetailsElement).open).toBe(true);
+    expect((groups[1] as HTMLDetailsElement).open).toBe(false);
+    await expect.element(page.getByText('most common')).toBeVisible();
+  });
+
+  it('names in words which edition the system would choose, not by colour alone', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    await expect.element(page.getByTestId('system-pick')).toBeVisible();
+    await expect.element(page.getByText('the system’s default')).toBeVisible();
+  });
+
+  it('says when the system would ask rather than choose', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'selection-required' })));
+
+    await expect.element(page.getByTestId('selection-required')).toBeVisible();
+    expect(document.querySelector('[data-testid="system-pick"]')).toBeNull();
+  });
+
+  it('requests the album itself until a pressing is chosen, then that pressing', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    const form = () => document.querySelector<HTMLFormElement>('form.detail-request')!;
+    expect(new FormData(form()).get('kind')).toBe('release-group');
+    expect(new FormData(form()).get('mbid')).toBe(RG);
+
+    await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
+
+    expect(new FormData(form()).get('kind')).toBe('musicbrainz');
+    expect(new FormData(form()).get('mbid')).toBe(OTHER);
+    await expect.element(page.getByRole('button', { name: 'Request this edition' })).toBeVisible();
+  });
+
+  it('lets a chosen pressing be unchosen, back to the system’s own default', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    const chooseUs = page.getByRole('button', { name: /1986-08-29 · US/ });
+    await chooseUs.click();
+    await chooseUs.click();
+
+    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    expect(new FormData(form).get('kind')).toBe('release-group');
+  });
+
+  it('asks for a tracklist only when a person asks to see one', async () => {
+    const onTracklist = vi.fn();
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      onTracklist,
+    });
+
+    expect(onTracklist).not.toHaveBeenCalled();
+    await page.getByRole('button', { name: 'View tracklist' }).first().click();
+
+    expect(onTracklist).toHaveBeenCalledWith(PICK);
+  });
+
+  it('shows the running order once it has been read', async () => {
+    await render(
+      CatalogDetail,
+      props(releaseGroupDetail({ kind: 'pick', mbid: PICK }), {
+        [PICK]: {
+          kind: 'loaded',
+          tracklist: {
+            tracks: [{ position: 1, title: 'The Boy in the Bubble', durationMs: 239_000 }],
+          },
+        },
+      }),
+    );
+
+    await expect.element(page.getByText('The Boy in the Bubble')).toBeVisible();
+    await expect.element(page.getByText('3:59')).toBeVisible();
+  });
+
+  it('says a tracklist is being read, and reports one that could not be', async () => {
+    await render(
+      CatalogDetail,
+      props(releaseGroupDetail({ kind: 'pick', mbid: PICK }), { [PICK]: { kind: 'loading' } }),
+    );
+
+    await expect.element(page.getByText('Reading the tracklist…')).toBeVisible();
+  });
+
+  it('reports a tracklist the catalog would not give', async () => {
+    await render(
+      CatalogDetail,
+      props(releaseGroupDetail({ kind: 'pick', mbid: PICK }), {
+        [PICK]: { kind: 'failed', message: 'Could not read the tracklist.' },
+      }),
+    );
+
+    await expect.element(page.getByText('Could not read the tracklist.')).toBeVisible();
+  });
+
+  it('offers an artist’s releases to request one by one', async () => {
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'artist',
+        mbid: RG,
+        title: 'Paul Simon',
+        discography: {
+          releaseGroups: [
+            {
+              mbid: PICK,
+              title: 'Graceland',
+              artistCredit: 'Paul Simon',
+              year: 1986,
+              primaryType: 'Album',
+              secondaryTypes: [],
+            },
+          ],
+        },
+      }),
+    );
+
+    await expect.element(page.getByText('Graceland')).toBeVisible();
+    await expect.element(page.getByText('1986 · Album')).toBeVisible();
+    const form = document.querySelector<HTMLFormElement>('.discography .request-form')!;
+    expect(new FormData(form).get('kind')).toBe('release-group');
+    expect(new FormData(form).get('mbid')).toBe(PICK);
+  });
+
+  it('renders a release the catalog has not dated or typed', async () => {
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'artist',
+        mbid: RG,
+        title: 'Paul Simon',
+        discography: {
+          releaseGroups: [
+            {
+              mbid: PICK,
+              title: 'Undated',
+              artistCredit: 'Paul Simon',
+              year: undefined,
+              primaryType: undefined,
+              secondaryTypes: [],
+            },
+          ],
+        },
+      }),
+    );
+
+    await expect.element(page.getByText('Undated')).toBeVisible();
+  });
+
+  it('requests a track as a track, with a quality floor to raise', async () => {
+    await render(
+      CatalogDetail,
+      props({ kind: 'recording', mbid: PICK, title: 'The Boy in the Bubble' }),
+    );
+
+    const form = document.querySelector<HTMLFormElement>('form.detail-request')!;
+    expect(new FormData(form).get('targetType')).toBe('track');
+    await expect.element(page.getByLabelText('Quality floor')).toBeVisible();
+  });
+
+  it('closes when asked', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, { ...props({ kind: 'loading', title: 'Graceland' }), onClose });
+
+    await page.getByRole('button', { name: 'Close' }).click();
+
+    expect(onClose).toHaveBeenCalled();
+  });
+});

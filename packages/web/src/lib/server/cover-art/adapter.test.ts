@@ -26,7 +26,9 @@ function fetchStub(...responses: (Response | Error)[]): typeof fetch & ReturnTyp
 
 const archive = (stub: typeof fetch) => new CoverArtArchive({ baseUrl: BASE_URL }, stub);
 
-async function unwrap(pending: ResultAsync<CoverArtAnswer, CoverArtUnavailable>): Promise<CoverArtAnswer> {
+async function unwrap(
+  pending: ResultAsync<CoverArtAnswer, CoverArtUnavailable>,
+): Promise<CoverArtAnswer> {
   const result = await pending;
   return result._unsafeUnwrap();
 }
@@ -41,7 +43,13 @@ async function unwrapError(
 describe('CoverArtArchive.front', () => {
   it('reads the front cover at the asked-for size', async () => {
     const stub = fetchStub(
-      manifest([{ front: true, image: 'https://ia.test/full.jpg', thumbnails: { '250': 'https://ia.test/250.jpg' } }]),
+      manifest([
+        {
+          front: true,
+          image: 'https://ia.test/full.jpg',
+          thumbnails: { '250': 'https://ia.test/250.jpg' },
+        },
+      ]),
       image(),
     );
 
@@ -79,6 +87,41 @@ describe('CoverArtArchive.front', () => {
 
     expect(stub.mock.calls[0]?.[0]).toBe(`${BASE_URL}/release/${RELEASE_GROUP}`);
     expect(stub.mock.calls[1]?.[0]).toBe('https://ia.test/full.jpg');
+  });
+
+  it('falls back to the full image when the archive thumbnails it at other sizes only', async () => {
+    const stub = fetchStub(
+      manifest([
+        {
+          front: true,
+          image: 'https://ia.test/full.jpg',
+          thumbnails: { '250': 'https://ia.test/250.jpg' },
+        },
+      ]),
+      image(),
+    );
+
+    await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 500));
+
+    expect(stub.mock.calls[1]?.[0]).toBe('https://ia.test/full.jpg');
+  });
+
+  it('serves art the archive does not type as the image it almost always is', async () => {
+    const untyped = new Response(IMAGE_BYTES, { status: 200 });
+    untyped.headers.delete('content-type');
+    const stub = fetchStub(manifest([{ front: true, image: 'https://ia.test/full.jpg' }]), untyped);
+
+    const answer = await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250));
+
+    expect(answer).toMatchObject({ kind: 'found', image: { contentType: 'image/jpeg' } });
+  });
+
+  it('reads a manifest that lists no images at all as absent', async () => {
+    const stub = fetchStub(Response.json({}));
+
+    expect(await unwrap(archive(stub).front('release-group', RELEASE_GROUP, 250))).toEqual({
+      kind: 'absent',
+    });
   });
 
   it('identifies this application to the archive', async () => {

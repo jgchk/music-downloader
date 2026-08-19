@@ -160,17 +160,18 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       `${this.baseUrl}/release-group/${mbid}?inc=artist-credits&fmt=json`,
       mbReleaseGroupEntitySchema,
       LOOKUP_OPERATION,
-    )
-      .andThen((group) => {
-        const [releaseGroup] = toReleaseGroups({ 'release-groups': group === undefined ? [] : [group] });
-        if (releaseGroup !== undefined) {
-          return okAsync<CatalogLookup>({
-            kind: 'found',
-            entity: { kind: 'release-group', releaseGroup },
-          });
-        }
-        return this.lookupArtist(mbid, scope);
+    ).andThen((group) => {
+      const [releaseGroup] = toReleaseGroups({
+        'release-groups': group === undefined ? [] : [group],
       });
+      if (releaseGroup !== undefined) {
+        return okAsync<CatalogLookup>({
+          kind: 'found',
+          entity: { kind: 'release-group', releaseGroup },
+        });
+      }
+      return this.lookupArtist(mbid, scope);
+    });
   }
 
   private lookupArtist(mbid: Mbid, scope: OperationScope): ResultAsync<CatalogLookup, InfraError> {
@@ -180,12 +181,16 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       LOOKUP_OPERATION,
     ).andThen((found) => {
       const [artist] = toArtists({ artists: found === undefined ? [] : [found] });
-      if (artist !== undefined) return okAsync<CatalogLookup>({ kind: 'found', entity: { kind: 'artist', artist } });
+      if (artist !== undefined)
+        return okAsync<CatalogLookup>({ kind: 'found', entity: { kind: 'artist', artist } });
       return this.lookupRecording(mbid, scope);
     });
   }
 
-  private lookupRecording(mbid: Mbid, scope: OperationScope): ResultAsync<CatalogLookup, InfraError> {
+  private lookupRecording(
+    mbid: Mbid,
+    scope: OperationScope,
+  ): ResultAsync<CatalogLookup, InfraError> {
     return this.get(
       `${this.baseUrl}/recording/${mbid}?inc=artist-credits+releases&fmt=json`,
       mbCatalogRecordingEntitySchema,
@@ -222,7 +227,10 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     ).map((json) => toEditionListing(json ?? {}));
   }
 
-  tracklist(release: Mbid, _scope: OperationScope): ResultAsync<readonly CatalogTrack[], InfraError> {
+  tracklist(
+    release: Mbid,
+    _scope: OperationScope,
+  ): ResultAsync<readonly CatalogTrack[], InfraError> {
     return this.get(
       `${this.baseUrl}/release/${release}?inc=recordings&fmt=json`,
       mbReleaseSchema,
@@ -235,7 +243,11 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
    * which every caller reads as an empty answer rather than a fault. Only successful reads are
    * cached: a fault must never be remembered as an answer.
    */
-  private get<T>(url: string, schema: ZodType<T>, operation: string): ResultAsync<T | undefined, InfraError> {
+  private get<T>(
+    url: string,
+    schema: ZodType<T>,
+    operation: string,
+  ): ResultAsync<T | undefined, InfraError> {
     const fresh = this.cached(url);
     if (fresh !== undefined) return okAsync(fresh.value as T | undefined);
 
@@ -272,7 +284,10 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     operation: string,
   ): ResultAsync<T | undefined, InfraError> {
     return ResultAsync.fromPromise(
-      this.http.send({ url, headers: { 'User-Agent': this.userAgent, Accept: 'application/json' } }),
+      this.http.send({
+        url,
+        headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
+      }),
       (cause) => infraError(operation, 'the catalog could not be reached', cause),
     ).andThen((response): Result<T | undefined, InfraError> => {
       // The catalog saying "no such thing" is an answer, not a fault.

@@ -11,7 +11,9 @@ const foundAnswer: CoverArtAnswer = {
   image: { contentType: 'image/jpeg', bytes: BYTES },
 };
 
-function port(answer: CoverArtAnswer | 'unavailable'): CoverArtPort & { front: ReturnType<typeof vi.fn> } {
+function port(
+  answer: CoverArtAnswer | 'unavailable',
+): CoverArtPort & { front: ReturnType<typeof vi.fn> } {
   const front = vi.fn(() =>
     answer === 'unavailable'
       ? errAsync({ kind: 'cover-art-unavailable' as const, detail: 'down' })
@@ -64,7 +66,9 @@ describe('GET /cover-art/[entity]/[mbid]', () => {
   });
 
   it('answers "no cover" in a way the browser may remember, so a placeholder settles', async () => {
-    const response = await GET(event(port({ kind: 'absent' }), { entity: 'release-group', mbid: MBID }));
+    const response = await GET(
+      event(port({ kind: 'absent' }), { entity: 'release-group', mbid: MBID }),
+    );
 
     expect(response.status).toBe(404);
     expect(response.headers.get('cache-control')).toContain('max-age=');

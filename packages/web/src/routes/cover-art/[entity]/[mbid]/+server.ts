@@ -32,7 +32,11 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
     return new Response(undefined, { status: 400 });
   }
 
-  const answer = await locals.coverArt.front(entity as CoverArtEntity, mbid, sizeFrom(url.searchParams.get('size')));
+  const answer = await locals.coverArt.front(
+    entity as CoverArtEntity,
+    mbid,
+    sizeFrom(url.searchParams.get('size')),
+  );
 
   return answer.match(
     (found) =>

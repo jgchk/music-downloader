@@ -14,7 +14,9 @@ function found(size: number): CoverArtAnswer {
 }
 
 /** A port that answers with the given outcomes in order, counting how often it was asked. */
-function archive(...answers: (CoverArtAnswer | 'unavailable')[]): CoverArtPort & { calls: () => number } {
+function archive(
+  ...answers: (CoverArtAnswer | 'unavailable')[]
+): CoverArtPort & { calls: () => number } {
   const front = vi.fn(() => {
     const next = answers.shift() ?? found(4);
     return next === 'unavailable'

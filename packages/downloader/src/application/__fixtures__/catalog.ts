@@ -46,10 +46,22 @@ export const CATALOG_RESULTS: CatalogSearchResults = {
   leading: 'release-group',
 };
 
+const GRACELAND_EDITION = {
+  mbid: asMbid('1b022e01-4da6-387b-8658-8678046e4cef'),
+  title: 'Graceland',
+  disambiguation: undefined,
+  date: '1986-08-29',
+  country: 'DE',
+  formats: 'CD',
+  status: 'Official',
+  trackCount: 11,
+};
+
 export const CATALOG_EDITIONS: CatalogEditionListing = {
   groups: [
     {
       trackCount: 11,
+      representative: GRACELAND_EDITION,
       editions: [
         {
           mbid: asMbid('1b022e01-4da6-387b-8658-8678046e4cef'),
@@ -83,7 +95,8 @@ export interface FakeCatalogOverrides {
 
 export function fakeCatalog(overrides: FakeCatalogOverrides = {}): CatalogSearchPort {
   const fault = overrides.fault;
-  const answer = <T>(value: T) => (fault === undefined ? okAsync<T, InfraError>(value) : errAsync<T, InfraError>(fault));
+  const answer = <T>(value: T) =>
+    fault === undefined ? okAsync<T, InfraError>(value) : errAsync<T, InfraError>(fault);
   return {
     search: () => answer(overrides.results ?? CATALOG_RESULTS),
     lookup: () =>

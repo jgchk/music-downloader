@@ -28,7 +28,9 @@ import type {
  */
 
 /** Join a credit the way the catalog renders it, so `A & B` survives as one line. */
-function joinCredit(credits: readonly { name?: string | null; joinphrase?: string | null }[] | undefined): string {
+function joinCredit(
+  credits: readonly { name?: string | null; joinphrase?: string | null }[] | undefined,
+): string {
   return (credits ?? []).map((credit) => `${credit.name ?? ''}${credit.joinphrase ?? ''}`).join('');
 }
 
@@ -128,12 +130,18 @@ const ALBUM_FIRST = new Set(['Album']);
  * means — then everything else, newest first inside each band so the recent work leads.
  */
 export function toDiscography(json: MbReleaseGroupSearch): readonly CatalogReleaseGroup[] {
-  return toReleaseGroups(json).toSorted((left, right) => {
-    const leftAlbum = ALBUM_FIRST.has(left.primaryType ?? '') ? 0 : 1;
-    const rightAlbum = ALBUM_FIRST.has(right.primaryType ?? '') ? 0 : 1;
-    if (leftAlbum !== rightAlbum) return leftAlbum - rightAlbum;
-    return (right.year ?? 0) - (left.year ?? 0);
-  });
+  // The ordering keys are read off each release group ONCE, before sorting, rather than inside the
+  // comparator: a comparator is called in an engine-chosen order, so reading "is it an album" there
+  // would make which groups get asked — and which of these readings ever run — an implementation
+  // detail of the sort.
+  return toReleaseGroups(json)
+    .map((group) => ({
+      group,
+      albumFirst: ALBUM_FIRST.has(group.primaryType ?? '') ? 0 : 1,
+      year: group.year ?? 0,
+    }))
+    .toSorted((left, right) => left.albumFirst - right.albumFirst || right.year - left.year)
+    .map((keyed) => keyed.group);
 }
 
 /** An edition's total track count: the sum of its media's counts (an unknown count adds nothing). */
@@ -183,15 +191,28 @@ export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionList
     });
   }
 
-  const byTrackCount = new Map<number, CatalogEdition[]>();
+  // A group is created by putting an edition in it, so the edition that created it IS its
+  // representative — established here rather than inferred by indexing later, which is what lets
+  // every reader treat a group as something that certainly has a tracklist to show.
+  const byTrackCount = new Map<
+    number,
+    { readonly representative: CatalogEdition; readonly editions: CatalogEdition[] }
+  >();
   for (const edition of editions) {
     const group = byTrackCount.get(edition.trackCount);
-    if (group === undefined) byTrackCount.set(edition.trackCount, [edition]);
-    else group.push(edition);
+    if (group === undefined) {
+      byTrackCount.set(edition.trackCount, { representative: edition, editions: [edition] });
+    } else {
+      group.editions.push(edition);
+    }
   }
 
   const groups: readonly CatalogEditionGroup[] = [...byTrackCount]
-    .map(([trackCount, grouped]) => ({ trackCount, editions: grouped }))
+    .map(([trackCount, grouped]) => ({
+      trackCount,
+      representative: grouped.representative,
+      editions: grouped.editions,
+    }))
     // Most-published tracklist first (the canonical one); ties by track count keep the listing
     // stable rather than depending on which edition the catalog happened to return first.
     .toSorted(
@@ -202,7 +223,8 @@ export function toEditionListing(json: MbReleaseGroupBrowse): CatalogEditionList
   const [pick] = releaseGroupEditionIds(pickable);
   return {
     groups,
-    bestMatch: pick === undefined ? { kind: 'selectionRequired' } : { kind: 'pick', mbid: pick as Mbid },
+    bestMatch:
+      pick === undefined ? { kind: 'selectionRequired' } : { kind: 'pick', mbid: pick as Mbid },
   };
 }
 

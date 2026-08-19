@@ -80,6 +80,20 @@ describe('toReleaseGroups', () => {
   it('reads an absent list as no hits', () => {
     expect(toReleaseGroups({})).toEqual([]);
   });
+
+  it('joins a credit the catalog left partly unsaid, without printing its gaps', () => {
+    const [group] = toReleaseGroups({
+      'release-groups': [
+        {
+          id: RG_ID,
+          title: 'Collaboration',
+          'artist-credit': [{ name: 'A', joinphrase: null }, { name: null }, {}],
+        },
+      ],
+    });
+
+    expect(group?.artistCredit).toBe('A');
+  });
 });
 
 describe('toArtists', () => {
@@ -130,6 +144,32 @@ describe('toRecordings', () => {
     });
   });
 
+  it('drops a recording that could not be presented or requested', () => {
+    const recordings = toRecordings({
+      recordings: [
+        { title: 'No id' },
+        { id: RECORDING_ID, title: null },
+        { id: RECORDING_ID, title: 'Keeper' },
+      ],
+    });
+
+    expect(recordings.map((recording) => recording.title)).toEqual(['Keeper']);
+  });
+
+  it('keeps a recording the catalog lists no releases for at all', () => {
+    const [orphan] = toRecordings({ recordings: [{ id: RECORDING_ID, title: 'Unreleased' }] });
+
+    expect(orphan?.release).toBeUndefined();
+  });
+
+  it('carries a release the catalog has not titled, without inventing a title', () => {
+    const [recording] = toRecordings({
+      recordings: [{ id: RECORDING_ID, title: 'Song', releases: [{ id: RELEASE_ID }] }],
+    });
+
+    expect(recording?.release).toEqual({ mbid: RELEASE_ID, title: '' });
+  });
+
   it('keeps a recording that names no usable release, marking it as having none', () => {
     const [orphan] = toRecordings({
       recordings: [{ id: RECORDING_ID, title: 'Unreleased', releases: [{ id: 'not-a-uuid' }] }],
@@ -145,11 +185,39 @@ describe('toDiscography', () => {
       'release-groups': [
         { id: RG_ID, title: 'Old Album', 'primary-type': 'Album', 'first-release-date': '1972' },
         { id: RG_ID_2, title: 'A Single', 'primary-type': 'Single', 'first-release-date': '2020' },
-        { id: RELEASE_ID, title: 'New Album', 'primary-type': 'Album', 'first-release-date': '1986' },
+        {
+          id: RELEASE_ID,
+          title: 'New Album',
+          'primary-type': 'Album',
+          'first-release-date': '1986',
+        },
       ],
     });
 
     expect(discography.map((group) => group.title)).toEqual(['New Album', 'Old Album', 'A Single']);
+  });
+});
+
+describe('toDiscography (sparse)', () => {
+  it('sorts a body of work the catalog has typed and dated only partly', () => {
+    const discography = toDiscography({
+      'release-groups': [
+        { id: RG_ID, title: 'Untyped and undated' },
+        { id: RG_ID_2, title: 'Album, undated', 'primary-type': 'Album' },
+        {
+          id: RELEASE_ID,
+          title: 'Album, dated',
+          'primary-type': 'Album',
+          'first-release-date': '1986',
+        },
+      ],
+    });
+
+    expect(discography.map((group) => group.title)).toEqual([
+      'Album, dated',
+      'Album, undated',
+      'Untyped and undated',
+    ]);
   });
 });
 
@@ -173,10 +241,20 @@ describe('toEditionListing', () => {
       ],
     });
 
-    expect(listing.groups.map((group) => ({ n: group.trackCount, size: group.editions.length }))).toEqual([
+    expect(
+      listing.groups.map((group) => ({ n: group.trackCount, size: group.editions.length })),
+    ).toEqual([
       { n: 11, size: 2 },
       { n: 19, size: 1 },
     ]);
+  });
+
+  it('names the edition a group is read from, which is the first one that made it', () => {
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 11), official(RG_ID, 11, { date: '1990-01-01' })],
+    });
+
+    expect(listing.groups[0]?.representative.mbid).toBe(RELEASE_ID);
   });
 
   it('presents an edition with what tells it apart from its siblings', () => {
@@ -204,6 +282,31 @@ describe('toEditionListing', () => {
     });
   });
 
+  it('presents an edition the catalog has barely described, without inventing details', () => {
+    const listing = toEditionListing({
+      releases: [{ id: RELEASE_ID, title: null, status: null, date: null, country: null }],
+    });
+
+    expect(listing.groups[0]?.editions[0]).toEqual({
+      mbid: RELEASE_ID,
+      title: '',
+      disambiguation: undefined,
+      date: undefined,
+      country: undefined,
+      formats: '',
+      status: undefined,
+      trackCount: 0,
+    });
+  });
+
+  it('orders two equally common tracklists by their length, so the listing is stable', () => {
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 19), official(RELEASE_ID_2, 11)],
+    });
+
+    expect(listing.groups.map((group) => group.trackCount)).toEqual([11, 19]);
+  });
+
   it('names the edition the pipeline itself would pick', () => {
     // Two official 11-track editions: the picker prefers the earliest precisely-dated one.
     const listing = toEditionListing({
@@ -220,6 +323,36 @@ describe('toEditionListing', () => {
 
     expect(listing.bestMatch).toEqual({ kind: 'selectionRequired' });
     expect(listing.groups[0]?.editions).toHaveLength(1);
+  });
+
+  it('drops an edition the catalog gives no usable identifier for', () => {
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 11), { id: 'not-a-uuid', title: 'Unaddressable' }],
+    });
+
+    expect(listing.groups.flatMap((group) => group.editions)).toHaveLength(1);
+  });
+
+  it('says nothing about formats the catalog does not name', () => {
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 11, { media: [{ 'track-count': 11, format: null }] })],
+    });
+
+    expect(listing.groups[0]?.editions[0]?.formats).toBe('');
+  });
+
+  it('counts a medium the catalog has not counted as adding no tracks', () => {
+    const listing = toEditionListing({
+      releases: [official(RELEASE_ID, 11, { media: [{ format: 'CD' }, { 'track-count': 4 }] })],
+    });
+
+    expect(listing.groups[0]?.trackCount).toBe(4);
+  });
+
+  it('reads an edition with no media at all as having no tracks', () => {
+    const listing = toEditionListing({ releases: [official(RELEASE_ID, 0, { media: undefined })] });
+
+    expect(listing.groups[0]?.trackCount).toBe(0);
   });
 
   it('reads a release group with no editions as an empty listing needing selection', () => {
@@ -251,5 +384,15 @@ describe('toTracks', () => {
 
   it('reads a release with no media as no tracks', () => {
     expect(toTracks({ id: RELEASE_ID })).toEqual([]);
+  });
+
+  it('reads a medium the catalog lists no tracks for as contributing none', () => {
+    expect(toTracks({ id: RELEASE_ID, media: [{}] })).toEqual([]);
+  });
+
+  it('reads a track the catalog neither titles nor times', () => {
+    expect(toTracks({ id: RELEASE_ID, media: [{ tracks: [{ position: 1 }] }] })).toEqual([
+      { position: 1, title: '', durationMs: undefined },
+    ]);
   });
 });

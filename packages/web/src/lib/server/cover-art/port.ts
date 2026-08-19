@@ -26,8 +26,7 @@ export interface CoverArtImage {
 }
 
 export type CoverArtAnswer =
-  | { readonly kind: 'found'; readonly image: CoverArtImage }
-  | { readonly kind: 'absent' };
+  { readonly kind: 'found'; readonly image: CoverArtImage } | { readonly kind: 'absent' };
 
 /** The archive is down, erroring, or off-contract — distinct from it having no art. */
 export interface CoverArtUnavailable {

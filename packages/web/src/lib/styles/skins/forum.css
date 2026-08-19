@@ -295,3 +295,82 @@
   border: 1px solid var(--border);
   padding: var(--step-1) var(--step-2);
 }
+
+/* Catalog-search anatomy as a 2005 board renders it: gradient caption bars over
+   each kind of result, beveled result cells, zebra track rows, and a detail
+   panel that reads as a properties dialog. */
+:root[data-skin='forum'] .results h2 {
+  padding: 5px 10px;
+  color: #fff;
+  border: 1px solid #2f5980;
+  background: linear-gradient(#5b8bb0, #3f6d92);
+}
+:root[data-skin='forum'] .results .count {
+  color: #dcecf6;
+}
+:root[data-skin='forum'] .art-grid > .result,
+:root[data-skin='forum'] .artist-row > .result {
+  border: 1px solid var(--border);
+  box-shadow:
+    inset -1px -1px 0 #cfd6da,
+    inset 1px 1px 0 #fff;
+}
+:root[data-skin='forum'] .art,
+:root[data-skin='forum'] .detail-art {
+  border: 1px solid var(--border);
+}
+:root[data-skin='forum'] .art-artist {
+  border-radius: 0;
+}
+:root[data-skin='forum'] .track-rows > .result:nth-child(even) {
+  background: var(--surface-2);
+}
+:root[data-skin='forum'] .track-rows > .result:hover {
+  background: #eef4d6;
+}
+:root[data-skin='forum'] .entity-filter {
+  gap: 0;
+  background: linear-gradient(#6f9ac0, #45749f);
+  border: 1px solid #2f5980;
+}
+:root[data-skin='forum'] .entity-filter button {
+  background: none;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+  text-shadow: none;
+  color: #fff;
+}
+:root[data-skin='forum'] .entity-filter button[aria-pressed='true'] {
+  background: var(--bg);
+  color: #013655;
+  font-weight: 700;
+  box-shadow: inset 0 2px 0 #7fd0f0;
+}
+:root[data-skin='forum'] .detail {
+  border-left: 1px solid #01405c;
+}
+:root[data-skin='forum'] .detail-head {
+  margin: calc(var(--page-pad) * -1) calc(var(--page-pad) * -1) 0;
+  padding: 5px 10px;
+  background: linear-gradient(#0d78a8, #005f86);
+  border-bottom: 1px solid #01405c;
+}
+:root[data-skin='forum'] .detail-head h2 {
+  color: #fff;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+:root[data-skin='forum'] .edition,
+:root[data-skin='forum'] .edition-group {
+  border-radius: 0;
+}
+:root[data-skin='forum'] .edition[aria-pressed='true'] {
+  background: #fff3c4;
+}
+:root[data-skin='forum'] .edition-group summary {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 2px var(--cell-pad-x);
+}

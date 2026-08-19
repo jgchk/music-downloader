@@ -41,7 +41,10 @@ export function testWiring(): TestWiring {
   };
   return {
     deps: dependencies,
-    facade: createDownloaderFacade(dependencies, { catalog: fakeCatalog(), logger: silentLogger() }),
+    facade: createDownloaderFacade(dependencies, {
+      catalog: fakeCatalog(),
+      logger: silentLogger(),
+    }),
     store,
     status,
     progress,

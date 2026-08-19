@@ -110,7 +110,8 @@ async function main(): Promise<void> {
   );
   write('catalog-artist-lookup.json', await get(`/artist/${artistId}`, 'fmt=json'));
 
-  const parsedRecordings = mbCatalogRecordingSearchSchema.parse(recordings.response.body).recordings ?? [];
+  const parsedRecordings =
+    mbCatalogRecordingSearchSchema.parse(recordings.response.body).recordings ?? [];
   const recordingId = firstId(
     parsedRecordings.map((hit) => hit.id),
     'recording',
