@@ -85,6 +85,11 @@ export function luceneLiteral(query: string): string {
   return query.replaceAll(/[+\-&|!(){}[\]^"~*?:\\/]/g, (character) => `\\${character}`);
 }
 
+/** One read's outcome, held as a value so a partial answer stays an answer. */
+type ReadAttempt<T> =
+  | { readonly kind: 'read'; readonly value: T | undefined }
+  | { readonly kind: 'unread'; readonly fault: InfraError };
+
 const parseJson = Result.fromThrowable(
   (body: string): unknown => JSON.parse(body),
   (cause) => cause,
@@ -118,30 +123,57 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
     const trimmed = query.trim();
     // A blank query asks nothing, so it costs the catalog nothing.
     if (trimmed === '') {
-      return okAsync({ releaseGroups: [], artists: [], recordings: [], leading: 'release-group' });
+      return okAsync({
+        releaseGroups: [],
+        artists: [],
+        recordings: [],
+        leading: 'release-group',
+        unavailable: [],
+      });
     }
     // Built with URLSearchParams rather than encodeURIComponent: the latter THROWS on a lone
     // surrogate, and a throw here would escape the Result this method promises. The former
     // replaces a malformed sequence instead, which is the right answer for a search box.
     const encoded = new URLSearchParams({ query: luceneLiteral(trimmed) }).toString();
     const limit = this.searchLimit;
+    // Each kind is read INDEPENDENTLY and its failure kept as a value: one 503 out of three must
+    // not discard the two answers that arrived, and `combine` would do exactly that.
     return ResultAsync.combine([
-      this.get(
+      this.attempt(
         `${this.baseUrl}/release-group?${encoded}&fmt=json&limit=${limit}`,
         mbReleaseGroupSearchSchema,
         RELEASE_GROUP_SEARCH_OPERATION,
       ),
-      this.get(
+      this.attempt(
         `${this.baseUrl}/artist?${encoded}&fmt=json&limit=${limit}`,
         mbArtistSearchSchema,
         ARTIST_SEARCH_OPERATION,
       ),
-      this.get(
+      this.attempt(
         `${this.baseUrl}/recording?${encoded}&inc=releases&fmt=json&limit=${limit}`,
         mbCatalogRecordingSearchSchema,
         RECORDING_SEARCH_OPERATION,
       ),
-    ]).map(([groupsJson, artistsJson, recordingsJson]) => {
+    ]).andThen(([groups, artists, recordings]): Result<CatalogSearchResults, InfraError> => {
+      const attempts = [
+        { kind: 'release-group' as const, attempt: groups },
+        { kind: 'artist' as const, attempt: artists },
+        { kind: 'recording' as const, attempt: recordings },
+      ];
+      const unread = attempts.filter((one) => one.attempt.kind === 'unread');
+      // EVERY kind failing is not a partial answer — it is the catalog being unreachable, and a
+      // page rendering "nothing matched" for that would claim to know something it does not.
+      const [first] = unread;
+      if (unread.length === attempts.length && first?.attempt.kind === 'unread') {
+        return err(first.attempt.fault);
+      }
+      const unavailable = unread.map((one) => one.kind);
+      if (unavailable.length > 0) {
+        scope.logger.warn({ unavailable }, 'catalog search answered for some kinds and not others');
+      }
+      const groupsJson = groups.kind === 'read' ? groups.value : undefined;
+      const artistsJson = artists.kind === 'read' ? artists.value : undefined;
+      const recordingsJson = recordings.kind === 'read' ? recordings.value : undefined;
       const scored = {
         releaseGroups: rankReleaseGroups(trimmed, toReleaseGroups(groupsJson ?? {})),
         artists: rankArtists(trimmed, toArtists(artistsJson ?? {})),
@@ -152,8 +184,10 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       // type does not declare it.
       const leading = leadingKind(trimmed, scored);
       const releaseGroups = scored.releaseGroups.map(({ score: _score, ...group }) => group);
-      const artists = scored.artists.map(({ score: _score, ...artist }) => artist);
-      const recordings = scored.recordings.map(({ score: _score, ...recording }) => recording);
+      const presentedArtists = scored.artists.map(({ score: _score, ...artist }) => artist);
+      const presentedRecordings = scored.recordings.map(
+        ({ score: _score, ...recording }) => recording,
+      );
       const received = {
         releaseGroups: (groupsJson?.['release-groups'] ?? []).length,
         artists: (artistsJson?.artists ?? []).length,
@@ -161,13 +195,13 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       };
       const presented = {
         releaseGroups: releaseGroups.length,
-        artists: artists.length,
-        recordings: recordings.length,
+        artists: presentedArtists.length,
+        recordings: presentedRecordings.length,
       };
       // "They answered 25 and we could present none of them" is drift, and it reaches a person as
       // "Nothing matched" — indistinguishable from a genuine no-match. So it is a WARN, not a
       // debug line: production runs at info, where a debug line is never written at all, and an
-      // upstream rename that empties every search would otherwise show only as clean 200s.
+      // upstream rename that emptied every search would otherwise show only as clean 200s.
       const emptied = (Object.keys(received) as (keyof typeof received)[]).filter(
         (kind) => received[kind] > 0 && presented[kind] === 0,
       );
@@ -179,8 +213,29 @@ export class MusicBrainzCatalogSearch implements CatalogSearchPort {
       } else {
         scope.logger.debug({ received, presented }, 'catalog search answered');
       }
-      return { releaseGroups, artists, recordings, leading };
+      return ok({
+        releaseGroups,
+        artists: presentedArtists,
+        recordings: presentedRecordings,
+        leading,
+        unavailable,
+      });
     });
+  }
+
+  /**
+   * One of a search's three reads, as a value: what it answered, or the fault that stopped it.
+   * Kept out of the error channel on purpose — a kind that could not be read is a hole in the
+   * answer, not the end of it.
+   */
+  private attempt<T>(
+    url: string,
+    schema: ZodType<T>,
+    operation: string,
+  ): ResultAsync<ReadAttempt<T>, InfraError> {
+    return this.get(url, schema, operation)
+      .map((value): ReadAttempt<T> => ({ kind: 'read', value }))
+      .orElse((fault) => okAsync<ReadAttempt<T>, InfraError>({ kind: 'unread', fault }));
   }
 
   /**

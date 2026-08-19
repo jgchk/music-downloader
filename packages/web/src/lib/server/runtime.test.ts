@@ -6,15 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { createDownloaderRuntime, DownloaderRuntime } from '@music/downloader/runtime';
 import type { createImporterRuntime, ImporterRuntime } from '@music/importer/runtime';
 import { PlexTvAccess } from './plex/adapter.js';
-import {
-  accessOf,
-  coverArtOf,
-  bootRuntimes,
-  facadesOf,
-  loggerOf,
-  readinessOf,
-  resetRuntimesForTesting,
-} from './runtime.js';
+import { bootRuntimes, bootedRuntimes, readinessOf, resetRuntimesForTesting } from './runtime.js';
 
 /** The shipped product version — read straight from the workspace root package.json (design D5). */
 const shippedVersion = (
@@ -160,10 +152,10 @@ describe('bootRuntimes', () => {
     expect(fakes.captured.acquisition?.feed).toBe(fakes.downloader.feed);
     expect(fakes.captured.acquisition?.wakeups).toBe(fakes.downloader.wakeups);
     expect(onShutdownSignal).toHaveBeenCalledOnce();
-    expect(facadesOf()).toBe(booted.facades);
+    expect(bootedRuntimes()?.facades).toBe(booted.facades);
     // The pino root is exposed to routes so degraded reads can leave a trace.
-    expect(loggerOf()).toBe(booted.logger);
-    expect(typeof loggerOf().warn).toBe('function');
+    expect(bootedRuntimes()?.logger).toBe(booted.logger);
+    expect(typeof bootedRuntimes()?.logger.warn).toBe('function');
   });
 
   it('shares one boot across repeated calls', async () => {
@@ -197,7 +189,7 @@ describe('bootRuntimes', () => {
     log.length = 0;
     await captured!();
     expect(log).toEqual(['acquisitions:stop', 'verdicts:stop', 'downloader:stop', 'importer:stop']);
-    expect(() => facadesOf()).toThrow(/not booted/);
+    expect(bootedRuntimes()).toBeUndefined();
   });
 
   it('warns at startup when booting on the deprecated deposit-directory name', async () => {
@@ -381,11 +373,11 @@ describe('bootRuntimes', () => {
       createImporter: fakes.createImporter,
       onShutdownSignal: vi.fn(),
     });
-    const access = accessOf();
+    const access = bootedRuntimes()!.access;
     expect(access.sessionSecret).toBe('runtime-test-secret-0123456789abcd');
     // One cached archive client serves the whole process — the same instance every time, or the
     // cache in front of it would be a fresh empty one per request.
-    expect(coverArtOf()).toBe(coverArtOf());
+    expect(bootedRuntimes()?.coverArt).toBe(bootedRuntimes()?.coverArt);
     // The one concretion behind the PlexAccess port is constructed HERE (design D6): no fake, no
     // null strategy, nothing an environment value could select instead (design D7).
     expect(access.plex).toBeInstanceOf(PlexTvAccess);
@@ -404,27 +396,18 @@ describe('bootRuntimes', () => {
       onShutdownSignal: vi.fn(),
     });
 
-    await coverArtOf().front('release-group', mbid, 250);
-    await coverArtOf().front('release-group', mbid, 250);
+    const booted = bootedRuntimes()!;
+    await booted.coverArt.front('release-group', mbid, 250);
+    await booted.coverArt.front('release-group', mbid, 250);
 
     vi.unstubAllGlobals();
     expect(answered).toHaveBeenCalledTimes(1);
   });
 
-  it('facadesOf refuses before boot', () => {
-    expect(() => facadesOf()).toThrow(/init hook/);
-  });
-
-  it('accessOf refuses before boot', () => {
-    expect(() => accessOf()).toThrow(/init hook/);
-  });
-
-  it('coverArtOf refuses before boot', () => {
-    expect(() => coverArtOf()).toThrow(/init hook/);
-  });
-
-  it('loggerOf refuses before boot', () => {
-    expect(() => loggerOf()).toThrow(/init hook/);
+  it('says nothing has booted rather than crashing on the question', () => {
+    // The absence is a value every caller can see and answer — the gate with a 503, the health
+    // probe with "not ready" — instead of five accessors each throwing on the same invariant.
+    expect(bootedRuntimes()).toBeUndefined();
   });
 
   it('registers the adapter-node shutdown signal by default', async () => {
@@ -437,7 +420,7 @@ describe('bootRuntimes', () => {
 
     (process.emit as (event: string) => boolean)('sveltekit:shutdown');
     await vi.waitFor(() => {
-      expect(() => facadesOf()).toThrow(/not booted/);
+      expect(bootedRuntimes()).toBeUndefined();
     });
     expect(log).toContain('downloader:stop');
   });
@@ -469,7 +452,7 @@ describe('bootRuntimes', () => {
 describe('readinessOf', () => {
   async function boot(statuses: { downloader?: 'up' | 'down'; importer?: 'up' | 'down' } = {}) {
     const fakes = fakeRuntimes([], statuses);
-    await bootRuntimes(VALID_ENV, {
+    return bootRuntimes(VALID_ENV, {
       createDownloader: fakes.createDownloader,
       createImporter: fakes.createImporter,
       onShutdownSignal: vi.fn(),
@@ -477,8 +460,7 @@ describe('readinessOf', () => {
   }
 
   it('composes both booted runtimes into ok with the shipped version when all up', async () => {
-    await boot();
-    expect(readinessOf()).toEqual({
+    expect(readinessOf(await boot())).toEqual({
       status: 'ok',
       version: shippedVersion,
       modules: { downloader: { status: 'up' }, importer: { status: 'up' } },
@@ -486,15 +468,13 @@ describe('readinessOf', () => {
   });
 
   it('reports the version from the shipped package, not the environment', async () => {
-    await boot();
     // The value tracks the workspace root package.json version — no env var is consulted.
-    expect(readinessOf().version).toBe(shippedVersion);
+    expect(readinessOf(await boot()).version).toBe(shippedVersion);
     expect(process.env.APP_VERSION).toBeUndefined();
   });
 
   it('reports degraded and names the downloader when it is down', async () => {
-    await boot({ downloader: 'down' });
-    const readiness = readinessOf();
+    const readiness = readinessOf(await boot({ downloader: 'down' }));
     expect(readiness.status).toBe('degraded');
     expect(readiness.modules).toEqual({
       downloader: { status: 'down' },
@@ -503,8 +483,7 @@ describe('readinessOf', () => {
   });
 
   it('reports degraded and names the importer when it is down', async () => {
-    await boot({ importer: 'down' });
-    const readiness = readinessOf();
+    const readiness = readinessOf(await boot({ importer: 'down' }));
     expect(readiness.status).toBe('degraded');
     expect(readiness.modules).toEqual({
       downloader: { status: 'up' },
@@ -512,7 +491,9 @@ describe('readinessOf', () => {
     });
   });
 
-  it('refuses before boot (values only after the init hook has run)', () => {
-    expect(() => readinessOf()).toThrow(/not booted/);
+  it('is asked with what booted, so there is no unbooted case for it to have', () => {
+    // The absence is answered by the caller — the health probe reports "not ready" — rather than
+    // by this function crashing on a question it should never have been asked.
+    expect(bootedRuntimes()).toBeUndefined();
   });
 });

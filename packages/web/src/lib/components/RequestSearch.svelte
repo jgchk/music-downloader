@@ -1,7 +1,8 @@
 <script lang="ts">
   import CatalogDetail from './CatalogDetail.svelte';
   import CatalogResults from './CatalogResults.svelte';
-  import { httpCatalog } from '$lib/search/client.js';
+  import RequestPolicies from './RequestPolicies.svelte';
+  import { UNREACHABLE, httpCatalog } from '$lib/search/client.js';
   import { openDetail, readTracklist, runSearch } from '$lib/search/session.js';
   import type { SearchOutcome } from '$lib/search/session.js';
   import { searchTyping, startTyping } from '$lib/search/typing.js';
@@ -19,7 +20,7 @@
      * fallback form, and treating every refusal as that form's would open it under a message about
      * something else entirely.
      */
-    values?: { kind?: string; artist?: string; title?: string };
+    values?: Record<string, string | undefined>;
     /** The catalog conversation — injected so the surface can be driven without a server. */
     catalog?: CatalogClient;
     /** When typing becomes a search — injected so tests need not wait out a debounce. */
@@ -62,19 +63,41 @@
     failure = undefined;
   }
 
+  /**
+   * A conversation with the catalog that ended in a rejection. Nothing SHOULD reject — the client
+   * converts every failure to a value — so this is a bug, and a spinner that never stops is the
+   * least debuggable way for one to show up. The page says what it can and lets go of the wait.
+   */
+  function rejected(cause: unknown): void {
+    console.error('catalog conversation rejected', cause);
+    searching = false;
+    failure = UNREACHABLE;
+  }
+
+  /** Run a catalog conversation, and let a rejection be a bug rather than a stuck page. */
+  async function attempt(conversation: Promise<void>): Promise<void> {
+    try {
+      await conversation;
+    } catch (error_: unknown) {
+      rejected(error_);
+    }
+  }
+
   function run(text: string): void {
     inFlight?.abort();
     const controller = new AbortController();
     inFlight = controller;
     failure = undefined;
-    void runSearch(catalog, text, controller.signal, {
-      onSearching: (value) => (searching = value),
-      onOutcome: (value) => (outcome = value),
-      onFailure: (message) => {
-        failure = message;
-        outcome = undefined;
-      },
-    });
+    void attempt(
+      runSearch(catalog, text, controller.signal, {
+        onSearching: (value) => (searching = value),
+        onOutcome: (value) => (outcome = value),
+        onFailure: (message) => {
+          failure = message;
+          outcome = undefined;
+        },
+      }),
+    );
   }
 
   /**
@@ -85,13 +108,15 @@
     tracklists = {};
     // What is open IS what was last asked for — `detail` is set synchronously to `loading` before
     // any read starts — so the surface is asked rather than tracked a second time alongside it.
-    void openDetail(
-      catalog,
-      kind,
-      mbid,
-      title,
-      (opened) => (detail = opened),
-      () => detail?.mbid === mbid,
+    void attempt(
+      openDetail(
+        catalog,
+        kind,
+        mbid,
+        title,
+        (opened) => (detail = opened),
+        () => detail?.mbid === mbid,
+      ),
     );
   }
 
@@ -182,7 +207,9 @@
     {detail}
     {tracklists}
     onTracklist={(mbid) =>
-      void readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists)))}
+      void attempt(
+        readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists))),
+      )}
     {pin}
     onPin={(chosen) => (pin = chosen)}
     onClose={() => (detail = undefined)}
@@ -203,8 +230,19 @@
         Title
         <input name="title" data-testid="native-title" value={values?.title ?? ''} />
       </label>
+      <label>
+        What to request
+        <select name="targetType" data-testid="native-target">
+          <!-- Explicit per-option `selected` (not select-level `value`): the compiler's
+               select_value helper emits a nullish guard our fallback makes unreachable. -->
+          <option value="album" selected={(values?.targetType ?? 'album') === 'album'}>
+            An album
+          </option>
+          <option value="track" selected={values?.targetType === 'track'}>A single track</option>
+        </select>
+      </label>
       <input type="hidden" name="kind" value="descriptor" />
-      <input type="hidden" name="targetType" value="album" />
+      <RequestPolicies {values} />
       <button type="submit" class="btn primary">Request download</button>
     </form>
   </details>

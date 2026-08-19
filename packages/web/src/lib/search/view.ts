@@ -31,10 +31,16 @@ export function countOf(results: CatalogSearchResultDto, kind: EntityKind): numb
   }
 }
 
+/** Whether the catalog could not be read for this kind at all — an empty block with a reason. */
+export function isUnavailable(results: CatalogSearchResultDto, kind: EntityKind): boolean {
+  return (results.unavailable ?? []).includes(kind);
+}
+
 /**
  * The blocks to render, in order. The catalog decides which kind leads — it is the one that read
  * the query — and the rest follow in reading order. A kind that matched nothing is left out
- * entirely rather than heading an empty section.
+ * entirely rather than heading an empty section — UNLESS it is empty because the catalog could not
+ * be read for it, which is a different fact and one worth a heading of its own to say.
  */
 export function orderedKinds(
   results: CatalogSearchResultDto,
@@ -44,7 +50,7 @@ export function orderedKinds(
     filter === 'all'
       ? [results.leading, ...READING_ORDER.filter((kind) => kind !== results.leading)]
       : [filter];
-  return kinds.filter((kind) => countOf(results, kind) > 0);
+  return kinds.filter((kind) => countOf(results, kind) > 0 || isUnavailable(results, kind));
 }
 
 /**
@@ -92,11 +98,13 @@ export function trackDetail(recording: {
     .join(' · ');
 }
 
-/** Where this application serves a catalog entity's artwork from, at the size being rendered. */
-// The entity union is spelt out rather than imported from the cover-art port: this module runs in
-// the browser, and SvelteKit forbids client code importing `$lib/server`. The route's own
-// `satisfies` guard is what makes growing that union a build error there; if it ever grows, this
-// list has to be grown by hand to match.
+/**
+ * Where this application serves a catalog entity's artwork from, at the size being rendered. The
+ * entity union is spelt out rather than imported from the cover-art port: this module runs in the
+ * browser, and SvelteKit forbids client code importing `$lib/server`. The route's own `satisfies`
+ * guard is what makes growing that union a build error there; if it ever grows, this list has to
+ * be grown by hand to match.
+ */
 export function artUrl(entity: 'release-group' | 'release', mbid: string, size: 250 | 500): string {
   return `/cover-art/${entity}/${mbid}?size=${size}`;
 }

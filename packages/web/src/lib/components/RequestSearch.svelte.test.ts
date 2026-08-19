@@ -434,6 +434,23 @@ describe('RequestSearch', () => {
     expect(new FormData(form).get('mbid')).toBe(RELEASE);
   });
 
+  it('says something, and stops waiting, when a catalog conversation rejects outright', async () => {
+    // Nothing should reject — the client converts every failure to a value — so this is a bug, and
+    // a spinner that never stops is the least debuggable way for one to surface.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const catalog = catalogStub({
+      search: vi.fn(() => Promise.reject(new Error('a bug, not an outage'))),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(page.getByTestId('search-error')).toBeVisible();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it('closes the detail when asked, leaving the results behind it', async () => {
     await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
     await page.getByTestId('catalog-query').fill('graceland');

@@ -27,6 +27,20 @@ function results(overrides: Partial<CatalogSearchResultDto> = {}): CatalogSearch
 }
 
 describe('orderedKinds', () => {
+  it('keeps a block the catalog could not be read for, so its absence can be explained', () => {
+    // An empty block means "nothing matched" OR "nobody could ask"; dropping the second silently
+    // tells someone to check their spelling when the spelling was never the problem.
+    const results = {
+      leading: 'release-group' as const,
+      releaseGroups: [],
+      artists: [],
+      recordings: [],
+      unavailable: ['artist' as const],
+    };
+
+    expect(orderedKinds(results, 'all')).toEqual(['artist']);
+  });
+
   it('leads with the kind the catalog says the query was asking about', () => {
     expect(orderedKinds(results({ leading: 'artist' }), 'all')).toEqual([
       'artist',

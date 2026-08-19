@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import {
     albumDetail,
     alternativeLabel,
     artUrl,
     countOf,
     emptyLead,
+    isUnavailable,
     orderedKinds,
     otherMatches,
     trackDetail,
@@ -61,6 +63,14 @@
   <section class="results" data-kind={kind}>
     <h2><span>{HEADINGS[kind]}</span> <span class="count">{countOf(results, kind)}</span></h2>
 
+    {#if isUnavailable(results, kind)}
+      <!-- An empty block means one of two different things. Saying which is the whole point: a
+           person told "nothing matched" will change their spelling, and the spelling is fine. -->
+      <p class="error" role="alert" data-testid="kind-unavailable">
+        The catalog could not be reached for these. The rest of the results are below.
+      </p>
+    {/if}
+
     {#if kind === 'release-group'}
       <ul class="art-grid">
         {#each results.releaseGroups as group (group.mbid)}
@@ -83,7 +93,7 @@
               <span class="result-title">{group.title}</span>
               <span class="result-detail">{albumDetail(group)}</span>
             </button>
-            <form method="POST" action="/acquisitions/new" class="request-form">
+            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
               <input type="hidden" name="kind" value="release-group" />
               <input type="hidden" name="mbid" value={group.mbid} />
               <button type="submit" class="btn primary request">Request</button>
@@ -135,7 +145,7 @@
               <span class="result-title">{recording.title}</span>
               <span class="result-detail">{trackDetail(recording)}</span>
             </button>
-            <form method="POST" action="/acquisitions/new" class="request-form">
+            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
               <input type="hidden" name="kind" value="musicbrainz" />
               <input type="hidden" name="targetType" value="track" />
               <input type="hidden" name="mbid" value={recording.mbid} />

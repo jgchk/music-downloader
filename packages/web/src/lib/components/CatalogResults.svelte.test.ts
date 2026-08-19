@@ -45,6 +45,18 @@ const props = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('CatalogResults', () => {
+  it('tells a person a block could not be read, rather than letting it read as no matches', async () => {
+    await render(
+      CatalogResults,
+      props({
+        results: results({ artists: [], unavailable: ['artist'] }),
+        filter: 'artist',
+      }),
+    );
+
+    await expect.element(page.getByTestId('kind-unavailable')).toBeVisible();
+  });
+
   it('shows each kind of result in its own shape, so they are told apart at a glance', async () => {
     await render(CatalogResults, props());
 

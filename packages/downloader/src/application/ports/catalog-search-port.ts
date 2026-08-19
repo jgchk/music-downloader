@@ -54,6 +54,14 @@ export interface CatalogSearchResults {
   readonly recordings: readonly CatalogRecording[];
   /** The kind the query is asking about, so a presenter can lead with it. */
   readonly leading: CatalogEntityKind;
+  /**
+   * The kinds the catalog could not be read for. A search asks about three kinds independently, so
+   * one of them failing is not the search failing: the albums that came back are still the albums,
+   * and discarding them because the artist read timed out answers a question nobody asked. Empty on
+   * the ordinary path; a search whose every kind failed is a fault, not a result with three of
+   * these.
+   */
+  readonly unavailable: readonly CatalogEntityKind[];
 }
 
 /** A single entity named by an identifier: the paste-an-id path's answer. */

@@ -67,7 +67,13 @@ describe('searchCatalog', () => {
 
   it('answers a query that matches nothing with empty lists, which is not a fault', async () => {
     const empty = fakeCatalog({
-      results: { releaseGroups: [], artists: [], recordings: [], leading: 'release-group' },
+      results: {
+        releaseGroups: [],
+        artists: [],
+        recordings: [],
+        leading: 'release-group',
+        unavailable: [],
+      },
     });
 
     const result = await facadeWith(empty).searchCatalog({ query: 'zzzz' }, STORY);

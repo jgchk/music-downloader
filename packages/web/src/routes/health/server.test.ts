@@ -10,8 +10,11 @@ import { GET } from './+server.js';
  * internals, scans no event store, and calls no third party — errors are values, no try/catch.
  */
 
-const { readinessOf } = vi.hoisted(() => ({ readinessOf: vi.fn<() => Readiness>() }));
-vi.mock('$lib/server/runtime.js', () => ({ readinessOf }));
+const { readinessOf, bootedRuntimes } = vi.hoisted(() => ({
+  readinessOf: vi.fn<() => Readiness>(),
+  bootedRuntimes: vi.fn((): unknown => ({})),
+}));
+vi.mock('$lib/server/runtime.js', () => ({ readinessOf, bootedRuntimes }));
 
 function invoke(): Response {
   // The handler ignores the event; an empty stub typed to the route's expected shape suffices.
@@ -19,7 +22,21 @@ function invoke(): Response {
 }
 
 describe('GET /health', () => {
-  beforeEach(() => readinessOf.mockClear());
+  beforeEach(() => {
+    readinessOf.mockClear();
+    bootedRuntimes.mockReturnValue({});
+  });
+
+  it('answers a probe that arrives before the daemon has booted, rather than crashing', async () => {
+    // Which is what a readiness probe is FOR: "not ready yet" is a reading, and a crash is not.
+    bootedRuntimes.mockReturnValue(undefined);
+
+    const response = invoke();
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ status: 'degraded' });
+    expect(readinessOf).not.toHaveBeenCalled();
+  });
 
   it('returns 200 and ok with the version when both modules are up', async () => {
     readinessOf.mockReturnValue({

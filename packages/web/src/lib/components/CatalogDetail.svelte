@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import {
     activeEdition,
     editionSummary,
@@ -8,7 +9,7 @@
     trackTime,
   } from '$lib/search/detail.js';
   import { artUrl } from '$lib/search/view.js';
-  import QualityFloorSelect from './QualityFloorSelect.svelte';
+  import RequestPolicies from './RequestPolicies.svelte';
   import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
 
   interface Properties {
@@ -157,7 +158,7 @@
         {/each}
       </ul>
 
-      <form method="POST" action="/acquisitions/new" class="detail-request">
+      <form method="POST" action="/acquisitions/new" use:enhance class="detail-request">
         {#if activePin === undefined}
           <input type="hidden" name="kind" value="release-group" />
           <input type="hidden" name="mbid" value={detail.mbid} />
@@ -166,7 +167,7 @@
           <input type="hidden" name="targetType" value="album" />
           <input type="hidden" name="mbid" value={activePin} />
         {/if}
-        <QualityFloorSelect />
+        <RequestPolicies />
         <button type="submit" class="btn primary">
           {activePin === undefined ? 'Request download' : 'Request this edition'}
         </button>
@@ -183,7 +184,7 @@
           <li>
             <span class="result-title">{group.title}</span>
             <span class="result-detail">{releaseLine(group)}</span>
-            <form method="POST" action="/acquisitions/new" class="request-form">
+            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
               <input type="hidden" name="kind" value="release-group" />
               <input type="hidden" name="mbid" value={group.mbid} />
               <button type="submit" class="btn primary request">Request</button>
@@ -192,11 +193,11 @@
         {/each}
       </ul>
     {:else if detail.kind === 'recording'}
-      <form method="POST" action="/acquisitions/new" class="detail-request">
+      <form method="POST" action="/acquisitions/new" use:enhance class="detail-request">
         <input type="hidden" name="kind" value="musicbrainz" />
         <input type="hidden" name="targetType" value="track" />
         <input type="hidden" name="mbid" value={detail.mbid} />
-        <QualityFloorSelect />
+        <RequestPolicies />
         <button type="submit" class="btn primary">Request this track</button>
       </form>
     {/if}
