@@ -49,6 +49,16 @@ const body = (overrides: Record<string, unknown> = {}): string =>
   }).body;
 
 describe('CatalogResults (SSR)', () => {
+  it('says a block could not be read, rather than heading it or hiding it', () => {
+    // An empty block means "nothing matched" OR "nobody could ask"; a person told the first will
+    // change their spelling, and the spelling was never the problem.
+    const html = body({
+      results: results({ releaseGroups: [], artists: [], recordings: [], unavailable: ['artist'] }),
+    });
+
+    expect(html).toContain('could not be reached for these');
+  });
+
   it('renders every kind with the hooks the skins style, in the catalog’s own order', () => {
     const html = body();
 

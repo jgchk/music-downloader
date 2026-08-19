@@ -44,6 +44,7 @@ export const CATALOG_RESULTS: CatalogSearchResults = {
     },
   ],
   leading: 'release-group',
+  unavailable: [],
 };
 
 const GRACELAND_EDITION = {

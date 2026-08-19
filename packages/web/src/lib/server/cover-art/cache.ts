@@ -1,5 +1,12 @@
 import { okAsync } from 'neverthrow';
-import type { CoverArtAnswer, CoverArtEntity, CoverArtPort, CoverArtSize } from './port.js';
+import type { ResultAsync } from 'neverthrow';
+import type {
+  CoverArtAnswer,
+  CoverArtEntity,
+  CoverArtPort,
+  CoverArtSize,
+  CoverArtUnavailable,
+} from './port.js';
 
 /**
  * A cache in front of a {@link CoverArtPort}, as a decorator so the caching decision is separable
@@ -54,6 +61,8 @@ export function cachingCoverArt(
   // Insertion order is recency order: a hit re-inserts, so the oldest key is the least recently
   // used one — which is exactly what a Map's iteration order gives for free.
   const entries = new Map<string, Entry>();
+  /** Reads already on the wire, so a page of tiles asking for one cover asks the archive once. */
+  const inFlight = new Map<string, ResultAsync<CoverArtAnswer, CoverArtUnavailable>>();
   let heldBytes = 0;
 
   const forget = (key: string): void => {
@@ -89,10 +98,23 @@ export function cachingCoverArt(
         }
         forget(key);
       }
-      return inner.front(entity, mbid, size).map((answer) => {
-        remember(key, answer);
-        return answer;
-      });
+      const existing = inFlight.get(key);
+      // Derived from the shared read rather than re-issued: `map` returns a new ResultAsync over
+      // the SAME pending request, so every concurrent caller is served by one archive round trip.
+      if (existing !== undefined) return existing.map((answer) => answer);
+
+      const pending = inner
+        .front(entity, mbid, size)
+        .map((answer) => {
+          remember(key, answer);
+          return answer;
+        })
+        // Cleared however the read ends: an entry left behind on the error channel would make one
+        // outage this cover's answer for the life of the process.
+        .andTee(() => inFlight.delete(key))
+        .orTee(() => inFlight.delete(key));
+      inFlight.set(key, pending);
+      return pending;
     },
   };
 }

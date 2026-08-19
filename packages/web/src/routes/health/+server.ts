@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { readinessOf } from '$lib/server/runtime.js';
+import { bootedRuntimes, readinessOf } from '$lib/server/runtime.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -10,6 +10,12 @@ import type { RequestHandler } from './$types';
  * culprit is named). Errors are values here — there is no try/catch swallowing.
  */
 export const GET: RequestHandler = () => {
-  const readiness = readinessOf();
+  const booted = bootedRuntimes();
+  // A probe that arrives before the init hook (or during shutdown) is answered, not crashed on:
+  // "not ready yet" is the honest reading of an unbooted daemon, and it is what a probe is for.
+  if (booted === undefined) {
+    return json({ status: 'degraded', modules: {} }, { status: 503 });
+  }
+  const readiness = readinessOf(booted);
   return json(readiness, { status: readiness.status === 'ok' ? 200 : 503 });
 };

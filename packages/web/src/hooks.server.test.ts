@@ -4,17 +4,16 @@ import type { RequestEvent, ResolveOptions } from '@sveltejs/kit';
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session.js';
 
 const bootRuntimes = vi.fn(() => Promise.resolve());
-const facadesOf = vi.fn(() => ({ downloader: {}, importer: {} }));
+const facades = { downloader: {}, importer: {} };
 const access = { sessionSecret: 'hook-test-secret', plex: {} };
 const child = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
 const logger = { warn: vi.fn(), error: vi.fn(), child: vi.fn(() => child) };
+/** What the process booted, or nothing — the one thing the gate reads before serving anything. */
+const bootedRuntimes = vi.fn((): unknown => ({ facades, access, coverArt, logger }));
 vi.mock('$env/dynamic/private', () => ({ env: { LIBRARY_ROOT: '/library' } }));
 vi.mock('$lib/server/runtime.js', () => ({
   bootRuntimes: (...arguments_: unknown[]) => bootRuntimes(...(arguments_ as [])),
-  facadesOf: () => facadesOf(),
-  loggerOf: () => logger,
-  accessOf: () => access,
-  coverArtOf: () => coverArt,
+  bootedRuntimes: () => bootedRuntimes(),
 }));
 
 /** The gate only needs the port to be injected; what it answers is the artwork endpoint's business. */
@@ -50,6 +49,21 @@ function validCookie(now = Date.now()): string {
 }
 
 describe('server hooks', () => {
+  it('answers a request that arrives before the daemon is ready, rather than crashing on it', async () => {
+    // Before the init hook, and during shutdown, there is nothing to serve a request with. "Not
+    // ready" is the truth and a 503 is how it is said — a crash says the same thing in a way
+    // nothing above can act on.
+    bootedRuntimes.mockReturnValueOnce(undefined);
+
+    const response = await handle({
+      event: gateEvent('/acquisitions'),
+      resolve: () => new Response('served'),
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+  });
+
   it('init boots the composed runtimes (awaited before any request is served)', async () => {
     await init();
     expect(bootRuntimes).toHaveBeenCalledOnce();
@@ -162,6 +176,27 @@ describe('server hooks', () => {
     expectLoginRedirect(() =>
       handle({ event: gateEvent('/', { method: 'HEAD' }), resolve: vi.fn() }),
     );
+  });
+
+  it('records a fault raised before the logger exists, so the quoted error id means something', () => {
+    // A boot failure has no pino root to write through, and losing the record would leave the
+    // person quoting an error id that appears nowhere.
+    bootedRuntimes.mockReturnValueOnce(undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const shaped = handleError({
+      error: new Error('boom'),
+      event: { locals: {}, route: { id: '/x' }, request: { method: 'GET' } },
+      status: 500,
+      message: 'Internal Error',
+    } as never) as { errorId: string };
+
+    expect(consoleError).toHaveBeenCalledWith(
+      'unhandled server error before boot',
+      expect.objectContaining({ errorId: shaped.errorId }),
+      expect.any(Error),
+    );
+    consoleError.mockRestore();
   });
 
   it('handleError records the fault through the pino root with an id + request context and returns a shaped, id-carrying message', () => {

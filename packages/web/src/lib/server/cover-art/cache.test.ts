@@ -71,6 +71,34 @@ describe('cachingCoverArt', () => {
     expect(inner.calls()).toBe(1);
   });
 
+  it('serves two tiles waiting on the same cover with one archive read', async () => {
+    // A grid renders twenty-five tiles at once; two of them wanting the same cover must not be two
+    // round trips to a volunteer-run archive.
+    const inner = archive(found(4), found(8));
+    const cached = cachingCoverArt(inner, {}, clock().now);
+
+    const [first, second] = await Promise.all([
+      cached.front('release-group', MBID, 250),
+      cached.front('release-group', MBID, 250),
+    ]);
+
+    expect(first._unsafeUnwrap()).toEqual(second._unsafeUnwrap());
+    expect(inner.calls()).toBe(1);
+  });
+
+  it('lets a shared read that failed be tried again, rather than remembering the failure', async () => {
+    const inner = archive('unavailable', found(4));
+    const cached = cachingCoverArt(inner, {}, clock().now);
+
+    await Promise.all([
+      cached.front('release-group', MBID, 250),
+      cached.front('release-group', MBID, 250),
+    ]);
+    const retried = await cached.front('release-group', MBID, 250);
+
+    expect(retried.isOk()).toBe(true);
+  });
+
   it('serves a second request for the same art without asking the archive again', async () => {
     const inner = archive(found(4));
     const cached = cachingCoverArt(inner, {}, clock().now);

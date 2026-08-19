@@ -154,6 +154,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
       artists: [],
       recordings: [],
       leading: 'release-group',
+      unavailable: [],
     });
     expect(sent).toHaveLength(0);
   });
@@ -166,8 +167,51 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(sent).toHaveLength(3); // one per entity kind — never one per result
   });
 
+  it('keeps the kinds that answered when one of the three could not be read', async () => {
+    // One 503 out of three reads is a hole in the answer, not the end of it: the albums that came
+    // back are still the albums, and discarding them answers a question nobody asked.
+    const { port } = searcher([
+      { match: '/release-group?query=', json: GRACELAND },
+      { match: '/artist?query=', status: 503 },
+      { match: '/recording?query=', json: BUBBLE },
+    ]);
+
+    const results = await unwrap(port.search('paul simon graceland', testScope()));
+
+    expect(results.releaseGroups.map((group) => group.title)).toEqual(['Graceland']);
+    expect(results.artists).toEqual([]);
+    expect(results.unavailable).toEqual(['artist']);
+  });
+
+  it('says out loud which kinds it could not read', async () => {
+    const { port } = searcher([
+      { match: '/release-group?query=', json: GRACELAND },
+      { match: '/artist?query=', status: 503 },
+      { match: '/recording?query=', json: BUBBLE },
+    ]);
+    const watched = watchedScope();
+
+    await unwrap(port.search('graceland', watched.scope));
+
+    expect(watched.warnings.join('')).toContain('answered for some kinds and not others');
+  });
+
+  it('reports a search whose every read failed as a fault, not as an answer with three holes', async () => {
+    const { port } = searcher([
+      { match: '/release-group?query=', status: 503 },
+      { match: '/artist?query=', status: 503 },
+      { match: '/recording?query=', status: 503 },
+    ]);
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.kind).toBe('InfraError');
+  });
+
   it('reports a catalog that refuses the request as an infrastructure fault, not as no matches', async () => {
-    const { port } = searcher([{ match: '/release-group?query=', status: 503 }]);
+    // Every read refused: one refusal is a hole in the answer (see the partial cases above), while
+    // all three is the catalog itself being unavailable.
+    const { port } = searcher([{ match: '?query=', status: 503 }]);
 
     const failure = await unwrapErr(port.search('graceland', testScope()));
 
@@ -188,6 +232,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
       artists: [],
       recordings: [],
       leading: 'release-group',
+      unavailable: [],
     });
   });
 
@@ -216,7 +261,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
   it.each([[429], [408]])(
     'reports a %d as a passing fault, since it is the catalog asking for later, not never',
     async (status) => {
-      const { port } = searcher([{ match: '/release-group?query=', status }]);
+      const { port } = searcher([{ match: '?query=', status }]);
 
       const failure = await unwrapErr(port.search('graceland', testScope()));
 
@@ -225,7 +270,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
   );
 
   it('reports a request the catalog refuses as permanent, since retrying reproduces it', async () => {
-    const { port } = searcher([{ match: '/release-group?query=', status: 400 }]);
+    const { port } = searcher([{ match: '?query=', status: 400 }]);
 
     const failure = await unwrapErr(port.search('graceland', testScope()));
 
@@ -254,7 +299,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
     expect(failure.permanent).toBe(true);
   });
 
-  it('reports a catalog whose shape drifted as permanent, since retrying cannot fix it', async () => {
+  it('reads an answer whose fields are the wrong type as a kind it could not read', async () => {
     const { port } = searcher([
       {
         match: '/release-group?query=',
@@ -264,34 +309,48 @@ describe('MusicBrainzCatalogSearch.search', () => {
       { match: '/recording?query=', json: BUBBLE },
     ]);
 
-    const failure = await unwrapErr(port.search('graceland', testScope()));
+    const results = await unwrap(port.search('graceland', testScope()));
 
-    expect(failure.permanent).toBe(true);
+    expect(results.unavailable).toEqual(['release-group']);
+    expect(results.artists).toHaveLength(1);
   });
 });
 
 describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
   it.each([
-    ['release group', { 'release-groups': [{ title: 'Graceland' }] }, undefined, undefined],
+    ['release-group', { 'release-groups': [{ title: 'Graceland' }] }, undefined, undefined],
     ['artist', undefined, { artists: [{ name: 'Paul Simon' }] }, undefined],
-    ['track', undefined, undefined, { recordings: [{ title: 'The Boy in the Bubble' }] }],
+    ['recording', undefined, undefined, { recordings: [{ title: 'The Boy in the Bubble' }] }],
   ])(
-    'refuses a %s hit that carries no identifier, rather than presenting none of them',
-    async (_kind, groups, artists, recordings) => {
-      // A renamed `id` parses clean under a tolerant reader and empties every result silently. An
+    'reads a %s answer whose hits carry no identifier as a kind it could not read',
+    async (kind, groups, artists, recordings) => {
+      // A renamed `id` parses clean under a tolerant reader and empties that block silently. An
       // identifier is the one field a hit cannot be shown without, so its absence is drift — and
-      // it is drift on whichever of the three reads it happens to.
+      // the block it drifted in is reported as unread rather than rendered as "nothing matched".
       const { port } = searcher([
         { match: '/release-group?query=', json: groups ?? GRACELAND },
         { match: '/artist?query=', json: artists ?? PAUL_SIMON },
         { match: '/recording?query=', json: recordings ?? BUBBLE },
       ]);
 
-      const failure = await unwrapErr(port.search('graceland', testScope()));
+      const results = await unwrap(port.search('graceland', testScope()));
 
-      expect(failure.permanent).toBe(true);
+      expect(results.unavailable).toEqual([kind]);
     },
   );
+
+  it('reports a catalog whose every answer has drifted as a permanent fault', async () => {
+    const { port } = searcher([
+      {
+        match: '?query=',
+        json: { 'release-groups': 'not-a-list', artists: 'not-a-list', recordings: 'not-a-list' },
+      },
+    ]);
+
+    const failure = await unwrapErr(port.search('graceland', testScope()));
+
+    expect(failure.permanent).toBe(true);
+  });
 
   it('says out loud when the catalog answered with hits it could present none of', async () => {
     // Every id well-formed, every TITLE gone: tolerable field by field, and yet the page would

@@ -53,6 +53,12 @@ export const catalogSearchResultSchema = z.object({
   releaseGroups: z.array(catalogReleaseGroupDtoSchema),
   artists: z.array(catalogArtistDtoSchema),
   recordings: z.array(catalogRecordingDtoSchema),
+  /**
+   * The blocks the catalog could not be read for. A search asks about three kinds independently,
+   * so an empty block means one of two different things — nothing matched, or nobody could ask —
+   * and only this list tells a reader which. Optional so an older producer's answer still parses.
+   */
+  unavailable: z.array(z.enum(['release-group', 'artist', 'recording'])).optional(),
 });
 
 /**
@@ -201,6 +207,7 @@ function recordingToDto(recording: CatalogRecording): z.infer<typeof catalogReco
 export function searchResultsToDto(results: CatalogSearchResults): CatalogSearchResultDto {
   return {
     leading: results.leading,
+    unavailable: [...results.unavailable],
     releaseGroups: results.releaseGroups.map((group) => releaseGroupToDto(group)),
     artists: results.artists.map((artist) => artistToDto(artist)),
     recordings: results.recordings.map((recording) => recordingToDto(recording)),

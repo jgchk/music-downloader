@@ -21,7 +21,12 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [svelte()],
   resolve: {
-    alias: { $lib: fileURLToPath(new URL('src/lib', import.meta.url)) },
+    alias: {
+      $lib: fileURLToPath(new URL('src/lib', import.meta.url)),
+      // `svelte-kit sync` is not run for this project, so the framework's own module has to be
+      // stood in for — see the stub for what it does and does not stand in for.
+      '$app/forms': fileURLToPath(new URL('test/stubs/app-forms.ts', import.meta.url)),
+    },
   },
   test: {
     name: 'web:client',

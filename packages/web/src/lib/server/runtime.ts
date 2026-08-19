@@ -229,53 +229,25 @@ export function bootRuntimes(
   return runtime.booting;
 }
 
-/** The facades for request handling; the daemon must have booted first (init hook). */
-export function facadesOf(): Facades {
-  if (runtime.booted === undefined) {
-    throw new Error('runtimes not booted — the init hook must run before requests are served');
-  }
-  return runtime.booted.facades;
-}
-
-/** The cover-art port for the artwork endpoint; boots with the daemon. */
-export function coverArtOf(): CoverArtPort {
-  if (runtime.booted === undefined) {
-    throw new Error('runtimes not booted — the init hook must run before requests are served');
-  }
-  return runtime.booted.coverArt;
-}
-
-/** The access-control composition for the gate and login routes; boots with the daemon. */
-export function accessOf(): Access {
-  if (runtime.booted === undefined) {
-    throw new Error('runtimes not booted — the init hook must run before requests are served');
-  }
-  return runtime.booted.access;
-}
-
-/** The structured logger for request handling; the daemon must have booted first (init hook). */
-export function loggerOf(): Logger {
-  if (runtime.booted === undefined) {
-    throw new Error('runtimes not booted — the init hook must run before requests are served');
-  }
-  return runtime.booted.logger;
-}
-
 /**
- * The readiness surface for `GET /health` (design D4/D6): reads each module runtime's live
- * readiness accessor and the shipped version — no event-store scan, no module-internal reach.
- * Overall `ok` only when both modules are `up`, else `degraded`. The daemon must have booted first.
+ * What the process booted, or nothing when it has not (or has since shut down).
+ *
+ * ONE accessor, returning the absence rather than crashing on it. Five accessors that each threw
+ * "not booted" made the same invariant five undeclared failures on the request path, resolved only
+ * by a framework catching them; here the caller sees the absence in the type and answers it once —
+ * `handle` with a 503 that says the daemon is not ready, which is exactly what is true.
  */
-export function readinessOf(): Readiness {
-  if (runtime.booted === undefined) {
-    throw new Error('runtimes not booted — the init hook must run before requests are served');
-  }
-  const downloader = runtime.booted.readiness.downloader();
-  const importer = runtime.booted.readiness.importer();
+export function bootedRuntimes(): Booted | undefined {
+  return runtime.booted;
+}
+
+export function readinessOf(booted: Booted): Readiness {
+  const downloader = booted.readiness.downloader();
+  const importer = booted.readiness.importer();
   const isHealthy = downloader.status === 'up' && importer.status === 'up';
   return {
     status: isHealthy ? 'ok' : 'degraded',
-    version: runtime.booted.version,
+    version: booted.version,
     modules: {
       downloader: { status: downloader.status },
       importer: { status: importer.status },

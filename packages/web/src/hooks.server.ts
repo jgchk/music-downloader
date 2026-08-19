@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { mintCorrelationId } from '$lib/server/correlation.js';
-import { accessOf, bootRuntimes, coverArtOf, facadesOf, loggerOf } from '$lib/server/runtime.js';
+import { bootRuntimes, bootedRuntimes } from '$lib/server/runtime.js';
 import { SESSION_COOKIE, verifySession } from '$lib/server/session.js';
 
 /**
@@ -42,10 +42,20 @@ export const handle: Handle = ({ event, resolve }) => {
   // (operation-correlation). One id per request, carried verbatim into both modules' commands and
   // bound onto the request logger, so every line this request produces joins the same story.
   event.locals.correlationId = mintCorrelationId();
-  event.locals.facades = facadesOf();
-  event.locals.logger = loggerOf().child({ correlationId: event.locals.correlationId });
-  event.locals.access = accessOf();
-  event.locals.coverArt = coverArtOf();
+  const booted = bootedRuntimes();
+  // Nothing can be served before the init hook has run, or after shutdown has torn the runtimes
+  // down. Answered once, here, as the 503 it is — rather than by five accessors each crashing on
+  // the same invariant and relying on the framework to turn that into a 500.
+  if (booted === undefined) {
+    return new Response('the daemon is starting up', {
+      status: 503,
+      headers: { 'Retry-After': '1' },
+    });
+  }
+  event.locals.facades = booted.facades;
+  event.locals.logger = booted.logger.child({ correlationId: event.locals.correlationId });
+  event.locals.access = booted.access;
+  event.locals.coverArt = booted.coverArt;
   event.locals.now = () => new Date().toISOString();
 
   const cookie = event.cookies.get(SESSION_COOKIE);
@@ -97,12 +107,17 @@ export const handle: Handle = ({ event, resolve }) => {
 export const handleError: HandleServerError = ({ error, event, status, message }) => {
   const errorId = crypto.randomUUID();
   const story: unknown = event.locals.correlationId;
-  const logger =
-    typeof story === 'string' ? loggerOf().child({ correlationId: story }) : loggerOf();
-  logger.error(
-    { errorId, routeId: event.route.id, method: event.request.method, status, err: error },
-    'unhandled server error',
-  );
+  const root = bootedRuntimes()?.logger;
+  const line = { errorId, routeId: event.route.id, method: event.request.method, status };
+  if (root === undefined) {
+    // A fault before the logger exists — a boot failure, most likely. The record still has to be
+    // made, and the console is the only place left to make it; losing the error id would leave
+    // the person quoting a number that appears nowhere.
+    console.error('unhandled server error before boot', line, error);
+  } else {
+    const logger = typeof story === 'string' ? root.child({ correlationId: story }) : root;
+    logger.error({ ...line, err: error }, 'unhandled server error');
+  }
   return {
     message: `${message} If it persists, quote error ${errorId} when reporting it.`,
     errorId,
