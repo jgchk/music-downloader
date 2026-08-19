@@ -1,6 +1,6 @@
 import { isCatalogId } from './view.js';
 import type { CatalogClient } from './client.js';
-import type { DetailContext, DetailState, TracklistState } from './detail.js';
+import type { BrowseState, DetailContext, DetailState, TracklistState } from './detail.js';
 import type { EntityKind } from './view.js';
 import type { CatalogLookupResultDto, CatalogSearchResultDto } from '@music/downloader';
 
@@ -105,11 +105,11 @@ export async function runSearch(
 
 /**
  * Open a result's detail view. A track needs nothing more read about it — everything shown is
- * already in hand — while an album and an artist each need one read, and either can fail.
+ * already in hand — while an album needs one read, which can fail.
  */
 export async function openDetail(
   catalog: CatalogClient,
-  kind: EntityKind,
+  kind: Exclude<EntityKind, 'artist'>,
   mbid: string,
   context: DetailContext,
   onDetail: (detail: DetailState) => void,
@@ -120,26 +120,37 @@ export async function openDetail(
     return;
   }
   onDetail({ kind: 'loading', mbid, ...context });
-  // Each read is awaited in its own branch, so its answer keeps its own type — see `runSearch`.
-  // "Something else was opened, or everything was closed, while this was being read" is checked
-  // after every await: rendering then would reopen a surface the person dismissed, or put one
-  // album's editions under another's title.
-  if (kind === 'release-group') {
-    const answer = await catalog.editions(mbid);
-    if (!isCurrent()) return;
-    onDetail(
-      answer.ok
-        ? { kind: 'release-group', mbid, ...context, editions: answer.value }
-        : { kind: 'failed', mbid, ...context, message: answer.message },
-    );
-    return;
-  }
-  const answer = await catalog.discography(mbid);
+  // The answer is awaited here so it keeps its own type — see `runSearch`. "Something else was
+  // opened, or everything was closed, while this was being read" is checked after the await:
+  // rendering then would reopen a view the person dismissed, or put one album's editions under
+  // another's title.
+  const answer = await catalog.editions(mbid);
   if (!isCurrent()) return;
   onDetail(
     answer.ok
-      ? { kind: 'artist', mbid, ...context, discography: answer.value }
+      ? { kind: 'release-group', mbid, ...context, editions: answer.value }
       : { kind: 'failed', mbid, ...context, message: answer.message },
+  );
+}
+
+/**
+ * Look at one artist's releases. Not a detail view: the results area becomes their discography,
+ * with the held search results one interaction behind it.
+ */
+export async function browseArtist(
+  catalog: CatalogClient,
+  mbid: string,
+  name: string,
+  onBrowse: (browse: BrowseState) => void,
+  isCurrent: () => boolean = () => true,
+): Promise<void> {
+  onBrowse({ kind: 'loading', mbid, name });
+  const answer = await catalog.discography(mbid);
+  if (!isCurrent()) return;
+  onBrowse(
+    answer.ok
+      ? { kind: 'browsing', mbid, name, discography: answer.value }
+      : { kind: 'failed', mbid, name, message: answer.message },
   );
 }
 

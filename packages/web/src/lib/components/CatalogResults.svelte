@@ -24,15 +24,19 @@
     results: CatalogSearchResultDto;
     /** Which kind is being looked at; `all` shows every kind that matched. */
     filter: EntityFilter;
-    /** What was searched for, so an empty answer can name it. */
-    query: string;
+    /**
+     * What was searched for, so an empty answer can name it. Optional because these results do
+     * not always come from a query: an artist's discography is rendered through this same grid,
+     * and its empty case is the page's to say, not this component's.
+     */
+    query?: string;
     /** Open a result's detail view, handing it what this card already knows. */
     onOpen: (kind: EntityKind, mbid: string, context: DetailContext) => void;
     /** Look at a different kind — the way out of an empty filtered view. */
     onFilter: (filter: EntityFilter) => void;
   }
 
-  let { results, filter, query, onOpen, onFilter }: Properties = $props();
+  let { results, filter, query = '', onOpen, onFilter }: Properties = $props();
 
   const kinds = $derived(orderedKinds(results, filter));
   /**

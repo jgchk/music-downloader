@@ -1053,6 +1053,15 @@
   .track-rows .request {
     width: auto;
   }
+  /* The artist discography view's head: whose releases these are, and the way back to the search
+     results that were held all along. */
+  .browse-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
   .empty-results {
     color: var(--text-muted);
   }

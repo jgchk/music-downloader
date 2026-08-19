@@ -32,12 +32,27 @@ export type DetailState =
       readonly mbid: string;
       readonly editions: CatalogEditionsResultDto;
     } & DetailContext)
-  | ({
-      readonly kind: 'artist';
-      readonly mbid: string;
-      readonly discography: CatalogDiscographyResultDto;
-    } & DetailContext)
   | ({ readonly kind: 'recording'; readonly mbid: string } & DetailContext);
+
+/**
+ * One artist's releases, taking over the results area. Held by the page rather than by the detail
+ * view, because it is not an overlay over the results — it IS what is being looked at, and the
+ * held search results are what it goes back to.
+ */
+export type BrowseState =
+  | { readonly kind: 'loading'; readonly mbid: string; readonly name: string }
+  | {
+      readonly kind: 'failed';
+      readonly mbid: string;
+      readonly name: string;
+      readonly message: string;
+    }
+  | {
+      readonly kind: 'browsing';
+      readonly mbid: string;
+      readonly name: string;
+      readonly discography: CatalogDiscographyResultDto;
+    };
 
 /** A tracklist the person asked to see, keyed by the edition it was read from. */
 export type TracklistState =

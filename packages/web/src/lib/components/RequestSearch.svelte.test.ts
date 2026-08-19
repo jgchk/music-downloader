@@ -199,9 +199,161 @@ describe('RequestSearch', () => {
       .first()
       .click();
 
-    await expect.element(page.getByRole('heading', { name: 'Releases' })).toBeVisible();
+    // The results area BECOMES their releases — an artist is not something to peek at beside the
+    // results, and a panel could not show their albums as albums.
+    await expect.element(page.getByRole('heading', { name: 'Albums by Paul Simon' })).toBeVisible();
+    expect(document.querySelectorAll('.art-grid > .result').length).toBeGreaterThan(0);
     expect(catalog.discography).toHaveBeenCalledWith(ARTIST);
     expect(catalog.editions).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the results it was holding, without searching again', async () => {
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { releaseGroups: [RESULTS.releaseGroups[0]!] },
+        }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('back-to-results')).toBeVisible();
+
+    await page.getByTestId('back-to-results').click();
+
+    await expect.element(page.getByRole('heading', { name: /Artists/ })).toBeVisible();
+    expect(catalog.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves an artist’s releases behind when a new query is typed', async () => {
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { releaseGroups: [RESULTS.releaseGroups[0]!] },
+        }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('back-to-results')).toBeVisible();
+
+    await page.getByTestId('catalog-query').fill('something else');
+    await userEvent.keyboard('{Enter}');
+
+    // Their releases are an answer to a question nobody is asking any more.
+    await expect.element(page.getByRole('heading', { name: /Artists/ })).toBeVisible();
+    expect(document.querySelector('[data-testid="back-to-results"]')).toBeNull();
+  });
+
+  it('a filter tab leaves the artist and applies itself to the held results', async () => {
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: {
+            ...RESULTS,
+            leading: 'artist' as const,
+            artists: [ARTIST_HIT],
+            recordings: [TRACK_HIT],
+          },
+        }),
+      ),
+      discography: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { releaseGroups: [RESULTS.releaseGroups[0]!] },
+        }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('back-to-results')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Tracks', exact: true }).click();
+
+    // The tabs stay honest: one of them cannot sit there filtering something nobody is looking at.
+    expect(document.querySelector('[data-testid="back-to-results"]')).toBeNull();
+    await expect.element(page.getByRole('heading', { name: /Tracks/ })).toBeVisible();
+    expect(catalog.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('says something when the conversation about an artist rejects outright', async () => {
+    // Nothing should reject — the client turns every failure into a value — so this is a bug, and
+    // a browse view that reads forever is the least debuggable way for one to surface.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() => Promise.reject(new Error('boom'))),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+
+    await expect.element(page.getByTestId('browse-error')).toBeVisible();
+  });
+
+  it('says an artist has no releases the catalog knows of', async () => {
+    const catalog = catalogStub({
+      search: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { ...RESULTS, leading: 'artist' as const, artists: [ARTIST_HIT] },
+        }),
+      ),
+      discography: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: { releaseGroups: [] } }),
+      ),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('paul simon');
+    await userEvent.keyboard('{Enter}');
+
+    await page
+      .getByRole('button', { name: /Paul Simon/ })
+      .first()
+      .click();
+
+    await expect.element(page.getByTestId('discography-empty')).toBeVisible();
   });
 
   it('opens a track without asking the catalog anything more about it', async () => {
@@ -275,7 +427,7 @@ describe('RequestSearch', () => {
       .first()
       .click();
 
-    await expect.element(page.getByTestId('detail-error')).toBeVisible();
+    await expect.element(page.getByTestId('browse-error')).toBeVisible();
   });
 
   it('goes to the track a pasted track identifier names', async () => {

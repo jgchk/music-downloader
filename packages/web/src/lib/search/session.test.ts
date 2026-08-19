@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { lookupAsOutcome, openDetail, readTracklist, runSearch } from './session.js';
+import { browseArtist, lookupAsOutcome, openDetail, readTracklist, runSearch } from './session.js';
 import type { CatalogClient } from './client.js';
-import type { DetailState, TracklistState } from './detail.js';
+import type { BrowseState, DetailState, TracklistState } from './detail.js';
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const ARTIST = '4d5447d7-c61c-4120-ba1b-d7f471d385b9';
@@ -242,13 +242,13 @@ describe('openDetail', () => {
         Promise.resolve({ ok: true as const, value: { releaseGroups: [RELEASE_GROUP_HIT] } }),
       ),
     });
-    const opened: DetailState[] = [];
+    const opened: BrowseState[] = [];
 
-    await openDetail(client, 'artist', ARTIST, { title: 'Paul Simon' }, (d) => {
+    await browseArtist(client, ARTIST, 'Paul Simon', (d) => {
       opened.push(d);
     });
 
-    expect(opened.at(-1)).toMatchObject({ kind: 'artist', mbid: ARTIST });
+    expect(opened.at(-1)).toMatchObject({ kind: 'browsing', mbid: ARTIST, name: 'Paul Simon' });
   });
 
   it('reports an artist whose releases could not be read', async () => {
@@ -257,28 +257,27 @@ describe('openDetail', () => {
         Promise.resolve({ ok: false as const, message: 'Could not be reached.' }),
       ),
     });
-    const opened: DetailState[] = [];
+    const opened: BrowseState[] = [];
 
-    await openDetail(client, 'artist', ARTIST, { title: 'Paul Simon' }, (d) => {
+    await browseArtist(client, ARTIST, 'Paul Simon', (d) => {
       opened.push(d);
     });
 
     expect(opened.at(-1)).toMatchObject({ kind: 'failed', message: 'Could not be reached.' });
   });
 
-  it('says nothing about an artist whose surface has moved on', async () => {
+  it('says nothing about an artist the page has moved on from', async () => {
     const client = catalog({
       discography: vi.fn(() =>
         Promise.resolve({ ok: true as const, value: { releaseGroups: [RELEASE_GROUP_HIT] } }),
       ),
     });
-    const opened: DetailState[] = [];
+    const opened: BrowseState[] = [];
 
-    await openDetail(
+    await browseArtist(
       client,
-      'artist',
       ARTIST,
-      { title: 'Paul Simon' },
+      'Paul Simon',
       (d) => {
         opened.push(d);
       },
