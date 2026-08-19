@@ -11,10 +11,35 @@ actual label strings used in this repo's tracker. Here they are identical.
 | `ready-for-human` | `ready-for-human`    | Requires human implementation            |
 | `wontfix`         | `wontfix`            | Will not be actioned                     |
 
-Category roles use GitHub's stock `bug` and `enhancement`, both already present.
-
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the
 corresponding label string from this table.
+
+## Category roles
+
+This repo has **three** category roles, not the usual two:
+
+| Category role   | Meaning                                                        |
+| --------------- | -------------------------------------------------------------- |
+| `bug`           | Something is broken                                            |
+| `enhancement`   | New feature or improvement                                     |
+| `quality-gate`  | A review finding nominated for promotion to a machine-enforced rule |
+
+`quality-gate` is a category, not a state — an issue carrying it still needs one of the five
+state roles above. It exists because a promotion candidate is neither a defect nor a
+feature: it proposes a *check*, and its lifecycle is governed by the promotion ladder and
+admission contract in `docs/development/quality-gates.md` rather than by ordinary
+implementation.
+
+Two consequences worth knowing when triaging one:
+
+- **Filing is not adoption.** These issues are deliberately filed as candidates. Adoption is
+  its own change that runs the one-shot rule triage and records the admission tally in that
+  change's design document. A `ready-for-agent` quality-gate issue means "the rung is
+  settled and the adopting change can be written", not "turn the rule on".
+- **The state usually turns on which ladder rung applies.** Where the rung is decided and
+  the admission bar is assessable, it is `ready-for-agent`. Where the rung is genuinely open
+  — typically a choice between a cheap check with a false-positive problem and a type-level
+  change with real reach — it is `ready-for-human`.
 
 ## How these actually get used here
 
