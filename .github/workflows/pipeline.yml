@@ -77,7 +77,7 @@ jobs:
   # on the Ubuntu mirrors, and has been measured at 11m08s here against a 20-35s norm.
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 # observed ~100s; Chromium install dominates on a cold cache
+    timeout-minutes: 15 # observed ~100s
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -89,8 +89,18 @@ jobs:
         with:
           python-version: '3.14'
       - run: pnpm install --frozen-lockfile
+      # NO `--with-deps`, deliberately — the same reasoning as the ffmpeg step above, measured the
+      # same way. Upstream recommends the flag, so the deviation is on us to justify: on the
+      # ubuntu-latest image every shared library Playwright asks for is ALREADY the newest version,
+      # and the only packages the flag installs are 9 CJK/Cyrillic font packages (21MB fetched,
+      # 79MB on disk) that nothing here renders — there is not one screenshot or visual-snapshot
+      # assertion in the repo, `vitest.client.config.ts` sets `screenshotFailures: false`, and the
+      # parity suite records traces, not video. So the apt phase bought ~14s of the step's ~25s
+      # norm and re-armed the `apt-get update` mirror wedge: run 32275016194 sat on it for 11m+.
+      # If a runner-image bump ever does drop a real lib, Chromium fails to LAUNCH — loudly, in the
+      # very next step — and the flag goes back in.
       - name: Install Chromium (browser-mode client tests)
-        run: pnpm --dir packages/web exec playwright install --with-deps chromium
+        run: pnpm --dir packages/web exec playwright install chromium
       - name: Test @ 100% coverage
         run: pnpm run test:cov
       - name: Contract tests (frozen fixtures; no network)
@@ -341,8 +351,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # No `--with-deps` — see the `test` job's step for the measurement and the failure mode.
       - name: Install Chromium (browser parity phase)
-        run: pnpm --dir packages/web exec playwright install --with-deps chromium
+        run: pnpm --dir packages/web exec playwright install chromium
 
       # THE GATE: stand up the freshly built image + WireMock stubs, drive it end to end over a real
       # socket — a real browser first (parity phase), then the loop phases (run.sh owns the list) —
