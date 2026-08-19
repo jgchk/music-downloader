@@ -4,5 +4,5 @@
 # skipped re-measure breaks main, not the PR), and re-run the gate.
 # The extras cover the production plugin chain's Python dependencies (binaries — ffmpeg, fpcalc,
 # oggz-tools, opus-tools — are baked into the runtime image by the Dockerfile).
-beets[fetchart,embedart,chroma,discogs,lastgenre,lyrics,scrub]==2.12.0
+beets[fetchart,embedart,chroma,discogs,lastgenre,lyrics,scrub]==2.13.1
 requests>=2.32.5

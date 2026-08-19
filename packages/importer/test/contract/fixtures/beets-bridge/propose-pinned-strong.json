@@ -29,7 +29,7 @@
             },
             "distance": 0.0,
             "index": 1,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/love-me-do/01 Love Me Do.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/love-me-do/01 Love Me Do.mp3",
             "title": "Love Me Do"
           },
           {
@@ -41,7 +41,7 @@
             },
             "distance": 0.0,
             "index": 2,
-            "path": "/tmp/tmp.5AUSmTvULo/intake/love-me-do/02 P.S. I Love You.mp3",
+            "path": "/tmp/tmp.rrdeP9exsY/intake/love-me-do/02 P.S. I Love You.mp3",
             "title": "P.S. I Love You"
           }
         ]
@@ -51,8 +51,8 @@
     "status": "proposal"
   },
   "provenance": {
-    "beets": "2.12.0",
-    "capturedAt": "2026-07-23",
+    "beets": "2.13.1",
+    "capturedAt": "2026-08-19",
     "recorder": "test/contract/record-bridge-fixtures.sh",
     "release": "22c9f6a3-0569-4c59-b551-cb4a26b0bc3f"
   },
