@@ -49,5 +49,5 @@ Naming scheme (design.md, Decision 0): **Download** = the saga, **Try** = one at
 ## 8. Gate, review, release
 
 - [x] 8.1 Full `pnpm check` + `pnpm test:e2e`; confirm the tripwires pass and contract fixtures are byte-identical
-- [ ] 8.2 `/review-all` sweep on the final diff; fix findings to convergence
-- [ ] 8.3 Commit train typed `refactor(...)` except the config alias as `feat(runtime)`; `pnpm version:prep`; PR per the house jj+gh flow
+- [x] 8.2 `/review-all` sweep on the final diff; fix findings to convergence
+- [x] 8.3 Commit train typed `refactor(...)` except the config alias as `feat(runtime)`; `pnpm version:prep`; PR per the house jj+gh flow
