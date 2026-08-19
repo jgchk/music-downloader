@@ -2,9 +2,25 @@ name: Contract drift
 
 # Tier 2 of the external-API contract tests (change: external-api-contract-tests). Verifies the
 # frozen contract against the live world on a schedule — never on a commit or PR. slskd is checked
-# by diffing its latest OpenAPI surface against our consumed-surface manifest; MusicBrainz by
-# replaying the recorded requests and validating live responses against the shared schemas. On
-# drift it opens — or refreshes — a single tracking issue.
+# by diffing its latest OpenAPI surface against our consumed-surface manifest; MusicBrainz and
+# plex.tv by replaying the recorded requests and validating live responses against the shared
+# schemas.
+#
+# Each check reports one of three outcomes by exit code (drift-signal-fidelity; the mapping lives
+# in `scripts/drift/run-check.sh`):
+#
+#   conforms     — the provider answered and the consumed surface still holds
+#   drift        — the consumed surface changed. Fails the run and opens or refreshes the single
+#                  `contract-drift` tracking issue.
+#   unavailable  — the provider could not be reached after retries, so the contract was neither
+#                  confirmed nor refuted. Leaves the run GREEN with a warning annotation and a job
+#                  summary line.
+#
+# Read a green run as "no drift found", NOT as "every provider was reached" — check the summary.
+# The split exists because both issues this job ever filed were false positives about reachability
+# (#110, a broken invocation; #184, two MusicBrainz 503s on a shared GitHub-runner egress IP), and
+# an alert channel whose whole history is noise is one nobody reads when a real dropped field
+# finally arrives.
 
 on:
   schedule:
@@ -36,44 +52,84 @@ jobs:
 
       - name: MusicBrainz drift (live replay vs schemas)
         id: mb
-        continue-on-error: true
-        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
-        run: |
-          set -o pipefail
-          pnpm tsx packages/downloader/test/contract/drift/musicbrainz.ts 2>&1 | tee mb.log
+        run: >
+          bash scripts/drift/run-check.sh MusicBrainz mb.log
+          pnpm tsx packages/downloader/test/contract/drift/musicbrainz.ts
 
       - name: plex.tv drift (live PIN surface vs schemas)
         id: plextv
-        continue-on-error: true
         # Unauthenticated PIN operations only: the token-requiring surface is replay-only by
         # design (no stored Plex credential exists to live-check it with).
-        run: |
-          set -o pipefail
-          pnpm tsx packages/web/test/contract/drift/plextv.ts 2>&1 | tee plextv.log
+        run: >
+          bash scripts/drift/run-check.sh plex.tv plextv.log
+          pnpm tsx packages/web/test/contract/drift/plextv.ts
 
       - name: Wait for slskd swagger
+        id: slskd_ready
+        # A container that never came up is an unavailable slskd, not a failed job: failing here
+        # would redden the run for the one reason this workflow has decided is not worth reddening
+        # it, and would skip the reporting steps that say so.
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5030/swagger/v0/swagger.json || true)
-            [ "$code" = "200" ] && exit 0
+            if [ "$code" = "200" ]; then
+              echo "ready=true" >>"$GITHUB_OUTPUT"
+              exit 0
+            fi
             sleep 2
           done
-          echo "slskd swagger did not become available" && exit 1
+          echo "ready=false" >>"$GITHUB_OUTPUT"
+          echo "slskd swagger did not become available within 60s" | tee slskd.log
 
       - name: slskd drift (latest OpenAPI vs consumed-surface manifest)
         id: slskd
-        continue-on-error: true
+        if: steps.slskd_ready.outputs.ready == 'true'
         env:
           SLSKD_SPEC_URL: http://localhost:5030/swagger/v0/swagger.json
           SLSKD_LATEST_LABEL: latest
-        # pipefail so `tee` doesn't mask a non-zero exit from the drift script.
-        run: |
-          set -o pipefail
-          pnpm tsx packages/downloader/test/contract/drift/slskd.ts 2>&1 | tee slskd.log
+        run: >
+          bash scripts/drift/run-check.sh slskd slskd.log
+          pnpm tsx packages/downloader/test/contract/drift/slskd.ts
+
+      - name: Report outcomes
+        id: report
+        uses: actions/github-script@v9
+        env:
+          MB_STATUS: ${{ steps.mb.outputs.status }}
+          PLEXTV_STATUS: ${{ steps.plextv.outputs.status }}
+          # Empty when the wait step gave up and the check was skipped — which IS unavailability.
+          SLSKD_STATUS: ${{ steps.slskd.outputs.status }}
+        with:
+          script: |
+            const checks = [
+              { target: 'MusicBrainz', status: process.env.MB_STATUS || 'unavailable' },
+              { target: 'slskd', status: process.env.SLSKD_STATUS || 'unavailable' },
+              { target: 'plex.tv', status: process.env.PLEXTV_STATUS || 'unavailable' },
+            ];
+            const badge = { conforms: '✓', drift: '✗', unavailable: '?' };
+            core.summary.addHeading('Contract drift', 3);
+            core.summary.addTable([
+              [{ data: 'Target', header: true }, { data: 'Outcome', header: true }],
+              ...checks.map((c) => [c.target, `${badge[c.status]} ${c.status}`]),
+            ]);
+            for (const { target, status } of checks) {
+              if (status === 'unavailable') {
+                core.warning(`${target} could not be reached — its contract was neither confirmed nor refuted this run. See the step log.`, { title: 'Drift check inconclusive' });
+              }
+            }
+            const drifted = checks.some((c) => c.status === 'drift');
+            if (!drifted && checks.some((c) => c.status === 'unavailable')) {
+              core.summary.addRaw('\nNo drift found, but this run did not reach every provider — a green result here is **not** a clean bill of health for the unreached ones.\n');
+            }
+            await core.summary.write();
+            core.setOutput('drifted', String(drifted));
+            core.setOutput('statuses', checks.map((c) => `- ${c.target}: **${c.status}**`).join('\n'));
 
       - name: Open or refresh drift issue
-        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure' || steps.plextv.outcome == 'failure'
+        if: steps.report.outputs.drifted == 'true'
         uses: actions/github-script@v9
+        env:
+          STATUSES: ${{ steps.report.outputs.statuses }}
         with:
           script: |
             const fs = require('fs');
@@ -81,11 +137,11 @@ jobs:
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const body = [
-              `Automated contract drift check failed on ${new Date().toISOString()}.`,
+              `Automated contract drift check found drift on ${new Date().toISOString()}.`,
               '',
-              `- MusicBrainz: **${{ steps.mb.outcome }}**`,
-              `- slskd: **${{ steps.slskd.outcome }}**`,
-              `- plex.tv: **${{ steps.plextv.outcome }}**`,
+              process.env.STATUSES,
+              '',
+              'An **unavailable** target above was not reached and says nothing about its contract — only **drift** rows are findings.',
               '',
               '### MusicBrainz', '```', read('mb.log'), '```',
               '### slskd', '```', read('slskd.log'), '```',
@@ -105,5 +161,5 @@ jobs:
             }
 
       - name: Fail the run on drift
-        if: steps.mb.outcome == 'failure' || steps.slskd.outcome == 'failure' || steps.plextv.outcome == 'failure'
+        if: steps.report.outputs.drifted == 'true'
         run: echo "contract drift detected — see the drift issue" && exit 1

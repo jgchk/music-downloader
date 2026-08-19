@@ -45,15 +45,40 @@ of them are the same endpoint seen in a different state:
 
 ## Tier 2 — weekly drift detection (`.github/workflows/contract-drift.yml`)
 
-Runs on a schedule + `workflow_dispatch`; never gates a commit. On drift it opens or refreshes a
-single `contract-drift` GitHub issue.
+Runs on a schedule + `workflow_dispatch`; never gates a commit.
 
 - `drift/musicbrainz.ts` — replays the recorded request set against live `musicbrainz.org` and
-  validates responses against the shared schemas (≤1 req/s, one retry).
+  validates responses against the shared schemas (≤1 req/s, identified with a contactable
+  User-Agent).
 - `drift/slskd.ts` — checks the consumed-surface manifest (`support/slskd-manifest.ts`) against a
   live `slskd/slskd:latest` OpenAPI document. slskd leaves most 2xx responses unschematized, so the
   spec check covers operations, path parameters, and request fields; response shape is pinned by the
   fixtures + runtime schemas.
+- `packages/web/test/contract/drift/plextv.ts` — the unauthenticated plex.tv PIN surface.
+
+### The three outcomes
+
+A live check is entangled with a question it must not confuse with drift: _could we reach the
+provider at all?_ Both issues this job ever filed were that confusion — #110 (a broken invocation)
+and #184 (two MusicBrainz 503s from a shared GitHub-runner egress IP, where a same-day local replay
+showed every fixture conforming). So each check reports one of three outcomes, carried by its exit
+code and mapped in `scripts/drift/run-check.sh`:
+
+| Exit | Outcome       | Means                                         | The workflow                                   |
+| ---- | ------------- | --------------------------------------------- | ---------------------------------------------- |
+| `0`  | `conforms`    | reached, and the consumed surface still holds | green                                          |
+| `1`  | `drift`       | reached, and the consumed surface changed     | **red**, opens or refreshes the tracking issue |
+| `2`  | `unavailable` | not reached — neither confirmed nor refuted   | green, with a `::warning::` and a summary row  |
+
+**A green run means "no drift found", not "every provider was reached"** — the job summary says
+which. The classification lives once in `scripts/drift/probe.ts`, which also owns the retry:
+transient statuses (`408 425 429 500 502 503 504`) and transport faults are retried with backoff,
+honouring `Retry-After` up to a ceiling. Everything else the provider answers is terminal, and the
+important members stay loud: a `404`/`410` on a recorded operation means it was **removed**, and a
+`401`/`403` on an anonymous one means the surface grew an auth requirement. Both are drift.
+
+An unhandled crash exits `1`, so a broken checker lands in the loud channel rather than passing for
+a quiet outage.
 
 ## Re-recording and refreshing
 
@@ -89,7 +114,10 @@ curl -s localhost:5030/swagger/v0/swagger.json -o test/contract/slskd-spec/swagg
 
 When a drift issue fires: if a consumed field or operation genuinely changed, update the schema,
 re-record the affected fixtures, and (for slskd) refresh the pinned snapshot and manifest. If only
-values or unconsumed surface moved, no action is needed.
+values or unconsumed surface moved, no action is needed. Triage starts by re-running the check
+locally — `pnpm tsx packages/downloader/test/contract/drift/musicbrainz.ts` needs nothing but
+network — because a run that conforms from a developer machine and not from CI is telling you about
+the runner, not the contract.
 
 ## Bumping the pinned slskd version
 
