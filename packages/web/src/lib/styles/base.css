@@ -2,21 +2,15 @@
    Base — semantic HTML styled through tokens, carrying no skin knowledge.
 
    Colours and skinnable dimensions read from tokens (a few fixed structural
-   values are inlined); no theme colour is hardcoded here. Rules target the
-   stable hooks the components emit (.btn, .badge[data-phase], .chip[data-kind],
-   role="alert") and semantic elements — with one standing exception: widget
-   chrome is opt-in through `.btn` and never rides a bare `button`, which is
-   what the reset layer below exists to say. Skins never need the components to
-   change; they remap tokens and reach these same hooks.
+   values are inlined); no theme colour is hardcoded here. Rules target semantic
+   elements plus the stable hooks the components emit (.btn, .badge[data-phase],
+   role="alert"). The one element that is NOT styled by its name is `button`:
+   widget chrome is opt-in through `.btn`, and the reset layer below says so.
+   Skins never need the components to change; they remap tokens and reach these
+   same hooks.
    ============================================================================ */
 
-/* The cascade's order, repeated at the head of EVERY stylesheet in this system. Layer order is
-   fixed by first appearance, so a single declaration would make the app's import order
-   load-bearing — reorder the layout's imports and a skin's `theme` would register first and then
-   lose to the base for the rest of time. Restating it is idempotent and order-independent, so no
-   import order can invert it. `theme` sits LAST on purpose: a skin overriding the base is the
-   skin system's whole contract. What that deliberately does not buy — protection from a skin
-   re-chroming bare buttons — is held by the convention test beside these files instead. */
+/* Restated in every stylesheet so no import order can decide it — see tokens.css for why. */
 @layer reset, base, theme;
 
 @layer reset {
@@ -166,9 +160,10 @@
 
   /* -- Push buttons + button-styled links -----------------------------------
      `.btn` is the whole of it: what wears this class is a widget, and what does
-     not is a surface or a link. UNSCOPED element selectors are the reset's
-     business; a `button` scoped inside a named widget (see .segmented) is fine
-     — it is the global reach that leaked. */
+     not is a surface or a link. The rule the layers test enforces is narrow and
+     is only about buttons: no rule outside the reset may chrome a `button` that
+     no class has claimed. A `button` scoped inside a named widget is fine (see
+     .segmented) — it was the global reach that leaked. */
   .btn {
     --btn-bg: var(--surface-2);
     --btn-fg: var(--text);
@@ -858,9 +853,10 @@
      Structural once, themed per skin (web-ui-presentation). Meaning-based hooks
      only: what a thing IS (a result, an edition, the artwork slot), never how it
      should look. The artwork slot reserves its space before an image arrives, so
-     a grid does not reflow as covers load; a cover that never arrives leaves the
-     placeholder it was drawn over, and one that FAILS is dropped from the render
-     entirely (CoverArt does that — CSS cannot select an errored image). */
+     a grid does not reflow as covers load. A slot with nothing to ask for (an
+     artist, a track with no release) simply keeps its placeholder; a cover that
+     is asked for and FAILS is dropped from the render entirely (CoverArt does
+     that — CSS cannot select an errored image). */
   .request-search {
     display: flex;
     flex-direction: column;
@@ -982,9 +978,10 @@
     flex-direction: column;
     gap: var(--step-0);
   }
-  /* min-width lets these clip along a row: a flex item's floor is its content on the main axis,
-     so in a track row a long title would push the row wider instead of ellipsing inside it. In
-     the column cards the stretch already bounds them, and this is simply harmless there. */
+  /* The `min-width` on the title and the subline below it is what lets them clip along a row: a
+     flex item's floor is its content on the main axis, so in a track row a long title would push
+     the row wider instead of ellipsing inside it. In the column cards the stretch already bounds
+     them, and it is simply harmless there. */
   .result-title {
     font-weight: var(--fw-head);
     min-width: 0;

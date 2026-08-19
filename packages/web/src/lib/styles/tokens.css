@@ -10,13 +10,14 @@
      with no DOM change. Keep component CSS reading ONLY the semantic tokens below.
    ============================================================================ */
 
-/* The cascade's order, repeated at the head of EVERY stylesheet in this system. Layer order is
-   fixed by first appearance, so a single declaration would make the app's import order
-   load-bearing — reorder the layout's imports and a skin's `theme` would register first and then
-   lose to the base for the rest of time. Restating it is idempotent and order-independent, so no
-   import order can invert it. `theme` sits LAST on purpose: a skin overriding the base is the
-   skin system's whole contract. What that deliberately does not buy — protection from a skin
-   re-chroming bare buttons — is held by the convention test beside these files instead. */
+/* The cascade's order — stated in full here, and RESTATED at the head of every other stylesheet
+   in this system. Layer order is fixed by first appearance, so a single declaration would make
+   the app's import order load-bearing: reorder the layout's imports and a skin's `theme` would
+   register first and then lose to the base for the rest of time. Restating it is idempotent and
+   order-independent, so no import order can invert it. `theme` sits LAST on purpose — a skin
+   overriding the base is the skin system's whole contract. What layering deliberately does NOT
+   buy is protection from a skin re-chroming buttons no class has claimed; that is held instead
+   by `styles/layers.svelte.test.ts`, which scans these sheets for exactly that. */
 @layer reset, base, theme;
 
 @layer base {
@@ -73,10 +74,12 @@
     --cell-pad-y: var(--step-2);
     --cell-pad-x: var(--step-3);
 
-    /* The detail view's readable width. rem-preferred so the panel keeps participating in each
-       skin's type scale, floored in px so no skin's root size can crush it below the band a side
-       panel is readable in, and ceilinged so it never becomes the page. */
-    --detail-size: clamp(340px, 26rem, 30rem);
+    /* The detail view's readable width: rem so the panel keeps participating in each skin's type
+       scale, floored in px so no skin's root size can crush it below the band a side panel is
+       readable in. Deliberately un-ceilinged here — a rem ceiling could never bind (26rem is
+       always under any larger rem figure), and what actually stops the panel becoming the page
+       is the viewport share it is applied through. */
+    --detail-size: max(340px, 26rem);
 
     --radius: 14px;
     --radius-sm: 8px;

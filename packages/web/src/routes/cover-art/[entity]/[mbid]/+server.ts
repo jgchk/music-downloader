@@ -39,15 +39,31 @@ function sizeFrom(value: string | null): CoverArtSize | undefined {
   return (SIZES as readonly number[]).includes(asked) ? (asked as CoverArtSize) : undefined;
 }
 
+/** Path and query values reach the log from outside, so they arrive at a length we choose. */
+const clipped = (value: string): string => value.slice(0, 64);
+
 export const GET: RequestHandler = async ({ params, url, locals }) => {
   const { entity, mbid } = params;
   const size = sizeFrom(url.searchParams.get('size'));
   if (size === undefined || !isEntity(entity) || !isMbidShaped(mbid)) {
-    // A URL this application emitted and this route refuses is a first-party defect, and since
-    // a failed cover now renders as its placeholder rather than the browser's broken-image mark,
-    // this line is the only sign of it left. `warn`, not `debug`: debug is off in production,
-    // which is exactly where a systemic blanking of every cover would go unnoticed.
-    locals.logger.warn({ entity, mbid, size: url.searchParams.get('size') }, 'cover art refused');
+    // A failed cover now renders as its placeholder rather than the browser's broken-image mark,
+    // so a refusal is invisible to the person looking at the page and this line is the only sign
+    // of it left. Which line depends on who could have built the URL: an identifier the catalog
+    // would recognise, refused over its kind or its size, is a URL only this application
+    // constructs — a first-party defect, and `warn`, because `debug` is off in production and
+    // that is exactly where every cover silently blanking would go unnoticed. Anything else is
+    // someone poking at the address bar, which must not be able to fill the warn stream. Both
+    // echo the path fields clipped, since the values came from outside.
+    const refused = {
+      entity: clipped(entity),
+      mbid: clipped(mbid),
+      size: clipped(url.searchParams.get('size') ?? ''),
+    };
+    if (isMbidShaped(mbid)) {
+      locals.logger.warn(refused, 'cover art refused');
+    } else {
+      locals.logger.debug(refused, 'cover art asked for with an identifier of no known shape');
+    }
     return new Response(undefined, { status: 400 });
   }
 
