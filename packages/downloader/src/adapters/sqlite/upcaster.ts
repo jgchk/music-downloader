@@ -25,7 +25,9 @@ export class UpcasterRegistry {
   // event type -> (fromVersion -> upcaster that produces fromVersion + 1)
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();
 
-  /** The stored tokens this registry has steps for — the seam's tests assert they are real. */
+  /** The stored tokens this registry has steps for. Registrations are keyed by the token on
+   * disk, never the model's name for the event, so this is the set a caller can meaningfully
+   * upcast under. */
   registeredTypes(): readonly string[] {
     return this.upcasters.keys().toArray();
   }

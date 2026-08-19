@@ -224,6 +224,32 @@ describe('SqliteEventStore', () => {
     expect((JSON.parse(row.data) as { type: string }).type).toBe('AcquisitionFulfilled');
   });
 
+  it('hands back an event type it does not know rather than dropping the row', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database, buildUpcasterRegistry());
+    // What a newer build would have written. The row must survive the read intact — the deciders
+    // are total over an unknown tag, so tolerating it here loses nothing.
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'acq-1',
+        0,
+        'SomethingNobodyKnows',
+        CURRENT_SCHEMA_VERSION,
+        '{"type":"SomethingNobodyKnows"}',
+        '{}',
+      );
+
+    const readResult = await store.readStream('acq-1');
+    const read = readResult._unsafeUnwrap();
+
+    expect(read).toHaveLength(1);
+    expect(read[0]!.type).toBe('SomethingNobodyKnows');
+  });
+
   it('reads a row written before the rename as the current model type', async () => {
     const database = freshDatabase();
     const store = new SqliteEventStore(database);

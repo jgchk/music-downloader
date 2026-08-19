@@ -80,7 +80,7 @@ describe('SqliteResourceLedger', () => {
     expect(allLiveResult._unsafeUnwrap()).toEqual([]);
   });
 
-  it('scopes live queries by download, and all-live across acquisitions', async () => {
+  it('scopes live queries by download, and all-live across downloads', async () => {
     const { store } = ledger();
     const other: SourceResource = { ...transfer, acquisitionId: 'acq-2', resourceKey: 'u2|x' };
     await store.recordCreated(transfer);

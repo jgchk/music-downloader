@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { foldEvents, initialState } from './state.js';
+import { proposed, requested } from './__fixtures__/import-fixtures.js';
 import { react } from './react.js';
 import type { ImportEvent } from './events.js';
 
@@ -19,9 +20,11 @@ describe('an event type this build does not know', () => {
     expect(foldEvents([FROM_A_NEWER_BUILD])).toEqual(initialState);
   });
 
-  it('does not break the fold of the events around it', () => {
-    const history = [FROM_A_NEWER_BUILD] as readonly ImportEvent[];
-    expect(() => foldEvents([...history, ...history])).not.toThrow();
+  it('is transparent to the events around it', () => {
+    // The real hazard: an unknown tag mid-stream used to make `evolve` return undefined, and the
+    // NEXT event dereferenced it. Folding with the intruder must equal folding without it.
+    const known: readonly ImportEvent[] = [requested(), proposed([])];
+    expect(foldEvents([known[0]!, FROM_A_NEWER_BUILD, known[1]!])).toEqual(foldEvents(known));
   });
 
   it('provokes no effect', () => {
