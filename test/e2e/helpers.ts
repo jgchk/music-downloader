@@ -101,7 +101,9 @@ export async function waitForOk(url: string, timeoutMs = 120_000): Promise<void>
  * redirect to the new acquisition's page, from which the id is read.
  */
 export async function submitAcquisition(mbid: string): Promise<string> {
-  const res = await fetch(`${BASE_URL}/acquisitions/new`, {
+  // The named submit action — the one that lands on the new download, which is what this helper
+  // reads the id out of. (`?/request` answers with the download instead of redirecting.)
+  const res = await fetch(`${BASE_URL}/acquisitions/new?/submit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
