@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
 import type { Access, Facades } from '$lib/server/runtime.js';
+import type { CoverArtPort } from '$lib/server/cover-art/port.js';
 import type { SessionClaims } from '$lib/server/session.js';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts for information about these interfaces.
@@ -28,6 +29,8 @@ declare global {
       now: () => string;
       /** The access-control composition (session secret + PlexAccess port) for the login flow. */
       access: Access;
+      /** The cached cover-art port, read by the artwork endpoint the request page's images use. */
+      coverArt: CoverArtPort;
       /**
        * The verified session's claims, set by the gate when the request carries a valid cookie.
        * Undefined on the open routes (login flow, health) when no valid session rides along.
