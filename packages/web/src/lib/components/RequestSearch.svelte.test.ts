@@ -73,6 +73,46 @@ function catalogStub(
 }
 
 describe('RequestSearch', () => {
+  it('puts the cursor where the typing goes, on arrival', async () => {
+    await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
+
+    // The box IS the page; arriving with the cursor anywhere else costs a click to start.
+    expect(document.activeElement).toBe(document.querySelector('#catalog-query'));
+  });
+
+  it('hands the cursor back to the box after filtering', async () => {
+    await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
+
+    await page.getByRole('button', { name: 'Albums', exact: true }).click();
+
+    // Filtering is a step within searching, and the next thing a person does is almost always type.
+    expect(document.activeElement).toBe(document.querySelector('#catalog-query'));
+  });
+
+  it('puts the cursor back on the result the view was opened from', async () => {
+    const catalog = catalogStub();
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    const card = page.getByRole('button', { name: /Graceland/ }).first();
+    await card.click();
+    await expect.element(page.getByTestId('detail')).toBeVisible();
+    const opened = document.querySelector('.art-grid .result-open');
+
+    await page.getByRole('button', { name: 'Close' }).click();
+
+    // Otherwise the cursor lands at the top of the document and a keyboard user walks the whole
+    // page back to where they already were.
+    expect(document.activeElement).toBe(opened);
+  });
+
+  it('gives the identifier path something to actually paste', async () => {
+    await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
+
+    // "Paste a MusicBrainz ID" teaches nothing to someone who has never seen one.
+    await expect.element(page.getByText('19847822-1430-3380-9cf1-bc45545b34ac')).toBeVisible();
+  });
+
   it('teaches what the box does before anything is typed', async () => {
     await render(RequestSearch, { catalog: catalogStub(), typing: manualTyping() });
 

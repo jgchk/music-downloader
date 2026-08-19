@@ -1080,6 +1080,9 @@
      under that name would have flattened that pane into an overlay on every route it lays out. */
   .catalog-detail {
     position: fixed;
+    /* The page behind stays scrollable — this is a panel, not a modal — but a scroll that runs
+       out inside it stops there rather than carrying the page along under it. */
+    overscroll-behavior: contain;
     inset: 0 0 0 auto;
     /* The token carries the readable band; the viewport share keeps the panel from taking a
        middling window over, whatever a skin remaps the token to. (Below 40rem there is no panel

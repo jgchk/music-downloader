@@ -2,6 +2,7 @@
   import {
     albumDetail,
     alternativeLabel,
+    artistDetail,
     artUrl,
     countOf,
     emptyLead,
@@ -30,8 +31,11 @@
      * and its empty case is the page's to say, not this component's.
      */
     query?: string;
-    /** Open a result's detail view, handing it what this card already knows. */
-    onOpen: (kind: EntityKind, mbid: string, context: DetailContext) => void;
+    /**
+     * Open a result's detail view, handing it what this card already knows — and the card
+     * itself, so closing the view can put the cursor back where it was.
+     */
+    onOpen: (kind: EntityKind, mbid: string, context: DetailContext, from: HTMLElement) => void;
     /** Look at a different kind — the way out of an empty filtered view. */
     onFilter: (filter: EntityFilter) => void;
   }
@@ -106,13 +110,18 @@
             <button
               type="button"
               class="result-open"
-              onclick={() =>
-                onOpen('release-group', group.mbid, {
-                  title: group.title,
-                  artistCredit: group.artistCredit,
-                  year: group.year,
-                  primaryType: group.primaryType,
-                })}
+              onclick={(event) =>
+                onOpen(
+                  'release-group',
+                  group.mbid,
+                  {
+                    title: group.title,
+                    artistCredit: group.artistCredit,
+                    year: group.year,
+                    primaryType: group.primaryType,
+                  },
+                  event.currentTarget,
+                )}
             >
               <CoverArt
                 src={artUrl('release-group', group.mbid, 250)}
@@ -132,11 +141,12 @@
             <button
               type="button"
               class="result-open"
-              onclick={() => onOpen('artist', artist.mbid, { title: artist.name })}
+              onclick={(event) =>
+                onOpen('artist', artist.mbid, { title: artist.name }, event.currentTarget)}
             >
               <CoverArt initials={initialsOf(artist.name)} shape="artist" />
               <span class="result-title">{artist.name}</span>
-              <span class="result-detail">{artist.disambiguation ?? 'Artist'}</span>
+              <span class="result-detail">{artistDetail(artist)}</span>
               <span class="result-action">Browse releases</span>
             </button>
           </li>
@@ -149,12 +159,17 @@
             <button
               type="button"
               class="result-open"
-              onclick={() =>
-                onOpen('recording', recording.mbid, {
-                  title: recording.title,
-                  artistCredit: recording.artistCredit,
-                  release: recording.release,
-                })}
+              onclick={(event) =>
+                onOpen(
+                  'recording',
+                  recording.mbid,
+                  {
+                    title: recording.title,
+                    artistCredit: recording.artistCredit,
+                    release: recording.release,
+                  },
+                  event.currentTarget,
+                )}
             >
               <CoverArt
                 src={recording.release === undefined

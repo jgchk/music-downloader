@@ -119,6 +119,12 @@
    * Open a result, and let the read know whether it is still the one being waited for: opening a
    * second result, or closing the surface, must not be undone by the first read arriving late.
    */
+  /** The result the open view was opened from, so closing it puts the cursor back there. */
+  let openedFrom: HTMLElement | undefined;
+
+  /** The search box, so a filter tab can hand the cursor back to where typing goes. */
+  let searchBox = $state<HTMLInputElement | undefined>();
+
   /** The artist whose releases have taken over the results area, when one has. */
   let browse = $state<BrowseState | undefined>();
 
@@ -149,7 +155,15 @@
     );
   }
 
-  function openDetailFor(kind: EntityKind, mbid: string, context: DetailContext): void {
+  function openDetailFor(
+    kind: EntityKind,
+    mbid: string,
+    context: DetailContext,
+    from: HTMLElement,
+  ): void {
+    // The card that was activated — not whatever happens to hold focus — is what the cursor goes
+    // back to when this closes.
+    openedFrom = from;
     if (kind === 'artist') {
       browseArtistFor(mbid, context.title);
       return;
@@ -203,6 +217,7 @@
       type="search"
       autocomplete="off"
       placeholder="An artist, an album, a track — or paste a MusicBrainz ID"
+      bind:this={searchBox}
       bind:value={query}
       onkeydown={(event) => {
         if (event.key !== 'Enter') {
@@ -213,6 +228,7 @@
         searchNow();
       }}
       data-testid="catalog-query"
+      {@attach (element: HTMLInputElement) => element.focus()}
     />
     {#if searching}
       <span class="searching" role="status" data-testid="searching">Searching…</span>
@@ -225,7 +241,12 @@
         type="button"
         class="btn"
         aria-pressed={filter === option.value}
-        onclick={() => filterResults(option.value)}
+        onclick={() => {
+          filterResults(option.value);
+          // Back to the box: filtering is a step within searching, and the next thing a person
+          // does is almost always type.
+          searchBox?.focus();
+        }}
       >
         {option.label}
       </button>
@@ -276,7 +297,8 @@
   {:else if !searching}
     <p class="search-hint" data-testid="search-hint">
       Search the catalog by artist, album, or track — results appear as you type, or press Enter to
-      search right away. Have the exact ID? Paste a MusicBrainz ID into the same box.
+      search right away. Have the exact ID? Paste a MusicBrainz ID into the same box, like
+      <code>19847822-1430-3380-9cf1-bc45545b34ac</code>.
     </p>
   {/if}
 
@@ -291,7 +313,13 @@
     {chosen}
     {values}
     onChoose={(edition) => (chosen = edition)}
-    onClose={() => (detail = undefined)}
+    onClose={() => {
+      detail = undefined;
+      // Back to the result it was opened from. Without this the cursor lands at the top of the
+      // document, and a keyboard user has to walk the whole page back to where they were.
+      openedFrom?.focus();
+      openedFrom = undefined;
+    }}
   />
 
   <!-- Open when THIS form's submission was refused: the message names a field in a form that is

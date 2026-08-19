@@ -363,6 +363,56 @@ describe('CatalogDetail', () => {
     await expect.element(page.getByRole('button', { name: 'Requesting…' })).toBeDisabled();
   });
 
+  it('closes on Escape pressed anywhere, not only inside it', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      onClose,
+    });
+
+    // The search box is where someone's hands already are; Escape there has to mean this.
+    document.body.focus();
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('closes when something outside it is used', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      onClose,
+    });
+
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('stays open when something inside it is used', async () => {
+    const onClose = vi.fn();
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      onClose,
+    });
+
+    // Choosing a pressing is not leaving.
+    document
+      .querySelector('.editions .edition')!
+      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('promises no modality it does not deliver', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    // `aria-modal` without real inertness tells a screen reader the rest of the page is gone
+    // when it is not — worse than saying nothing.
+    await expect.element(page.getByTestId('detail')).toHaveAttribute('aria-modal', 'false');
+    expect(document.querySelector('.scrim')).toBeNull();
+  });
+
   it('closes when asked', async () => {
     const onClose = vi.fn();
     await render(CatalogDetail, {

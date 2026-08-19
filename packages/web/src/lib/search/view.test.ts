@@ -4,6 +4,7 @@ import {
   albumDetail,
   alternativeLabel,
   artUrl,
+  artistDetail,
   asBrowsedResults,
   countOf,
   emptyLead,
@@ -245,5 +246,19 @@ describe('asBrowsedResults', () => {
 
   it('carries an empty discography as empty, not as something else', () => {
     expect(asBrowsedResults({ releaseGroups: [] }).releaseGroups).toEqual([]);
+  });
+});
+
+describe('artistDetail', () => {
+  it('prefers the catalog’s own tie-breaker, which is written for exactly this', () => {
+    expect(artistDetail({ disambiguation: 'US singer', type: 'Person' })).toBe('US singer');
+  });
+
+  it('says what kind of act they are when there is no tie-breaker', () => {
+    expect(artistDetail({ type: 'Group' })).toBe('Group');
+  });
+
+  it('keeps the card’s shape when the catalog said neither', () => {
+    expect(artistDetail({})).toBe('Artist');
   });
 });
