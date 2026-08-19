@@ -328,7 +328,11 @@ describe('the intake event consumer', () => {
 
     const outcome = await consume(fulfilledEvent({ location: '/elsewhere/Radiohead - Kid A' }));
 
-    expect(outcome._unsafeUnwrapErr()).toEqual({ kind: 'Permanent', reason: 'OutsideSourceRoot' });
+    // `OutsideSourceRoot` covers four distinct refusals, and this classification halts the seam —
+    // so the location it refused and the roots it judged against have to reach the log with it.
+    const failure = outcome._unsafeUnwrapErr();
+    expect(failure).toMatchObject({ kind: 'Permanent', reason: 'OutsideSourceRoot' });
+    expect(failure.cause).toMatchObject({ location: '/elsewhere/Radiohead - Kid A' });
     expect(wiring.store.all()).toHaveLength(0);
   });
 

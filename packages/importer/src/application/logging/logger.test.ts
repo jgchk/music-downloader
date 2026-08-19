@@ -85,12 +85,29 @@ describe('createLogger', () => {
     const logger = createLogger({ destination: stream });
 
     logger.error(
-      { err: { kind: 'Transient', reason: 'InfraError', cause: { apiKey: 'sekret' } } },
+      {
+        err: {
+          kind: 'Transient',
+          reason: 'InfraError',
+          cause: {
+            password: 'leak-password',
+            apiKey: 'leak-apiKey',
+            token: 'leak-token',
+            authorization: 'leak-authorization',
+            fileContents: 'leak-fileContents',
+          },
+        },
+      },
       'seam feed read failed; holding checkpoint',
     );
 
-    expect(lines[0]).toContain('[REDACTED]');
-    expect(lines[0]).not.toContain('sekret');
+    // Every path, not a representative one: each literal in the list is its own claim, and a
+    // string mutant on any of them should have somewhere to fail.
+    expect(lines[0]).not.toContain('leak-password');
+    expect(lines[0]).not.toContain('leak-apiKey');
+    expect(lines[0]).not.toContain('leak-token');
+    expect(lines[0]).not.toContain('leak-authorization');
+    expect(lines[0]).not.toContain('leak-fileContents');
   });
 
   it('honours custom redaction paths', () => {
