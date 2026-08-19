@@ -203,7 +203,7 @@ describe('bootRuntimes', () => {
     const lines: string[] = [];
     const legacy = { ...VALID_ENV } as Record<string, string | undefined>;
     delete legacy.DEPOSIT_ROOT;
-    legacy.LIBRARY_ROOT = '/deposit';
+    legacy.LIBRARY_ROOT = '/legacy-deposit';
 
     await bootRuntimes(legacy, {
       ...fakeRuntimes([]),
@@ -214,7 +214,7 @@ describe('bootRuntimes', () => {
       },
     });
 
-    expect(lines.some((line) => line.includes('DEPOSIT_ROOT'))).toBe(true);
+    expect(lines.join('')).toContain('DEPOSIT_ROOT');
   });
 
   it('fails fast on an invalid environment, naming the setting', async () => {

@@ -199,6 +199,32 @@ describe('SqliteEventStore', () => {
     expect((JSON.parse(row.data) as { type: string }).type).toBe('CandidatesProposed');
   });
 
+  it('hands back an event type it does not know rather than dropping the row', async () => {
+    const database = freshDatabase();
+    const store = new SqliteEventStore(database, buildUpcasterRegistry());
+    // What a newer build would have written. The row must survive the read intact — the deciders
+    // are total over an unknown tag, so tolerating it here loses nothing.
+    database
+      .prepare(
+        `INSERT INTO events (stream_id, version, type, schema_version, data, metadata)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'imp-1',
+        0,
+        'SomethingNobodyKnows',
+        CURRENT_SCHEMA_VERSION,
+        '{"type":"SomethingNobodyKnows"}',
+        '{}',
+      );
+
+    const readResult = await store.readStream('imp-1');
+    const read = readResult._unsafeUnwrap();
+
+    expect(read).toHaveLength(1);
+    expect(read[0]!.type).toBe('SomethingNobodyKnows');
+  });
+
   it('reads a row written before the rename as the current model type, upcasting by its token', async () => {
     const database = freshDatabase();
     // The upcaster is keyed by the STORED token — a renamed event proves the ordering matters.
@@ -226,7 +252,7 @@ describe('SqliteEventStore', () => {
     const read = readResult._unsafeUnwrap();
 
     expect(read[0]!.type).toBe('MatchesProposed');
-    expect(read[0]!.event).toMatchObject({ type: 'MatchesProposed', upcasted: true });
+    expect(read[0]!.event).toEqual({ type: 'MatchesProposed', candidates: [], upcasted: true });
   });
 
   it('upcasts stored events on read', async () => {
