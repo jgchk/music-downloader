@@ -68,6 +68,10 @@ const resultProps = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * A real album's worth of pressings — enough to overflow the panel, which is the state the
+ * panel's own layout has to survive: a column that scrolls will shrink whatever lets it.
+ */
 const albumDetail = (): DetailState => ({
   kind: 'release-group',
   mbid: RG,
@@ -76,7 +80,12 @@ const albumDetail = (): DetailState => ({
     groups: [
       {
         representative: { mbid: RELEASE, title: 'Ziggy Stardust', formats: ['CD'], trackCount: 11 },
-        editions: [{ mbid: RELEASE, title: 'Ziggy Stardust', formats: ['CD'], trackCount: 11 }],
+        editions: Array.from({ length: 28 }, (_unused, index) => ({
+          mbid: index === 0 ? RELEASE : String(index).padStart(8, '0') + RELEASE.slice(8),
+          title: 'Ziggy Stardust',
+          formats: ['CD'],
+          trackCount: 11,
+        })),
       },
     ],
     bestMatch: { kind: 'pick', mbid: RELEASE },
@@ -203,6 +212,20 @@ describe.each(SKINS)('request-page anatomy under skin %s', (skin) => {
     expect(panel.width).toBeLessThanOrEqual(Math.max(340, 30 * rootFontSize) + 1);
     // And it never takes the window over, however narrow the window is.
     expect(panel.width).toBeLessThanOrEqual(window.innerWidth * 0.75 + 1);
+  });
+
+  it('gives the detail view the same reserved artwork square the grids have', async () => {
+    wearing(skin);
+    await wideViewport();
+    await render(CatalogDetail, detailProps(albumDetail()));
+
+    const art = boxOf('.catalog-detail .art');
+    const panel = boxOf('.catalog-detail');
+
+    // The panel is a scrolling column: without saying so, a slot whose height comes from its
+    // width and whose contents are positioned is free to shrink away to nothing.
+    expect(art.width).toBeGreaterThan(panel.width * 0.5);
+    expect(Math.abs(art.height - art.width)).toBeLessThanOrEqual(1);
   });
 
   it('shows the placeholder, not a broken-image glyph, when a cover cannot be fetched', async () => {
