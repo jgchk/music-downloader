@@ -82,6 +82,11 @@ lost, plus two robustness gaps the audit exposed:
 - `cover-art`: an unreachable archive is remembered briefly — distinct from and much shorter than
   confirmed absence — so bursts of lookups fail fast while art stays re-findable.
 
+Two existing scenario headings keep their wording — "Dig-in request with a pinned edition" and
+"The default edition is visible before requesting". The archiver reads a renamed scenario as a
+dropped one, so a heading can only change when its requirement is next restated wholesale; their
+prose and every scenario added here use the settled language.
+
 ## Impact
 
 - **`packages/web`**: the bulk — `RequestSearch`/`CatalogResults`/`CatalogDetail` and the
