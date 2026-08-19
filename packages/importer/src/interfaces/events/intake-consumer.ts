@@ -108,7 +108,21 @@ export function intakeEventConsumer(
       intakeRoot: options.intakeRoot,
     });
     if (rerooted.isErr()) {
-      return err({ kind: 'Permanent' as const, reason: rerooted.error });
+      // Another halt, so it owes the same account as the others: `OutsideSourceRoot` covers four
+      // distinct refusals (not under the prefix; an empty, `.`, or `..` segment), and the operator
+      // needs the location and the roots it was judged against to tell them apart.
+      return err({
+        kind: 'Permanent' as const,
+        reason: rerooted.error,
+        cause: {
+          eventType: event.type,
+          globalSeq: event.globalSeq,
+          acquisitionId,
+          location,
+          sourceRoot: options.sourceRoot,
+          intakeRoot: options.intakeRoot,
+        },
+      });
     }
     const directory = rerooted.value;
     let isVisible: boolean;
