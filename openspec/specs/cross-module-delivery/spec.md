@@ -104,17 +104,22 @@ No step of the delivery mechanism SHALL require an atomic write spanning both mo
 
 ### Requirement: Poison-event policy per subscription
 
-A subscription SHALL retry a failing event a bounded number of times with backoff; on exhaustion it SHALL apply its declared policy: **halt** (stop the subscription without advancing, surfacing the stall via structured logs) or **park** (record the event's position and error as a dead-letter row in the consumer's store, then advance). Each subscription MUST declare exactly one policy.
+A subscription SHALL retry a failing event a bounded number of times with backoff; on exhaustion it SHALL **halt**: stop the subscription without advancing the checkpoint, surfacing the stall via structured logs, leaving later events unprocessed and other subscriptions unaffected. Failures classified transient SHALL hold the checkpoint for redelivery (the fallback poll retries them indefinitely) rather than counting toward exhaustion-halt; only failures classified permanent halt the subscription. Recovery from a halt is a restart (or explicit reset) after the defect is fixed: the subscription resumes from the held checkpoint in order.
 
 #### Scenario: Halt preserves order
 
-- **WHEN** an event exhausts its retries on a subscription declared `halt`
+- **WHEN** an event exhausts its retries on a subscription
 - **THEN** the subscription stops advancing, later events remain unprocessed, the stall is logged, and other subscriptions continue unaffected
 
-#### Scenario: Park preserves progress
+#### Scenario: Restart after a fix is the redrive
 
-- **WHEN** an event exhausts its retries on a subscription declared `park`
-- **THEN** a dead-letter row records the event's position and failure, and the subscription continues with the next event
+- **WHEN** a halted subscription's process restarts after the causing defect is fixed
+- **THEN** the subscription resumes from the held checkpoint and processes the formerly poison event and all successors in feed order, with no event skipped
+
+#### Scenario: Transient failure holds without halting
+
+- **WHEN** an event's handler reports a transient failure
+- **THEN** the checkpoint is not advanced, the event is redelivered by the poll loop, and the subscription does not halt
 
 ### Requirement: A permanent render defect at the feed halts the subscription
 
