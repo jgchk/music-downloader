@@ -15,6 +15,7 @@
     trimmedCount,
   } from '$lib/search/view.js';
   import CoverArt from './CoverArt.svelte';
+  import type { DetailContext } from '$lib/search/detail.js';
   import type { EntityFilter, EntityKind } from '$lib/search/view.js';
   import type { CatalogSearchResultDto } from '@music/downloader';
 
@@ -25,8 +26,8 @@
     filter: EntityFilter;
     /** What was searched for, so an empty answer can name it. */
     query: string;
-    /** Open a result's detail view. */
-    onOpen: (kind: EntityKind, mbid: string, title: string) => void;
+    /** Open a result's detail view, handing it what this card already knows. */
+    onOpen: (kind: EntityKind, mbid: string, context: DetailContext) => void;
     /** Look at a different kind — the way out of an empty filtered view. */
     onFilter: (filter: EntityFilter) => void;
   }
@@ -115,7 +116,13 @@
             <button
               type="button"
               class="result-open"
-              onclick={() => onOpen('release-group', group.mbid, group.title)}
+              onclick={() =>
+                onOpen('release-group', group.mbid, {
+                  title: group.title,
+                  artistCredit: group.artistCredit,
+                  year: group.year,
+                  primaryType: group.primaryType,
+                })}
             >
               <CoverArt
                 src={artUrl('release-group', group.mbid, 250)}
@@ -146,7 +153,7 @@
             <button
               type="button"
               class="result-open"
-              onclick={() => onOpen('artist', artist.mbid, artist.name)}
+              onclick={() => onOpen('artist', artist.mbid, { title: artist.name })}
             >
               <CoverArt initials={initialsOf(artist.name)} shape="artist" />
               <span class="result-title">{artist.name}</span>
@@ -163,7 +170,12 @@
             <button
               type="button"
               class="result-open"
-              onclick={() => onOpen('recording', recording.mbid, recording.title)}
+              onclick={() =>
+                onOpen('recording', recording.mbid, {
+                  title: recording.title,
+                  artistCredit: recording.artistCredit,
+                  release: recording.release,
+                })}
             >
               <CoverArt
                 src={recording.release === undefined

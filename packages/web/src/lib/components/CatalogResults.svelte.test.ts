@@ -184,7 +184,30 @@ describe('CatalogResults', () => {
       .first()
       .click();
 
-    expect(onOpen).toHaveBeenCalledWith('release-group', RG, 'Graceland');
+    // The card hands over what it already had on screen, so the view can name its subject
+    // without a second read of a record the person is already looking at.
+    expect(onOpen).toHaveBeenCalledWith('release-group', RG, {
+      title: 'Graceland',
+      artistCredit: 'Paul Simon',
+      year: 1986,
+      primaryType: 'Album',
+    });
+  });
+
+  it('hands a track the release it came from, for its context and its artwork', async () => {
+    const onOpen = vi.fn();
+    await render(CatalogResults, props({ onOpen }));
+
+    await page
+      .getByRole('button', { name: /The Boy in the Bubble/ })
+      .first()
+      .click();
+
+    expect(onOpen).toHaveBeenCalledWith('recording', RECORDING, {
+      title: 'The Boy in the Bubble',
+      artistCredit: 'Paul Simon',
+      release: { mbid: RELEASE, title: 'Graceland' },
+    });
   });
 
   it('sends an artist to their releases rather than requesting them all', async () => {

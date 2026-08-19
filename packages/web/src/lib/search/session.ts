@@ -1,6 +1,6 @@
 import { isCatalogId } from './view.js';
 import type { CatalogClient } from './client.js';
-import type { DetailState, TracklistState } from './detail.js';
+import type { DetailContext, DetailState, TracklistState } from './detail.js';
 import type { EntityKind } from './view.js';
 import type { CatalogLookupResultDto, CatalogSearchResultDto } from '@music/downloader';
 
@@ -111,15 +111,15 @@ export async function openDetail(
   catalog: CatalogClient,
   kind: EntityKind,
   mbid: string,
-  title: string,
+  context: DetailContext,
   onDetail: (detail: DetailState) => void,
   isCurrent: () => boolean = () => true,
 ): Promise<void> {
   if (kind === 'recording') {
-    onDetail({ kind: 'recording', mbid, title });
+    onDetail({ kind: 'recording', mbid, ...context });
     return;
   }
-  onDetail({ kind: 'loading', mbid, title });
+  onDetail({ kind: 'loading', mbid, ...context });
   // Each read is awaited in its own branch, so its answer keeps its own type — see `runSearch`.
   // "Something else was opened, or everything was closed, while this was being read" is checked
   // after every await: rendering then would reopen a surface the person dismissed, or put one
@@ -129,8 +129,8 @@ export async function openDetail(
     if (!isCurrent()) return;
     onDetail(
       answer.ok
-        ? { kind: 'release-group', mbid, title, editions: answer.value }
-        : { kind: 'failed', mbid, title, message: answer.message },
+        ? { kind: 'release-group', mbid, ...context, editions: answer.value }
+        : { kind: 'failed', mbid, ...context, message: answer.message },
     );
     return;
   }
@@ -138,8 +138,8 @@ export async function openDetail(
   if (!isCurrent()) return;
   onDetail(
     answer.ok
-      ? { kind: 'artist', mbid, title, discography: answer.value }
-      : { kind: 'failed', mbid, title, message: answer.message },
+      ? { kind: 'artist', mbid, ...context, discography: answer.value }
+      : { kind: 'failed', mbid, ...context, message: answer.message },
   );
 }
 

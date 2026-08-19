@@ -8,7 +8,12 @@
   import type { SearchOutcome } from '$lib/search/session.js';
   import { searchTyping, startTyping } from '$lib/search/typing.js';
   import type { CatalogClient } from '$lib/search/client.js';
-  import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
+  import type {
+    DetailContext,
+    DetailState,
+    EditionPin,
+    TracklistState,
+  } from '$lib/search/detail.js';
   import type { TypingDriver } from '$lib/search/typing.js';
   import type { EntityFilter, EntityKind } from '$lib/search/view.js';
 
@@ -109,20 +114,20 @@
    * Open a result, and let the read know whether it is still the one being waited for: opening a
    * second result, or closing the surface, must not be undone by the first read arriving late.
    */
-  function openDetailFor(kind: EntityKind, mbid: string, title: string): void {
+  function openDetailFor(kind: EntityKind, mbid: string, context: DetailContext): void {
     tracklists = {};
     // What is open IS what was last asked for — `detail` is set synchronously to `loading` before
-    // any read starts — so the surface is asked rather than tracked a second time alongside it.
+    // any read starts — so the view is asked rather than tracked a second time alongside it.
     void attempt(
       openDetail(
         catalog,
         kind,
         mbid,
-        title,
+        context,
         (opened) => (detail = opened),
         () => detail?.mbid === mbid,
       ),
-      () => (detail = { kind: 'failed', mbid, title, message: UNEXPECTED }),
+      () => (detail = { kind: 'failed', mbid, ...context, message: UNEXPECTED }),
     );
   }
 

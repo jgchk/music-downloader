@@ -193,7 +193,7 @@ describe('openDetail', () => {
     const client = catalog();
     const opened: DetailState[] = [];
 
-    await openDetail(client, 'recording', RECORDING, 'The Boy in the Bubble', (d) => {
+    await openDetail(client, 'recording', RECORDING, { title: 'The Boy in the Bubble' }, (d) => {
       opened.push(d);
     });
 
@@ -208,7 +208,7 @@ describe('openDetail', () => {
     const client = catalog();
     const opened: DetailState[] = [];
 
-    await openDetail(client, 'release-group', RG, 'Graceland', (d) => {
+    await openDetail(client, 'release-group', RG, { title: 'Graceland' }, (d) => {
       opened.push(d);
     });
 
@@ -224,7 +224,7 @@ describe('openDetail', () => {
     });
     const opened: DetailState[] = [];
 
-    await openDetail(client, 'release-group', RG, 'Graceland', (d) => {
+    await openDetail(client, 'release-group', RG, { title: 'Graceland' }, (d) => {
       opened.push(d);
     });
 
@@ -244,7 +244,7 @@ describe('openDetail', () => {
     });
     const opened: DetailState[] = [];
 
-    await openDetail(client, 'artist', ARTIST, 'Paul Simon', (d) => {
+    await openDetail(client, 'artist', ARTIST, { title: 'Paul Simon' }, (d) => {
       opened.push(d);
     });
 
@@ -259,7 +259,7 @@ describe('openDetail', () => {
     });
     const opened: DetailState[] = [];
 
-    await openDetail(client, 'artist', ARTIST, 'Paul Simon', (d) => {
+    await openDetail(client, 'artist', ARTIST, { title: 'Paul Simon' }, (d) => {
       opened.push(d);
     });
 
@@ -278,7 +278,7 @@ describe('openDetail', () => {
       client,
       'artist',
       ARTIST,
-      'Paul Simon',
+      { title: 'Paul Simon' },
       (d) => {
         opened.push(d);
       },
@@ -362,7 +362,7 @@ describe('readTracklist', () => {
       client,
       'release-group',
       RG,
-      'Graceland',
+      { title: 'Graceland' },
       (d) => {
         opened.push(d);
       },
