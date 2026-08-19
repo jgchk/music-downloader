@@ -32,6 +32,7 @@ export const CATALOG_RESULTS: CatalogSearchResults = {
     {
       mbid: asMbid('4d5447d7-c61c-4120-ba1b-d7f471d385b9'),
       name: 'Paul Simon',
+      type: 'Person',
       disambiguation: 'US singer',
     },
   ],

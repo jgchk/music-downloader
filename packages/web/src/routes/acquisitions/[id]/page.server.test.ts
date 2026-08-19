@@ -228,7 +228,9 @@ describe('cancel action', () => {
       status: number;
       data: { message: string };
     };
-    expect(result.status).toBe(500);
+    // Unmarked infrastructure faults read as possibly-transient — the store did not say the
+    // failure was permanent, so this is not an occasion to tell someone it will never work.
+    expect(result.status).toBe(502);
     expect(result.data.message).toBe('Something went wrong. Try again.');
   });
 });

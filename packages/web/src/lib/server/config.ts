@@ -29,6 +29,8 @@ const environmentSchema = z.object({
   SLSKD_API_KEY: z.string().min(1).optional(),
   MUSICBRAINZ_BASE_URL: z.string().min(1).optional(),
   MUSICBRAINZ_USER_AGENT: z.string().min(1).optional(),
+  /** Where cover art is fetched from. Unset means the archive itself — see CoverArtArchive. */
+  COVER_ART_BASE_URL: z.string().min(1).optional(),
   // Parked-effect retry tuning (reactor-durability D2); unset falls back to runtime defaults
   // (5s initial, 15min cap, 6h wall-clock budget, 30d stalled retention).
   REACTOR_RETRY_INITIAL_DELAY_MS: z.coerce.number().int().positive().optional(),
@@ -89,6 +91,8 @@ export interface ComposedConfig {
   readonly importer: ImporterRuntimeConfig;
   readonly intakeSourceRoot: string;
   readonly access: AccessConfig;
+  /** Web-owned: the cover-art archive is this BFF's upstream, not either module's. */
+  readonly coverArt: { readonly baseUrl: string | undefined };
 }
 
 export function loadComposedConfig(
@@ -161,5 +165,6 @@ export function loadComposedConfig(
       sessionSecret: v.SESSION_SECRET,
       plex: { machineId: v.PLEX_SERVER_MACHINE_ID, baseUrl: v.PLEX_API_BASE_URL },
     },
+    coverArt: { baseUrl: v.COVER_ART_BASE_URL },
   });
 }

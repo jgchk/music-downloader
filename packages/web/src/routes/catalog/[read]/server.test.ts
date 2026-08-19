@@ -99,7 +99,9 @@ describe('GET /catalog/[read]', () => {
 
     const response = await GET(event('search', 'q=graceland', downloader));
 
-    expect(response.status).toBe(500);
+    // 502, not 500: the catalog could not be REACHED, which may pass. The page's copy turns on
+    // this, so collapsing the two here would put "that is a bug" in front of an outage.
+    expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       message: 'Something went wrong. Try again.',
     });

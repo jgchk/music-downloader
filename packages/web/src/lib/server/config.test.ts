@@ -11,6 +11,12 @@ const VALID = {
 };
 
 describe('loadComposedConfig', () => {
+  it('leaves the cover-art archive where it lives when nothing says otherwise', () => {
+    const config = loadComposedConfig({ ...VALID })._unsafeUnwrap();
+
+    expect(config.coverArt.baseUrl).toBeUndefined();
+  });
+
   it('maps a minimal valid environment onto both module configs with defaults', () => {
     const config = loadComposedConfig(VALID)._unsafeUnwrap();
     expect(config.downloader.databaseFile).toBe('data/downloader/events.db');
@@ -61,6 +67,7 @@ describe('loadComposedConfig', () => {
       SLSKD_API_KEY: 'key',
       MUSICBRAINZ_BASE_URL: 'http://mb',
       MUSICBRAINZ_USER_AGENT: 'ua',
+      COVER_ART_BASE_URL: 'http://art',
       DOWNLOADER_DATABASE_FILE: '/data/d.db',
       IMPORTER_DATABASE_FILE: '/data/i.db',
       BRIDGE_PYTHON: '/venv/bin/python',
@@ -72,6 +79,9 @@ describe('loadComposedConfig', () => {
     expect(config.downloader.slskd).toEqual({ baseUrl: 'http://slskd:5030', apiKey: 'key' });
     expect(config.downloader.ffmpeg).toEqual({ timeoutMs: 30_000 });
     expect(config.downloader.musicbrainz).toEqual({ baseUrl: 'http://mb', userAgent: 'ua' });
+    // Deployment reality, not a preference: a stub, a proxy, or a constrained network needs the
+    // archive somewhere other than where it lives.
+    expect(config.coverArt).toEqual({ baseUrl: 'http://art' });
     expect(config.downloader.databaseFile).toBe('/data/d.db');
     expect(config.importer.databaseFile).toBe('/data/i.db');
     expect(config.importer.bridgePython).toBe('/venv/bin/python');

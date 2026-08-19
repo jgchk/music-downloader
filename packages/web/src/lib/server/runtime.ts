@@ -200,7 +200,7 @@ async function boot(
     facades: { downloader: downloader.facade, importer: importer.facade },
     // One cached archive client for the process: covers are re-fetchable, so the cache is a
     // courtesy to the archive and a latency win for the grid, never a source of truth.
-    coverArt: cachingCoverArt(new CoverArtArchive()),
+    coverArt: cachingCoverArt(new CoverArtArchive({ baseUrl: config.value.coverArt.baseUrl })),
     access: {
       sessionSecret: config.value.access.sessionSecret,
       plex: new PlexTvAccess(config.value.access.plex),

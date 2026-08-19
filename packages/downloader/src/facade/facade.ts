@@ -66,7 +66,17 @@ export const downloaderFacadeErrorSchema = z.discriminatedUnion('kind', [
     streamId: z.string(),
     expectedVersion: z.number(),
   }),
-  z.object({ kind: z.literal('InfraError'), operation: z.string(), message: z.string() }),
+  z.object({
+    kind: z.literal('InfraError'),
+    operation: z.string(),
+    message: z.string(),
+    /**
+     * Whether retrying is futile — the adapter's own classification (schema drift, a refusal it
+     * recognized) rather than a guess. Additive and optional: an older producer simply does not
+     * say, and a reader that cannot tell must treat the fault as possibly-transient.
+     */
+    permanent: z.boolean().optional(),
+  }),
 ]);
 
 export type DownloaderFacadeError = z.infer<typeof downloaderFacadeErrorSchema>;
@@ -88,7 +98,12 @@ function validationFailed<T>(error: z.ZodError): FacadeResult<T> {
 /** Command failures pass through as values; the infra fault drops its non-serializable `cause`. */
 function toFacadeError(error: CommandError): DownloaderFacadeError {
   if (error.kind === 'InfraError') {
-    return { kind: 'InfraError', operation: error.operation, message: error.message };
+    return {
+      kind: 'InfraError',
+      operation: error.operation,
+      message: error.message,
+      permanent: error.permanent,
+    };
   }
   return error;
 }

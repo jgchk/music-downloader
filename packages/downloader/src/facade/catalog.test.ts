@@ -13,6 +13,7 @@ import {
   catalogLookupResultSchema,
   catalogSearchResultSchema,
   catalogTracklistResultSchema,
+  downloaderFacadeErrorSchema,
 } from './index.js';
 import type { CatalogSearchPort } from '../application/ports/catalog-search-port.js';
 
@@ -63,6 +64,41 @@ describe('searchCatalog', () => {
       ok: false,
       error: { kind: 'InfraError', operation: 'musicbrainz.catalog.search' },
     });
+  });
+
+  it('says whether a fault is worth retrying, so a reader need not guess', async () => {
+    // Reached-or-drifted is decided by the adapter that failed, and it is the difference between
+    // "try again in a moment" and "this will never work until we fix it". Dropping it at the
+    // facade left every consumer to invent an answer.
+    const unreachable = await facadeWith(
+      fakeCatalog({ fault: UNREACHABLE_CATALOG_FAULT }),
+    ).searchCatalog({ query: 'graceland' }, STORY);
+
+    expect(unreachable).toMatchObject({ ok: false, error: { kind: 'InfraError' } });
+    if (!unreachable.ok && unreachable.error.kind === 'InfraError') {
+      expect(unreachable.error.permanent).not.toBe(true);
+    }
+  });
+
+  it('marks a drifted catalog permanent all the way to the wire', async () => {
+    const drifted = {
+      kind: 'InfraError' as const,
+      operation: 'musicbrainz.catalog.search',
+      message: 'the catalog’s shape has drifted',
+      permanent: true,
+    };
+
+    const result = await facadeWith(fakeCatalog({ fault: drifted })).searchCatalog(
+      { query: 'graceland' },
+      STORY,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.kind === 'InfraError') {
+      expect(result.error.permanent).toBe(true);
+      // And it survives serialization — this is a value a BFF reads on the other side of a wire.
+      expect(downloaderFacadeErrorSchema.parse(roundTrip(result.error))).toEqual(result.error);
+    }
   });
 
   it('answers a query that matches nothing with empty lists, which is not a fault', async () => {
