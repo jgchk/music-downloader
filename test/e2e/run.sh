@@ -21,9 +21,9 @@
 # Path topology (host ./.e2e-tmp ⇄ container):
 #   music/staging  ⇄ /music/staging   STAGING_ROOT — the harness seeds the fixture at the location
 #                                     the slskd stub REPORTS (events.json under options.json root)
-#   music/deposit  ⇄ /music/deposit   LIBRARY_ROOT (downloader deposits) = INTAKE_ROOT (importer
+#   music/deposit  ⇄ /music/deposit   DEPOSIT_ROOT (downloader deposits) = INTAKE_ROOT (importer
 #                                     reads the same directory; INTAKE_SOURCE_ROOT defaults to
-#                                     LIBRARY_ROOT, so re-rooting is the identity here)
+#                                     DEPOSIT_ROOT, so re-rooting is the identity here)
 #   music/library  ⇄ /music/library   beets' `directory` — the final library
 #   data/          ⇄ /data            both modules' SQLite event stores (durable, host-inspectable)
 #   config/beets   ⇄ /config/beets    hermetic beets config + its library.db; musicbrainz.host
@@ -146,7 +146,7 @@ start_app() { # start_app [extra docker-run args...]
     -e PORT="$PORT" \
     -e ORIGIN="http://localhost:$PORT" \
     -e LOG_LEVEL=info \
-    -e LIBRARY_ROOT=/music/deposit \
+    -e DEPOSIT_ROOT=/music/deposit \
     -e STAGING_ROOT=/music/staging \
     -e DOWNLOADER_DATABASE_FILE=/data/downloader/events.db \
     -e SLSKD_BASE_URL="http://localhost:$SLSKD_PORT" \

@@ -199,7 +199,7 @@ describe('resolve action', () => {
   it('surfaces the missing-retained-candidate refusal with reject still available', async () => {
     const resolveReview = vi
       .fn()
-      .mockResolvedValue({ ok: false, error: { kind: 'NoRetainedCandidate' } });
+      .mockResolvedValue({ ok: false, error: { kind: 'NoRetainedCopy' } });
     const result = (await actions.resolve!(
       eventFor({ resolveReview }, { verb: 'reject-unusable-delivery', confirmed: 'true' }),
     )) as { status: number; data: { message: string } };

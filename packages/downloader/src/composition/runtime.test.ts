@@ -117,7 +117,7 @@ async function testRuntime(databaseFile = ':memory:'): Promise<DownloaderRuntime
   const runtime = await bootDownloaderRuntime(
     {
       databaseFile,
-      libraryRoot: '/library',
+      depositRoot: '/library',
       stagingRoot: '/staging',
       musicbrainz: {},
       slskd: {},
@@ -174,7 +174,7 @@ async function bootWithParkingFirstEffect(): Promise<{
   const runtime = await bootDownloaderRuntime(
     {
       databaseFile: ':memory:',
-      libraryRoot: '/library',
+      depositRoot: '/library',
       stagingRoot: '/staging',
       musicbrainz: {},
       slskd: {},
@@ -260,7 +260,7 @@ describe('createDownloaderRuntime', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -292,7 +292,7 @@ describe('createDownloaderRuntime', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -349,7 +349,7 @@ describe('createDownloaderRuntime', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -413,7 +413,7 @@ describe('createDownloaderRuntime', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: file,
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -452,7 +452,7 @@ describe('createDownloaderRuntime', () => {
       const runtime = await bootDownloaderRuntime(
         {
           databaseFile: ':memory:',
-          libraryRoot: '/library',
+          depositRoot: '/library',
           stagingRoot: '/staging',
           musicbrainz: {},
           slskd: {},
@@ -611,7 +611,7 @@ describe('createDownloaderRuntime', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: path.join(directory, 'data', 'events.db'),
-        libraryRoot: path.join(directory, 'library'),
+        depositRoot: path.join(directory, 'library'),
         stagingRoot: path.join(directory, 'staging'),
         musicbrainz: {},
         slskd: {},
@@ -777,7 +777,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: file,
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -818,7 +818,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: ':memory:',
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -882,7 +882,7 @@ describe('boot readiness (reactor-durability D4)', () => {
     const runtime = await bootDownloaderRuntime(
       {
         databaseFile: file,
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},
@@ -922,7 +922,7 @@ describe('boot readiness (reactor-durability D4)', () => {
     const result = await createDownloaderRuntime(
       {
         databaseFile: file,
-        libraryRoot: '/library',
+        depositRoot: '/library',
         stagingRoot: '/staging',
         musicbrainz: {},
         slskd: {},

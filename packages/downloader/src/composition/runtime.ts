@@ -70,7 +70,7 @@ export { DEFAULT_REDACT_PATHS } from '../application/logging/logger.js';
 
 export interface DownloaderRuntimeConfig {
   readonly databaseFile: string;
-  readonly libraryRoot: string;
+  readonly depositRoot: string;
   readonly stagingRoot: string;
   readonly musicbrainz: { readonly baseUrl?: string; readonly userAgent?: string };
   readonly slskd: { readonly baseUrl?: string; readonly apiKey?: string };
@@ -294,7 +294,7 @@ export async function createDownloaderRuntime(
       // Stryker disable next-line ObjectLiteral: drops the library/staging roots, which are read
       // only when an import effect moves files — unreachable without the whole real port set.
       library: new FilesystemLibrary({
-        libraryRoot: config.libraryRoot,
+        depositRoot: config.depositRoot,
         stagingRoot: config.stagingRoot,
       }),
     };

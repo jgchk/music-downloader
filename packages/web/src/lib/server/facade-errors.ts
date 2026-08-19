@@ -15,7 +15,7 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 {
     case 'ValidationFailed':
     case 'InvalidPolicy':
     case 'InvalidResolution':
-    case 'UnknownCandidate':
+    case 'UnknownMatch':
     case 'UnknownEdition': {
       return 400;
     }
@@ -26,7 +26,7 @@ export function statusOf(error: FacadeError): 400 | 404 | 409 | 500 {
     case 'AlreadyExists':
     case 'IllegalTransition':
     case 'NoOpenReview':
-    case 'NoRetainedCandidate':
+    case 'NoRetainedCopy':
     case 'CycleInFlight':
     case 'ConcurrencyConflict': {
       return 409;
@@ -63,13 +63,13 @@ export function messageOf(error: FacadeError): string {
     case 'InvalidResolution': {
       return `Invalid resolution: ${error.detail}`;
     }
-    case 'UnknownCandidate': {
+    case 'UnknownMatch': {
       return `Unknown candidate: ${error.candidate}.`;
     }
     case 'UnknownEdition': {
       return `Unknown edition: ${error.releaseMbid}. It is not among the offered candidates — reload and choose from the list.`;
     }
-    case 'NoRetainedCandidate': {
+    case 'NoRetainedCopy': {
       // One-voice register: no module nouns in user-visible copy; the refusal is deterministic
       // (no retained candidate ⇒ the verb is refused), so it is stated plainly, not hedged.
       return 'These files didn\u{2019}t come from a tracked download, so rejecting them can\u{2019}t resume a search for a replacement. A plain reject is still available.';

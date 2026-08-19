@@ -20,8 +20,8 @@ const importerErrors: ImporterFacadeError[] = [
   { kind: 'UnknownImport' },
   { kind: 'NoOpenReview' },
   { kind: 'InvalidResolution', detail: 'verb not applicable' },
-  { kind: 'UnknownCandidate', candidate: 'mb/abc' },
-  { kind: 'NoRetainedCandidate' },
+  { kind: 'UnknownMatch', candidate: 'mb/abc' },
+  { kind: 'NoRetainedCopy' },
   { kind: 'CycleInFlight' },
   { kind: 'ConcurrencyConflict', streamId: 'imp-1', expectedVersion: 1 },
   { kind: 'InfraError', operation: 'bridge.apply', message: 'timeout' },
@@ -46,8 +46,8 @@ describe('statusOf', () => {
     ['UnknownImport', 404],
     ['NoOpenReview', 409],
     ['InvalidResolution', 400],
-    ['UnknownCandidate', 400],
-    ['NoRetainedCandidate', 409],
+    ['UnknownMatch', 400],
+    ['NoRetainedCopy', 409],
     ['CycleInFlight', 409],
   ] as const)('%s -> %d (importer)', (kind, status) => {
     const error = importerErrors.find((entry) => entry.kind === kind)!;
@@ -77,8 +77,8 @@ describe('messageOf', () => {
     ['UnknownImport', 'No such import'],
     ['NoOpenReview', 'already been settled'],
     ['InvalidResolution', 'Invalid resolution'],
-    ['UnknownCandidate', 'Unknown candidate'],
-    ['NoRetainedCandidate', 'tracked download'],
+    ['UnknownMatch', 'Unknown candidate'],
+    ['NoRetainedCopy', 'tracked download'],
     ['CycleInFlight', 'still in progress'],
     ['ConcurrencyConflict', 'reload'],
     ['InfraError', 'Something went wrong'],
@@ -97,7 +97,7 @@ describe('messageOf', () => {
     expect(
       messageOf({ kind: 'IllegalTransition', command: 'Cancel', phase: 'Fulfilled' }),
     ).toContain('Fulfilled');
-    expect(messageOf({ kind: 'UnknownCandidate', candidate: 'mb/x' })).toContain('mb/x');
+    expect(messageOf({ kind: 'UnknownMatch', candidate: 'mb/x' })).toContain('mb/x');
     expect(messageOf({ kind: 'UnknownEdition', releaseMbid: 'mb/ed' })).toContain('mb/ed');
     expect(messageOf({ kind: 'InvalidResolution', detail: 'no candidates' })).toContain(
       'no candidates',

@@ -53,7 +53,7 @@ export const nodeLibraryFileSystem: LibraryFileSystem = {
 };
 
 export interface LibraryConfig {
-  readonly libraryRoot: string;
+  readonly depositRoot: string;
   readonly stagingRoot: string;
 }
 
@@ -108,7 +108,7 @@ export class FilesystemLibrary implements LibraryPort {
     target: Target,
     logger: Logger,
   ): Promise<ImportResult> {
-    const location = path.join(this.config.libraryRoot, renderReleaseDirectory(target));
+    const location = path.join(this.config.depositRoot, renderReleaseDirectory(target));
     if (await this.fs.exists(location)) {
       logger.warn({ location }, 'library import conflict; leaving existing release untouched');
       return { kind: 'conflict', location };

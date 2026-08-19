@@ -200,7 +200,7 @@ describe('bootRuntimes', () => {
   });
 
   it('fails fast on an invalid environment, naming the setting', async () => {
-    await expect(bootRuntimes({}, {})).rejects.toThrow(/LIBRARY_ROOT/);
+    await expect(bootRuntimes({}, {})).rejects.toThrow(/STAGING_ROOT/);
   });
 
   it('stops the downloader and fails when the importer cannot start', async () => {
