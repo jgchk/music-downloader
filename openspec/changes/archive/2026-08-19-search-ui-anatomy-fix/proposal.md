@@ -52,6 +52,11 @@ chrome is opt-in via a class.
 
 ### Modified Capabilities
 
+One existing scenario heading, "The detail surface follows the viewport", keeps its wording: the
+archiver reads a renamed scenario as a dropped one, so the heading can only change when that
+requirement is next restated wholesale. Its prose, and every scenario added here, say "detail
+view".
+
 - `web-ui-presentation`: the catalog-search anatomy requirement gains the chrome-opt-in rule
   (container buttons and link-affordances are surfaces and links, never widget buttons, under
   every skin), the broken-image suppression, the detail-view artwork placeholder, and the

@@ -22,7 +22,7 @@ deliberately styled search field, filter control, per-entity result layouts, and
 - **WHEN** the detail view presents the edition the system would pick
 - **THEN** that row states in its text that it is the default, with styling as reinforcement
 
-#### Scenario: The detail view follows the viewport
+#### Scenario: The detail surface follows the viewport
 
 - **WHEN** the request page's detail view opens at a narrow viewport
 - **THEN** it presents as a bottom sheet rather than a side panel, with the same DOM

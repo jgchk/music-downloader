@@ -54,4 +54,4 @@ regression lives in.
       detail view re-screenshotted under forum and glass; the audit's visual items confirmed
       closed. This is what caught the detail view's artwork collapsing in a scrolling column
       (`flex: none`), which the first round of geometry tests had not reached
-- [ ] 4.3 `pnpm version:prep` patch bump (`fix`); one PR for this change
+- [x] 4.3 `pnpm version:prep` patch bump (`fix`); one PR for this change
