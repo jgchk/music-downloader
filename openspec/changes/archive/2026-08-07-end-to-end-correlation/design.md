@@ -129,14 +129,6 @@ Alternative considered and deferred: making every command against an existing st
 stream's story. That is a broader semantic change (it would supersede the request's own mint for
 cancel/select/resolve) and was out of scope here.
 
-> **Amended by `extract-eventing-package` D5 (2026-08-18).** The mint/adopt/causation *mechanism*
-> now lives once in `packages/eventing`; each context keeps only the name it stamps onto derived
-> coordinates. This decision's core claim is untouched — the envelope still crosses the seam as
-> DATA, the facades still take a plain `StoryId` string, and no model type is shared. What changed
-> is its conclusion that the MODULE had to be duplicated: an opaque observability identity carries
-> neither context's language, and the boundary test that held the two copies byte-identical was
-> itself the evidence (a shared kernel without its benefit — see
-> `docs/research/bounded-contexts-vs-modules.md` §pitfalls).
 
 **D13 — The pair is duplicated per context, not shared.** Each module owns its own
 `CommandContext`/`CausationReference`/`CorrelationSource`, exactly as each already owns a
@@ -145,6 +137,15 @@ kernel coupling the two languages; the envelope crosses the seam as DATA, never 
 The web layer mints its own story too, because a story belongs to neither module — one request
 drives both, and each adopts what it is handed. The facades therefore take a plain `StoryId`
 string, not either module's branded `CorrelationId`.
+
+> **Amended by `extract-eventing-package` D5 (2026-08-18).** The mint/adopt/causation *mechanism*
+> now lives once in `packages/eventing`; each context keeps only the name it stamps onto derived
+> coordinates. This decision's core claim is untouched — the envelope still crosses the seam as
+> DATA, the facades still take a plain `StoryId` string, and no model type is shared. What changed
+> is its conclusion that the MODULE had to be duplicated: an opaque observability identity carries
+> neither context's language, and the boundary test that held the two copies byte-identical was
+> itself the evidence (a shared kernel without its benefit — see
+> `docs/research/bounded-contexts-vs-modules.md` §pitfalls).
 
 **D14 — The e2e proves the join over the STORES, not captured logs.** D7 proposed a grep against
 container logs. The stored metadata carries the same id by construction (the reactor binds its

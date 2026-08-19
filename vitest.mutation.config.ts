@@ -35,6 +35,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'packages/downloader/src/**/*.test.ts',
+      'packages/eventing/src/**/*.test.ts',
       'packages/importer/src/**/*.test.ts',
       'packages/downloader/test/contract/**/*.contract.test.ts',
       'packages/importer/test/contract/**/*.contract.test.ts',

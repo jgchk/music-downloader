@@ -20,6 +20,7 @@ RUN apt-get update \
 # build; without it the install skips the native addon and the runtime image is broken.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/downloader/package.json packages/downloader/package.json
+COPY packages/eventing/package.json packages/eventing/package.json
 COPY packages/importer/package.json packages/importer/package.json
 COPY packages/web/package.json packages/web/package.json
 RUN pnpm install --frozen-lockfile

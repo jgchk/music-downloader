@@ -1,8 +1,13 @@
 # module-architecture — delta
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: No shared kernel`
+- TO: `### Requirement: No shared model`
+
 ## MODIFIED Requirements
 
-### Requirement: No shared kernel
+### Requirement: No shared model
 
 The workspace SHALL contain no shared **model**: no source package shared between the two modules may define or export a domain type, event vocabulary, seam contract schema, or any name from either module's ubiquitous language. A model type needed by both modules MUST be duplicated in each, not extracted into a shared package.
 

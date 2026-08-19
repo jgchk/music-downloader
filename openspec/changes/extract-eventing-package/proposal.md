@@ -6,14 +6,14 @@ The seam's delivery and correlation *mechanisms* exist as near-identical copies 
 
 ## What Changes
 
-- New workspace package `packages/eventing`: a generic, domain-blind leaf library holding the seam's mechanics — a `checkpointedDrain` module (the resume-from-checkpoint / drain-to-head / hold-on-transient / halt-on-permanent protocol behind a ~5-field interface, tuning constants as defaults, the coalescing pass as an unexported internal) and the correlation mechanics (mint, adopt-vs-mint, causation chaining, envelope attach/parse, parameterized by an opaque context name).
+- New workspace package `packages/eventing`: a generic, domain-blind leaf library holding the seam's mechanics — a `checkpointedDrain` module (the resume-from-checkpoint / drain-to-head / hold-on-transient / halt-on-permanent protocol behind a ~5-field interface, tuning constants as defaults, the coalescing pass as an unexported internal) and the correlation mechanics (mint, adopt-vs-mint, causation chaining, the causation parser, bound to an opaque context name; the wire envelope schemas stay per context).
 - Both contexts' `CatchUpSubscription` twins become consumers of `checkpointedDrain`; both contexts' `application/correlation` twins become consumers of the correlation module. Domain language, event vocabularies, ACL schemas, and per-context event-store types stay duplicated per context — the no-shared-**model** rule is unchanged.
 - The `park` poison policy is deleted (unused in production; halt-only per the research verdict). The `Transient`/`Permanent` classification becomes the load-bearing wall: transient still holds-and-retries with the fallback poll; only permanent halts.
 - The `module-architecture` "No shared kernel" requirement is amended to "No shared model": a mechanism-only leaf package is permitted under lint-enforced conditions (no imports from `packages/*`, no domain vocabulary; contexts import it outside `domain/`).
 - Doc updates: CONTEXT-MAP seam vocabulary gains "checkpointed drain" and corrects "poison-event policy (`halt` or `park`)" to halt-only; archived D1/D7/D13 get annotations pointing at the superseding decisions (D7's Marten citation has drifted — Marten deleted the policy palette D7 mirrored).
 - Test consolidation: the two subscription suites collapse into one suite in `packages/eventing` plus per-context step-function tests; the string-equality correlation boundary test retires (the twins it pinned stop existing); `packages/eventing` joins the `pnpm check` lanes and the 100% coverage gate.
 
-**Both reactors are explicitly out of scope** — see design "Non-Goals" and D3. No wire contract, event schema, or observable seam behaviour changes except the removal of the never-exercised park arm.
+**Both reactors are explicitly out of scope** — see design "Non-Goals" and D3. No wire contract or event schema changes. Two observable surfaces do change: the never-exercised park arm is gone, and the drain's structured log lines name the feed position `position` rather than `globalSeq`, because the shared module cannot carry a consumer's field name.
 
 ## Capabilities
 

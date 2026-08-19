@@ -1,5 +1,3 @@
-import type { CorrelationId } from '../correlation/correlation-id.js';
-
 /** Ambient capabilities injected into the shell so it stays deterministic under test. */
 
 export interface Clock {
@@ -19,6 +17,4 @@ export interface IdGenerator {
  * It mints the BRANDED id, so the composition root's implementation is the single place the format
  * is established — every lift downstream then follows from a constructor rather than from trust.
  */
-export interface CorrelationSource {
-  mint(): CorrelationId;
-}
+export type { CorrelationSource } from '@music/eventing';

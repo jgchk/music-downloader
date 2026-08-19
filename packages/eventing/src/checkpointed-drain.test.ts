@@ -51,9 +51,11 @@ class FakeCheckpointStore {
   private readonly positions = new Map<string, number>();
   public failLoads = false;
   public failSaves = false;
+  public rejectSaves = false;
   /** Saves of exactly these positions fail; everything else succeeds. */
   public failSavesAt = new Set<number>();
-  public rejectSaves = false;
+  /** Park every save behind this, so a test can hold one open across a barrier. */
+  public beforeSave: (() => Promise<void>) | undefined;
 
   load(consumer: string): ResultAsync<number, StoreFault> {
     if (this.failLoads) return errAsync(storeFault('load failed'));
@@ -61,6 +63,15 @@ class FakeCheckpointStore {
   }
 
   save(consumer: string, position: number): ResultAsync<void, StoreFault> {
+    if (this.beforeSave !== undefined) {
+      const gate = this.beforeSave();
+      this.beforeSave = undefined;
+      const save = async (): Promise<void> => {
+        await gate;
+        this.positions.set(consumer, position);
+      };
+      return ResultAsync.fromSafePromise(save());
+    }
     // `fromSafePromise` deliberately does NOT catch, so this models an adapter that rejects
     // instead of answering with a Result — a defect, not a modeled failure.
     if (this.rejectSaves) {
@@ -126,7 +137,7 @@ function drain(
   const capture = capturingLogger();
   logged = capture.lines;
   return new CheckpointedDrain<TestItem, StoreFault>({
-    name: 'seam:test',
+    name: 'drain:test',
     feed,
     checkpoints,
     step: (subject) => {
@@ -137,6 +148,7 @@ function drain(
       return Promise.resolve(ok(undefined));
     },
     logger: capture.logger,
+    mapDefect: (defect) => storeFault(defect.message),
     wakeups: {
       subscribe: (listener) => {
         wakeListeners.push(listener);
@@ -163,7 +175,7 @@ function drain(
   });
 }
 
-async function checkpointOf(name = 'seam:test'): Promise<number> {
+async function checkpointOf(name = 'drain:test'): Promise<number> {
   const loaded = await checkpoints.load(name);
   return loaded._unsafeUnwrap();
 }
@@ -190,7 +202,7 @@ describe('CheckpointedDrain', () => {
 
     it('resumes strictly after its persisted checkpoint on restart', async () => {
       feed.items = [item(1), item(2), item(3)];
-      await checkpoints.save('seam:test', 2);
+      await checkpoints.save('drain:test', 2);
 
       const subject = drain();
       await subject.start();
@@ -221,19 +233,29 @@ describe('CheckpointedDrain', () => {
       await subject.start();
 
       expect(stepped).toEqual([1, 2, 3, 4]);
-      expect(sleeps.filter((ms) => ms === 0).length).toBeGreaterThanOrEqual(2); // one yield per batch
+      expect(sleeps.filter((ms) => ms === 0)).toEqual([0, 0]); // one yield per batch, no more
       await subject.stop();
     });
 
     it('keeps draining past a run of positions the producer never published', async () => {
-      // A scanned window with no deliverable items is progress, not the end of the feed: the
-      // checkpoint advances past the gap and the drain reads on rather than stalling behind it.
-      feed.items = [item(1), item(50)];
-      const subject = drain({ tuning: { batchSize: 2, sleep: () => Promise.resolve() } });
+      // A scanned window with NO deliverable items is progress, not the end of the feed. The window
+      // has to be genuinely empty for this to mean anything: a fixture that returns the far item in
+      // the same batch never produces the case, and a drain that treated an empty window as the end
+      // would still pass it while walking a long gap one poll interval at a time.
+      const windowed: DrainFeed<TestItem> = {
+        read: (from) => {
+          if (from < 1) return Promise.resolve(ok({ items: [item(1)], scannedTo: 1 }));
+          if (from < 40) return Promise.resolve(ok({ items: [], scannedTo: from + 20 })); // the gap
+          if (from < 50) return Promise.resolve(ok({ items: [item(50)], scannedTo: 50 }));
+          return Promise.resolve(ok({ items: [], scannedTo: from }));
+        },
+        positionOf: (subject) => subject.position,
+      };
+      const subject = drain({ feed: windowed });
 
       await subject.start();
 
-      expect(stepped).toEqual([1, 50]);
+      expect(stepped).toEqual([1, 50]); // it crossed the empty window within one cycle
       expect(await checkpointOf()).toBe(50);
       await subject.stop();
     });
@@ -282,9 +304,9 @@ describe('CheckpointedDrain', () => {
     it('names the failure in the standing-hold log, so a wedged seam says why', async () => {
       feed.items = [item(1)];
       failures.set(1, [
-        transient('beets is down'),
-        transient('beets is down'),
-        transient('beets is down'),
+        transient('the source is unavailable'),
+        transient('the source is unavailable'),
+        transient('the source is unavailable'),
       ]);
       const subject = drain();
 
@@ -294,7 +316,7 @@ describe('CheckpointedDrain', () => {
         line.message.includes('exhausted cycle retries; holding checkpoint for redelivery'),
       );
       expect(held).toBeDefined();
-      expect(JSON.stringify(held?.payload)).toContain('beets is down');
+      expect(held?.payload).toMatchObject({ err: { reason: 'the source is unavailable' } });
       await subject.stop();
     });
 
@@ -309,6 +331,26 @@ describe('CheckpointedDrain', () => {
 
       expect(stepped).toEqual([1]);
       expect(await checkpointOf()).toBe(1);
+      await subject.stop();
+    });
+
+    it("carries the classifier's cause into the log, so a halted seam says what broke", async () => {
+      // `kind` and `reason` only restate what readiness already reports. The field that names the
+      // actual defect — which event type failed to render — lives in the consumer's own error, and
+      // a classifier that dropped it would leave an operator with a stall and no fix.
+      feed.failure = {
+        kind: 'Permanent',
+        reason: 'RenderError',
+        cause: { kind: 'RenderError', eventType: 'ReleaseVerdict', message: 'schema refused it' },
+      };
+      const subject = drain();
+
+      await subject.start();
+
+      const halted = logged.find((line) => line.message.includes('render defect'));
+      expect(halted?.payload).toMatchObject({
+        err: { cause: { eventType: 'ReleaseVerdict', message: 'schema refused it' } },
+      });
       await subject.stop();
     });
 
@@ -336,7 +378,38 @@ describe('CheckpointedDrain', () => {
 
       expect(stepped).toEqual([1]); // the first was handled, its checkpoint could not be recorded
       expect(await checkpointOf()).toBe(0);
+      expect(subject.isHalted).toBe(false); // held, not poisoned — the next cycle retries
       expect(messages()).toContain('checkpoint save failed; holding for redelivery');
+      await subject.stop();
+    });
+
+    it('redelivers a held item once the store recovers — at-least-once means duplicates happen', async () => {
+      feed.items = [item(1), item(2)];
+      checkpoints.failSaves = true;
+      const subject = drain();
+      await subject.start();
+      expect(stepped).toEqual([1]);
+
+      checkpoints.failSaves = false;
+      await subject.poll();
+
+      expect(stepped).toEqual([1, 1, 2]); // item 1 handled twice: the consumer must be idempotent
+      expect(await checkpointOf()).toBe(2);
+      await subject.stop();
+    });
+
+    it('checkpoints the position it recorded, never the one it merely scanned past', async () => {
+      // A selective fault: the save for the delivered item succeeds, the trailing scan's does not.
+      feed.items = [item(1), item(6)];
+      checkpoints.failSavesAt = new Set([6]);
+      const subject = drain({ tuning: { batchSize: 1 } });
+
+      await subject.start();
+
+      // Both were handed to the step; only the one whose save landed is durable, so the next
+      // cycle redelivers the second — the point of never checkpointing ahead of a commit.
+      expect(stepped).toEqual([1, 6]);
+      expect(await checkpointOf()).toBe(1);
       await subject.stop();
     });
 
@@ -354,6 +427,29 @@ describe('CheckpointedDrain', () => {
 
       expect(await checkpointOf()).toBe(0);
       expect(messages()).toContain('checkpoint save failed; holding for redelivery');
+      await subject.stop();
+    });
+  });
+
+  describe('a feed whose positions do not ascend is a producer defect', () => {
+    it('halts rather than re-reading a window it has already checkpointed', async () => {
+      // The cursor is the drain's only guarantee that work is not redelivered forever. A feed that
+      // answers a position at or behind it would drive the durable checkpoint DOWN, and the
+      // no-progress exit cannot catch that, because the cursor did move.
+      const stuck: DrainFeed<TestItem> = {
+        read: (from, limit) => feed.read(from, limit),
+        positionOf: () => 0,
+      };
+      feed.items = [item(1), item(2)];
+      const subject = drain({ feed: stuck });
+
+      await subject.start();
+
+      expect(subject.isHalted).toBe(true);
+      expect(await checkpointOf()).toBe(0);
+      expect(messages()).toContain(
+        'feed reported a position at or behind the checkpoint; drain halted (positions must ascend)',
+      );
       await subject.stop();
     });
   });
@@ -395,6 +491,11 @@ describe('CheckpointedDrain', () => {
 
       expect(subject.isHalted).toBe(true);
       expect(await checkpointOf()).toBe(0);
+      // Exactly one line, and it names the defect permanent. Falling through to the transient
+      // "holding checkpoint" line would tell an operator to wait for a retry that never comes.
+      expect(messages()).toEqual([
+        'seam feed render defect (permanent); subscription halted, checkpoint held',
+      ]);
       await subject.stop();
     });
 
@@ -420,7 +521,7 @@ describe('CheckpointedDrain', () => {
       expect(halting.isHalted).toBe(true);
 
       failures.clear();
-      const healthy = drain({ name: 'seam:other' });
+      const healthy = drain({ name: 'drain:other' });
       await healthy.start();
 
       expect(stepped).toEqual([1]);
@@ -610,8 +711,27 @@ describe('CheckpointedDrain', () => {
 
       const reset = await subject.reset(0);
 
-      expect(reset.isErr()).toBe(true);
+      // The store's OWN modeled error, unwrapped — distinct from the DrainDefect channel a
+      // rejecting adapter takes. A mutant collapsing the two would be invisible without this.
+      expect(reset._unsafeUnwrapErr()).toEqual(storeFault('save failed'));
       expect(messages()).toContain('checkpoint reset failed; replay not armed');
+      await subject.stop();
+    });
+
+    it('leaves a halted drain halted when the reset it was told to arm did not land', async () => {
+      // The dangerous shape: report the replay as unarmed AND resume delivering anyway, from the
+      // old position. The halt must outlive a reset that failed to persist.
+      feed.items = [item(1)];
+      failures.set(1, [permanent()]);
+      const subject = drain();
+      await subject.start();
+      expect(subject.isHalted).toBe(true);
+
+      checkpoints.failSaves = true;
+      const reset = await subject.reset(0);
+
+      expect(reset.isErr()).toBe(true);
+      expect(subject.isHalted).toBe(true);
       await subject.stop();
     });
 
@@ -741,15 +861,37 @@ describe('CheckpointedDrain', () => {
 
       const reset = await subject.reset(0);
 
-      expect(reset._unsafeUnwrapErr()).toMatchObject({
-        kind: 'DrainDefect',
-        operation: 'checkpoint.reset',
-        message: 'checkpoint reset failed unexpectedly',
-      });
+      // Translated, not leaked: the caller sees ITS OWN error type, so a consumer narrowing on its
+      // own union never meets a variant its module never declared.
+      expect(reset._unsafeUnwrapErr()).toEqual(storeFault('checkpoint reset failed unexpectedly'));
     });
   });
 
   describe('stop', () => {
+    it('waits out an in-flight reset, the other writer to the checkpoint', async () => {
+      // `stop()` resolving is the caller's signal to close the store handle. A reset saves the
+      // checkpoint too, and with no drain cycle running there is no in-flight cycle to await — so a
+      // barrier that watched only the drain would resolve straight into a closed-handle write.
+      const gate = Promise.withResolvers<void>();
+      const slowSaves = new FakeCheckpointStore();
+      slowSaves.beforeSave = () => gate.promise;
+      const subject = drain({ checkpoints: slowSaves });
+
+      const resetting = subject.reset(0);
+      await settleEventLoopTurn();
+      const stopping = subject.stop();
+      let hasStopped = false;
+      void stopping.then(() => {
+        hasStopped = true;
+      });
+      await settleEventLoopTurn();
+      expect(hasStopped).toBe(false); // the reset still owns the checkpoint
+
+      gate.resolve();
+      await stopping;
+      await resetting;
+    });
+
     it('detaches the wakeup listener and the fallback interval', async () => {
       const subject = drain();
       await subject.start();

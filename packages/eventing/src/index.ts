@@ -32,5 +32,6 @@ export type {
   CorrelationSource,
   OperationScope,
   StoryOrigin,
+  SubjectBindings,
   TriggeringEvent,
 } from './correlation.js';

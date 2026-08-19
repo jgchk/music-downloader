@@ -15,9 +15,14 @@
 // but see the note on the job itself: until the seeding burn-down closes (task 2.1) the step runs
 // `continue-on-error` and the check is NOT required, because main is not yet mutant-clean.
 //
-// SCOPE — both bounded-context packages, every layer, adapters included: a mutant surviving an
+// SCOPE — both bounded-context packages AND the shared mechanism package
+// (`packages/eventing`), every layer, adapters included: a mutant surviving an
 // adapter's error mapping is precisely the tolerant-reader assertion gap the contract tier was
 // supposed to catch, so adapters are not a lesser tier here.
+//
+// `packages/eventing` carries the seam's delivery and correlation mechanism, which both
+// contexts now depend on: a mutant surviving there survives for both of them at once, so it
+// is the last tree that may sit outside the gate.
 //
 // `packages/web` is EXCLUDED, and named rather than omitted. StrykerJS cannot instrument `.svelte`,
 // so including the package would mutate only its TypeScript BFF fragments while presenting as full
@@ -60,6 +65,7 @@ export default {
   // exactly, so a third exclusion cannot be added without arguing for it.
   mutate: [
     'packages/downloader/src/**/*.ts',
+    'packages/eventing/src/**/*.ts',
     'packages/importer/src/**/*.ts',
     '!packages/*/src/**/*.test.ts',
     '!packages/*/src/**/__fixtures__/**',

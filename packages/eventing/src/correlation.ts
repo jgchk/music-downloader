@@ -152,9 +152,15 @@ export interface ContinuedOperation {
  * Generic in the logger so each consumer keeps its own logger type through the scope; this module
  * needs only that a logger can bear children.
  */
-export interface ChildLogger<TSelf> {
+export interface ChildLogger<TSelf extends ChildLogger<TSelf>> {
   child(bindings: Record<string, unknown>): TSelf;
 }
+
+/**
+ * What a scope's caller may add: the subject identity the unit of work is about (stream, position).
+ * The story itself is not theirs to set — {@link operationScope} owns that key.
+ */
+export type SubjectBindings = Record<string, unknown> & { correlationId?: never };
 
 export interface OperationScope<TLogger> {
   readonly context: CommandContext;
@@ -169,11 +175,15 @@ export interface OperationScope<TLogger> {
 export function operationScope<TLogger extends ChildLogger<TLogger>>(
   context: CommandContext,
   parent: TLogger,
-  bindings: Record<string, unknown> = {},
+  bindings: SubjectBindings = {},
 ): OperationScope<TLogger> {
   return {
     context,
-    logger: parent.child({ correlationId: context.correlationId, ...bindings }),
+    // The story is bound LAST. Spread first and a caller passing its own `correlationId` would get
+    // a logger filed under a different story than the context it is handed beside — defeating the
+    // one invariant that makes these two members a single type. `SubjectBindings` also says so in
+    // the type, so the mistake does not compile.
+    logger: parent.child({ ...bindings, correlationId: context.correlationId }),
   };
 }
 
@@ -229,7 +239,7 @@ function isStreamVersion(value: unknown): value is number {
  * Anything unrecognised becomes `undefined`, because a reference we cannot read is no reference —
  * and inventing one is worse. Note this is NOT the same case as an absent story: `causation` is
  * mandatory on the write path, so a stored one that fails to parse means a first-party invariant has
- * been violated, exactly as a malformed `correlationId` does. Nothing reads causation yet, so that
+ * been violated, exactly as a malformed `correlationId` does. Nothing resolves causation yet, so that
  * distinction has no consumer to report it to; the first reader to resolve a reference should take
  * it as an origin the way {@link Correlation.continueFrom} does.
  */
