@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import {
     activeEdition,
+    detailSubtitle,
     editionSummary,
     groupHeading,
     pickedMbid,
@@ -57,6 +58,8 @@
 </script>
 
 {#if detail !== undefined}
+  <!-- Who made it, when, and what kind — from what the result card already had on screen. -->
+  {@const subtitle = detailSubtitle(detail)}
   <!-- An overlay, so it says what it is and can be left the way an overlay is left. -->
   <div
     class="catalog-detail"
@@ -86,6 +89,14 @@
         initials={initialsOf(detail.title)}
         shape="detail"
       />
+      {#if subtitle !== ''}
+        <p class="detail-subtitle">{subtitle}</p>
+      {/if}
+      <!-- The identifier is here because this is where someone checks they opened the right
+           record, and where they copy it from to talk about it elsewhere. -->
+      <p class="detail-mbid">
+        <span class="eyebrow">MusicBrainz ID</span> <code>{detail.mbid}</code>
+      </p>
 
       <h3>Edition</h3>
       {#if detail.editions.groups.length === 0}
@@ -218,6 +229,25 @@
         {/each}
       </ul>
     {:else if detail.kind === 'recording'}
+      <!-- Bound once: read straight off `detail` in the markup, each access compiles to its own
+           defensive check for a value this branch has already established. -->
+      {@const release = detail.release}
+      {#if release !== undefined}
+        <CoverArt
+          src={artUrl('release', release.mbid, 500)}
+          initials={initialsOf(release.title)}
+          shape="detail"
+        />
+      {/if}
+      {#if subtitle !== ''}
+        <p class="detail-subtitle">{subtitle}</p>
+      {/if}
+      {#if release !== undefined}
+        <!-- A track is a track OF something; without this the panel is a title and a button.
+             The sentence is built as one string: interpolating a field of an optional value
+             compiles to a nullish guard for a case this branch already ruled out. -->
+        <p class="detail-from">{`from ${release.title}`}</p>
+      {/if}
       <form
         method="POST"
         action="/acquisitions/new"

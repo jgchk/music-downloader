@@ -10,27 +10,34 @@ import type {
  * "whose album that choice was made on" — are testable as values rather than through a rendered DOM.
  */
 
+/**
+ * What the result that was clicked already knew about itself. Carried into the view rather than
+ * read again: the card had all of it on screen a moment ago, and a second round trip to re-learn
+ * what a person is already looking at buys nothing but a delay.
+ */
+export interface DetailContext {
+  readonly title: string;
+  readonly artistCredit?: string | undefined;
+  readonly year?: number | undefined;
+  readonly primaryType?: string | undefined;
+  /** For a track: the release it appears on — the source of its context line and its artwork. */
+  readonly release?: { readonly mbid: string; readonly title: string } | undefined;
+}
+
 export type DetailState =
-  | { readonly kind: 'loading'; readonly mbid: string; readonly title: string }
-  | {
-      readonly kind: 'failed';
-      readonly mbid: string;
-      readonly title: string;
-      readonly message: string;
-    }
-  | {
+  | ({ readonly kind: 'loading'; readonly mbid: string } & DetailContext)
+  | ({ readonly kind: 'failed'; readonly mbid: string; readonly message: string } & DetailContext)
+  | ({
       readonly kind: 'release-group';
       readonly mbid: string;
-      readonly title: string;
       readonly editions: CatalogEditionsResultDto;
-    }
-  | {
+    } & DetailContext)
+  | ({
       readonly kind: 'artist';
       readonly mbid: string;
-      readonly title: string;
       readonly discography: CatalogDiscographyResultDto;
-    }
-  | { readonly kind: 'recording'; readonly mbid: string; readonly title: string };
+    } & DetailContext)
+  | ({ readonly kind: 'recording'; readonly mbid: string } & DetailContext);
 
 /** A tracklist the person asked to see, keyed by the edition it was read from. */
 export type TracklistState =
@@ -70,6 +77,16 @@ export function editionSummary(edition: EditionLike): string {
 /** The edition the acquisition pipeline itself would choose, when it would choose one. */
 export function pickedMbid(editions: CatalogEditionsResultDto): string | undefined {
   return editions.bestMatch.kind === 'pick' ? editions.bestMatch.mbid : undefined;
+}
+
+/**
+ * The line under an album's title in its detail view: who made it, when, and what kind of release
+ * it is. Absent parts are left out rather than placeheld — "Unknown · 1986" says less than "1986".
+ */
+export function detailSubtitle(context: DetailContext): string {
+  return [context.artistCredit, context.year?.toString(), context.primaryType]
+    .filter((part) => part !== undefined && part !== '')
+    .join(' \u{00B7} ');
 }
 
 /** What the catalog knows of a release beyond its title: when, and of what kind. */

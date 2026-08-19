@@ -41,6 +41,61 @@ const releaseGroup = (bestMatch: {
 });
 
 describe('CatalogDetail (SSR)', () => {
+  it('names what it is showing, beyond the bare title', () => {
+    const html = body({
+      ...releaseGroup({ kind: 'pick', mbid: PICK }),
+      artistCredit: 'Paul Simon',
+      year: 1986,
+      primaryType: 'Album',
+    });
+
+    // Everything here was already on the card that was clicked — no second read buys it.
+    expect(html).toContain('Paul Simon');
+    expect(html).toContain('1986');
+    expect(html).toContain('Album');
+    // And the identifier, which is where someone checks they opened the right record.
+    expect(html).toContain(RG);
+  });
+
+  it('leaves out what the catalog never said, rather than placeholding it', () => {
+    const html = body({
+      ...releaseGroup({ kind: 'pick', mbid: PICK }),
+      artistCredit: 'Paul Simon',
+    });
+
+    expect(html).toContain('Paul Simon');
+    expect(html).not.toContain('Unknown');
+  });
+
+  it('says nothing about what the catalog did not say', () => {
+    // The catalog names neither a release nor an artist credit for this track. Every line the
+    // view would have drawn from them is absent, rather than drawn empty.
+    const html = body({
+      kind: 'recording',
+      mbid: 'e7f1a1b8-51ee-4e0a-a3b6-6f1a5a4de1a2',
+      title: 'The Boy in the Bubble',
+      artistCredit: '',
+    });
+
+    expect(html).not.toContain('from ');
+    expect(html).not.toContain('/cover-art/release/');
+    expect(html).not.toContain('detail-subtitle');
+  });
+
+  it('gives a track the release it came from, and that release’s artwork', () => {
+    const html = body({
+      kind: 'recording',
+      mbid: 'e7f1a1b8-51ee-4e0a-a3b6-6f1a5a4de1a2',
+      title: 'The Boy in the Bubble',
+      artistCredit: 'Paul Simon',
+      release: { mbid: PICK, title: 'Graceland' },
+    });
+
+    // A track is a track OF something; without this the panel is a title and a button.
+    expect(html).toContain('from Graceland');
+    expect(html).toContain(`/cover-art/release/${PICK}?size=500`);
+  });
+
   it('requests the chosen pressing, said in words, once one has been chosen', () => {
     // The component is a pure function of its props — the choice is markup, not something a
     // browser-only effect paints in afterwards. (Nothing persists the choice across a reload; the

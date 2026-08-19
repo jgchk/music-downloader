@@ -34,10 +34,10 @@ creates and extends its layout tests).
 
 ## 4. Detail view context (web)
 
-- [ ] 4.1 `DetailState` carries the opening result's display fields (red first): artist credit,
+- [x] 4.1 `DetailState` carries the opening result's display fields (red first): artist credit,
       year, type for release groups; artist credit + release title/identifier for recordings;
       the identifier-lookup path carries the same fields
-- [ ] 4.2 Release-group view (red first): subtitle line (artist · year · type, absent parts
+- [x] 4.2 Release-group view (red first): subtitle line (artist · year · type, absent parts
       omitted) and the release-group identifier line
 - [ ] 4.3 Always-visible best-match summary (red first): names the pick's title, disambiguation,
       and distinguishing details — or the selection-required sentence — above the groups,
@@ -46,7 +46,7 @@ creates and extends its layout tests).
 - [ ] 4.4 Format chips (red first): pure categorization (cd / vinyl / digital / other) in
       `lib/search`, filtering editions and regrouping with truthful counts, empty-in-this-format
       state named
-- [ ] 4.5 Track view (red first): release artwork slot, artist credit, and the "from <release>"
+- [x] 4.5 Track view (red first): release artwork slot, artist credit, and the "from <release>"
       line above the track request form
 - [ ] 4.6 The chosen-edition rename: `EditionPin`/`onPin`/`pin` and their copy become the
       chosen-edition family throughout `lib/search` and the components; no occurrence of the old
