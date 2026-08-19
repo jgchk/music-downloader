@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.19.0](https://github.com/jgchk/music-downloader/compare/v3.18.1...v3.19.0) (2026-08-19)
+
+### Features
+
+* **downloader:** state when an acquisition was requested ([afb9561](https://github.com/jgchk/music-downloader/commit/afb9561396034ece3d9a410afe7b2dc99842938a))
+* **web:** read the queue newest first and show one pane on small screens ([10b1600](https://github.com/jgchk/music-downloader/commit/10b160049b5a7e53d2f2652df58ae4e66fc9a2d6))
+
+### Bug Fixes
+
+* **acquisitions-queue-ux:** close the review cycle's findings ([bba6712](https://github.com/jgchk/music-downloader/commit/bba671282a17ffdf4975962b8c66106322f8a7d2))
+* **acquisitions-queue-ux:** close the second review cycle ([2bb4418](https://github.com/jgchk/music-downloader/commit/2bb441879024bedf0e5f9b574da6607d403044f0))
+* **acquisitions-queue-ux:** close the third review cycle ([3770037](https://github.com/jgchk/music-downloader/commit/377003742d479f1ea018134b467cfabf3180204f))
 ## [3.18.1](https://github.com/jgchk/music-downloader/compare/v3.18.0...v3.18.1) (2026-08-07)
 
 ### Bug Fixes
