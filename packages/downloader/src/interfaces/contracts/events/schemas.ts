@@ -10,7 +10,7 @@ import { CORRELATION_ID_PATTERN } from '../../../application/correlation/correla
  * **additive-only within an event type; a breaking change is a new `type`**. Optional facts carry
  * explicit `null` defaults so absent-field behavior lives in the contract, not in receiver code.
  *
- * The vocabulary is deliberately this tool's own ubiquitous language (acquisition, target,
+ * The vocabulary is deliberately this tool's own ubiquitous language (download, target,
  * candidate, fulfilled); consumers translate at their anti-corruption layers.
  */
 
@@ -23,7 +23,7 @@ export const publishedFileSchema = z.object({
 });
 
 export const acquisitionFulfilledDataSchema = z.object({
-  /** The acquisition's id — with the delivery's `webhook-id`, a consumer's dedup key. */
+  /** The download's id — with the delivery's `webhook-id`, a consumer's dedup key. */
   acquisitionId: z.string().min(1),
   /** The resolved target the deposit satisfies, in MusicBrainz terms. */
   target: z.object({
@@ -78,7 +78,7 @@ export type PublishedCorrelation = z.infer<typeof publishedCorrelationSchema>;
 /** The Standard Webhooks body: `{type, timestamp, data}`, plus the optional correlation block. */
 export const acquisitionFulfilledEventSchema = z.object({
   type: z.literal(ACQUISITION_FULFILLED_TYPE),
-  timestamp: z.iso.datetime(), // when the acquisition was fulfilled (stable across redeliveries)
+  timestamp: z.iso.datetime(), // when the download was fulfilled (stable across redeliveries)
   data: acquisitionFulfilledDataSchema,
   metadata: publishedCorrelationSchema.optional(),
 });

@@ -52,10 +52,10 @@ describe('UpcasterRegistry', () => {
 
   it('is pass-through when nothing is registered (the MVP)', () => {
     const registry = new UpcasterRegistry();
-    const data = { type: 'AcquisitionExhausted' };
+    const data = { type: 'DownloadExhausted' };
 
-    expect(registry.upcast('AcquisitionExhausted', 1, data)).toEqual({
-      type: 'AcquisitionExhausted',
+    expect(registry.upcast('DownloadExhausted', 1, data)).toEqual({
+      type: 'DownloadExhausted',
     });
   });
 

@@ -1,4 +1,4 @@
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 
 /**
  * Event versioning / upcasting seam (D8): persisted events are immutable facts that live forever,
@@ -26,6 +26,11 @@ export class UpcasterRegistry {
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();
 
   /** Register the upcaster that lifts `type` events from `fromVersion` to the next version. */
+  /** The stored tokens this registry has steps for — the seam's tests assert they are real. */
+  registeredTypes(): readonly string[] {
+    return [...this.upcasters.keys()];
+  }
+
   register(type: string, fromVersion: number, upcaster: Upcaster): this {
     const forType = this.upcasters.get(type) ?? new Map<number, Upcaster>();
     forType.set(fromVersion, upcaster);
@@ -44,9 +49,9 @@ export class UpcasterRegistry {
    * no-change-by-declaration at read time; it is guarded where it can be: the contract tier
    * replays frozen legacy fixtures through the production registry.
    */
-  upcast(type: string, schemaVersion: number, data: Record<string, unknown>): AcquisitionEvent {
+  upcast(type: string, schemaVersion: number, data: Record<string, unknown>): DownloadEvent {
     const forType = this.upcasters.get(type);
-    if (forType === undefined) return data as unknown as AcquisitionEvent;
+    if (forType === undefined) return data as unknown as DownloadEvent;
 
     const steps = forType
       .entries()
@@ -55,7 +60,7 @@ export class UpcasterRegistry {
       .toSorted(([a], [b]) => a - b);
     let current = data;
     for (const [, step] of steps) current = step(current);
-    return current as unknown as AcquisitionEvent;
+    return current as unknown as DownloadEvent;
   }
 }
 
@@ -89,4 +94,9 @@ export function buildUpcasterRegistry(): UpcasterRegistry {
     1,
     manualSelectionRequestedV1ToV2,
   );
+}
+
+/** Exposes a registry's keys so the storage-token seam can verify they are stored tokens. */
+export function registeredUpcasterTypes(registry: UpcasterRegistry): readonly string[] {
+  return registry.registeredTypes();
 }

@@ -40,7 +40,7 @@ export function combineVerdict(outcomes: readonly ValidatorOutcome[]): Validatio
   return { confidence, reasons };
 }
 
-/** A download is valid only when the verdict clears the acquisition's match threshold (D5). */
+/** A download is valid only when the verdict clears the download's match threshold (D5). */
 export function isVerdictPassing(verdict: ValidationVerdict, policy: MatchPolicy): boolean {
   return verdict.confidence >= policy.threshold;
 }

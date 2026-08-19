@@ -35,7 +35,7 @@ function correlationOf(stored: StoredEvent): Record<string, unknown> | undefined
 
 /**
  * Renders `acquisition.fulfilled` from the stream prefix (change: acquisition-outbound-events).
- * `AcquisitionFulfilled` alone does not carry the target/candidate detail, so the payload is
+ * `DownloadFulfilled` alone does not carry the target/candidate detail, so the payload is
  * assembled from the facts already on the stream — the last `TargetResolved` and `Imported` before
  * the fulfilment — making rendering a deterministic, replay-safe function of the prefix. The result
  * is validated against the outbound schema; a violating payload never leaves the process.
@@ -49,7 +49,7 @@ function renderFulfilled(
   stored: StoredEvent,
   prefix: readonly StoredEvent[],
 ): Result<PublishedEvent, RenderError> {
-  if (stored.event.type !== 'AcquisitionFulfilled') {
+  if (stored.event.type !== 'DownloadFulfilled') {
     return err(renderError(`event type ${stored.event.type} has no published mapping`));
   }
   const events = prefix.map((entry) => entry.event);
@@ -113,6 +113,6 @@ function renderFulfilled(
 
 /** The catalog of published event types — additive: future types join here. */
 export const publishedEventMapping: PublishedEventMapping = {
-  publishes: (type) => type === 'AcquisitionFulfilled',
+  publishes: (type) => type === 'DownloadFulfilled',
   render: renderFulfilled,
 };

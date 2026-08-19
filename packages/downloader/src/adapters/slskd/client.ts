@@ -81,7 +81,7 @@ export class SlskdClient {
    * GET a resource, returning `notFound` for a 404 — for collections whose absence is a *state*,
    * not a fault: slskd 404s the downloads listing of a user with no transfers, and for the abort
    * and poll paths that means "nothing there" (converge), never "retry until it exists" (which
-   * wedged the reactor on a cancelled acquisition's abort, prod 2026-07-22). Other non-2xx throw.
+   * wedged the reactor on a cancelled download's abort, prod 2026-07-22). Other non-2xx throw.
    */
   async getOr(path: string, notFound: unknown): Promise<unknown> {
     const response = await this.dispatch('GET', path);

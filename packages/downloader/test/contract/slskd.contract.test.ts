@@ -6,8 +6,8 @@ import { SlskdClient } from '../../src/adapters/slskd/client.js';
 import { SlskdDownload } from '../../src/adapters/slskd/download.js';
 import { SlskdSearch } from '../../src/adapters/slskd/search.js';
 import type {
-  DownloadProgress,
-  DownloadResult,
+  TransferProgress,
+  TryResult,
 } from '../../src/application/ports/outbound-ports.js';
 import { baseName } from '../../src/adapters/slskd/mapping.js';
 import {
@@ -29,7 +29,7 @@ import {
 import type { Candidate } from '../../src/domain/candidate/candidate.js';
 import { parseCandidateIdentity } from '../../src/domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../src/domain/policy/policies.js';
-import type { DownloadPolicyInput } from '../../src/domain/policy/policies.js';
+import type { TryPolicyInput } from '../../src/domain/policy/policies.js';
 import { createTarget } from '../../src/domain/target/target.js';
 import type { Timer } from '../../src/adapters/slskd/timer.js';
 import { loadFixtures, loadScenario } from './support/fixture.js';
@@ -105,22 +105,22 @@ function rejectionIn(scenario: string, name = 'transfers-enqueue.json'): string 
 }
 
 interface Driven {
-  readonly outcomes: DownloadResult[];
-  readonly progress: DownloadProgress[];
+  readonly outcomes: TryResult[];
+  readonly progress: TransferProgress[];
 }
 
 /**
  * Drive the real download adapter against the currently-served scenario for one candidate.
  *
  * The policy is built through the domain's own constructor rather than taken as a literal: a
- * `DownloadPolicy` is a branded type, and a test that forges the brand can exercise a policy the
+ * `TryPolicy` is a branded type, and a test that forges the brand can exercise a policy the
  * system itself can never produce (a `maxQueueWaitMs` of 0 is exactly such a value — the
  * constructor rejects it — so the smallest legal wait, 1, is what bounds these poll loops).
  */
-async function drive(candidate: Candidate, input: DownloadPolicyInput): Promise<Driven> {
+async function drive(candidate: Candidate, input: TryPolicyInput): Promise<Driven> {
   const policy = createDownloadPolicy(input)._unsafeUnwrap();
-  const outcomes: DownloadResult[] = [];
-  const progress: DownloadProgress[] = [];
+  const outcomes: TryResult[] = [];
+  const progress: TransferProgress[] = [];
   const download = new SlskdDownload(
     silentLogger(),
     new FakeResourceLedger(),
@@ -151,7 +151,7 @@ function candidateFor(scenario: string, filename: string): Candidate {
   return {
     // Built through the domain's own parser, not a branding helper: a fixture that forges a
     // value object proves nothing about the shape the system can actually hold, which is the
-    // defect this tier's DownloadPolicy fixture had.
+    // defect this tier's TryPolicy fixture had.
     identity: parseCandidateIdentity({
       username: body.username,
       path: filename,
@@ -462,7 +462,7 @@ describe('slskd contract — an absent downloads collection is state, not a faul
     // Driven through `pollOwnedTransfers` — the function the watch loop actually uses — rather than
     // the raw client, so the absence default under test is production's own and not one the test
     // supplied. That distinction is the whole finding: reading this 404 as a fault is what wedged
-    // the reactor on a cancelled acquisition's abort in production.
+    // the reactor on a cancelled download's abort in production.
     await serve('absent');
     const recorded = fixtureOf('absent', 'transfers-poll.json');
     // Pinned: re-recording this as a 200-with-empty-body would keep the test green while silently

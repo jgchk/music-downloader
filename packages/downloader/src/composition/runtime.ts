@@ -25,27 +25,27 @@ import {
 } from '../adapters/index.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
 import type { DeadLetterStore } from '../application/ports/dead-letter-port.js';
-import { Reactor } from '../application/acquisition/reactor.js';
-import { DEFAULT_RETRY_POLICY } from '../application/acquisition/retry-policy.js';
-import type { RetryPolicy } from '../application/acquisition/retry-policy.js';
-import { SourceResourceSweep } from '../application/acquisition/sweep.js';
+import { Reactor } from '../application/download/reactor.js';
+import { DEFAULT_RETRY_POLICY } from '../application/download/retry-policy.js';
+import type { RetryPolicy } from '../application/download/retry-policy.js';
+import { SourceResourceSweep } from '../application/download/sweep.js';
 import type {
   EffectPorts,
   InterpreterDependencies,
-} from '../application/acquisition/interpreter.js';
-import { deliverDownloadOutcome } from '../application/acquisition/download-outcome-consumer.js';
-import type { DownloadObserverPort } from '../application/ports/outbound-ports.js';
-import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
+} from '../application/download/interpreter.js';
+import { deliverDownloadOutcome } from '../application/download/download-outcome-consumer.js';
+import type { TransferObserverPort } from '../application/ports/outbound-ports.js';
+import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import type { Logger } from '../application/logging/logger.js';
 import type { Clock, CorrelationSource, IdGenerator } from '../application/ports/system-ports.js';
 import {
-  AcquisitionStatusProjection,
+  DownloadStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
   StalledReadModel,
   seedStalledReadModel,
 } from '../application/projections/read-models.js';
-import { REACTOR_CONSUMER } from '../application/acquisition/reactor.js';
+import { REACTOR_CONSUMER } from '../application/download/reactor.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
 import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
@@ -90,7 +90,7 @@ export interface DownloaderRuntimeOverrides {
    * fake download port can deliver asynchronous outcomes through the real consumer wiring, the
    * way the slskd supervisor does (nonblocking-download-observation D2).
    */
-  readonly ports?: (observer: DownloadObserverPort) => EffectPorts;
+  readonly ports?: (observer: TransferObserverPort) => EffectPorts;
   readonly clock?: Clock;
   readonly ids?: IdGenerator;
   readonly correlation?: CorrelationSource;
@@ -182,7 +182,7 @@ export async function createDownloaderRuntime(
   const parkedEffects = new SqliteParkedEffectStore(database);
   const ledger = new SqliteResourceLedger(database, clock);
 
-  const status = new AcquisitionStatusProjection();
+  const status = new DownloadStatusProjection();
   const progressModel = new ProgressReadModel();
   const libraryView = new LibraryViewProjection();
 
@@ -193,7 +193,7 @@ export async function createDownloaderRuntime(
 
   const backlog = await store.readAll(0);
   if (backlog.isErr()) {
-    // A projection rebuilt from a failed read boots half-blind: every acquisition list/detail
+    // A projection rebuilt from a failed read boots half-blind: every download list/detail
     // answers "nothing exists" and the library dedup view is empty, all while readiness still
     // reads `up` — an infra fault masquerading as a business answer. Fail the boot loudly,
     // exactly as the importer's factory does — never boot on a projection we could not fully
@@ -228,7 +228,7 @@ export async function createDownloaderRuntime(
   // The download observer: the supervisor's asynchronous reports re-entering the core — progress
   // into the ephemeral read model, outcomes through the download-outcome consumer (the appended
   // events publish on the bus, waking the reactor), and watch-end retiring live progress.
-  const downloadObserver: DownloadObserverPort = {
+  const downloadObserver: TransferObserverPort = {
     progress: (acquisitionId, progress) => {
       progressModel.update(acquisitionId, progress);
     },
@@ -400,7 +400,7 @@ export async function createDownloaderRuntime(
       // Latch every supervisor watch before closing the store: a watch settling after close
       // would otherwise retry its delivery against the closed handle forever — the same error
       // loop the verdict poller's stop guards against. A latched-away outcome costs at most a
-      // repeated transfer next boot (the re-drive re-drives the candidate), never the acquisition.
+      // repeated transfer next boot (the re-drive re-drives the candidate), never the download.
       slskdDownload?.stop();
       database.close();
     },

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { StoredEvent } from '../../../application/ports/event-store-port.js';
-import type { AcquisitionEvent } from '../../../domain/acquisition/events.js';
+import type { DownloadEvent } from '../../../domain/download/events.js';
 import {
   importingHistory,
   matchingCandidate,
   sampleFiles,
   sampleTarget,
-} from '../../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../../domain/download/__fixtures__/download-fixtures.js';
 import { asMbid } from '../../../domain/shared/__fixtures__/mbid.js';
 import { createTarget } from '../../../domain/target/target.js';
 import type { Target } from '../../../domain/target/target.js';
@@ -17,7 +17,7 @@ const OCCURRED_AT = '2026-07-03T12:00:00.000Z';
 const LOCATION = '/library/Radiohead/Kid A (2000)';
 
 function stored(
-  events: readonly AcquisitionEvent[],
+  events: readonly DownloadEvent[],
   streamId = 'acq-1',
   metadata: (id: string) => StoredEvent['metadata'] = (id) => ({
     acquisitionId: id,
@@ -37,32 +37,32 @@ function stored(
 }
 
 /** A stream whose rows predate correlation metadata entirely — real, permanent history. */
-function legacyStored(events: readonly AcquisitionEvent[]): StoredEvent[] {
+function legacyStored(events: readonly DownloadEvent[]): StoredEvent[] {
   return stored(events, 'acq-1', (id) => ({ acquisitionId: id, occurredAt: OCCURRED_AT }));
 }
 
 const candidate = matchingCandidate('peer');
 
-function fulfilledHistory(target: Target = sampleTarget): AcquisitionEvent[] {
+function fulfilledHistory(target: Target = sampleTarget): DownloadEvent[] {
   const base = importingHistory([candidate]).map((event) =>
     event.type === 'TargetResolved' ? { ...event, target } : event,
   );
   return [
     ...base,
     { type: 'Imported', candidate: candidate.identity, location: LOCATION, files: sampleFiles },
-    { type: 'AcquisitionFulfilled', location: LOCATION },
+    { type: 'DownloadFulfilled', location: LOCATION },
   ];
 }
 
-function renderLast(events: readonly AcquisitionEvent[]) {
+function renderLast(events: readonly DownloadEvent[]) {
   const prefix = stored(events);
   return publishedEventMapping.render(prefix.at(-1)!, prefix);
 }
 
 describe('publishedEventMapping.publishes', () => {
-  it('maps AcquisitionFulfilled and nothing else', () => {
-    expect(publishedEventMapping.publishes('AcquisitionFulfilled')).toBe(true);
-    expect(publishedEventMapping.publishes('AcquisitionRequested')).toBe(false);
+  it('maps DownloadFulfilled and nothing else', () => {
+    expect(publishedEventMapping.publishes('DownloadFulfilled')).toBe(true);
+    expect(publishedEventMapping.publishes('DownloadRequested')).toBe(false);
     expect(publishedEventMapping.publishes('Imported')).toBe(false);
   });
 });
@@ -136,7 +136,7 @@ describe('publishedEventMapping.render — acquisition.fulfilled', () => {
 
   it('refuses a payload that violates the outbound schema (it must never leave the process)', () => {
     const history = fulfilledHistory().map((event) =>
-      event.type === 'AcquisitionFulfilled' ? { ...event, location: '' } : event,
+      event.type === 'DownloadFulfilled' ? { ...event, location: '' } : event,
     );
     const error = renderLast(history)._unsafeUnwrapErr();
     expect(error.kind).toBe('RenderError');

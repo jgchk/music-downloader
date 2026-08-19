@@ -1,7 +1,7 @@
 import { access, copyFile, mkdir, rename, rm, rmdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { ResultAsync } from 'neverthrow';
-import type { DownloadedFile } from '../../domain/acquisition/events.js';
+import type { DownloadedFile } from '../../domain/download/events.js';
 import type { Target } from '../../domain/target/target.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';

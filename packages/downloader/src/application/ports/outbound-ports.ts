@@ -1,14 +1,14 @@
 import type { ResultAsync } from 'neverthrow';
 import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
-import type { DownloadPolicy } from '../../domain/policy/policies.js';
+import type { TryPolicy } from '../../domain/policy/policies.js';
 import type { Target } from '../../domain/target/target.js';
 import type { ProbedAudio } from '../../domain/validation/validators.js';
 import type {
-  AcquisitionRequest,
-  DownloadFailureReason,
+  DownloadRequest,
+  TryFailureReason,
   DownloadedFile,
   EditionCandidate,
-} from '../../domain/acquisition/events.js';
+} from '../../domain/download/events.js';
 import type { CommandContext, OperationScope } from '../correlation/context.js';
 import type { InfraError } from './errors.js';
 
@@ -20,11 +20,11 @@ import type { InfraError } from './errors.js';
  *
  * Every OUTBOUND effect method takes the dispatching {@link OperationScope} as its LAST parameter —
  * one uniform rule, so there is no per-port exception to remember and the compiler catches a call
- * site that forgot. {@link DownloadObserverPort} is the exception because it is not an effect: it
+ * site that forgot. {@link TransferObserverPort} is the exception because it is not an effect: it
  * is the INBOUND half, implemented by the application, so `outcome` takes the pinned
  * {@link CommandContext} to carry back into the shell and the fire-and-forget notifications take
  * neither. An adapter uses `scope.logger` (already bound to the operation, so its lines join
- * the acquisition without the adapter knowing what correlation is) and carries `scope.context`
+ * the download without the adapter knowing what correlation is) and carries `scope.context`
  * opaquely wherever it re-enters the shell asynchronously. No adapter reads a field of either.
  */
 
@@ -38,7 +38,7 @@ export type MetadataResolution =
 
 export interface MetadataPort {
   resolve(
-    request: AcquisitionRequest,
+    request: DownloadRequest,
     scope: OperationScope,
   ): ResultAsync<MetadataResolution, InfraError>;
 }
@@ -59,20 +59,20 @@ export interface SearchPort {
   ): ResultAsync<readonly Candidate[], InfraError>;
 }
 
-// --- DownloadPort (first adapter: slskd) -------------------------------------------------------
+// --- TransferPort (first adapter: slskd) -------------------------------------------------------
 
-export interface DownloadProgress {
+export interface TransferProgress {
   readonly percent: number;
   readonly bytesTransferred: number;
   readonly bytesTotal: number;
   readonly queuePosition?: number;
 }
 
-export type DownloadResult =
+export type TryResult =
   | { readonly kind: 'completed'; readonly files: readonly DownloadedFile[] }
   | {
       readonly kind: 'failed';
-      readonly reason: DownloadFailureReason;
+      readonly reason: TryFailureReason;
       // Files the source had already completed into staging before the candidate was abandoned or
       // doomed. Threaded through the domain so staging-cleanup removes them (design D2); best-effort,
       // so an unresolvable subset simply yields none rather than failing the outcome (D3).
@@ -80,9 +80,9 @@ export type DownloadResult =
     };
 
 /** Start's synchronous answer: the source accepted the enqueue, or refused THIS candidate. */
-export type DownloadStart =
+export type TryStart =
   | { readonly kind: 'started' }
-  | { readonly kind: 'rejected'; readonly reason: DownloadFailureReason };
+  | { readonly kind: 'rejected'; readonly reason: TryFailureReason };
 
 /**
  * The application-owned face the download supervisor reports through
@@ -92,8 +92,8 @@ export type DownloadStart =
  * Implemented by the application, injected into the adapter at composition — the inbound half of
  * the download conversation, mirroring how another context's verdicts are consumed.
  */
-export interface DownloadObserverPort {
-  progress(acquisitionId: string, progress: DownloadProgress): void;
+export interface TransferObserverPort {
+  progress(acquisitionId: string, progress: TransferProgress): void;
   /**
    * Deliver the settled outcome, named with the candidate it settles (the consumer threads it
    * into the decision path's late-report guard). An `Err` means the delivery could not land
@@ -103,40 +103,40 @@ export interface DownloadObserverPort {
   outcome(
     acquisitionId: string,
     candidate: CandidateIdentity,
-    result: DownloadResult,
+    result: TryResult,
     context: CommandContext,
   ): ResultAsync<void, InfraError>;
   /**
-   * Every watch for the acquisition has ended — settled, or aborted. Live progress for the
-   * acquisition is retired.
+   * Every watch for the download has ended — settled, or aborted. Live progress for the
+   * download is retired.
    */
   finished(acquisitionId: string): void;
 }
 
-export interface DownloadPort {
+export interface TransferPort {
   /**
    * Ensure the candidate is enqueued at the source and being watched
    * (nonblocking-download-observation D1): reconcile/re-attach against the ownership ledger,
    * enqueue when the source holds nothing, register the watch, and return promptly. Idempotent —
    * starting an already-watched candidate is a no-op answer of `started`, which is what lets the
    * reactor re-dispatch it level-triggered (live redelivery and startup re-drive alike). The
-   * outcome arrives later through the {@link DownloadObserverPort}; only an enqueue the source
+   * outcome arrives later through the {@link TransferObserverPort}; only an enqueue the source
    * itself refused is answered synchronously as `rejected`.
    */
   start(
     acquisitionId: string,
     candidate: Candidate,
-    policy: DownloadPolicy,
+    policy: TryPolicy,
     scope: OperationScope,
-  ): ResultAsync<DownloadStart, InfraError>;
+  ): ResultAsync<TryStart, InfraError>;
 
   /**
    * Cancel a candidate's in-flight transfers at the source and remove their records, so a cancelled
-   * acquisition stops downloading rather than running to completion (D: cancellation). Ends the
+   * download stops downloading rather than running to completion (D: cancellation). Ends the
    * candidate's watch promptly — no outcome is emitted for an aborted candidate; the abort's own
    * settlement (this method's return, fed back as a command) owns the cleanup. Idempotent:
    * transfers already settled or absent are tolerated, so a redelivered abort is safe. The
-   * `acquisitionId` scopes the transfers to the ones this acquisition owns in the ledger.
+   * `acquisitionId` scopes the transfers to the ones this download owns in the ledger.
    *
    * Returns the files the source had already completed into staging before the abort, so the caller
    * can thread them into the settlement for staging-cleanup (design D2). Best-effort: an unresolvable

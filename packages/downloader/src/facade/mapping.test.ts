@@ -7,7 +7,7 @@ import {
   DEFAULT_RETRY_POLICY,
 } from '../domain/policy/policies.js';
 import { DEFAULT_QUALITY_POLICY } from '../domain/policy/quality-policy.js';
-import type { AcquisitionStatusView } from '../application/projections/read-models.js';
+import type { DownloadStatusView } from '../application/projections/read-models.js';
 import { progressToDto, requestToDomain, resolvePolicies, statusViewToDto } from './mapping.js';
 
 describe('requestToDomain', () => {
@@ -91,8 +91,8 @@ describe('statusViewToDto', () => {
   const candidate = asCandidateIdentity({ username: 'u1', path: 'p', sizeBytes: 100 });
   const MBID = '11111111-1111-4111-8111-111111111111';
 
-  /** A view of an acquisition whose metadata never resolved, so only the request describes it. */
-  const unresolvedView = (requestedTarget: AcquisitionStatusView['requestedTarget']) =>
+  /** A view of an download whose metadata never resolved, so only the request describes it. */
+  const unresolvedView = (requestedTarget: DownloadStatusView['requestedTarget']) =>
     ({
       acquisitionId: 'acq-1',
       status: 'MetadataFailed',
@@ -103,7 +103,7 @@ describe('statusViewToDto', () => {
       history: [],
       cancellable: false,
       awaitingSelection: false,
-    }) satisfies AcquisitionStatusView;
+    }) satisfies DownloadStatusView;
 
   it('maps every history-entry kind and the current candidate', () => {
     const request = {
@@ -112,7 +112,7 @@ describe('statusViewToDto', () => {
       artist: 'A',
       title: 'T',
     };
-    const view: AcquisitionStatusView = {
+    const view: DownloadStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
       transferStarted: true,
@@ -163,8 +163,8 @@ describe('statusViewToDto', () => {
     ]);
   });
 
-  it('carries when the acquisition was requested onto the wire', () => {
-    const view: AcquisitionStatusView = {
+  it('carries when the download was requested onto the wire', () => {
+    const view: DownloadStatusView = {
       ...unresolvedView({ kind: 'musicbrainz', mbid: asMbid(MBID), targetType: 'album' }),
       requestedAt: '2026-01-01T00:00:00Z',
     };
@@ -207,7 +207,7 @@ describe('statusViewToDto', () => {
       ).target,
     ).toBeUndefined();
 
-    const resolved: AcquisitionStatusView = {
+    const resolved: DownloadStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
       transferStarted: true,
@@ -223,7 +223,7 @@ describe('statusViewToDto', () => {
   });
 
   it('omits an absent current candidate', () => {
-    const view: AcquisitionStatusView = {
+    const view: DownloadStatusView = {
       acquisitionId: 'acq-1',
       status: 'Pending',
       transferStarted: false,
@@ -238,7 +238,7 @@ describe('statusViewToDto', () => {
   });
 
   it('passes the stalled exposure through to the wire', () => {
-    const view: AcquisitionStatusView = {
+    const view: DownloadStatusView = {
       acquisitionId: 'acq-1',
       status: 'Downloading',
       transferStarted: false,
@@ -254,7 +254,7 @@ describe('statusViewToDto', () => {
   });
 
   it('carries the decided lifecycle flags through to the wire', () => {
-    const cancellableAwaiting: AcquisitionStatusView = {
+    const cancellableAwaiting: DownloadStatusView = {
       acquisitionId: 'acq-1',
       status: 'AwaitingManualSelection',
       transferStarted: false,
@@ -268,7 +268,7 @@ describe('statusViewToDto', () => {
     expect(cancellableDto.cancellable).toBe(true);
     expect(cancellableDto.awaitingSelection).toBe(true);
 
-    const terminal: AcquisitionStatusView = {
+    const terminal: DownloadStatusView = {
       acquisitionId: 'acq-2',
       status: 'Fulfilled',
       transferStarted: false,

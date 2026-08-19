@@ -8,7 +8,7 @@ import {
   defaultPolicies,
   sampleEditionCandidates,
   sampleGroupRequest,
-} from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../domain/download/__fixtures__/download-fixtures.js';
 import { asMbid } from '../domain/shared/__fixtures__/mbid.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
@@ -59,7 +59,7 @@ function roundTrip<T>(value: T): T {
 
 describe('createDownloaderFacade', () => {
   describe('submitAcquisition', () => {
-    it('accepts a valid submission and returns the acquisition id', async () => {
+    it('accepts a valid submission and returns the download id', async () => {
       const facade = createDownloaderFacade(testWiring().deps);
       const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
@@ -183,7 +183,7 @@ describe('createDownloaderFacade', () => {
       }
     });
 
-    it('cancels a live acquisition', async () => {
+    it('cancels a live download', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
@@ -223,7 +223,7 @@ describe('createDownloaderFacade', () => {
         0,
         [
           {
-            type: 'AcquisitionRequested',
+            type: 'DownloadRequested',
             request: sampleGroupRequest,
             policies: defaultPolicies(),
           },
@@ -238,7 +238,7 @@ describe('createDownloaderFacade', () => {
       return wiring;
     }
 
-    it('accepts a retained candidate and resumes the acquisition', async () => {
+    it('accepts a retained candidate and resumes the download', async () => {
       const wiring = await awaitingWiring();
       const result = await wiring.facade.selectEdition(
         {
@@ -311,7 +311,7 @@ describe('createDownloaderFacade', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Both inputs are non-empty strings the schema accepts, so the message is the only thing
-        // that tells the caller it is the chosen edition — not the acquisition id — that is bad.
+        // that tells the caller it is the chosen edition — not the download id — that is bad.
         expect(result.error).toEqual({
           kind: 'ValidationFailed',
           message: 'releaseMbid is not a valid MusicBrainz id',
@@ -321,7 +321,7 @@ describe('createDownloaderFacade', () => {
   });
 
   describe('getAcquisition', () => {
-    it('exposes the candidate editions while an acquisition awaits manual selection', async () => {
+    it('exposes the candidate editions while an download awaits manual selection', async () => {
       const wiring = testWiring();
       await wiring.store.append(
         'acq-1',
@@ -341,7 +341,7 @@ describe('createDownloaderFacade', () => {
       }
     });
 
-    it('returns the status view for a known acquisition', async () => {
+    it('returns the status view for a known download', async () => {
       const wiring = testWiring();
       const facade = createDownloaderFacade(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
@@ -357,7 +357,7 @@ describe('createDownloaderFacade', () => {
       }
     });
 
-    it('returns NotFound for an unknown acquisition', () => {
+    it('returns NotFound for an unknown download', () => {
       const facade = createDownloaderFacade(testWiring().deps);
       const result = facade.getAcquisition({ id: 'acq-unknown' });
 

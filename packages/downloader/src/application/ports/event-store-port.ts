@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { AcquisitionEvent, AcquisitionEventType } from '../../domain/acquisition/events.js';
+import type { DownloadEvent, DownloadEventType } from '../../domain/download/events.js';
 import type { CausationReference } from '../correlation/context.js';
 import type { CorrelationId } from '../correlation/correlation-id.js';
 import type { InfraError } from './errors.js';
@@ -40,8 +40,8 @@ export interface StoredEvent {
   readonly globalSeq: number;
   readonly streamId: string;
   readonly version: number;
-  readonly type: AcquisitionEventType;
-  readonly event: AcquisitionEvent;
+  readonly type: DownloadEventType;
+  readonly event: DownloadEvent;
   readonly metadata: EventMetadata;
 }
 
@@ -58,7 +58,7 @@ export interface EventStorePort {
   append(
     streamId: string,
     expectedVersion: number,
-    events: readonly AcquisitionEvent[],
+    events: readonly DownloadEvent[],
     metadata: AppendMetadata,
   ): ResultAsync<readonly StoredEvent[], AppendError>;
 

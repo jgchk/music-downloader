@@ -1,5 +1,5 @@
 import { ResultAsync } from 'neverthrow';
-import type { AcquisitionRequest } from '../../domain/acquisition/events.js';
+import type { DownloadRequest } from '../../domain/download/events.js';
 import { classifiedFault } from '../support/fault.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { MetadataPort, MetadataResolution } from '../../application/ports/outbound-ports.js';
@@ -72,7 +72,7 @@ export class MusicBrainzMetadata implements MetadataPort {
   }
 
   resolve(
-    request: AcquisitionRequest,
+    request: DownloadRequest,
     scope: OperationScope,
   ): ResultAsync<MetadataResolution, InfraError> {
     return ResultAsync.fromPromise(this.doResolve(request, scope.logger), (cause) =>
@@ -81,7 +81,7 @@ export class MusicBrainzMetadata implements MetadataPort {
   }
 
   private async doResolve(
-    request: AcquisitionRequest,
+    request: DownloadRequest,
     logger: Logger,
   ): Promise<MetadataResolution> {
     logger.debug({ kind: request.kind, targetType: request.targetType }, 'resolving metadata');

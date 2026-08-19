@@ -1,8 +1,8 @@
 import { Result, ok } from 'neverthrow';
-import type { AcquisitionRequest } from '../domain/acquisition/events.js';
+import type { DownloadRequest } from '../domain/download/events.js';
 import { parseMbid } from '../domain/shared/mbid.js';
 import type { InvalidMbid } from '../domain/shared/mbid.js';
-import type { AcquisitionPolicies } from '../domain/policy/policies.js';
+import type { DownloadPolicies } from '../domain/policy/policies.js';
 import {
   DEFAULT_DOWNLOAD_POLICY,
   DEFAULT_MATCH_POLICY,
@@ -12,9 +12,9 @@ import {
   createRetryPolicy,
 } from '../domain/policy/policies.js';
 import { DEFAULT_QUALITY_POLICY, createQualityPolicy } from '../domain/policy/quality-policy.js';
-import type { DownloadProgress } from '../application/ports/outbound-ports.js';
+import type { TransferProgress } from '../application/ports/outbound-ports.js';
 import type {
-  AcquisitionStatusView,
+  DownloadStatusView,
   StatusHistoryEntry,
 } from '../application/projections/read-models.js';
 import type {
@@ -36,7 +36,7 @@ type HistoryDto = AcquisitionStatusResponseDto['history'][number];
 
 export function requestToDomain(
   dto: AcquisitionRequestDto,
-): Result<AcquisitionRequest, InvalidMbid> {
+): Result<DownloadRequest, InvalidMbid> {
   // The wire request mirrors the domain request today, but its id crosses the anti-corruption
   // boundary here: parse it once into an Mbid so the domain only ever holds well-formed ids.
   if (dto.kind === 'descriptor') return ok(dto);
@@ -45,7 +45,7 @@ export function requestToDomain(
 
 export function resolvePolicies(
   dto: SubmitAcquisitionRequestDto,
-): Result<AcquisitionPolicies, 'InvalidPolicy'> {
+): Result<DownloadPolicies, 'InvalidPolicy'> {
   const quality = createQualityPolicy(
     dto.qualityPolicy?.order ?? DEFAULT_QUALITY_POLICY.order,
     dto.qualityPolicy?.floor ?? DEFAULT_QUALITY_POLICY.floor,
@@ -67,10 +67,10 @@ export function resolvePolicies(
 
 /**
  * The request echoed onto the wire as an explicit field projection — never a spread, so a future
- * domain-only field on `AcquisitionRequest` cannot leak into a response (the anti-corruption copy
+ * domain-only field on `DownloadRequest` cannot leak into a response (the anti-corruption copy
  * is real). The domain's branded mbid decays to its string here.
  */
-function requestToWire(request: AcquisitionRequest): RequestedTargetEchoDto {
+function requestToWire(request: DownloadRequest): RequestedTargetEchoDto {
   switch (request.kind) {
     case 'musicbrainz': {
       return { kind: 'musicbrainz', mbid: request.mbid, targetType: request.targetType };
@@ -153,7 +153,7 @@ function historyEntryToDto(entry: StatusHistoryEntry): HistoryDto {
   }
 }
 
-export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusResponseDto {
+export function statusViewToDto(view: DownloadStatusView): AcquisitionStatusResponseDto {
   return {
     acquisitionId: view.acquisitionId,
     status: view.status,
@@ -173,7 +173,7 @@ export function statusViewToDto(view: AcquisitionStatusView): AcquisitionStatusR
   };
 }
 
-export function progressToDto(progress: DownloadProgress): ProgressResponseDto {
+export function progressToDto(progress: TransferProgress): ProgressResponseDto {
   return {
     percent: progress.percent,
     bytesTransferred: progress.bytesTransferred,

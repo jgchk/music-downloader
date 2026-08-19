@@ -1,16 +1,16 @@
 import { ResultAsync } from 'neverthrow';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import { candidateKey } from '../../domain/candidate/candidate.js';
-import type { DownloadPolicy } from '../../domain/policy/policies.js';
-import type { DownloadFailureReason, DownloadedFile } from '../../domain/acquisition/events.js';
+import type { TryPolicy } from '../../domain/policy/policies.js';
+import type { TryFailureReason, DownloadedFile } from '../../domain/download/events.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type { OperationScope } from '../../application/correlation/context.js';
 import type {
-  DownloadObserverPort,
-  DownloadPort,
-  DownloadResult,
-  DownloadStart,
+  TransferObserverPort,
+  TransferPort,
+  TryResult,
+  TryStart,
 } from '../../application/ports/outbound-ports.js';
 import type {
   ResourceLedgerStore,
@@ -30,11 +30,11 @@ import { aggregate, enqueueRejectionReason, recogniseRejection } from './transfe
 import type { OwnedTransfer } from './transfers.js';
 
 /**
- * The slskd `DownloadPort` adapter — the download supervisor (nonblocking-download-observation
+ * The slskd `TransferPort` adapter — the download supervisor (nonblocking-download-observation
  * D1). `start` reconciles/re-attaches against the ownership ledger, enqueues when the source
  * holds nothing, registers an in-memory watch, and returns promptly; the watch then observes the
  * transfers on its own cadence — never inside a reactor dispatch — and reports one candidate-level
- * outcome through the {@link DownloadObserverPort} when it settles. Progress is surfaced live via
+ * outcome through the {@link TransferObserverPort} when it settles. Progress is surfaced live via
  * the observer (never as events — D4). The supervisor owns the *detection* of stalls and hopeless
  * queues against the caller-supplied policy (the policy stays source-agnostic), and dooms the
  * whole candidate the moment any file fails rather than downloading the rest of a release it will
@@ -85,7 +85,7 @@ interface Watch {
   readonly scope: OperationScope;
 }
 
-export class SlskdDownload implements DownloadPort {
+export class SlskdDownload implements TransferPort {
   private readonly client: SlskdClient;
   private readonly pollIntervalMs: number;
   private readonly transferLedger: TransferLedger;
@@ -104,7 +104,7 @@ export class SlskdDownload implements DownloadPort {
     collaboratorLogger: Logger,
     ledger: ResourceLedgerStore,
     config: SlskdDownloadConfig,
-    private readonly observer: DownloadObserverPort,
+    private readonly observer: TransferObserverPort,
     client: SlskdClient,
     private readonly timer: Timer = realTimer,
   ) {
@@ -124,9 +124,9 @@ export class SlskdDownload implements DownloadPort {
   start(
     acquisitionId: string,
     candidate: Candidate,
-    policy: DownloadPolicy,
+    policy: TryPolicy,
     scope: OperationScope,
-  ): ResultAsync<DownloadStart, InfraError> {
+  ): ResultAsync<TryStart, InfraError> {
     return ResultAsync.fromPromise(this.doStart(acquisitionId, candidate, policy, scope), (cause) =>
       infraError('slskd.download', String(cause), cause),
     );
@@ -142,9 +142,9 @@ export class SlskdDownload implements DownloadPort {
   private async doStart(
     acquisitionId: string,
     candidate: Candidate,
-    policy: DownloadPolicy,
+    policy: TryPolicy,
     scope: OperationScope,
-  ): Promise<DownloadStart> {
+  ): Promise<TryStart> {
     const key = this.watchKey(acquisitionId, candidate);
     const existing = this.watches.get(key);
     // Level-triggered ensure: an already-live watch is the answer. An aborted watch still winding
@@ -200,8 +200,8 @@ export class SlskdDownload implements DownloadPort {
     key: string,
     acquisitionId: string,
     candidate: Candidate,
-    policy: DownloadPolicy,
-  ): Promise<DownloadStart> {
+    policy: TryPolicy,
+  ): Promise<TryStart> {
     const { username, requests, wanted, ownedKeys } = this.transferPlan(acquisitionId, candidate);
     // Reconcile before enqueue (reactor-durability D3): live ledgered rows are evidence of a
     // prior attempt whose watch died with the process. If the source still holds those
@@ -227,14 +227,14 @@ export class SlskdDownload implements DownloadPort {
         // offline peer, a file the peer does not share, a peer that never answers — so those take
         // THIS branch, not the candidate-failure branch below, and the "never an InfraError" promise
         // written there does not hold for them. The consequence is real: a dead peer parks the
-        // acquisition for the whole retry budget instead of failing the candidate and advancing the
+        // download for the whole retry budget instead of failing the candidate and advancing the
         // ladder. Separating "slskd is unwell" from "slskd says this peer is bad" means reading the
         // body on a 5xx, which promotes text classification into the retry decision — its own
         // design question, proposed separately. The evidence is pinned by the contract tier's
         // "answers every enqueue failure with a 500" test.
         //
         // Until then, log what slskd's body classifies to, so an operator staring at a parked
-        // acquisition can tell the two apart. The reason is derived and PII-free; the body itself is
+        // download can tell the two apart. The reason is derived and PII-free; the body itself is
         // never logged, because it embeds the peer's chosen username verbatim.
         // Only a 5xx carries a peer-rejection body worth reading; a 401/403/429 is slskd's own
         // health or auth speaking, and classifying that text would invite an operator to read a
@@ -289,7 +289,7 @@ export class SlskdDownload implements DownloadPort {
   }
 
   /**
-   * Retire the acquisition's live progress once its LAST watch (or failed reservation) is gone —
+   * Retire the download's live progress once its LAST watch (or failed reservation) is gone —
    * every release path funnels here, so a frozen progress bar cannot outlive the watches that
    * fed it, while a genuine sibling (a successor candidate's watch) keeps the bar alive.
    */
@@ -297,7 +297,7 @@ export class SlskdDownload implements DownloadPort {
     if (!this.hasWatchFor(acquisitionId)) this.observer.finished(acquisitionId);
   }
 
-  /** True while any watch (any candidate) for the acquisition is still registered. */
+  /** True while any watch (any candidate) for the download is still registered. */
   private hasWatchFor(acquisitionId: string): boolean {
     const prefix = `${acquisitionId}|`;
     for (const key of this.watches.keys()) if (key.startsWith(prefix)) return true;
@@ -309,7 +309,7 @@ export class SlskdDownload implements DownloadPort {
    * polling the source or retrying deliveries against torn-down infrastructure. Deliberately not
    * a drain — the startup re-drive re-drives an unfinished candidate (re-attaching where the
    * source still holds its transfers, repeating the download where teardown already removed
-   * them), so a latched-away outcome costs at most a repeat transfer, never the acquisition.
+   * them), so a latched-away outcome costs at most a repeat transfer, never the download.
    */
   stop(): void {
     for (const watch of this.watches.values()) watch.aborted = true;
@@ -328,7 +328,7 @@ export class SlskdDownload implements DownloadPort {
     key: string,
     acquisitionId: string,
     candidate: Candidate,
-    policy: DownloadPolicy,
+    policy: TryPolicy,
     wanted: ReadonlySet<string>,
     ownedKeys: readonly SourceResourceKey[],
   ): Promise<void> {
@@ -341,7 +341,7 @@ export class SlskdDownload implements DownloadPort {
     try {
       for (;;) {
         if (watch.aborted) return;
-        let result: DownloadResult | undefined;
+        let result: TryResult | undefined;
         try {
           const mine = await pollOwnedTransfers(this.client, username, wanted);
           await this.transferLedger.captureIds(acquisitionId, username, mine, captured);
@@ -439,7 +439,7 @@ export class SlskdDownload implements DownloadPort {
       // Nothing may escape the floating loop: an unexpected throw (a bug, not a modeled fault)
       // is logged with its context and the watch dies. The startup re-drive re-drives the
       // candidate — re-attaching where the source still holds the transfers, otherwise repeating
-      // the download — so the acquisition is never lost, at the cost of a possible repeat.
+      // the download — so the download is never lost, at the cost of a possible repeat.
       watch.scope.logger.error(
         { acquisitionId, username, err: error },
         'download watch failed unexpectedly; a restart re-drive resumes the candidate',
@@ -466,7 +466,7 @@ export class SlskdDownload implements DownloadPort {
     watch: Watch,
     acquisitionId: string,
     candidate: Candidate,
-    result: DownloadResult,
+    result: TryResult,
   ): Promise<void> {
     for (let attempt = 1; ; attempt += 1) {
       if (watch.aborted) return;
@@ -524,7 +524,7 @@ export class SlskdDownload implements DownloadPort {
   }
 
   /**
-   * Cancel the acquisition's in-flight transfers at the source and remove their records (D:
+   * Cancel the download's in-flight transfers at the source and remove their records (D:
    * cancellation). Ends the candidate's watch first — promptly, without waiting for the transfer
    * to settle on its own — so no outcome is emitted for a candidate the caller abandoned; the
    * abort's own settlement (fed back by the interpreter) owns the staging cleanup. Idempotent, so
@@ -567,13 +567,13 @@ export class SlskdDownload implements DownloadPort {
     username: string,
     mine: readonly OwnedTransfer[],
     ownedKeys: readonly SourceResourceKey[],
-    reason: DownloadFailureReason,
+    reason: TryFailureReason,
     candidate: Candidate,
     scope: OperationScope,
-  ): Promise<DownloadResult> {
+  ): Promise<TryResult> {
     scope.logger.warn({ username, reason }, 'abandoning slskd download');
     const files = await this.staged.completedStagedFiles(mine, candidate);
-    const result: DownloadResult = { kind: 'failed', reason, files };
+    const result: TryResult = { kind: 'failed', reason, files };
     await this.teardownOwned(acquisitionId, username, mine, ownedKeys, scope);
     return result;
   }

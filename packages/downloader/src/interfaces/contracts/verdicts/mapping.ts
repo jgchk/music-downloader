@@ -7,7 +7,7 @@ import {
 import type { CommandContext } from '../../../application/correlation/context.js';
 import type { CorrelationSource } from '../../../application/ports/system-ports.js';
 import { inboundCorrelationSchema } from './schemas.js';
-import type { ExternalValidationFailureInput } from '../../../application/acquisition/use-cases.js';
+import type { ExternalValidationFailureInput } from '../../../application/download/use-cases.js';
 import type { ExternalVerdictDelivery } from './schemas.js';
 
 /**

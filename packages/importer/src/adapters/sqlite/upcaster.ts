@@ -19,6 +19,11 @@ export class UpcasterRegistry {
   private readonly upcasters = new Map<string, Map<number, Upcaster>>();
 
   /** Register the upcaster that lifts `type` events from `fromVersion` to the next version. */
+  /** The stored tokens this registry has steps for — the seam's tests assert they are real. */
+  registeredTypes(): readonly string[] {
+    return [...this.upcasters.keys()];
+  }
+
   register(type: string, fromVersion: number, upcaster: Upcaster): this {
     const forType = this.upcasters.get(type) ?? new Map<number, Upcaster>();
     forType.set(fromVersion, upcaster);
@@ -68,4 +73,9 @@ export const reviewResolvedV1ToV2: Upcaster = (data) => {
 /** The populated registry wired in composition: every registered upcaster in one testable place. */
 export function buildUpcasterRegistry(): UpcasterRegistry {
   return new UpcasterRegistry().register('ReviewResolved', 1, reviewResolvedV1ToV2);
+}
+
+/** Exposes a registry's keys so the storage-token seam can verify they are stored tokens. */
+export function registeredUpcasterTypes(registry: UpcasterRegistry): readonly string[] {
+  return registry.registeredTypes();
 }

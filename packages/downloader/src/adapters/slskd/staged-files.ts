@@ -1,4 +1,4 @@
-import type { DownloadedFile } from '../../domain/acquisition/events.js';
+import type { DownloadedFile } from '../../domain/download/events.js';
 import type { Candidate } from '../../domain/candidate/candidate.js';
 import type { Logger } from '../../application/logging/logger.js';
 import type { SlskdClient } from './client.js';
@@ -91,7 +91,7 @@ export class StagedFileResolver {
    * the scan walks older
    * pages until every id resolves or a page comes back empty (log exhausted). An id can lag its
    * transfer-state flip by moments, so an exhausted log triggers a bounded re-poll from the top;
-   * persistent absence is an infra fault the acquisition retry then handles.
+   * persistent absence is an infra fault the download retry then handles.
    */
   private async resolveStaged(
     wantedIds: ReadonlySet<string>,

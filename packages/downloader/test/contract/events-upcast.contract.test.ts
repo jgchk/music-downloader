@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { AcquisitionEvent } from '../../src/domain/acquisition/events.js';
+import type { DownloadEvent } from '../../src/domain/download/events.js';
 import {
   defaultPolicies,
   sampleGroupRequest,
-} from '../../src/domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../../src/domain/download/__fixtures__/download-fixtures.js';
 import { asMbid } from '../../src/domain/shared/__fixtures__/mbid.js';
-import { foldEvents } from '../../src/domain/acquisition/state.js';
+import { foldEvents } from '../../src/domain/download/state.js';
 import { buildUpcasterRegistry } from '../../src/adapters/sqlite/upcaster.js';
 
 /**
@@ -29,7 +29,7 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
     event: Record<string, unknown>;
   };
 
-  function upcastFixture(): AcquisitionEvent {
+  function upcastFixture(): DownloadEvent {
     return buildUpcasterRegistry().upcast('ManualSelectionRequested', 1, {
       ...fixture.event,
     });
@@ -47,8 +47,8 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
   });
 
   it('folds the upcast legacy event to AwaitingManualSelection with the unknown count absent', () => {
-    const history: readonly AcquisitionEvent[] = [
-      { type: 'AcquisitionRequested', request: sampleGroupRequest, policies: defaultPolicies() },
+    const history: readonly DownloadEvent[] = [
+      { type: 'DownloadRequested', request: sampleGroupRequest, policies: defaultPolicies() },
       upcastFixture(),
     ];
 
@@ -75,7 +75,7 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
     // UUID guard to certify — the ids match the fixture's only so the two cases read as one story.
     // (Values that DO come from a recording are parsed: see `recordedMbid` in
     // musicbrainz.contract.test.ts and `parseCandidateIdentity` in slskd.contract.test.ts.)
-    const v2Event: AcquisitionEvent = {
+    const v2Event: DownloadEvent = {
       type: 'ManualSelectionRequested',
       candidates: [
         { releaseMbid: asMbid('boot-1'), title: 'Live at Budokan', trackCount: 12 },
@@ -84,7 +84,7 @@ describe('ManualSelectionRequested v1 → v2 upcast (EditionCandidate.trackCount
     };
 
     const folded = foldEvents([
-      { type: 'AcquisitionRequested', request: sampleGroupRequest, policies: defaultPolicies() },
+      { type: 'DownloadRequested', request: sampleGroupRequest, policies: defaultPolicies() },
       buildUpcasterRegistry().upcast('ManualSelectionRequested', 2, {
         ...v2Event,
       }),

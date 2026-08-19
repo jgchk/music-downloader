@@ -26,7 +26,7 @@ function row(overrides: Partial<SourceResource> = {}): SourceResource {
 }
 
 describe('TransferLedger', () => {
-  it('re-reads the write-ahead rows it recorded for the acquisition', async () => {
+  it('re-reads the write-ahead rows it recorded for the download', async () => {
     // The round trip that reconciliation depends on: rows are written under `keyFor`'s key and read
     // back by the same class. A key shape that drifts between the two makes a crashed attempt's
     // transfers invisible on restart, and the candidate is silently downloaded a second time.
@@ -42,7 +42,7 @@ describe('TransferLedger', () => {
   });
 
   it('reports only the wanted transfer rows this peer owns', async () => {
-    // Everything else in the acquisition's ledger is a near-miss on exactly one field, and each one
+    // Everything else in the download's ledger is a near-miss on exactly one field, and each one
     // would be a different candidate's or a different source's business if it were read as ours.
     const { store, transfers } = ledgerFor();
     store.created.push(

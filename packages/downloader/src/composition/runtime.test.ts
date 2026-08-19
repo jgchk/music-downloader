@@ -11,17 +11,17 @@ import {
   openEventDatabase,
 } from '../adapters/index.js';
 import { SqliteDeadLetterStore } from '../adapters/sqlite/dead-letters.js';
-import type { EffectPorts } from '../application/acquisition/interpreter.js';
+import type { EffectPorts } from '../application/download/interpreter.js';
 import { FakeDeadLetterStore, silentLogger } from '../application/__fixtures__/fakes.js';
 import { createLogger } from '../application/logging/logger.js';
 import { infraError } from '../application/ports/errors.js';
-import type { DownloadObserverPort, DownloadResult } from '../application/ports/outbound-ports.js';
+import type { TransferObserverPort, TryResult } from '../application/ports/outbound-ports.js';
 import {
   defaultPolicies,
   matchingCandidate,
   requestedHistory,
   sampleTarget,
-} from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../domain/download/__fixtures__/download-fixtures.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
 import type { SeamEvent, SeamFeed } from '../application/events/catch-up-subscription.js';
 import { createDownloaderRuntime } from './runtime.js';
@@ -31,7 +31,7 @@ import type { DownloaderRuntime } from './runtime.js';
  * The runtime factory under test: the composed-process construction path (merge-modular-monolith
  * D8) — store, projections, reactor, seam surfaces — driven end to end with fake effect ports.
  * The composed product entry (packages/web) calls exactly this factory; these tests are its
- * wiring proof: an acquisition submitted through the facade is fulfilled by the reactor, appears
+ * wiring proof: an download submitted through the facade is fulfilled by the reactor, appears
  * on the outbound feed, fires the post-commit wakeup, and a verdict consumed from the importer's
  * feed revives it — all against a runtime built by the factory, not hand-wired.
  */
@@ -44,9 +44,9 @@ const PROBES: Record<string, ProbedAudio> = {
   'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251_000 },
   'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264_000 },
 };
-const COMPLETED: DownloadResult = { kind: 'completed', files: FILES };
+const COMPLETED: TryResult = { kind: 'completed', files: FILES };
 
-function fakePorts(observer: DownloadObserverPort): EffectPorts {
+function fakePorts(observer: TransferObserverPort): EffectPorts {
   return {
     metadata: { resolve: () => okAsync({ kind: 'resolved', target: sampleTarget }) },
     search: { search: () => okAsync([matchingCandidate('seeder')]) },
@@ -160,7 +160,7 @@ async function bootWithParkingFirstEffect(): Promise<{
     level: 'error',
     destination: { write: (line: string) => void errorLines.push(line) },
   });
-  const ports = (observer: DownloadObserverPort): EffectPorts => ({
+  const ports = (observer: TransferObserverPort): EffectPorts => ({
     ...fakePorts(observer),
     metadata: {
       resolve: () => {
@@ -200,7 +200,7 @@ async function advanceUntil(isDone: () => boolean, stepMs: number, slices = 30):
 }
 
 describe('createDownloaderRuntime', () => {
-  it('drives a submitted acquisition to fulfilment and exposes it on the seam surfaces', async () => {
+  it('drives a submitted download to fulfilment and exposes it on the seam surfaces', async () => {
     const runtime = await testRuntime();
     const wokeUp = vi.fn();
     cleanups.push(runtime.wakeups.subscribe(wokeUp));
@@ -213,7 +213,7 @@ describe('createDownloaderRuntime', () => {
     await untilFulfilled(runtime, id);
     expect(wokeUp).toHaveBeenCalled();
 
-    // The settled watch retired its live progress: a fulfilled acquisition reports none. The
+    // The settled watch retired its live progress: a fulfilled download reports none. The
     // observer→read-model flow-through itself is pinned mid-flight by its own test below.
     const progress = runtime.facade.getAcquisitionProgress({ id });
     expect(progress.ok).toBe(false);
@@ -229,7 +229,7 @@ describe('createDownloaderRuntime', () => {
     // The delivery is gated so the download stays in flight while the test reads progress —
     // pinning observer.progress → read model (an assertion the post-settle read cannot make).
     const { promise: gate, resolve: release } = Promise.withResolvers<void>();
-    const ports = (observer: DownloadObserverPort): EffectPorts => ({
+    const ports = (observer: TransferObserverPort): EffectPorts => ({
       ...fakePorts(observer),
       download: {
         start: (id, candidate) => {
@@ -303,7 +303,7 @@ describe('createDownloaderRuntime', () => {
     await runtime.stop();
   });
 
-  it('consumes importer verdicts over the connected feed and revives the acquisition', async () => {
+  it('consumes importer verdicts over the connected feed and revives the download', async () => {
     const runtime = await testRuntime();
     const submitted = await runtime.facade.submitAcquisition(SUBMIT, STORY);
     if (!submitted.ok) throw new Error('submit failed');
@@ -574,10 +574,10 @@ describe('createDownloaderRuntime', () => {
     insert.run(
       'acq-legacy',
       0,
-      'AcquisitionRequested',
+      'DownloadRequested',
       1,
       JSON.stringify({
-        type: 'AcquisitionRequested',
+        type: 'DownloadRequested',
         request: SUBMIT.request,
         policies: defaultPolicies(),
       }),
@@ -600,7 +600,7 @@ describe('createDownloaderRuntime', () => {
 
     const runtime = await testRuntime(file);
     const status = runtime.facade.getAcquisition({ id: 'acq-legacy' });
-    if (!status.ok) throw new Error('legacy acquisition not served');
+    if (!status.ok) throw new Error('legacy download not served');
     expect(status.value.status).toBe('AwaitingManualSelection');
     expect(status.value.candidates).toEqual([{ releaseMbid: 'r-1', title: 'Unknown Edition' }]);
   });
@@ -687,7 +687,7 @@ describe('createDownloaderRuntime', () => {
   it('retries a parked effect from the reactor’s fallback poll once its backoff is due', async () => {
     // Nothing appends to the stream while the park waits, so the periodic poll composition wires
     // is the ONLY thing that can pick the retry up. Without it a single transient MusicBrainz
-    // outage would strand the acquisition until the next restart.
+    // outage would strand the download until the next restart.
     vi.useFakeTimers();
     try {
       const { runtime, resolutions, setNow } = await bootWithParkingFirstEffect();
@@ -840,7 +840,7 @@ describe('stalled exposure at boot (reactor-durability D2)', () => {
     // Absence, not falsiness: the wire flag is tag-or-omit (`stalled?: true`).
     expect(status.ok ? status.value.stalled : undefined).toBeUndefined();
 
-    // No longer stalled, the acquisition is fair game for the startup re-drive: the backgrounded
+    // No longer stalled, the download is fair game for the startup re-drive: the backgrounded
     // pass (instant deterministic timing, injected above) drives it to its outcome.
     await vi.waitFor(() => {
       expect(runtime.facade.getAcquisition({ id: 'acq-stalled' })).toMatchObject({
@@ -873,7 +873,7 @@ describe('boot readiness (reactor-durability D4)', () => {
         resolve({ kind: 'unresolved' });
       };
     });
-    const ports = (observer: DownloadObserverPort): EffectPorts => ({
+    const ports = (observer: TransferObserverPort): EffectPorts => ({
       ...fakePorts(observer),
       metadata: { resolve: () => ResultAsync.fromSafePromise(gate) },
     });
@@ -931,7 +931,7 @@ describe('boot readiness (reactor-durability D4)', () => {
       { ports: fakePorts },
     );
 
-    // A half-rebuilt projection boots half-blind: every acquisition list/detail answers "nothing
+    // A half-rebuilt projection boots half-blind: every download list/detail answers "nothing
     // exists" while readiness still reads `up` — an infra fault masquerading as a business answer.
     // Mirror the importer's contract: never boot on a projection we could not fully rebuild.
     expect(result.isErr()).toBe(true);

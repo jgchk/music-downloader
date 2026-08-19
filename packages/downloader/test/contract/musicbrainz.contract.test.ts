@@ -9,7 +9,7 @@ import {
   mbRecordingSearchSchema,
   mbReleaseGroupBrowseSchema,
 } from '../../src/adapters/musicbrainz/schemas.js';
-import type { AcquisitionRequest } from '../../src/domain/acquisition/events.js';
+import type { DownloadRequest } from '../../src/domain/download/events.js';
 import type { Mbid } from '../../src/domain/shared/mbid.js';
 import { parseMbid } from '../../src/domain/shared/mbid.js';
 import { loadFixtures } from './support/fixture.js';
@@ -62,7 +62,7 @@ afterEach(async () => {
 describe('MusicBrainz contract (tier 1)', () => {
   it('resolves a release by MBID and requests the recorded path, query, and headers', async () => {
     const mbid = mbidFromPath('release-lookup.json');
-    const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'album' };
+    const request: DownloadRequest = { kind: 'musicbrainz', mbid, targetType: 'album' };
 
     const resolution = await adapter().resolve(request, testScope());
     const result = resolution._unsafeUnwrap();
@@ -78,7 +78,7 @@ describe('MusicBrainz contract (tier 1)', () => {
 
   it('resolves a recording by MBID from the recorded lookup', async () => {
     const mbid = mbidFromPath('recording-lookup.json');
-    const request: AcquisitionRequest = { kind: 'musicbrainz', mbid, targetType: 'track' };
+    const request: DownloadRequest = { kind: 'musicbrainz', mbid, targetType: 'track' };
 
     const resolution = await adapter().resolve(request, testScope());
     const result = resolution._unsafeUnwrap();
@@ -179,7 +179,7 @@ describe('MusicBrainz release-group contract (tier 1)', () => {
     const pickedId = lookupEntry.fixture.request.path.split('/').at(-1)!;
     expect(candidates[0]).toBe(pickedId);
 
-    const request: AcquisitionRequest = {
+    const request: DownloadRequest = {
       kind: 'release-group',
       mbid: releaseGroupMbid,
       targetType: 'album',

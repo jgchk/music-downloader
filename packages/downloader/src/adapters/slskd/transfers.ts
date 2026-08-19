@@ -1,5 +1,5 @@
-import type { DownloadFailureReason } from '../../domain/acquisition/events.js';
-import type { DownloadProgress } from '../../application/ports/outbound-ports.js';
+import type { TryFailureReason } from '../../domain/download/events.js';
+import type { TransferProgress } from '../../application/ports/outbound-ports.js';
 import type { SlskdTransfer, SlskdTransfersPayload } from './schemas.js';
 
 /**
@@ -109,7 +109,7 @@ export function isTransferSucceeded(transfer: SlskdTransfer): boolean {
  * Two spellings that had no recorded backing were dropped rather than kept on faith.
  */
 /** Every reason this table can produce — `Cancelled` is ours to assert, never slskd's text's. */
-type TextDerivedReason = Exclude<DownloadFailureReason, 'Cancelled'>;
+type TextDerivedReason = Exclude<TryFailureReason, 'Cancelled'>;
 
 const FAILURE_VOCABULARY: readonly {
   readonly spellings: readonly string[];
@@ -216,7 +216,7 @@ function escapeRegExp(value: string): string {
 export function reasonFromTransfer(
   transfer: SlskdTransfer,
   username: string,
-): DownloadFailureReason {
+): TryFailureReason {
   const state = stateOf(transfer);
   if (state.toLowerCase().includes('cancel')) return 'Cancelled';
   // The exception is peer-adjacent too — slskd wraps other failures as "…from user <name>: …" — so
@@ -250,7 +250,7 @@ export function reasonFromTransfer(
 export function recogniseRejection(
   body: string,
   username: string,
-): DownloadFailureReason | undefined {
+): TryFailureReason | undefined {
   // For diagnostics only. `TransferError` is both a real classification and the catch-all, so a
   // caller that just wants to know "did slskd's body say anything we understand?" cannot learn it
   // from {@link enqueueRejectionReason} — an unrecognised body and a genuine generic error are the
@@ -260,7 +260,7 @@ export function recogniseRejection(
   return recognise(redactPeer(body, username));
 }
 
-export function enqueueRejectionReason(body: string, username: string): DownloadFailureReason {
+export function enqueueRejectionReason(body: string, username: string): TryFailureReason {
   // Take the peer's name out of the sentence before reading it. slskd frames these messages around
   // the username ("User <name> appears to be offline", "Failed to connect to user <name>: …"), so
   // the name is the one span of attacker-chosen text inside them — and a peer calling itself
@@ -271,7 +271,7 @@ export function enqueueRejectionReason(body: string, username: string): Download
 }
 
 export interface TransferAggregate {
-  readonly progress: DownloadProgress;
+  readonly progress: TransferProgress;
   /** Every transfer succeeded. */
   readonly succeeded: boolean;
   /** Every transfer is still queued (nothing has started). */
@@ -279,7 +279,7 @@ export interface TransferAggregate {
   /** At least one transfer has failed terminally (dooms the candidate before the rest settle). */
   readonly hasFailure: boolean;
   /** The reason to report if the candidate is failing (the first failed transfer's reason). */
-  readonly failureReason: DownloadFailureReason;
+  readonly failureReason: TryFailureReason;
 }
 
 /** Fold a candidate's per-file transfers into one outcome-shaped aggregate. */

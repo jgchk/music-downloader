@@ -2,7 +2,7 @@ import { errAsync, okAsync } from 'neverthrow';
 import { parseCausation } from '../../application/correlation/context.js';
 import type { ResultAsync } from 'neverthrow';
 import type { Statement } from 'better-sqlite3';
-import type { ImportEvent, ImportEventType } from '../../domain/import/events.js';
+import type { ImportEvent } from '../../domain/import/events.js';
 import { infraError } from '../../application/ports/errors.js';
 import type { InfraError } from '../../application/ports/errors.js';
 import type {
@@ -16,6 +16,7 @@ import type {
 } from '../../application/ports/event-store-port.js';
 import type { EventDatabase } from './schema.js';
 import { buildUpcasterRegistry, CURRENT_SCHEMA_VERSION } from './upcaster.js';
+import { toModelType, toStoredToken } from './event-tokens.js';
 import type { UpcasterRegistry } from './upcaster.js';
 
 /**
@@ -88,12 +89,16 @@ export class SqliteEventStore implements EventStorePort {
         const metaJson = JSON.stringify(metadata);
         return events.map((event, index) => {
           const version = expectedVersion + index;
+          // The stored token, not the model's name for the event — see `event-tokens.ts`. It is
+          // rewritten inside `data` too: the blob is a whole-event stringify, so leaving the model
+          // name there would fork the on-disk shape from the column it is indexed by.
+          const storedToken = toStoredToken(event.type);
           const info = this.insertStmt.run({
             streamId,
             version,
-            type: event.type,
+            type: storedToken,
             schemaVersion: CURRENT_SCHEMA_VERSION,
-            data: JSON.stringify(event),
+            data: JSON.stringify({ ...event, type: storedToken }),
             metadata: metaJson,
           });
           return {
@@ -152,16 +157,21 @@ export class SqliteEventStore implements EventStorePort {
   }
 
   private toStored(row: EventRow): StoredEvent {
+    // Upcasting runs first and is keyed by the STORED token, because legacy shapes were registered
+    // under the names the log actually holds. Only once the payload is current does the token
+    // become the model's name, so nothing above this adapter ever sees storage vocabulary.
+    const modelType = toModelType(row.type);
+    const upcast = this.upcasters.upcast(
+      row.type,
+      row.schema_version,
+      JSON.parse(row.data) as Record<string, unknown>,
+    );
     return {
       globalSeq: row.global_seq,
       streamId: row.stream_id,
       version: row.version,
-      type: row.type as ImportEventType,
-      event: this.upcasters.upcast(
-        row.type,
-        row.schema_version,
-        JSON.parse(row.data) as Record<string, unknown>,
-      ),
+      type: modelType,
+      event: { ...upcast, type: modelType } as ImportEvent,
       // Metadata has no upcaster and no schema, so the cast is the only thing standing behind the
       // whole shape — and `causation` is a discriminated union whose tag nothing has checked.
       // Re-establish that one invariant here rather than let a future reader narrow on a lie.

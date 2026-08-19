@@ -3,13 +3,13 @@ import { appendMetadata } from '../../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { assertAsyncProperty } from '../../__fixtures__/property.js';
 import type { AppendMetadata } from '../../application/ports/event-store-port.js';
-import { Acquisition } from '../../domain/acquisition/acquisition.js';
-import type { AcquisitionEvent } from '../../domain/acquisition/events.js';
+import { Download } from '../../domain/download/download.js';
+import type { DownloadEvent } from '../../domain/download/events.js';
 import {
   defaultPolicies,
   sampleGroupRequest,
-} from '../../domain/acquisition/__fixtures__/acquisition-fixtures.js';
-import { arbEvent } from '../../domain/acquisition/__fixtures__/arbitraries.js';
+} from '../../domain/download/__fixtures__/download-fixtures.js';
+import { arbEvent } from '../../domain/download/__fixtures__/arbitraries.js';
 import { SqliteEventStore } from './event-store.js';
 import { openEventDatabase } from './schema.js';
 import type { EventDatabase } from './schema.js';
@@ -121,8 +121,8 @@ describe('legacy history upcasts to v2 semantics through the real store', () => 
     await assertAsyncProperty(
       fc.asyncProperty(arbLegacyEditionMenu, async (legacyCandidates) => {
         await withStore(async (store, database) => {
-          const opening: AcquisitionEvent = {
-            type: 'AcquisitionRequested',
+          const opening: DownloadEvent = {
+            type: 'DownloadRequested',
             request: sampleGroupRequest,
             policies: defaultPolicies(),
           };
@@ -134,12 +134,12 @@ describe('legacy history upcasts to v2 semantics through the real store', () => 
           });
 
           const read = await store.readStream('acq-1');
-          const acquisition = Acquisition.fromHistory(read._unsafeUnwrap().map((row) => row.event));
+          const download = Download.fromHistory(read._unsafeUnwrap().map((row) => row.event));
 
           // The legacy row must reach a phase that actually *consumes* it: folding onto a state
           // that ignores the event would pass for any payload at all.
-          expect(acquisition.phase).toBe('AwaitingManualSelection');
-          expect(acquisition.snapshot.candidates?.map((candidate) => candidate.trackCount)).toEqual(
+          expect(download.phase).toBe('AwaitingManualSelection');
+          expect(download.snapshot.candidates?.map((candidate) => candidate.trackCount)).toEqual(
             legacyCandidates.map((candidate) =>
               candidate.trackCount === 0 ? undefined : candidate.trackCount,
             ),

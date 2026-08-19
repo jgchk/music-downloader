@@ -13,27 +13,27 @@ import {
 import type {
   EffectPorts,
   InterpreterDependencies,
-} from '../application/acquisition/interpreter.js';
-import { Reactor } from '../application/acquisition/reactor.js';
-import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
+} from '../application/download/interpreter.js';
+import { Reactor } from '../application/download/reactor.js';
+import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import { fixedClock, sequentialIds, silentLogger } from '../application/__fixtures__/fakes.js';
-import { deliverDownloadOutcome } from '../application/acquisition/download-outcome-consumer.js';
+import { deliverDownloadOutcome } from '../application/download/download-outcome-consumer.js';
 import type {
-  DownloadProgress,
-  DownloadResult,
+  TransferProgress,
+  TryResult,
   ImportResult,
 } from '../application/ports/outbound-ports.js';
 import {
-  AcquisitionStatusProjection,
+  DownloadStatusProjection,
   LibraryViewProjection,
   ProgressReadModel,
   StalledReadModel,
 } from '../application/projections/read-models.js';
-import type { AcquisitionPhase } from '../domain/acquisition/acquisition.js';
+import type { DownloadPhase } from '../domain/download/download.js';
 import {
   matchingCandidate,
   sampleTarget,
-} from '../domain/acquisition/__fixtures__/acquisition-fixtures.js';
+} from '../domain/download/__fixtures__/download-fixtures.js';
 import type { Candidate, CandidateIdentity } from '../domain/candidate/candidate.js';
 import type { ProbedAudio } from '../domain/validation/validators.js';
 import { CatchUpSubscription } from '../application/events/catch-up-subscription.js';
@@ -62,11 +62,11 @@ const PROBES: Record<string, ProbedAudio> = {
   'staging/01.flac': { decodedCleanly: true, codec: 'flac', durationMs: 251_000 },
   'staging/02.flac': { decodedCleanly: true, codec: 'flac', durationMs: 264_000 },
 };
-const COMPLETED: DownloadResult = { kind: 'completed', files: DOWNLOADED_FILES };
-const FAILED: DownloadResult = { kind: 'failed', reason: 'Stalled' };
+const COMPLETED: TryResult = { kind: 'completed', files: DOWNLOADED_FILES };
+const FAILED: TryResult = { kind: 'failed', reason: 'Stalled' };
 /** Files the source had already completed into staging when a multi-file candidate was abandoned. */
 const PARTIAL_FILES = [{ path: 'staging/partial-01.flac', name: '01.flac' }];
-const ABANDONED: DownloadResult = { kind: 'failed', reason: 'Stalled', files: PARTIAL_FILES };
+const ABANDONED: TryResult = { kind: 'failed', reason: 'Stalled', files: PARTIAL_FILES };
 const IMPORTED: ImportResult = { kind: 'imported', location: '/library/Radiohead/Kid A (2000)' };
 const CONFLICT: ImportResult = { kind: 'conflict', location: '/library/Radiohead/Kid A (2000)' };
 
@@ -85,7 +85,7 @@ function candidateWithSpeed(username: string, speedBytesPerSec: number): Candida
 
 interface E2EOptions {
   searchByRound: (round: number) => readonly Candidate[];
-  downloadByUser: Record<string, DownloadResult>;
+  downloadByUser: Record<string, TryResult>;
   importResult: ImportResult;
 }
 
@@ -95,7 +95,7 @@ function wire(options: E2EOptions) {
   const store = new SqliteEventStore(database, new UpcasterRegistry(), bus);
   const checkpoints = new SqliteCheckpointStore(database);
   const discardStaging = vi.fn((_files) => okAsync<void>(undefined));
-  const status = new AcquisitionStatusProjection();
+  const status = new DownloadStatusProjection();
   const progressModel = new ProgressReadModel();
   const stalledModel = new StalledReadModel();
   const libraryView = new LibraryViewProjection();
@@ -108,11 +108,11 @@ function wire(options: E2EOptions) {
   // outcome re-enters asynchronously through the real download-outcome consumer, waking the
   // reactor via the store's bus publication — the composed loop under test is the shipped one.
   const downloadObserver = {
-    progress: (id: string, progress: DownloadProgress) => progressModel.update(id, progress),
+    progress: (id: string, progress: TransferProgress) => progressModel.update(id, progress),
     outcome: (
       id: string,
       candidate: CandidateIdentity,
-      result: DownloadResult,
+      result: TryResult,
       context: CommandContext,
     ) =>
       deliverDownloadOutcome(
@@ -237,7 +237,7 @@ async function submit(facade: ReturnType<typeof createDownloaderFacade>): Promis
   return result.value.acquisitionId;
 }
 
-async function settle(w: Wiring, id: string, phase: AcquisitionPhase): Promise<void> {
+async function settle(w: Wiring, id: string, phase: DownloadPhase): Promise<void> {
   await vi.waitFor(() => {
     expect(w.status.get(id)?.status).toBe(phase);
   });
@@ -249,8 +249,8 @@ const happyOptions: E2EOptions = {
   importResult: IMPORTED,
 };
 
-describe('acquisition E2E', () => {
-  it('fulfills an acquisition end to end through the facade', async () => {
+describe('download E2E', () => {
+  it('fulfills an download end to end through the facade', async () => {
     const { w, facade } = await startApp(happyOptions);
 
     const id = await submit(facade);
@@ -259,7 +259,7 @@ describe('acquisition E2E', () => {
     const status = facade.getAcquisition({ id });
     expect(status.ok && status.value.location).toBe(IMPORTED.location);
 
-    // The watch settled and retired its live progress: a fulfilled acquisition reports none
+    // The watch settled and retired its live progress: a fulfilled download reports none
     // (progress is an ephemeral read model for in-flight downloads only).
     const progress = facade.getAcquisitionProgress({ id });
     expect(progress.ok).toBe(false);
@@ -327,7 +327,7 @@ describe('acquisition E2E', () => {
     });
   });
 
-  it('exposes a fulfilled acquisition on the outbound feed — self-contained and stable across redelivery', async () => {
+  it('exposes a fulfilled download on the outbound feed — self-contained and stable across redelivery', async () => {
     const { w, facade } = await startApp(happyOptions);
 
     // A consuming module's subscription: checkpoint + dead letters in the CONSUMER's own store.
@@ -382,7 +382,7 @@ describe('acquisition E2E', () => {
     expect(received[1]).toStrictEqual(envelope);
   });
 
-  it('revives a fulfilled acquisition on a seam-delivered rejection and re-fulfils with the next candidate', async () => {
+  it('revives a fulfilled download on a seam-delivered rejection and re-fulfils with the next candidate', async () => {
     // Two ranked candidates: 'a' wins the first pass; 'b' stays in the retained working set.
     const { w, facade } = await startApp({
       searchByRound: (round) =>
@@ -435,7 +435,7 @@ describe('acquisition E2E', () => {
     await subscription.start();
     cleanups.push(() => subscription.stop());
 
-    // The revival re-enters the existing ladder: candidate 'b' downloads and the acquisition
+    // The revival re-enters the existing ladder: candidate 'b' downloads and the download
     // re-fulfils, spending a second attempt.
     await vi.waitFor(() => {
       const view = w.status.get(id)!;

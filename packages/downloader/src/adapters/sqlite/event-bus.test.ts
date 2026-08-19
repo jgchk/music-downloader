@@ -25,8 +25,8 @@ function storedAt(globalSeq: number): StoredEvent {
     globalSeq,
     streamId: 'acq-1',
     version: globalSeq - 1,
-    type: 'AcquisitionExhausted',
-    event: { type: 'AcquisitionExhausted' },
+    type: 'DownloadExhausted',
+    event: { type: 'DownloadExhausted' },
     metadata: { acquisitionId: 'acq-1', occurredAt: '2026-07-03T12:00:00.000Z' },
   };
 }
@@ -78,7 +78,7 @@ describe('InProcessEventBus', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('subscriber boom');
     expect(lines[0]).toContain('"globalSeq":7');
-    expect(lines[0]).toContain('AcquisitionExhausted');
+    expect(lines[0]).toContain('DownloadExhausted');
   });
 });
 

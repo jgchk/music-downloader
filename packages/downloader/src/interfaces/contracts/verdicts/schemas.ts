@@ -4,7 +4,7 @@ import { CORRELATION_ID_PATTERN } from '../../../application/correlation/correla
 /**
  * The inbound external-verdict contract (change: fulfillment-external-verdict D4): a consumer-
  * defined tolerant reader for verdict webhook deliveries. Only the facts this domain needs are
- * read — the acquisition id, the judged candidate's identity, the verdict, and optional reasons —
+ * read — the download id, the judged candidate's identity, the verdict, and optional reasons —
  * and every unknown field (the sender's envelope `type`/`timestamp` included) is ignored, so the
  * sender's schema can evolve freely. Unknown *verdict values* are rejected — accepting more
  * verdicts later is an additive relaxation.

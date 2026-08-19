@@ -7,12 +7,12 @@ import { OTHER_STORY, STORY, testContext } from '../../application/__fixtures__/
 import type { CommandContext, OperationScope } from '../../application/correlation/context.js';
 import type { Candidate, CandidateIdentity } from '../../domain/candidate/candidate.js';
 import { createDownloadPolicy } from '../../domain/policy/policies.js';
-import type { DownloadPolicy } from '../../domain/policy/policies.js';
+import type { TryPolicy } from '../../domain/policy/policies.js';
 import { infraError } from '../../application/ports/errors.js';
 import type {
-  DownloadObserverPort,
-  DownloadProgress,
-  DownloadResult,
+  TransferObserverPort,
+  TransferProgress,
+  TryResult,
 } from '../../application/ports/outbound-ports.js';
 import type { HttpClient, HttpResponse } from '../support/http.js';
 import { SlskdClient } from './client.js';
@@ -43,7 +43,7 @@ const candidate: Candidate = {
   source: { speedBytesPerSec: 0, freeSlots: 1, queueLength: 0 },
 };
 
-const policy = (stallTimeoutMs: number, maxQueueWaitMs: number): DownloadPolicy =>
+const policy = (stallTimeoutMs: number, maxQueueWaitMs: number): TryPolicy =>
   createDownloadPolicy({ stallTimeoutMs, maxQueueWaitMs })._unsafeUnwrap();
 
 function transfer(name: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -182,7 +182,7 @@ interface Options {
 interface Delivered {
   readonly acquisitionId: string;
   readonly candidate: CandidateIdentity;
-  readonly result: DownloadResult;
+  readonly result: TryResult;
   readonly context: CommandContext;
 }
 
@@ -193,7 +193,7 @@ interface Harness {
   ledger: FakeResourceLedger;
   counts: { options: number; events: number; posts: number; deliveries: number; polls: number };
   outcomes: Delivered[];
-  progress: DownloadProgress[];
+  progress: TransferProgress[];
   finished: string[];
   errorLogs: string[];
   /** Pushed in lockstep with {@link Harness.errorLogs}, so an index found in one indexes the other. */
@@ -211,7 +211,7 @@ function downloader(options: Options): Harness {
   const ledger = new FakeResourceLedger();
   const counts = { options: 0, events: 0, posts: 0, deliveries: 0, polls: 0 };
   const outcomes: Delivered[] = [];
-  const progress: DownloadProgress[] = [];
+  const progress: TransferProgress[] = [];
   const finished: string[] = [];
   const errorLogs: string[] = [];
   const errorContexts: Record<string, unknown>[] = [];
@@ -251,7 +251,7 @@ function downloader(options: Options): Harness {
       return Promise.resolve(drain(polls, { status: 200, body: '{"directories":[]}' }));
     },
   };
-  const observer: DownloadObserverPort = {
+  const observer: TransferObserverPort = {
     progress: (_acquisitionId, snapshot) => {
       progress.push(snapshot);
     },
@@ -311,8 +311,8 @@ function downloader(options: Options): Harness {
 /** Start the candidate and drive the watch to its delivered outcome (the common happy shape). */
 async function run(
   harness: Harness,
-  downloadPolicy: DownloadPolicy = policy(1000, 1000),
-): Promise<DownloadResult> {
+  downloadPolicy: TryPolicy = policy(1000, 1000),
+): Promise<TryResult> {
   const started = await harness.adapter.start(ACQ, candidate, downloadPolicy, harness.scope);
   expect(started._unsafeUnwrap()).toEqual({ kind: 'started' });
   await harness.adapter.settled();
@@ -732,7 +732,7 @@ describe('SlskdDownload', () => {
         return Promise.resolve();
       },
     };
-    const outcomes: DownloadResult[] = [];
+    const outcomes: TryResult[] = [];
     const http: HttpClient = {
       send: ({ method, url }) => {
         if (method === 'POST') return Promise.resolve({ status: 200, body: '' });
@@ -817,7 +817,7 @@ describe('SlskdDownload', () => {
 
   it('surfaces a 5xx enqueue response as a retryable InfraError, not a candidate defeat', async () => {
     // A 503 is slskd itself faulting/overloaded — transient infrastructure. Marking it a candidate
-    // failure would manufacture AcquisitionExhausted from a passing slskd hiccup; the reactor must
+    // failure would manufacture DownloadExhausted from a passing slskd hiccup; the reactor must
     // hold and retry the short start effect instead.
     const harness = downloader({
       enqueue: { status: 503, body: 'Service Unavailable' },
@@ -842,7 +842,7 @@ describe('SlskdDownload', () => {
     expect(JSON.stringify(warned)).not.toContain('Service Unavailable');
   });
 
-  it('names the peer failure a 5xx enqueue body describes, so a parked acquisition is diagnosable', async () => {
+  it('names the peer failure a 5xx enqueue body describes, so a parked download is diagnosable', async () => {
     // A dead peer and an overloaded slskd both come back as a 5xx and are both retried; the only
     // thing telling an operator which they are looking at is this field.
     const harness = downloader({
@@ -932,7 +932,7 @@ describe('SlskdDownload', () => {
       harness.scope,
     );
     expect(first._unsafeUnwrap()).toEqual({ kind: 'started' });
-    // The ensure re-dispatch (a DownloadStarted reaction, or a redelivery): no second enqueue,
+    // The ensure re-dispatch (a TryStarted reaction, or a redelivery): no second enqueue,
     // no second watch — the live watch is the answer.
     const second = await harness.adapter.start(
       ACQ,
@@ -1214,7 +1214,7 @@ describe('SlskdDownload', () => {
       },
     };
     const ledger = new FakeResourceLedger();
-    const outcomes: DownloadResult[] = [];
+    const outcomes: TryResult[] = [];
     const adapter = new SlskdDownload(
       silentLogger(),
       ledger,
@@ -1332,7 +1332,7 @@ describe('SlskdDownload', () => {
     expect(harness.finished.toSorted(byName)).toEqual(['acq-1', 'acq-2']);
   });
 
-  it('aborting one acquisition leaves a sibling acquisition’s watch alive', async () => {
+  it('aborting one download leaves a sibling download’s watch alive', async () => {
     const control = manualTimer();
     const inFlight = poll([
       transfer('01.flac', { state: 'InProgress', size: 100, bytesTransferred: 50 }),
@@ -1352,7 +1352,7 @@ describe('SlskdDownload', () => {
     expect(aborted.isOk()).toBe(true);
     await tickUntil(control, () => harness.finished.includes('acq-1'), 'acq-1 to wind down');
 
-    // Only the aborted acquisition retired; the sibling's watch is still live and undelivered.
+    // Only the aborted download retired; the sibling's watch is still live and undelivered.
     expect(harness.finished).toEqual(['acq-1']);
     expect(harness.outcomes).toEqual([]);
 
@@ -1430,9 +1430,9 @@ describe('SlskdDownload', () => {
   });
 
   it('a predecessor watch winding down does not retire a successor candidate’s progress', async () => {
-    // Two watches for ONE acquisition (the failed-candidate → successor race): the first watch's
+    // Two watches for ONE download (the failed-candidate → successor race): the first watch's
     // exit must neither delete the successor's registry entry nor blank its live progress —
-    // `finished` fires only once the acquisition's last watch ends.
+    // `finished` fires only once the download's last watch ends.
     const control = manualTimer();
     const successor: Candidate = {
       identity: asCandidateIdentity({ username: 'u1', path: String.raw`@@a\Other`, sizeBytes: 9 }),
@@ -1493,7 +1493,7 @@ describe('SlskdDownload', () => {
     expect(again._unsafeUnwrap()).toEqual({ kind: 'started' }); // a fresh watch, not the latched one
 
     await control.tick(); // wake the latched predecessor; it sees the abort and winds down
-    // Its cleanup released only its own reservation: the acquisition is not retired while the
+    // Its cleanup released only its own reservation: the download is not retired while the
     // replacement still watches, and an ensure still finds that replacement rather than enqueueing.
     expect(harness.finished).toEqual([]);
     const ensure = await harness.adapter.start(
@@ -1532,7 +1532,7 @@ describe('SlskdDownload', () => {
   it('a failed successor start still retires progress once it was the last hope', async () => {
     // Watch A winds down seeing successor B's reservation (so A skips retirement); B's enqueue
     // is then refused and B releases LAST — B's guard path must retire the progress, or the bar
-    // freezes forever for an acquisition whose ladder has already moved on.
+    // freezes forever for an download whose ladder has already moved on.
     const control = manualTimer();
     const gate = Promise.withResolvers<HttpResponse>();
     const successor: Candidate = {
@@ -1573,7 +1573,7 @@ describe('SlskdDownload', () => {
     const rejected = await successorStart;
     expect(rejected._unsafeUnwrap()).toEqual({ kind: 'rejected', reason: 'TransferError' });
     await harness.adapter.settled();
-    expect(harness.finished).toEqual([ACQ]); // the guard path retired the acquisition's progress
+    expect(harness.finished).toEqual([ACQ]); // the guard path retired the download's progress
   });
 
   it('contains a throwing finished() hook: the registry entry is still released', async () => {
