@@ -1,5 +1,7 @@
 import { json } from '@sveltejs/kit';
+import { version } from '$lib/server/version.js';
 import { bootedRuntimes, readinessOf } from '$lib/server/runtime.js';
+import type { Readiness } from '$lib/server/runtime.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -11,10 +13,16 @@ import type { RequestHandler } from './$types';
  */
 export const GET: RequestHandler = () => {
   const booted = bootedRuntimes();
-  // A probe that arrives before the init hook (or during shutdown) is answered, not crashed on:
-  // "not ready yet" is the honest reading of an unbooted daemon, and it is what a probe is for.
+  // A probe that arrives before the init hook, after shutdown, or after a failed boot is answered
+  // rather than crashed on — that reading is what a probe is for, and the gate lets this one route
+  // through unbooted so the answer keeps this body's shape instead of the gate's plain text.
   if (booted === undefined) {
-    return json({ status: 'degraded', modules: {} }, { status: 503 });
+    const readiness: Readiness = {
+      status: 'degraded',
+      version,
+      modules: { downloader: { status: 'down' }, importer: { status: 'down' } },
+    };
+    return json(readiness, { status: 503 });
   }
   const readiness = readinessOf(booted);
   return json(readiness, { status: readiness.status === 'ok' ? 200 : 503 });

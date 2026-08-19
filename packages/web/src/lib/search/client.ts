@@ -36,6 +36,10 @@ export const UNREADABLE =
  * Kept apart from {@link UNREADABLE} on purpose: telling someone to sign in again cannot possibly
  * help with a producer and consumer that disagree, and they would go and do it.
  */
+/** Shown when the page's own conversation with the catalog broke in a way it does not model. */
+export const UNEXPECTED =
+  'Something went wrong on this page. Reload it — if it keeps happening, this is a bug.';
+
 export const MALFORMED =
   'That answer could not be understood. Reload the page — if it keeps happening, this is a bug.';
 

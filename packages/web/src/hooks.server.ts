@@ -25,7 +25,9 @@ export const init: ServerInit = async () => {
  * credential-less. An exact set, not a prefix: a future route born under /login/ starts out
  * GATED until deliberately listed here (fail closed).
  */
-const OPEN_ROUTES = new Set(['/health', '/login', '/login/callback']);
+/** The readiness probe: open to everyone, and answered even before there is anything to serve. */
+const HEALTH_ROUTE = '/health';
+const OPEN_ROUTES = new Set([HEALTH_ROUTE, '/login', '/login/callback']);
 
 /**
  * The access gate (web-access-control, design D6/D7): every request's cookie is verified by the
@@ -43,11 +45,19 @@ export const handle: Handle = ({ event, resolve }) => {
   // bound onto the request logger, so every line this request produces joins the same story.
   event.locals.correlationId = mintCorrelationId();
   const booted = bootedRuntimes();
-  // Nothing can be served before the init hook has run, or after shutdown has torn the runtimes
-  // down. Answered once, here, as the 503 it is — rather than by five accessors each crashing on
-  // the same invariant and relying on the framework to turn that into a 500.
+  // Nothing can be served before the init hook has run, after shutdown has torn the runtimes down,
+  // or if the boot itself failed. Answered once, here, as the 503 it is — rather than by five
+  // accessors each crashing on the same invariant and relying on the framework to turn that into
+  // a 500. The readiness probe is let through, because reading exactly this state is its job.
   if (booted === undefined) {
-    return new Response('the daemon is starting up', {
+    if (event.url.pathname === HEALTH_ROUTE) return resolve(event);
+    // No logger exists to write through, and a boot that FAILED looks identical here to one that
+    // has not finished — so the line is made on the console, where a startup storm is at least
+    // visible. Structured, so an aggregator can index it like every other line.
+    console.warn(
+      JSON.stringify({ level: 'warn', pathname: event.url.pathname, msg: 'request before boot' }),
+    );
+    return new Response('the daemon is not ready', {
       status: 503,
       headers: { 'Retry-After': '1' },
     });
@@ -112,8 +122,16 @@ export const handleError: HandleServerError = ({ error, event, status, message }
   if (root === undefined) {
     // A fault before the logger exists — a boot failure, most likely. The record still has to be
     // made, and the console is the only place left to make it; losing the error id would leave
-    // the person quoting a number that appears nowhere.
-    console.error('unhandled server error before boot', line, error);
+    // the person quoting a number that appears nowhere. Written as one JSON object, because an
+    // aggregator indexes fields and not the arguments of a multi-argument console call.
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        ...line,
+        err: String(error),
+        msg: 'unhandled server error',
+      }),
+    );
   } else {
     const logger = typeof story === 'string' ? root.child({ correlationId: story }) : root;
     logger.error({ ...line, err: error }, 'unhandled server error');

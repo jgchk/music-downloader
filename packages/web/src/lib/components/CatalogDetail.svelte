@@ -27,10 +27,24 @@
     pin: EditionPin | undefined;
     /** Choose a pressing to request, or (with nothing) go back to the system's own default. */
     onPin: (pin: EditionPin | undefined) => void;
+    /** What a refused submission carried, so its policies are corrected rather than retyped. */
+    values?: Record<string, string | undefined>;
     onClose: () => void;
   }
 
-  let { detail, tracklists, onTracklist, pin, onPin, onClose }: Properties = $props();
+  let { detail, tracklists, onTracklist, pin, onPin, values, onClose }: Properties = $props();
+
+  /** How many requests are in flight, so a submitted form cannot be submitted again. */
+  let requesting = $state(0);
+
+  /** Enhanced submission keeps the page — which also keeps the button live for the round trip. */
+  const oneAtATime = () => {
+    requesting += 1;
+    return async ({ update }: { update: (options: { reset: boolean }) => Promise<void> }) => {
+      await update({ reset: false });
+      requesting -= 1;
+    };
+  };
 
   const activePin = $derived(activeEdition(detail, pin));
 
@@ -158,7 +172,12 @@
         {/each}
       </ul>
 
-      <form method="POST" action="/acquisitions/new" use:enhance class="detail-request">
+      <form
+        method="POST"
+        action="/acquisitions/new"
+        use:enhance={oneAtATime}
+        class="detail-request"
+      >
         {#if activePin === undefined}
           <input type="hidden" name="kind" value="release-group" />
           <input type="hidden" name="mbid" value={detail.mbid} />
@@ -167,8 +186,8 @@
           <input type="hidden" name="targetType" value="album" />
           <input type="hidden" name="mbid" value={activePin} />
         {/if}
-        <RequestPolicies />
-        <button type="submit" class="btn primary">
+        <RequestPolicies {values} />
+        <button type="submit" class="btn primary" disabled={requesting > 0}>
           {activePin === undefined ? 'Request download' : 'Request this edition'}
         </button>
       </form>
@@ -184,21 +203,35 @@
           <li>
             <span class="result-title">{group.title}</span>
             <span class="result-detail">{releaseLine(group)}</span>
-            <form method="POST" action="/acquisitions/new" use:enhance class="request-form">
+            <form
+              method="POST"
+              action="/acquisitions/new"
+              use:enhance={oneAtATime}
+              class="request-form"
+            >
               <input type="hidden" name="kind" value="release-group" />
               <input type="hidden" name="mbid" value={group.mbid} />
-              <button type="submit" class="btn primary request">Request</button>
+              <button type="submit" class="btn primary request" disabled={requesting > 0}>
+                Request
+              </button>
             </form>
           </li>
         {/each}
       </ul>
     {:else if detail.kind === 'recording'}
-      <form method="POST" action="/acquisitions/new" use:enhance class="detail-request">
+      <form
+        method="POST"
+        action="/acquisitions/new"
+        use:enhance={oneAtATime}
+        class="detail-request"
+      >
         <input type="hidden" name="kind" value="musicbrainz" />
         <input type="hidden" name="targetType" value="track" />
         <input type="hidden" name="mbid" value={detail.mbid} />
-        <RequestPolicies />
-        <button type="submit" class="btn primary">Request this track</button>
+        <RequestPolicies {values} />
+        <button type="submit" class="btn primary" disabled={requesting > 0}>
+          Request this track
+        </button>
       </form>
     {/if}
   </div>

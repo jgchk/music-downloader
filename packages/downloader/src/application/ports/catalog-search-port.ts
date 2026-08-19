@@ -48,6 +48,13 @@ export interface CatalogRecording {
 /** Which block of results answers the query best — see {@link CatalogSearchPort.search}. */
 export type CatalogEntityKind = 'release-group' | 'artist' | 'recording';
 
+/** One kind of result the catalog could not be read for, and which of the two reasons it was. */
+export interface CatalogUnavailableKind {
+  readonly kind: CatalogEntityKind;
+  /** `unreadable` is drift — the catalog answered, in a shape this application cannot present. */
+  readonly reason: 'unreachable' | 'unreadable';
+}
+
 export interface CatalogSearchResults {
   readonly releaseGroups: readonly CatalogReleaseGroup[];
   readonly artists: readonly CatalogArtist[];
@@ -55,13 +62,17 @@ export interface CatalogSearchResults {
   /** The kind the query is asking about, so a presenter can lead with it. */
   readonly leading: CatalogEntityKind;
   /**
-   * The kinds the catalog could not be read for. A search asks about three kinds independently, so
-   * one of them failing is not the search failing: the albums that came back are still the albums,
-   * and discarding them because the artist read timed out answers a question nobody asked. Empty on
-   * the ordinary path; a search whose every kind failed is a fault, not a result with three of
-   * these.
+   * The kinds the catalog could not be read for, and why. A search asks about three kinds
+   * independently, so one of them failing is not the search failing: the albums that came back are
+   * still the albums, and discarding them because the artist read timed out answers a question
+   * nobody asked. Empty on the ordinary path; a search whose every kind failed is a fault, not a
+   * result with three of these.
+   *
+   * The reason is carried because the two are different facts with different advice: a catalog we
+   * could not REACH may answer on a retry, while one whose answer we could not READ has changed
+   * shape and will keep not answering until someone changes this application.
    */
-  readonly unavailable: readonly CatalogEntityKind[];
+  readonly unavailable: readonly CatalogUnavailableKind[];
 }
 
 /** A single entity named by an identifier: the paste-an-id path's answer. */

@@ -17,34 +17,73 @@
 
 <QualityFloorSelect />
 
-<details class="request-policies">
+<details>
   <summary>Advanced policies (optional)</summary>
   <label>
-    Quality order (comma-separated buckets)
+    Quality order (comma-separated, best first — e.g. LOSSLESS, LOSSY_HIGH)
     <input name="qualityOrder" value={values?.qualityOrder ?? ''} />
   </label>
+  <!-- Typed and bounded where the contract is numeric: the reshaper turns anything unparseable
+       into NaN, which comes back as a zod message after a round trip the field can prevent. -->
   <label>
     Match threshold (0–1)
-    <input name="matchThreshold" inputmode="decimal" value={values?.matchThreshold ?? ''} />
+    <input
+      name="matchThreshold"
+      type="number"
+      min="0"
+      max="1"
+      step="0.01"
+      value={values?.matchThreshold ?? ''}
+    />
   </label>
   <label>
     Max search rounds
-    <input name="maxSearchRounds" inputmode="numeric" value={values?.maxSearchRounds ?? ''} />
+    <input
+      name="maxSearchRounds"
+      type="number"
+      min="1"
+      step="1"
+      value={values?.maxSearchRounds ?? ''}
+    />
   </label>
   <label>
     Max total attempts
-    <input name="maxTotalAttempts" inputmode="numeric" value={values?.maxTotalAttempts ?? ''} />
+    <input
+      name="maxTotalAttempts"
+      type="number"
+      min="1"
+      step="1"
+      value={values?.maxTotalAttempts ?? ''}
+    />
   </label>
   <label>
     Time budget (ms)
-    <input name="timeBudgetMs" inputmode="numeric" value={values?.timeBudgetMs ?? ''} />
+    <input
+      name="timeBudgetMs"
+      type="number"
+      min="0"
+      step="1000"
+      value={values?.timeBudgetMs ?? ''}
+    />
   </label>
   <label>
     Stall timeout (ms)
-    <input name="stallTimeoutMs" inputmode="numeric" value={values?.stallTimeoutMs ?? ''} />
+    <input
+      name="stallTimeoutMs"
+      type="number"
+      min="0"
+      step="1000"
+      value={values?.stallTimeoutMs ?? ''}
+    />
   </label>
   <label>
     Max queue wait (ms)
-    <input name="maxQueueWaitMs" inputmode="numeric" value={values?.maxQueueWaitMs ?? ''} />
+    <input
+      name="maxQueueWaitMs"
+      type="number"
+      min="0"
+      step="1000"
+      value={values?.maxQueueWaitMs ?? ''}
+    />
   </label>
 </details>

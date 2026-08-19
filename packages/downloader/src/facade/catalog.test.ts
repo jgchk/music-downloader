@@ -159,6 +159,24 @@ describe('lookupCatalog', () => {
   });
 });
 
+describe('a search the catalog answered only part of', () => {
+  it('carries which kinds could not be read, and why, to the wire', async () => {
+    const partial = fakeCatalog({
+      results: {
+        ...CATALOG_RESULTS,
+        unavailable: [{ kind: 'artist' as const, reason: 'unreadable' as const }],
+      },
+    });
+
+    const result = await facadeWith(partial).searchCatalog({ query: 'graceland' }, STORY);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(catalogSearchResultSchema.safeParse(roundTrip(result.value)).success).toBe(true);
+    expect(result.value.unavailable).toEqual([{ kind: 'artist', reason: 'unreadable' }]);
+  });
+});
+
 describe('a catalog read that faults', () => {
   it('writes down the cause the wire answer cannot carry', async () => {
     // `toFacadeError` drops the zod issues and the fetch error — the wire cannot hold them — so

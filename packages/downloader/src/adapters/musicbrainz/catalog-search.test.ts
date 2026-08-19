@@ -180,7 +180,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
 
     expect(results.releaseGroups.map((group) => group.title)).toEqual(['Graceland']);
     expect(results.artists).toEqual([]);
-    expect(results.unavailable).toEqual(['artist']);
+    expect(results.unavailable).toEqual([{ kind: 'artist', reason: 'unreachable' }]);
   });
 
   it('says out loud which kinds it could not read', async () => {
@@ -193,7 +193,13 @@ describe('MusicBrainzCatalogSearch.search', () => {
 
     await unwrap(port.search('graceland', watched.scope));
 
-    expect(watched.warnings.join('')).toContain('answered for some kinds and not others');
+    // WITH the fault: the operation and status are the whole diagnosis, and below this line they
+    // are gone — a permanent drift would otherwise leave one line naming a kind and nothing else.
+    const [line] = watched.warnings;
+    expect(JSON.parse(line!)).toMatchObject({
+      unavailable: [{ kind: 'artist', reason: 'unreachable' }],
+      faults: [{ operation: 'musicbrainz.catalog.search.artist' }],
+    });
   });
 
   it('reports a search whose every read failed as a fault, not as an answer with three holes', async () => {
@@ -311,7 +317,7 @@ describe('MusicBrainzCatalogSearch.search', () => {
 
     const results = await unwrap(port.search('graceland', testScope()));
 
-    expect(results.unavailable).toEqual(['release-group']);
+    expect(results.unavailable).toEqual([{ kind: 'release-group', reason: 'unreadable' }]);
     expect(results.artists).toHaveLength(1);
   });
 });
@@ -335,7 +341,8 @@ describe('MusicBrainzCatalogSearch and a catalog that has drifted', () => {
 
       const results = await unwrap(port.search('graceland', testScope()));
 
-      expect(results.unavailable).toEqual([kind]);
+      // Drift, not unreachability: the catalog answered, in a shape this application cannot read.
+      expect(results.unavailable).toEqual([{ kind, reason: 'unreadable' }]);
     },
   );
 

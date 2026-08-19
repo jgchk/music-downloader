@@ -2,7 +2,8 @@
   import CatalogDetail from './CatalogDetail.svelte';
   import CatalogResults from './CatalogResults.svelte';
   import RequestPolicies from './RequestPolicies.svelte';
-  import { UNREACHABLE, httpCatalog } from '$lib/search/client.js';
+  import { enhance } from '$app/forms';
+  import { UNEXPECTED, httpCatalog } from '$lib/search/client.js';
   import { openDetail, readTracklist, runSearch } from '$lib/search/session.js';
   import type { SearchOutcome } from '$lib/search/session.js';
   import { searchTyping, startTyping } from '$lib/search/typing.js';
@@ -64,22 +65,21 @@
   }
 
   /**
-   * A conversation with the catalog that ended in a rejection. Nothing SHOULD reject — the client
-   * converts every failure to a value — so this is a bug, and a spinner that never stops is the
-   * least debuggable way for one to show up. The page says what it can and lets go of the wait.
+   * Run a catalog conversation, and let a rejection be a bug rather than a stuck page.
+   *
+   * Nothing SHOULD reject — the client converts every failure to a value — so a rejection is a
+   * bug, and the least debuggable way for one to surface is a spinner that never stops. Each
+   * conversation therefore hands in its OWN recovery: they set different loading state before
+   * they await (the page's "Searching…", the detail surface's "Reading the catalog…", a
+   * disclosure's tracklist), and a single page-level banner would leave the other two spinning —
+   * the tracklist one permanently, since a tracklist already being read is never asked for again.
    */
-  function rejected(cause: unknown): void {
-    console.error('catalog conversation rejected', cause);
-    searching = false;
-    failure = UNREACHABLE;
-  }
-
-  /** Run a catalog conversation, and let a rejection be a bug rather than a stuck page. */
-  async function attempt(conversation: Promise<void>): Promise<void> {
+  async function attempt(conversation: Promise<void>, recover: () => void): Promise<void> {
     try {
       await conversation;
     } catch (error_: unknown) {
-      rejected(error_);
+      console.error('catalog conversation rejected', error_);
+      recover();
     }
   }
 
@@ -97,6 +97,11 @@
           outcome = undefined;
         },
       }),
+      () => {
+        searching = false;
+        failure = UNEXPECTED;
+        outcome = undefined;
+      },
     );
   }
 
@@ -117,6 +122,7 @@
         (opened) => (detail = opened),
         () => detail?.mbid === mbid,
       ),
+      () => (detail = { kind: 'failed', mbid, title, message: UNEXPECTED }),
     );
   }
 
@@ -209,8 +215,10 @@
     onTracklist={(mbid) =>
       void attempt(
         readTracklist(catalog, mbid, tracklists, (update) => (tracklists = update(tracklists))),
+        () => (tracklists = { ...tracklists, [mbid]: { kind: 'failed', message: UNEXPECTED } }),
       )}
     {pin}
+    {values}
     onPin={(chosen) => (pin = chosen)}
     onClose={() => (detail = undefined)}
   />
@@ -221,7 +229,9 @@
        the message above a form the person never touched. -->
   <details class="native-request" open={values?.kind === 'descriptor'}>
     <summary>Request by artist and title</summary>
-    <form method="POST" data-testid="native-form">
+    <!-- Enhanced like every other request form: this is the one carrying free text, so it is the
+         one most likely to come back refused — and without JavaScript it is still a plain POST. -->
+    <form method="POST" data-testid="native-form" use:enhance>
       <label>
         Artist
         <input name="artist" data-testid="native-artist" value={values?.artist ?? ''} />

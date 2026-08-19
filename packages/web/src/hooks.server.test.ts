@@ -1,5 +1,5 @@
 import { okAsync } from 'neverthrow';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { RequestEvent, ResolveOptions } from '@sveltejs/kit';
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session.js';
 
@@ -49,6 +49,17 @@ function validCookie(now = Date.now()): string {
 }
 
 describe('server hooks', () => {
+  it('lets the readiness probe through even with nothing booted, since reading that is its job', async () => {
+    bootedRuntimes.mockReturnValueOnce(undefined);
+
+    const response = await handle({
+      event: gateEvent('/health'),
+      resolve: () => new Response('the route’s own answer'),
+    });
+
+    expect(await response.text()).toBe('the route’s own answer');
+  });
+
   it('answers a request that arrives before the daemon is ready, rather than crashing on it', async () => {
     // Before the init hook, and during shutdown, there is nothing to serve a request with. "Not
     // ready" is the truth and a 503 is how it is said — a crash says the same thing in a way
@@ -183,6 +194,7 @@ describe('server hooks', () => {
     // person quoting an error id that appears nowhere.
     bootedRuntimes.mockReturnValueOnce(undefined);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
 
     const shaped = handleError({
       error: new Error('boom'),
@@ -191,12 +203,8 @@ describe('server hooks', () => {
       message: 'Internal Error',
     } as never) as { errorId: string };
 
-    expect(consoleError).toHaveBeenCalledWith(
-      'unhandled server error before boot',
-      expect.objectContaining({ errorId: shaped.errorId }),
-      expect.any(Error),
-    );
-    consoleError.mockRestore();
+    // One JSON object, so an aggregator can index the error id the person is told to quote.
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(shaped.errorId));
   });
 
   it('handleError records the fault through the pino root with an id + request context and returns a shaped, id-carrying message', () => {

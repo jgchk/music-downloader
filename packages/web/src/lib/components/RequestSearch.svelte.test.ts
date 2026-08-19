@@ -1,6 +1,6 @@
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import RequestSearch from './RequestSearch.svelte';
 import type { CatalogClient } from '$lib/search/client.js';
 import type { TypingDriver } from '$lib/search/typing.js';
@@ -438,6 +438,7 @@ describe('RequestSearch', () => {
     // Nothing should reject — the client converts every failure to a value — so this is a bug, and
     // a spinner that never stops is the least debuggable way for one to surface.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
     const catalog = catalogStub({
       search: vi.fn(() => Promise.reject(new Error('a bug, not an outage'))),
     });
@@ -447,8 +448,69 @@ describe('RequestSearch', () => {
     await userEvent.keyboard('{Enter}');
 
     await expect.element(page.getByTestId('search-error')).toBeVisible();
+    expect(document.querySelector('[data-testid="searching"]')).toBeNull();
     expect(consoleError).toHaveBeenCalled();
-    consoleError.mockRestore();
+  });
+
+  it('does not leave a detail surface reading forever when its read rejects', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const catalog = catalogStub({
+      editions: vi.fn(() => Promise.reject(new Error('a bug, not an outage'))),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+
+    await page
+      .getByRole('button', { name: /Graceland/ })
+      .first()
+      .click();
+
+    await expect.element(page.getByTestId('detail-error')).toBeVisible();
+    expect(document.querySelector('[data-testid="detail-loading"]')).toBeNull();
+  });
+
+  it('does not wedge a tracklist disclosure when its read rejects', async () => {
+    // A tracklist left "loading" is worse than a failed one: a read already in flight is never
+    // asked for again, so the spinner would outlive every retry the person makes.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    onTestFinished(() => consoleError.mockRestore());
+    const catalog = catalogStub({
+      editions: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: {
+            groups: [
+              {
+                representative: {
+                  mbid: RELEASE,
+                  title: 'Graceland',
+                  formats: ['CD'],
+                  trackCount: 11,
+                },
+                editions: [{ mbid: RELEASE, title: 'Graceland', formats: ['CD'], trackCount: 11 }],
+              },
+            ],
+            bestMatch: { kind: 'pick' as const, mbid: RELEASE },
+          },
+        }),
+      ),
+      tracklist: vi.fn(() => Promise.reject(new Error('a bug, not an outage'))),
+    });
+    await render(RequestSearch, { catalog, typing: manualTyping() });
+    await page.getByTestId('catalog-query').fill('graceland');
+    await userEvent.keyboard('{Enter}');
+    await page
+      .getByRole('button', { name: /Graceland/ })
+      .first()
+      .click();
+    await expect.element(page.getByTestId('detail')).toBeVisible();
+
+    await page.getByRole('button', { name: 'View tracklist' }).first().click();
+
+    await expect.element(page.getByRole('alert')).toBeVisible();
+    expect(document.body.textContent).not.toContain('Reading the tracklist…');
   });
 
   it('closes the detail when asked, leaving the results behind it', async () => {

@@ -9,9 +9,10 @@
   mapped `<option {value}>` to `option.value = (option.__value = value()) ?? ''`, and that `?? ''`
   is a branch no test can reach. The values here are pinned against the contract's own keys by
   "offers every quality floor the request contract accepts, and no other" in
-  `CatalogDetail.svelte.test.ts`; the LABELS are duplicated from `view.ts` and asserted by nothing,
-  which is the price of the guard and worth naming. If this select is ever used outside
-  `CatalogDetail`, move that test with it.
+  `CatalogDetail.svelte.test.ts` — where it stays even though this select is now reached through
+  `RequestPolicies` from several surfaces, because one place asserting the contract is enough and
+  three would be three copies to keep. The LABELS are duplicated from `view.ts` and asserted by
+  nothing, which is the price of the guard and worth naming.
 -->
 <label>
   Quality floor
