@@ -161,7 +161,7 @@
           <td>
             <form method="POST" action="?/select">
               <input type="hidden" name="releaseMbid" value={candidate.releaseMbid} />
-              <button type="submit" data-testid="select-edition">Choose</button>
+              <button type="submit" class="btn" data-testid="select-edition">Choose</button>
             </form>
           </td>
         </tr>
@@ -179,7 +179,7 @@
 
 {#if isCancellable(acquisition)}
   <form method="POST" action="?/cancel">
-    <button type="submit" data-testid="cancel">Cancel</button>
+    <button type="submit" class="btn" data-testid="cancel">Cancel</button>
   </form>
 {/if}
 

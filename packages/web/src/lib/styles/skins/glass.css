@@ -4,145 +4,149 @@
    Note the layout inversion vs forum/terminal: nav becomes a left rail.
    ============================================================================ */
 
-:root[data-skin='glass'] {
-  color-scheme: light;
+/* A skin is the theme layer: last in the cascade, so it overrides the base without having to
+   out-specify it. What it may NOT do is put chrome back on bare buttons — see the layers test. */
+@layer theme {
+  :root[data-skin='glass'] {
+    color-scheme: light;
 
-  --bg: #e8edf1;
-  --surface: rgba(255, 255, 255, 0.68);
-  --surface-2: rgba(255, 255, 255, 0.42);
-  --border: rgba(16, 46, 56, 0.12);
-  --text: #14262d;
-  --text-muted: #5c6f77;
-  --accent: #0e7c72;
-  --accent-contrast: #ffffff;
-  --focus: #0e7c72;
+    --bg: #e8edf1;
+    --surface: rgba(255, 255, 255, 0.68);
+    --surface-2: rgba(255, 255, 255, 0.42);
+    --border: rgba(16, 46, 56, 0.12);
+    --text: #14262d;
+    --text-muted: #5c6f77;
+    --accent: #0e7c72;
+    --accent-contrast: #ffffff;
+    --focus: #0e7c72;
 
-  --ok: #16855f;
-  --warn: #a86a13;
-  --danger: #bb3f38;
-  --info: #256f92;
+    --ok: #16855f;
+    --warn: #a86a13;
+    --danger: #bb3f38;
+    --info: #256f92;
 
-  --font-body: var(--font-sans);
-  --font-head: var(--font-serif);
-  --fw-head: 600;
-  --fs-root: 15.5px;
-  --fs-h1: 1.9rem;
-  --fs-h2: 1.2rem;
-  --lh: 1.55;
-  --tracking-label: 0.06em;
-  --tt-label: uppercase;
+    --font-body: var(--font-sans);
+    --font-head: var(--font-serif);
+    --fw-head: 600;
+    --fs-root: 15.5px;
+    --fs-h1: 1.9rem;
+    --fs-h2: 1.2rem;
+    --lh: 1.55;
+    --tracking-label: 0.06em;
+    --tt-label: uppercase;
 
-  --page-pad: var(--step-5);
-  --region-gap: var(--step-5);
-  --stack-gap: var(--step-4);
-  --inline-gap: var(--step-2);
-  --cell-pad-y: var(--step-3);
-  --cell-pad-x: var(--step-4);
+    --page-pad: var(--step-5);
+    --region-gap: var(--step-5);
+    --stack-gap: var(--step-4);
+    --inline-gap: var(--step-2);
+    --cell-pad-y: var(--step-3);
+    --cell-pad-x: var(--step-4);
 
-  --radius: 16px;
-  --radius-sm: 10px;
-  --shadow: 0 1px 2px rgba(15, 40, 50, 0.05), 0 14px 40px rgba(15, 40, 50, 0.1);
-  --surface-blur: 16px;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 1px 2px rgba(15, 40, 50, 0.05), 0 14px 40px rgba(15, 40, 50, 0.1);
+    --surface-blur: 16px;
 
-  --nav-dir: column;
-  --shell-cols: 15rem 1fr;
-  --shell-rows: auto 1fr auto;
-  --shell-areas: 'masthead masthead' 'nav      main' 'status   status';
-}
-:root[data-skin='glass'] body {
-  background:
-    radial-gradient(120% 80% at 12% -10%, rgba(14, 124, 114, 0.14), transparent 55%),
-    radial-gradient(90% 70% at 110% 0%, rgba(43, 122, 155, 0.12), transparent 50%), var(--bg);
-}
-
-/* Frosted surfaces */
-:root[data-skin='glass'] nav.primary ul,
-:root[data-skin='glass'] .statusbar,
-:root[data-skin='glass'] details,
-:root[data-skin='glass'] dl.stats > div {
-  backdrop-filter: blur(var(--surface-blur));
-}
-
-/* Timeline as soft dots on a hairline spine, frosted disclosure surfaces. */
-:root[data-skin='glass'] ol.timeline {
-  position: relative;
-}
-:root[data-skin='glass'] ol.timeline::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--step-3) / 2);
-  top: var(--step-2);
-  bottom: var(--step-2);
-  width: 1px;
-  background: var(--border);
-}
-:root[data-skin='glass'] ol.timeline > li.timeline-entry {
-  position: relative;
-}
-:root[data-skin='glass'] .timeline-marker {
-  box-shadow: 0 0 0 3px var(--bg);
-}
-:root[data-skin='glass'] li.timeline-date {
-  padding-left: calc(var(--step-3) + var(--inline-gap));
-}
-
-/* Review decision surface: the confirm block floats as a frosted danger card;
-   diff marks glow softly rather than filling hard. */
-:root[data-skin='glass'] .confirm-destructive {
-  backdrop-filter: blur(var(--surface-blur));
-  background: color-mix(in oklab, var(--danger) 12%, transparent);
-  box-shadow: var(--shadow);
-}
-:root[data-skin='glass'] .track-diff mark {
-  background: color-mix(in oklab, var(--warn) 30%, transparent);
-  border-radius: 4px;
-}
-
-/* Catalog-search anatomy in glass: translucent result cards on the cool ground,
-   generous artwork, a filter that reads as a quiet segmented control, and a
-   detail panel that floats rather than abuts. */
-:root[data-skin='glass'] .art-grid {
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-}
-:root[data-skin='glass'] .art-grid > .result,
-:root[data-skin='glass'] .artist-row > .result,
-:root[data-skin='glass'] .track-rows {
-  background: var(--surface);
-  backdrop-filter: blur(var(--surface-blur));
-  box-shadow: var(--shadow);
-}
-:root[data-skin='glass'] .results h2 {
-  font-family: var(--font-head);
-  letter-spacing: var(--tracking-label);
-}
-:root[data-skin='glass'] .entity-filter {
-  background: var(--surface-2);
-  border-radius: var(--radius);
-  padding: var(--step-0);
-  backdrop-filter: blur(var(--surface-blur));
-  width: fit-content;
-}
-:root[data-skin='glass'] .entity-filter button {
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-}
-:root[data-skin='glass'] .catalog-detail {
-  inset: var(--step-4) var(--step-4) var(--step-4) auto;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  backdrop-filter: blur(var(--surface-blur));
-}
-@media (max-width: 40rem) {
-  :root[data-skin='glass'] .catalog-detail {
-    inset: auto 0 0 0;
-    border-radius: var(--radius) var(--radius) 0 0;
+    --nav-dir: column;
+    --shell-cols: 15rem 1fr;
+    --shell-rows: auto 1fr auto;
+    --shell-areas: 'masthead masthead' 'nav      main' 'status   status';
   }
-}
-:root[data-skin='glass'] .edition {
-  background: var(--surface-2);
-}
-:root[data-skin='glass'] .edition[aria-pressed='true'] {
-  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  :root[data-skin='glass'] body {
+    background:
+      radial-gradient(120% 80% at 12% -10%, rgba(14, 124, 114, 0.14), transparent 55%),
+      radial-gradient(90% 70% at 110% 0%, rgba(43, 122, 155, 0.12), transparent 50%), var(--bg);
+  }
+
+  /* Frosted surfaces */
+  :root[data-skin='glass'] nav.primary ul,
+  :root[data-skin='glass'] .statusbar,
+  :root[data-skin='glass'] details,
+  :root[data-skin='glass'] dl.stats > div {
+    backdrop-filter: blur(var(--surface-blur));
+  }
+
+  /* Timeline as soft dots on a hairline spine, frosted disclosure surfaces. */
+  :root[data-skin='glass'] ol.timeline {
+    position: relative;
+  }
+  :root[data-skin='glass'] ol.timeline::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--step-3) / 2);
+    top: var(--step-2);
+    bottom: var(--step-2);
+    width: 1px;
+    background: var(--border);
+  }
+  :root[data-skin='glass'] ol.timeline > li.timeline-entry {
+    position: relative;
+  }
+  :root[data-skin='glass'] .timeline-marker {
+    box-shadow: 0 0 0 3px var(--bg);
+  }
+  :root[data-skin='glass'] li.timeline-date {
+    padding-left: calc(var(--step-3) + var(--inline-gap));
+  }
+
+  /* Review decision surface: the confirm block floats as a frosted danger card;
+     diff marks glow softly rather than filling hard. */
+  :root[data-skin='glass'] .confirm-destructive {
+    backdrop-filter: blur(var(--surface-blur));
+    background: color-mix(in oklab, var(--danger) 12%, transparent);
+    box-shadow: var(--shadow);
+  }
+  :root[data-skin='glass'] .track-diff mark {
+    background: color-mix(in oklab, var(--warn) 30%, transparent);
+    border-radius: 4px;
+  }
+
+  /* Catalog-search anatomy in glass: translucent result cards on the cool ground,
+     generous artwork, a filter that reads as a quiet segmented control, and a
+     detail panel that floats rather than abuts. */
+  :root[data-skin='glass'] .art-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  }
+  :root[data-skin='glass'] .art-grid > .result,
+  :root[data-skin='glass'] .artist-row > .result,
+  :root[data-skin='glass'] .track-rows {
+    background: var(--surface);
+    backdrop-filter: blur(var(--surface-blur));
+    box-shadow: var(--shadow);
+  }
+  :root[data-skin='glass'] .results h2 {
+    font-family: var(--font-head);
+    letter-spacing: var(--tracking-label);
+  }
+  :root[data-skin='glass'] .entity-filter {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: var(--step-0);
+    backdrop-filter: blur(var(--surface-blur));
+    width: fit-content;
+  }
+  :root[data-skin='glass'] .entity-filter button {
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+  }
+  :root[data-skin='glass'] .catalog-detail {
+    inset: var(--step-4) var(--step-4) var(--step-4) auto;
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    backdrop-filter: blur(var(--surface-blur));
+  }
+  @media (max-width: 40rem) {
+    :root[data-skin='glass'] .catalog-detail {
+      inset: auto 0 0 0;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+  }
+  :root[data-skin='glass'] .edition {
+    background: var(--surface-2);
+  }
+  :root[data-skin='glass'] .edition[aria-pressed='true'] {
+    background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  }
 }

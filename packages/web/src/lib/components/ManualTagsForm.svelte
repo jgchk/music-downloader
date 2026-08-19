@@ -77,14 +77,19 @@
           />
         </label>
         {#if rows.length > 1}
-          <button type="button" data-testid="remove-track" onclick={() => removeRow(index)}>
+          <button
+            type="button"
+            class="btn"
+            data-testid="remove-track"
+            onclick={() => removeRow(index)}
+          >
             Remove track
           </button>
         {/if}
       </fieldset>
     {/each}
 
-    <button type="button" data-testid="add-track" onclick={addRow}>Add track</button>
-    <button type="submit">{actionButtonText('manual-tags')}</button>
+    <button type="button" class="btn" data-testid="add-track" onclick={addRow}>Add track</button>
+    <button type="submit" class="btn">{actionButtonText('manual-tags')}</button>
   </form>
 </details>

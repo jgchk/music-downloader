@@ -8,7 +8,8 @@
     releaseLine,
     trackTime,
   } from '$lib/search/detail.js';
-  import { artUrl } from '$lib/search/view.js';
+  import { artUrl, initialsOf } from '$lib/search/view.js';
+  import CoverArt from './CoverArt.svelte';
   import RequestPolicies from './RequestPolicies.svelte';
   import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
 
@@ -71,7 +72,7 @@
   >
     <header class="detail-head">
       <h2>{detail.title}</h2>
-      <button type="button" class="detail-close" onclick={onClose}>Close</button>
+      <button type="button" class="btn detail-close" onclick={onClose}>Close</button>
     </header>
 
     {#if detail.kind === 'loading'}
@@ -80,12 +81,10 @@
       <p class="error" role="alert" data-testid="detail-error">{detail.message}</p>
     {:else if detail.kind === 'release-group'}
       {@const picked = pickedMbid(detail.editions)}
-      <img
-        class="detail-art"
+      <CoverArt
         src={artUrl('release-group', detail.mbid, 500)}
-        alt=""
-        width="500"
-        height="500"
+        initials={initialsOf(detail.title)}
+        shape="art-detail"
       />
 
       <h3>Edition</h3>

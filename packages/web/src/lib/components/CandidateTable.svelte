@@ -153,7 +153,9 @@
               <option value="keep-both">Keep both copies</option>
             </select>
           {/if}
-          <button type="submit" data-testid="apply">{actionButtonText('apply-candidate')}</button>
+          <button type="submit" class="btn" data-testid="apply"
+            >{actionButtonText('apply-candidate')}</button
+          >
         </form>
       {/if}
     </li>
