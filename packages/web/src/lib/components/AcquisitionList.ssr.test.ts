@@ -82,20 +82,24 @@ describe('AcquisitionList (SSR)', () => {
 
   it('renders the rows in the order it is given, without re-sorting them', () => {
     // Recency is decided upstream, in the layout's load (orderByNewestRequest) — this component
-    // knows nothing about it and must simply not disturb the order on the way to the DOM. Both
-    // rows are asserted present first: `indexOf` returns -1 for a missing one, so comparing
-    // positions alone would pass vacuously if a row were dropped.
+    // knows nothing about it and must simply not disturb the order on the way to the DOM.
+    //
+    // The given order deliberately contradicts every key the component could plausibly sort on:
+    // it is descending by id AND descending by target text. A fixture that happened to arrive in
+    // ascending order would only catch a reversal, leaving a re-sort — which silently destroys the
+    // spec's newest-first requirement — to pass. Both rows are asserted present first, because
+    // `indexOf` returns -1 for a missing one and comparing positions alone would pass vacuously.
     const { body } = render(AcquisitionList, {
       props: {
         acquisitions: [
-          acquisition({ acquisitionId: 'acq-first', target: { artist: 'F', title: 'First' } }),
-          acquisition({ acquisitionId: 'acq-second', target: { artist: 'S', title: 'Second' } }),
+          acquisition({ acquisitionId: 'acq-zeta', target: { artist: 'Z', title: 'Zeta' } }),
+          acquisition({ acquisitionId: 'acq-alpha', target: { artist: 'A', title: 'Alpha' } }),
         ],
       },
     });
-    expect(body).toContain('F — First');
-    expect(body).toContain('S — Second');
-    expect(body.indexOf('F — First')).toBeLessThan(body.indexOf('S — Second'));
+    expect(body).toContain('Z — Zeta');
+    expect(body).toContain('A — Alpha');
+    expect(body.indexOf('Z — Zeta')).toBeLessThan(body.indexOf('A — Alpha'));
   });
 
   it('presents an awaiting-selection row as action-needed while a searching row stays generic', () => {

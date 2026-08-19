@@ -15,6 +15,12 @@ import { guardedRead } from '$lib/server/facade-reads.js';
  * other context's outage. Safe to leave outside: the comparator is total over strings, and a
  * degraded read hands over an empty array.
  */
+/**
+ * Acquisitions already reported as stating no request time. Process-lifetime and bounded by the
+ * queue's size; the condition is cleared by the restart that fixes it, which also clears this.
+ */
+const warnedUndated = new Set<string>();
+
 export const load: LayoutServerLoad = ({ locals, params, route }) => {
   const acquisitions = guardedRead(
     locals.logger,
@@ -25,13 +31,19 @@ export const load: LayoutServerLoad = ({ locals, params, route }) => {
   // bottom row reads as the oldest thing here, a claim about when the user asked that nobody made.
   // The decider cannot produce such a stream, but a running system can present one (a throw
   // swallowed while applying an event leaves the projection diverged until restart), so the
-  // condition leaves a trace naming the streams rather than quietly reordering the queue. A
-  // degraded read yields no entries, so a downloader outage cannot trip this.
-  const undated = acquisitions.entries.filter((entry) => entry.requestedAt === undefined);
-  if (undated.length > 0) {
+  // condition leaves a trace naming the stream rather than quietly reordering the queue. A degraded
+  // read yields no entries, so a downloader outage cannot trip this.
+  //
+  // Once per stream per process, NOT once per load: an open detail page re-runs this load on the
+  // freshness interval (`invalidateAll` bypasses the usual dependency check), so an unguarded warn
+  // would repeat every few seconds, per tab, for as long as the defect lasts — a diagnostic worth
+  // one line shouting at poll rate exactly when the system is already unhealthy.
+  for (const entry of acquisitions.entries) {
+    if (entry.requestedAt !== undefined || warnedUndated.has(entry.acquisitionId)) continue;
+    warnedUndated.add(entry.acquisitionId);
     locals.logger.warn(
-      { module: 'downloader', acquisitionIds: undated.map((entry) => entry.acquisitionId) },
-      'acquisitions listed with no requestedAt; they sort last, reading as the oldest in the queue',
+      { module: 'downloader', acquisitionId: entry.acquisitionId },
+      'acquisition listed with no requestedAt; it sorts last, reading as the oldest in the queue',
     );
   }
   return {

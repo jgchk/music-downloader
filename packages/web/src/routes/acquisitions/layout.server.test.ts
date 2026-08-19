@@ -68,17 +68,29 @@ describe('acquisitions layout load', () => {
     expect(acquisitions.map((entry) => entry.acquisitionId)).toEqual(['newer', 'older']);
   });
 
-  it('logs the acquisitions that state no request time, naming them', () => {
+  it('logs an acquisition that states no request time, naming it', () => {
     const { event: requestEvent, warnings } = event({
       listAcquisitions: () => ({
         acquisitions: [
-          { acquisitionId: 'dated', requestedAt: '2026-01-01T00:00:00Z' },
-          { acquisitionId: 'undated' },
+          { acquisitionId: 'dated-1', requestedAt: '2026-01-01T00:00:00Z' },
+          { acquisitionId: 'undated-1' },
         ],
       }),
     });
     expect(load(requestEvent as never)).toBeDefined();
-    expect(warnings).toEqual([{ module: 'downloader', acquisitionIds: ['undated'] }]);
+    expect(warnings).toEqual([{ module: 'downloader', acquisitionId: 'undated-1' }]);
+  });
+
+  it('says it once per stream, not once per load', () => {
+    // An open detail page re-runs this load on the freshness interval, so an unguarded warn would
+    // repeat every few seconds per tab for as long as the defect lasted.
+    const listAcquisitions = () => ({ acquisitions: [{ acquisitionId: 'undated-2' }] });
+    const first = event({ listAcquisitions });
+    const second = event({ listAcquisitions });
+    expect(load(first.event as never)).toBeDefined();
+    expect(load(second.event as never)).toBeDefined();
+    expect(first.warnings).toEqual([{ module: 'downloader', acquisitionId: 'undated-2' }]);
+    expect(second.warnings).toEqual([]);
   });
 
   it('says nothing when every acquisition states its request time', () => {
