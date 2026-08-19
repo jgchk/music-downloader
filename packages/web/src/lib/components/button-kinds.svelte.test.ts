@@ -19,7 +19,16 @@ const WIDGET = 'btn';
  * its own: a whole result card, an edition row, an inline link-styled action, the tracklist
  * disclosure, and one segment of the segmented control.
  */
-const PLAIN_KINDS = new Set(['result-open', 'edition', 'linkish', 'tracklist-open', 'segment']);
+const PLAIN_KINDS = new Set([
+  'result-open',
+  'edition',
+  'linkish',
+  'tracklist-open',
+  'segment',
+  // The best-match summary: a surface stating what the system would take, which is selectable to
+  // hand the choice back to it. A raised push button would read as a fifth request action.
+  'best-match',
+]);
 
 const SOURCES = import.meta.glob<string>('/src/**/*.svelte', {
   query: '?raw',

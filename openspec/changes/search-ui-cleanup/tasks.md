@@ -39,16 +39,16 @@ creates and extends its layout tests).
       the identifier-lookup path carries the same fields
 - [x] 4.2 Release-group view (red first): subtitle line (artist · year · type, absent parts
       omitted) and the release-group identifier line
-- [ ] 4.3 Always-visible best-match summary (red first): names the pick's title, disambiguation,
+- [x] 4.3 Always-visible best-match summary (red first): names the pick's title, disambiguation,
       and distinguishing details — or the selection-required sentence — above the groups,
       visible under any group collapse and any format filter; the group containing the pick opens
       alongside the most-common group; activating the summary clears any chosen edition
-- [ ] 4.4 Format chips (red first): pure categorization (cd / vinyl / digital / other) in
+- [x] 4.4 Format chips (red first): pure categorization (cd / vinyl / digital / other) in
       `lib/search`, filtering editions and regrouping with truthful counts, empty-in-this-format
       state named
 - [x] 4.5 Track view (red first): release artwork slot, artist credit, and the "from <release>"
       line above the track request form
-- [ ] 4.6 The chosen-edition rename: `EditionPin`/`onPin`/`pin` and their copy become the
+- [x] 4.6 The chosen-edition rename: `EditionPin`/`onPin`/`pin` and their copy become the
       chosen-edition family throughout `lib/search` and the components; no occurrence of the old
       word survives outside history
 

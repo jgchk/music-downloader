@@ -1,7 +1,7 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import CatalogDetail from './CatalogDetail.svelte';
-import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
+import type { DetailState, ChosenEdition, TracklistState } from '$lib/search/detail.js';
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const PICK = '1b022e01-4da6-387b-8658-8678046e4cef';
@@ -21,10 +21,10 @@ const edition = (mbid: string, overrides: Record<string, unknown> = {}) => ({
 const body = (
   detail: DetailState,
   tracklists: Record<string, TracklistState> = {},
-  pin?: EditionPin,
+  chosen?: ChosenEdition,
 ): string =>
   render(CatalogDetail, {
-    props: { detail, tracklists, onTracklist: noop, pin, onPin: noop, onClose: noop },
+    props: { detail, tracklists, onTracklist: noop, chosen, onChoose: noop, onClose: noop },
   }).body;
 
 const releaseGroup = (bestMatch: {
@@ -41,6 +41,24 @@ const releaseGroup = (bestMatch: {
 });
 
 describe('CatalogDetail (SSR)', () => {
+  it('names the pick even when the catalog says nothing else about it', () => {
+    const bare = { mbid: PICK, title: 'Graceland', formats: [] as string[] };
+    const html = body({
+      kind: 'release-group',
+      mbid: RG,
+      title: 'Graceland',
+      editions: {
+        groups: [{ representative: bare, editions: [bare] }],
+        bestMatch: { kind: 'pick', mbid: PICK },
+      },
+    });
+
+    // No date, no country, no format, no track count — so there is no detail line to draw, and
+    // an empty one under the title would read as a fact the catalog stated.
+    expect(html).toContain('The system would take');
+    expect(html).not.toContain('edition-summary"></span>');
+  });
+
   it('names what it is showing, beyond the bare title', () => {
     const html = body({
       ...releaseGroup({ kind: 'pick', mbid: PICK }),
@@ -142,8 +160,8 @@ describe('CatalogDetail (SSR)', () => {
           detail: undefined,
           tracklists: {},
           onTracklist: noop,
-          pin: undefined,
-          onPin: noop,
+          chosen: undefined,
+          onChoose: noop,
           onClose: noop,
         },
       }).body.trim(),

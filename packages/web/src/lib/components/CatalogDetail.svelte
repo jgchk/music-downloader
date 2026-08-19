@@ -1,9 +1,12 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import {
-    activeEdition,
+    FORMAT_CATEGORIES,
+    chosenEdition,
+    bestMatchSummary,
     detailSubtitle,
     editionSummary,
+    narrowedToFormat,
     groupHeading,
     pickedMbid,
     releaseLine,
@@ -12,7 +15,12 @@
   import { artUrl, initialsOf } from '$lib/search/view.js';
   import CoverArt from './CoverArt.svelte';
   import RequestPolicies from './RequestPolicies.svelte';
-  import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
+  import type {
+    DetailState,
+    ChosenEdition,
+    FormatCategory,
+    TracklistState,
+  } from '$lib/search/detail.js';
 
   interface Properties {
     /** What is open, and what has been read about it so far; nothing when nothing is open. */
@@ -26,15 +34,15 @@
      * the page's state rather than here, so this component stays a function of its props — and so
      * the choice can be rendered on the server, where nothing can be clicked.
      */
-    pin: EditionPin | undefined;
+    chosen: ChosenEdition | undefined;
     /** Choose a pressing to request, or (with nothing) go back to the system's own default. */
-    onPin: (pin: EditionPin | undefined) => void;
+    onChoose: (edition?: ChosenEdition) => void;
     /** What a refused submission carried, so its policies are corrected rather than retyped. */
     values?: Record<string, string | undefined>;
     onClose: () => void;
   }
 
-  let { detail, tracklists, onTracklist, pin, onPin, values, onClose }: Properties = $props();
+  let { detail, tracklists, onTracklist, chosen, onChoose, values, onClose }: Properties = $props();
 
   /** How many requests are in flight, so a submitted form cannot be submitted again. */
   let requesting = $state(0);
@@ -48,7 +56,16 @@
     };
   };
 
-  const activePin = $derived(activeEdition(detail, pin));
+  const chosenHere = $derived(chosenEdition(detail, chosen));
+  /** Which shelf of pressings is being looked at. Narrowing is a view of the same listing. */
+  let format = $state<FormatCategory>('all');
+  const FORMAT_LABELS: Record<FormatCategory, string> = {
+    all: 'All',
+    cd: 'CD',
+    vinyl: 'Vinyl',
+    digital: 'Digital',
+    other: 'Other',
+  };
 
   /** An edition's own name, plus whatever the catalog says makes it different. */
   const editionTitle = (edition: { title: string; disambiguation?: string | undefined }): string =>
@@ -84,6 +101,8 @@
       <p class="error" role="alert" data-testid="detail-error">{detail.message}</p>
     {:else if detail.kind === 'release-group'}
       {@const picked = pickedMbid(detail.editions)}
+      {@const summary = bestMatchSummary(detail.editions)}
+      {@const shown = narrowedToFormat(detail.editions, format)}
       <CoverArt
         src={artUrl('release-group', detail.mbid, 500)}
         initials={initialsOf(detail.title)}
@@ -105,20 +124,63 @@
         <p class="detail-status" data-testid="editions-unknown">
           The catalog lists no pressings for this album.
         </p>
-      {:else if picked === undefined}
+      {:else if summary.kind === 'selection-required'}
         <!-- Says WHAT the system would do, not WHY: the reason is the picker's, and a copy that
              restates its criterion becomes a falsehood the moment the picker widens. -->
         <p class="detail-status" data-testid="selection-required">
           No edition here can be chosen automatically, so the system would ask you to pick one
           before downloading.
         </p>
+      {:else}
+        <!-- Above the groups, and outside the format filter, because the pick regularly sits in a
+             collapsed group and on a shelf nobody is looking at. It doubles as the way back to
+             letting the system choose: selecting it clears any pressing chosen by hand. -->
+        <button
+          type="button"
+          class="best-match"
+          data-testid="best-match"
+          aria-pressed={chosenHere === undefined}
+          onclick={() => onChoose()}
+        >
+          <span class="eyebrow">The system would take</span>
+          <span class="best-match-title">{summary.title}</span>
+          {#if summary.detail !== ''}
+            <span class="edition-summary">{summary.detail}</span>
+          {/if}
+        </button>
+      {/if}
+
+      {#if detail.editions.groups.length > 0}
+        <div class="format-filter" role="group" aria-label="Pressing format">
+          {#each FORMAT_CATEGORIES as option (option)}
+            <button
+              type="button"
+              class="btn"
+              aria-pressed={format === option}
+              onclick={() => (format = option)}
+            >
+              {FORMAT_LABELS[option]}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      {@const wasNarrowedToNothing = detail.editions.groups.length > 0 && shown.groups.length === 0}
+      {#if wasNarrowedToNothing}
+        <!-- Built as one string: interpolating an indexed lookup compiles to a guard for a key
+             this record cannot be missing. -->
+        {@const nothingHere = `The catalog lists no ${FORMAT_LABELS[format]} pressings for this album.`}
+        <p class="detail-status" data-testid="no-editions-in-format">{nothingHere}</p>
       {/if}
 
       <ul class="edition-groups">
-        {#each detail.editions.groups as group, index (group.representative.mbid)}
+        {#each shown.groups as group, index (group.representative.mbid)}
           {@const state = tracklists[group.representative.mbid]}
+          {@const holdsThePick = group.editions.some((edition) => edition.mbid === picked)}
           <li>
-            <details class="edition-group" open={index === 0}>
+            <!-- The most-common tracklist, and whichever group the pick is in — a pick nobody can
+                 see is a pick nobody can check. -->
+            <details class="edition-group" open={index === 0 || holdsThePick}>
               <summary>
                 <span>{groupHeading(group)}</span>
                 {#if index === 0}<span class="edition-note">most common</span>{/if}
@@ -151,27 +213,30 @@
 
               <ul class="editions">
                 {#each group.editions as edition (edition.mbid)}
+                  {@const says = editionSummary(edition)}
                   <li>
                     <button
                       type="button"
                       class="edition"
-                      aria-pressed={activePin === edition.mbid}
+                      aria-pressed={chosenHere === edition.mbid}
                       onclick={() =>
-                        onPin(
-                          activePin === edition.mbid
+                        onChoose(
+                          chosenHere === edition.mbid
                             ? undefined
                             : { album: detail.mbid, edition: edition.mbid },
                         )}
                     >
                       <span class="edition-title">{editionTitle(edition)}</span>
-                      <span class="edition-summary">{editionSummary(edition)}</span>
+                      {#if says !== ''}
+                        <span class="edition-summary">{says}</span>
+                      {/if}
                       {#if edition.mbid === picked}
                         <span class="edition-default" data-testid="system-pick">
                           the system’s default
                         </span>
                       {/if}
-                      {#if activePin === edition.mbid}
-                        <span class="edition-pinned">chosen</span>
+                      {#if chosenHere === edition.mbid}
+                        <span class="edition-chosen">chosen</span>
                       {/if}
                     </button>
                   </li>
@@ -188,17 +253,17 @@
         use:enhance={oneAtATime}
         class="detail-request"
       >
-        {#if activePin === undefined}
+        {#if chosenHere === undefined}
           <input type="hidden" name="kind" value="release-group" />
           <input type="hidden" name="mbid" value={detail.mbid} />
         {:else}
           <input type="hidden" name="kind" value="musicbrainz" />
           <input type="hidden" name="targetType" value="album" />
-          <input type="hidden" name="mbid" value={activePin} />
+          <input type="hidden" name="mbid" value={chosenHere} />
         {/if}
         <RequestPolicies {values} />
         <button type="submit" class="btn primary" disabled={requesting > 0}>
-          {activePin === undefined ? 'Request download' : 'Request this edition'}
+          {chosenHere === undefined ? 'Request download' : 'Request this edition'}
         </button>
       </form>
     {:else if detail.kind === 'artist'}

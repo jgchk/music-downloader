@@ -4,7 +4,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { holdSubmissions } from '../../../test/stubs/app-forms.js';
 import CatalogDetail from './CatalogDetail.svelte';
 import { QUALITY_FLOORS } from '$lib/search/view.js';
-import type { DetailState, EditionPin, TracklistState } from '$lib/search/detail.js';
+import type { DetailState, ChosenEdition, TracklistState } from '$lib/search/detail.js';
 
 const RG = '19847822-1430-3380-9cf1-bc45545b34ac';
 const PICK = '1b022e01-4da6-387b-8658-8678046e4cef';
@@ -45,17 +45,101 @@ const releaseGroupDetail = (bestMatch: {
 const props = (
   detail: DetailState,
   tracklists: Record<string, TracklistState> = {},
-  pin?: EditionPin,
+  chosen?: ChosenEdition,
 ) => ({
   detail,
   tracklists,
   onTracklist: vi.fn(),
-  pin,
-  onPin: vi.fn(),
+  chosen,
+  onChoose: vi.fn(),
   onClose: vi.fn(),
 });
 
 describe('CatalogDetail', () => {
+  it('draws no detail line for a pressing the catalog says nothing else about', async () => {
+    const bare = { mbid: PICK, title: 'Graceland', formats: [] as string[] };
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'release-group',
+        mbid: RG,
+        title: 'Graceland',
+        editions: {
+          groups: [{ representative: bare, editions: [bare] }],
+          bestMatch: { kind: 'pick', mbid: PICK },
+        },
+      }),
+    );
+
+    // No date, country, format or track count — so no line, rather than an empty one that reads
+    // as a fact the catalog stated.
+    await expect.element(page.getByTestId('best-match')).toBeVisible();
+    expect(document.querySelector('.edition-summary')).toBeNull();
+  });
+
+  it('says the catalog lists no pressings, without offering a format filter over nothing', async () => {
+    await render(
+      CatalogDetail,
+      props({
+        kind: 'release-group',
+        mbid: RG,
+        title: 'Graceland',
+        editions: { groups: [], bestMatch: { kind: 'selection-required' } },
+      }),
+    );
+
+    await expect.element(page.getByTestId('editions-unknown')).toBeVisible();
+    expect(document.querySelector('.format-filter')).toBeNull();
+  });
+
+  it('states what the system would take, above everything and outside the filter', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    // Groups sort by shared tracklist and the pick is chosen on other grounds, so it is regularly
+    // inside a collapsed group — a badge down there is a pick nobody can check.
+    await expect.element(page.getByTestId('best-match')).toBeVisible();
+  });
+
+  it('hands the choice back to the system when its own summary is selected', async () => {
+    const onChoose = vi.fn();
+    await render(CatalogDetail, {
+      ...props(releaseGroupDetail({ kind: 'pick', mbid: PICK })),
+      chosen: { album: RG, edition: OTHER },
+      onChoose,
+    });
+
+    await page.getByTestId('best-match').click();
+
+    // Called with nothing at all: "no chosen edition" is the absence of one, not a value.
+    expect(onChoose).toHaveBeenCalledWith();
+  });
+
+  it('keeps the summary on screen while a format is being looked at', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    await page.getByRole('button', { name: 'Vinyl', exact: true }).click();
+
+    // What the system would take does not change because someone is browsing the vinyl.
+    await expect.element(page.getByTestId('best-match')).toBeVisible();
+  });
+
+  it('says when a format has no pressings, rather than showing an empty listing', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    await page.getByRole('button', { name: 'Vinyl', exact: true }).click();
+
+    await expect.element(page.getByTestId('no-editions-in-format')).toBeVisible();
+  });
+
+  it('narrows to the pressings of a format that does have some', async () => {
+    await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
+
+    await page.getByRole('button', { name: 'CD', exact: true }).click();
+
+    expect(document.querySelector('[data-testid="no-editions-in-format"]')).toBeNull();
+    expect(document.querySelectorAll('.editions .edition').length).toBeGreaterThan(0);
+  });
+
   it('asks the archive for the album cover, at the size the panel renders', async () => {
     await render(CatalogDetail, props(releaseGroupDetail({ kind: 'pick', mbid: PICK })));
 
@@ -71,8 +155,8 @@ describe('CatalogDetail', () => {
       detail: undefined,
       tracklists: {},
       onTracklist: vi.fn(),
-      pin: undefined,
-      onPin: vi.fn(),
+      chosen: undefined,
+      onChoose: vi.fn(),
       onClose: vi.fn(),
     });
 
@@ -139,7 +223,7 @@ describe('CatalogDetail', () => {
 
     await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
 
-    expect(chosen.onPin).toHaveBeenCalledWith({ album: RG, edition: OTHER });
+    expect(chosen.onChoose).toHaveBeenCalledWith({ album: RG, edition: OTHER });
   });
 
   it('lets a chosen pressing be unchosen, back to the system’s own default', async () => {
@@ -155,7 +239,7 @@ describe('CatalogDetail', () => {
 
     await page.getByRole('button', { name: /1986-08-29 · US/ }).click();
 
-    expect(chosen.onPin).toHaveBeenCalledWith(undefined);
+    expect(chosen.onChoose).toHaveBeenCalledWith(undefined);
   });
 
   it('shows the chosen pressing as the one that would be requested', async () => {

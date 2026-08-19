@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeEdition,
+  chosenEdition,
+  bestMatchSummary,
   editionSummary,
+  formatCategory,
   groupHeading,
+  narrowedToFormat,
   pickedMbid,
   releaseLine,
   trackTime,
@@ -104,7 +107,7 @@ describe('releaseLine', () => {
   });
 });
 
-describe('activeEdition', () => {
+describe('chosenEdition', () => {
   const album = (mbid: string): DetailState => ({
     kind: 'release-group',
     mbid,
@@ -113,22 +116,22 @@ describe('activeEdition', () => {
   });
 
   it('is the edition chosen on the album that is open', () => {
-    expect(activeEdition(album(MBID), { album: MBID, edition: 'chosen' })).toBe('chosen');
+    expect(chosenEdition(album(MBID), { album: MBID, edition: 'chosen' })).toBe('chosen');
   });
 
   it('is nothing until an edition has been chosen', () => {
-    expect(activeEdition(album(MBID), undefined)).toBeUndefined();
+    expect(chosenEdition(album(MBID), undefined)).toBeUndefined();
   });
 
   it('is nothing once a different album is opened', () => {
     // The surface is re-used, so a choice that outlived its album would request the first album's
     // pressing under the second album's name — a wrong-record download, silently.
-    expect(activeEdition(album('other'), { album: MBID, edition: 'chosen' })).toBeUndefined();
+    expect(chosenEdition(album('other'), { album: MBID, edition: 'chosen' })).toBeUndefined();
   });
 
   it('is nothing for anything that is not an album', () => {
     expect(
-      activeEdition(
+      chosenEdition(
         { kind: 'recording', mbid: MBID, title: 'A Track' },
         {
           album: MBID,
@@ -136,6 +139,132 @@ describe('activeEdition', () => {
         },
       ),
     ).toBeUndefined();
-    expect(activeEdition(undefined, undefined)).toBeUndefined();
+    expect(chosenEdition(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('formatCategory', () => {
+  it.each([
+    [['CD'], 'cd'],
+    [['12" Vinyl'], 'vinyl'],
+    [['Digital Media'], 'digital'],
+    [['Cassette'], 'other'],
+    [[], 'other'],
+  ] as const)('files %s under %s', (formats, category) => {
+    expect(formatCategory(formats)).toBe(category);
+  });
+
+  it('files a mixed pressing under the first thing a person would look for it as', () => {
+    // A CD+DVD set is a CD to someone browsing for one; filing it under neither would hide it.
+    expect(formatCategory(['CD', 'DVD'])).toBe('cd');
+  });
+});
+
+describe('narrowedToFormat', () => {
+  const editions = {
+    groups: [
+      {
+        representative: { mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 },
+        editions: [
+          { mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 },
+          { mbid: 'b', title: 'X', formats: ['12" Vinyl'], trackCount: 11 },
+        ],
+      },
+    ],
+    bestMatch: { kind: 'pick' as const, mbid: 'a' },
+  };
+
+  it('keeps only the pressings of the format asked for', () => {
+    const narrowed = narrowedToFormat(editions, 'vinyl');
+
+    expect(narrowed.groups[0]?.editions.map((edition) => edition.mbid)).toEqual(['b']);
+  });
+
+  it('recounts the groups it narrowed, so a heading cannot claim pressings that are gone', () => {
+    const narrowed = narrowedToFormat(editions, 'vinyl');
+
+    expect(narrowed.groups[0]?.editions).toHaveLength(1);
+  });
+
+  it('drops a group nothing survived in, rather than heading an empty list', () => {
+    const narrowed = narrowedToFormat(editions, 'digital');
+
+    expect(narrowed.groups).toEqual([]);
+  });
+
+  it('is the whole listing again when nothing is being asked for', () => {
+    expect(narrowedToFormat(editions, 'all')).toEqual(editions);
+  });
+});
+
+describe('bestMatchSummary', () => {
+  it('says which pressing the system would take, and what makes it that one', () => {
+    const summary = bestMatchSummary({
+      groups: [
+        {
+          representative: { mbid: 'a', title: 'Graceland', formats: ['CD'], trackCount: 11 },
+          editions: [
+            {
+              mbid: 'a',
+              title: 'Graceland',
+              disambiguation: 'gatefold',
+              formats: ['CD'],
+              trackCount: 11,
+              date: '1986-08-29',
+              country: 'DE',
+            },
+          ],
+        },
+      ],
+      bestMatch: { kind: 'pick', mbid: 'a' },
+    });
+
+    expect(summary).toMatchObject({ kind: 'pick', mbid: 'a', title: 'Graceland (gatefold)' });
+    expect(summary.kind === 'pick' && summary.detail).toContain('1986-08-29');
+  });
+
+  it('says plainly when there is nothing to take, rather than implying a choice was made', () => {
+    const summary = bestMatchSummary({
+      groups: [],
+      bestMatch: { kind: 'selection-required' },
+    });
+
+    expect(summary.kind).toBe('selection-required');
+  });
+
+  it('asks for a choice when the pick names a pressing the listing does not have', () => {
+    // The producer disagreeing with itself. "Choose one" is the honest reading, and the only one
+    // a person can act on — naming a pressing that is not on screen would be worse than silence.
+    const summary = bestMatchSummary({
+      groups: [
+        {
+          representative: { mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 },
+          editions: [{ mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 }],
+        },
+      ],
+      bestMatch: { kind: 'pick', mbid: 'not-in-the-listing' },
+    });
+
+    expect(summary.kind).toBe('selection-required');
+  });
+
+  it('finds the pick wherever the catalog put it, not only in the first group', () => {
+    const summary = bestMatchSummary({
+      groups: [
+        {
+          representative: { mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 },
+          editions: [{ mbid: 'a', title: 'X', formats: ['CD'], trackCount: 11 }],
+        },
+        {
+          representative: { mbid: 'z', title: 'Deluxe', formats: ['CD'], trackCount: 19 },
+          editions: [{ mbid: 'z', title: 'Deluxe', formats: ['CD'], trackCount: 19 }],
+        },
+      ],
+      bestMatch: { kind: 'pick', mbid: 'z' },
+    });
+
+    // Groups sort by how many pressings share a tracklist; the pick is chosen on other grounds
+    // entirely, so it is regularly not in the first one.
+    expect(summary).toMatchObject({ kind: 'pick', title: 'Deluxe' });
   });
 });
