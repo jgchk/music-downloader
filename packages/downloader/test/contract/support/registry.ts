@@ -1,8 +1,14 @@
 import type { ZodType } from 'zod';
 import {
+  mbArtistEntitySchema,
+  mbArtistSearchSchema,
+  mbCatalogRecordingEntitySchema,
+  mbCatalogRecordingSearchSchema,
   mbRecordingSchema,
   mbRecordingSearchSchema,
   mbReleaseGroupBrowseSchema,
+  mbReleaseGroupEntitySchema,
+  mbReleaseGroupSearchSchema,
   mbReleaseSchema,
   mbReleaseSearchSchema,
 } from '../../../src/adapters/musicbrainz/schemas.js';
@@ -35,6 +41,16 @@ export const fixtureSchemas: Record<string, ZodType> = {
   'musicbrainz/release-group-browse.json': mbReleaseGroupBrowseSchema,
   'musicbrainz/release-group-lookup.json': mbReleaseSchema,
   'musicbrainz/release-group-no-official-browse.json': mbReleaseGroupBrowseSchema,
+  // The catalog-SEARCH half of the contract: search-to-formulate reads presentation fields the
+  // resolution path never touches, so its recordings are bound to their own schemas.
+  'musicbrainz/catalog-release-group-search.json': mbReleaseGroupSearchSchema,
+  'musicbrainz/catalog-artist-search.json': mbArtistSearchSchema,
+  'musicbrainz/catalog-recording-search.json': mbCatalogRecordingSearchSchema,
+  'musicbrainz/catalog-release-group-lookup.json': mbReleaseGroupEntitySchema,
+  'musicbrainz/catalog-artist-lookup.json': mbArtistEntitySchema,
+  'musicbrainz/catalog-recording-lookup.json': mbCatalogRecordingEntitySchema,
+  'musicbrainz/catalog-artist-browse.json': mbReleaseGroupSearchSchema,
+  'musicbrainz/catalog-tracklist.json': mbReleaseSchema,
   // The live-network cross-check: real heterogeneous peers, recorded from the maintainer's slskd.
   // The lab cannot fake a search answered by hundreds of different client implementations, so this
   // set stays as the witness that the lab's shapes are the network's shapes.

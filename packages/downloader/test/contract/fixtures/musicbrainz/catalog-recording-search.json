@@ -1,0 +1,3054 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/recording",
+    "query": {
+      "query": "paul simon the boy in the bubble",
+      "inc": "releases",
+      "fmt": "json",
+      "limit": "25"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "created": "2026-08-19T01:06:56.248Z",
+      "count": 13485888,
+      "offset": 0,
+      "recordings": [
+        {
+          "id": "dc116aff-899f-4c39-b9a9-043fc3319138",
+          "score": 100,
+          "artist-credit-id": "bc5b307f-46b0-3d9f-b3a9-a4064942b96d",
+          "title": "Boy in the Bubble",
+          "length": 260986,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "The Detholz!",
+              "artist": {
+                "id": "7a6288ca-c654-442e-a745-2148159217ec",
+                "name": "The Detholz!",
+                "sort-name": "Detholz!, The",
+                "aliases": [
+                  {
+                    "sort-name": "Detholz",
+                    "name": "Detholz",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2006-08-31",
+          "releases": [
+            {
+              "id": "1eaac429-02a7-48c7-b328-d1247f4d93a4",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "bc5b307f-46b0-3d9f-b3a9-a4064942b96d",
+              "count": 1,
+              "title": "Cast Out Devils",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "The Detholz!",
+                  "artist": {
+                    "id": "7a6288ca-c654-442e-a745-2148159217ec",
+                    "name": "The Detholz!",
+                    "sort-name": "Detholz!, The"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "54e53f68-4693-3e51-a301-881649485a95",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Cast Out Devils",
+                "primary-type": "Album"
+              },
+              "date": "2006-08-31",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2006-08-31",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 11,
+              "media": [
+                {
+                  "id": "884dd49a-b6b9-3bfe-aea2-ffe689456215",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "4c9c25ef-e5d1-3f4b-9fdf-faf2937181b5",
+                      "number": "7",
+                      "title": "Boy in the Bubble",
+                      "length": 260986
+                    }
+                  ],
+                  "track-count": 11,
+                  "track-offset": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "284fde17-24f8-42c7-ad74-ab906c5ea32b",
+          "score": 100,
+          "artist-credit-id": "144632ec-ad05-355c-9851-d1bbbfff7b53",
+          "title": "Boy in the Bubble",
+          "length": 253000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Candy Golde",
+              "artist": {
+                "id": "10e50cb7-c21d-4bf4-9343-fea32ff5c76d",
+                "name": "Candy Golde",
+                "sort-name": "Candy Golde"
+              }
+            }
+          ],
+          "first-release-date": "2011",
+          "releases": [
+            {
+              "id": "b3f333bd-0977-4535-adf6-c123f019b098",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "Candy Golde",
+              "status": "Official",
+              "release-group": {
+                "id": "d247b155-7889-49fb-bdce-25e92f6c4939",
+                "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "title": "Candy Golde",
+                "primary-type": "EP"
+              },
+              "date": "2011",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2011",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 5,
+              "media": [
+                {
+                  "id": "16cd555b-c9af-3570-8036-3198afab9f6d",
+                  "position": 1,
+                  "format": "10\" Vinyl",
+                  "track": [
+                    {
+                      "id": "a6422d95-b336-3683-9749-7f1cd924b1b6",
+                      "number": "2",
+                      "title": "Boy in the Bubble",
+                      "length": 253000
+                    }
+                  ],
+                  "track-count": 5,
+                  "track-offset": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "65602437-2058-45a2-ba0b-ab4976013e3b",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 333734,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1992",
+          "releases": [
+            {
+              "id": "723ba05c-98c9-4366-ae79-3c89f8a370ca",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "MTV Unplugged",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "17e82740-92e1-3018-9e4e-d1fb3a8e2047",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "MTV Unplugged",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "1992",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "1992",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "350bde28-0fe2-31e4-88bd-c43b017f1028",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "a4896e67-97f8-39a6-8f49-5076c220eb40",
+                      "number": "10",
+                      "title": "Boy in the Bubble",
+                      "length": 333734
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "aeb4d294-4494-402f-a49c-5640621bdfc7",
+          "score": 100,
+          "artist-credit-id": "e59ae34d-9db5-3093-a92e-f96ec373e669",
+          "title": "Boy in the Bubble",
+          "length": 211586,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Snowdogs",
+              "artist": {
+                "id": "09daaf91-45f1-4ac3-8e06-e790db9c2a01",
+                "name": "Snowdogs",
+                "sort-name": "Snowdogs"
+              }
+            }
+          ],
+          "first-release-date": "2003-01-28",
+          "releases": [
+            {
+              "id": "7ffc8edd-6962-46c6-863a-2606b7f9296d",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "Deep Cuts, Fast Remedies",
+              "status": "Official",
+              "release-group": {
+                "id": "768f5fd0-188d-3abf-a5b1-a476094ce5f5",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Deep Cuts, Fast Remedies",
+                "primary-type": "Album"
+              },
+              "date": "2003-01-28",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2003-01-28",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "ab63c195-7813-3dd3-b315-fa5e3cceb733",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "f8a7e3e2-fe1a-3653-8a2a-e0810de2c418",
+                      "number": "6",
+                      "title": "Boy in the Bubble",
+                      "length": 211586
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "1e6ed88e-cff2-4a9a-b44c-08b2657f663e",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 347919,
+          "disambiguation": "live, 2011-12-05: Ruther Eckerd Hall, Clearwater, FL, USA",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2011-12-05",
+          "releases": [
+            {
+              "id": "0d357555-6f6f-4a00-b23f-6b61d7a0ab92",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "2011-12-05: Ruth Eckerd Hall, Clearwater, FL, USA",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "7e76413b-29c1-4f94-bb5b-3cada893a372",
+                "title": "2011-12-05: Ruth Eckerd Hall, Clearwater, FL, USA",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "2011-12-05",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2011-12-05",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 25,
+              "media": [
+                {
+                  "id": "3be63aa1-d3d1-3aa2-87ea-efda0f0dd94b",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "2831801c-497b-3017-9828-8b58a819bc82",
+                      "number": "1",
+                      "title": "Boy in the Bubble",
+                      "length": 347919
+                    }
+                  ],
+                  "track-count": 25,
+                  "track-offset": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "317a12b1-3ed9-49e0-ba33-d51866714157",
+          "score": 100,
+          "artist-credit-id": "46e72344-ac6c-32e4-be1d-e3af6d3b57ed",
+          "title": "Boy in the Bubble",
+          "length": 232000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "John Stewart",
+              "artist": {
+                "id": "775f55c0-1ea8-43fd-a5d0-0817a5085575",
+                "name": "John Stewart",
+                "sort-name": "Stewart, John",
+                "disambiguation": "singer-songwriter (Kingston Trio)",
+                "aliases": [
+                  {
+                    "sort-name": "Stewart, John C.",
+                    "name": "John C. Stewart",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "John Steward",
+                    "name": "John Steward",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1999",
+          "releases": [
+            {
+              "id": "1e0f5349-ced5-4f1a-ac20-ad28a8d02414",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "46e72344-ac6c-32e4-be1d-e3af6d3b57ed",
+              "count": 1,
+              "title": "John Stewart & Darwin's Army",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "John Stewart",
+                  "artist": {
+                    "id": "775f55c0-1ea8-43fd-a5d0-0817a5085575",
+                    "name": "John Stewart",
+                    "sort-name": "Stewart, John",
+                    "disambiguation": "singer-songwriter (Kingston Trio)"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "c577fc99-18a1-30a4-a56c-e6562450026d",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "John Stewart & Darwin's Army",
+                "primary-type": "Album"
+              },
+              "date": "1999",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "1999",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 15,
+              "media": [
+                {
+                  "id": "76d61aa1-4194-31e1-89c2-5be68558a4f7",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "2f630074-ee4e-3d8a-9233-63da8e6b49cf",
+                      "number": "9",
+                      "title": "Boy in the Bubble",
+                      "length": 232000
+                    }
+                  ],
+                  "track-count": 15,
+                  "track-offset": 8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "29d2ebe3-bf9d-410e-9e32-70bd99c984d3",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 359240,
+          "disambiguation": "live",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1994",
+          "releases": [
+            {
+              "id": "10260314-093f-40b3-b0b9-ac61bc8b75a7",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "His Greatest Hits - Live in Concert",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "3d4389df-bbd4-470e-a798-07141902269b",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "His Greatest Hits - Live in Concert",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation",
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "1994",
+              "country": "DE",
+              "release-events": [
+                {
+                  "date": "1994",
+                  "area": {
+                    "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+                    "name": "Germany",
+                    "sort-name": "Germany",
+                    "iso-3166-1-codes": [
+                      "DE"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "eff5deb5-2293-3bbf-9f35-d8d8ae39f990",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "2f182a91-18cb-4e91-89d1-57102b5dead6",
+                      "number": "8",
+                      "title": "Boy in the Bubble",
+                      "length": 359240
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d030c322-88ec-46e6-bc23-db554f46e395",
+          "score": 100,
+          "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+          "title": "Boy in the Bubble",
+          "length": 224000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Steve Wynn",
+              "artist": {
+                "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                "name": "Steve Wynn",
+                "sort-name": "Wynn, Steve",
+                "aliases": [
+                  {
+                    "sort-name": "Steve Wynn and Friends",
+                    "name": "Steve Wynn and Friends",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2000",
+          "releases": [
+            {
+              "id": "efe8e829-2dae-4524-9512-036c6cec3bb0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+              "count": 1,
+              "title": "Dazzling Display",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Steve Wynn",
+                  "artist": {
+                    "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                    "name": "Steve Wynn",
+                    "sort-name": "Wynn, Steve"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "99bff56a-faa1-3841-b9ee-580a2b032492",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Dazzling Display",
+                "primary-type": "Album"
+              },
+              "date": "2000",
+              "country": "GB",
+              "release-events": [
+                {
+                  "date": "2000",
+                  "area": {
+                    "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+                    "name": "United Kingdom",
+                    "sort-name": "United Kingdom",
+                    "iso-3166-1-codes": [
+                      "GB"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 18,
+              "media": [
+                {
+                  "id": "f2e28a45-ddb9-3976-844d-af85b8dfb186",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "92a3f9fd-f025-457c-9e61-18f618d0ebff",
+                      "number": "14",
+                      "title": "Boy in the Bubble",
+                      "length": 224000
+                    }
+                  ],
+                  "track-count": 18,
+                  "track-offset": 13
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "06c0c821-612e-46be-a1c7-a275f283faac",
+          "score": 100,
+          "artist-credit-id": "cddd8cf4-d3af-396e-810e-0adec7993e63",
+          "title": "Bubble in the Boy",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Montana",
+              "artist": {
+                "id": "142b8be8-07b2-4a2f-a323-df1f11a981db",
+                "name": "Montana",
+                "sort-name": "Montana",
+                "disambiguation": "Australian Indie Pop band"
+              }
+            }
+          ],
+          "first-release-date": "1998",
+          "releases": [
+            {
+              "id": "aaf64074-48c6-4876-a282-e1d1a4effaf3",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "Bubblegum Love",
+              "status": "Official",
+              "release-group": {
+                "id": "1cc8d228-4eb9-4cc0-a70b-5566ece06115",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Bubblegum Love",
+                "primary-type": "Album"
+              },
+              "date": "2003",
+              "country": "ES",
+              "release-events": [
+                {
+                  "date": "2003",
+                  "area": {
+                    "id": "471c46a7-afc5-31c4-923c-d0444f5053a4",
+                    "name": "Spain",
+                    "sort-name": "Spain",
+                    "iso-3166-1-codes": [
+                      "ES"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 15,
+              "media": [
+                {
+                  "id": "95d1c7be-985d-3340-9fdc-401454ff754a",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "6aaa4276-342f-4a48-9320-400d19f57154",
+                      "number": "12",
+                      "title": "Bubble in the Boy"
+                    }
+                  ],
+                  "track-count": 15,
+                  "track-offset": 11
+                }
+              ]
+            },
+            {
+              "id": "6d0aa051-36cc-4aba-9e87-fc62f576cfff",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "Montana",
+              "status": "Official",
+              "release-group": {
+                "id": "29ffeabe-9e90-4f7d-b680-b1f86f755939",
+                "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "title": "Montana",
+                "primary-type": "EP"
+              },
+              "date": "1998",
+              "country": "AU",
+              "release-events": [
+                {
+                  "date": "1998",
+                  "area": {
+                    "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+                    "name": "Australia",
+                    "sort-name": "Australia",
+                    "iso-3166-1-codes": [
+                      "AU"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 5,
+              "media": [
+                {
+                  "id": "3391bc98-6026-48cf-abef-84567adfd546",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "fd34efec-390d-4629-97ba-ebf8debc43ab",
+                      "number": "3",
+                      "title": "Bubble In The Boy"
+                    }
+                  ],
+                  "track-count": 5,
+                  "track-offset": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "71cb19f4-c00f-43a4-9fbd-02b1cd22ed2d",
+          "score": 100,
+          "artist-credit-id": "334eff4d-8c25-31e5-8bd8-9d2321e6a331",
+          "title": "Boy in the Bubble",
+          "length": 359426,
+          "disambiguation": "live, 1993: USA",
+          "video": null,
+          "artist-credit": [
+            {
+              "joinphrase": " feat. ",
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "joinphrase": " & ",
+              "name": "Michael Brecker",
+              "artist": {
+                "id": "795058e7-927e-4fcd-a5a0-f57c2fe9d3d1",
+                "name": "Michael Brecker",
+                "sort-name": "Brecker, Michael",
+                "disambiguation": "American jazz saxophonist, multi‐instrumentalist and composer",
+                "aliases": [
+                  {
+                    "sort-name": "マイケル・ブレッカー, マイク・ブレッカー",
+                    "name": "マイク・ブレッカー, マイケル・ブレッカー",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Брекер, М.",
+                    "name": "М. Брекер",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Breckler, Mike",
+                    "name": "Mike Breckler",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brecker, Micheal",
+                    "name": "Micheal Brecker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brecker, Michaël",
+                    "name": "Michaël Brecker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brëcker, Michael",
+                    "name": "Michael Brëcker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Breker, Michael",
+                    "name": "Michael Breker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Breckert, Michael",
+                    "name": "Michael Breckert",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Breckar, Michael",
+                    "name": "Michael Breckar",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brcker, Michael",
+                    "name": "Michael Brcker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brecker, Mike",
+                    "name": "Mike Brecker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Blecker, Michael",
+                    "name": "Michael Blecker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Breker, M.",
+                    "name": "M. Breker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brecker, M.",
+                    "name": "M. Brecker",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Brecker, Michael Leonard",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Michael Leonard Brecker",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Steve Gadd",
+              "artist": {
+                "id": "7433918e-5c12-4a81-8875-06e3a54d2e00",
+                "name": "Steve Gadd",
+                "sort-name": "Gadd, Steve",
+                "disambiguation": "drummer",
+                "aliases": [
+                  {
+                    "sort-name": "Gadd, Stephen Kendall",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Stephen Kendall Gadd",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1995",
+          "releases": [
+            {
+              "id": "6c6bfa44-7119-44ba-a51f-113b5fce9535",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "334eff4d-8c25-31e5-8bd8-9d2321e6a331",
+              "count": 1,
+              "title": "Unplugged",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "joinphrase": " feat. ",
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                },
+                {
+                  "joinphrase": " & ",
+                  "name": "Michael Brecker",
+                  "artist": {
+                    "id": "795058e7-927e-4fcd-a5a0-f57c2fe9d3d1",
+                    "name": "Michael Brecker",
+                    "sort-name": "Brecker, Michael",
+                    "disambiguation": "American jazz saxophonist, multi‐instrumentalist and composer"
+                  }
+                },
+                {
+                  "name": "Steve Gadd",
+                  "artist": {
+                    "id": "7433918e-5c12-4a81-8875-06e3a54d2e00",
+                    "name": "Steve Gadd",
+                    "sort-name": "Gadd, Steve",
+                    "disambiguation": "drummer"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "3b044709-5896-3e60-a240-ad469ecd18ee",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Unplugged",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "1995",
+              "country": "CZ",
+              "release-events": [
+                {
+                  "date": "1995",
+                  "area": {
+                    "id": "51d34c28-61bf-3d21-849f-7492672a9d44",
+                    "name": "Czechia",
+                    "sort-name": "Czechia",
+                    "iso-3166-1-codes": [
+                      "CZ"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "acaa20b5-e5c5-3dc2-87c5-13e43ad21fe9",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "a9f229bb-8342-3859-8eca-2e57a21e9afd",
+                      "number": "8",
+                      "title": "Boy in the Bubble",
+                      "length": 359426
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 7
+                }
+              ]
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "pop"
+            }
+          ]
+        },
+        {
+          "id": "40adee76-c26d-45cc-b64d-aeb5487da048",
+          "score": 100,
+          "artist-credit-id": "9f2d55fc-1e2f-3106-b9bd-3bf4e438191e",
+          "title": "Boy in the Bubble",
+          "length": 273000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Barnstar!",
+              "artist": {
+                "id": "5f485c63-34fa-4302-9e19-fa0fbe8c93a0",
+                "name": "Barnstar!",
+                "sort-name": "Barnstar!"
+              }
+            }
+          ],
+          "first-release-date": "2011",
+          "releases": [
+            {
+              "id": "f230fbcf-fb5e-45bc-963a-fe45e3026040",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "C'mon!",
+              "status": "Official",
+              "release-group": {
+                "id": "9fc8bd9c-06e7-433a-9bd6-c69769ac7383",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "C'mon!",
+                "primary-type": "Album"
+              },
+              "date": "2011",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2011",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "9279a2cf-4014-3939-a4d5-c4b149932150",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "8fb7322e-d2a8-3343-822a-83f38d432bec",
+                      "number": "5",
+                      "title": "Boy in the Bubble",
+                      "length": 273000
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ef85e534-ae96-4049-9474-2e512e0c454e",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 336106,
+          "disambiguation": "live",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "f09a2b9f-a111-49f2-b4c2-d0bd72b2c83c",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "1992-03-04",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "b32f0351-6a2f-3934-ada1-6806b5adc1dd",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "1992-03-04",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 16,
+              "media": [
+                {
+                  "id": "3c59f121-6650-3d28-aa7f-a597ddd3432c",
+                  "position": 1,
+                  "track": [
+                    {
+                      "id": "162c6f76-4c16-3472-8831-3e472eeb45d2",
+                      "number": "3",
+                      "title": "Boy in the Bubble",
+                      "length": 336106
+                    }
+                  ],
+                  "track-count": 16,
+                  "track-offset": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "8337e700-4c0e-496b-8952-d2e5324b74e7",
+          "score": 100,
+          "artist-credit-id": "2cd8caa0-11c4-3f59-b9f8-9ab5a3ce1c7e",
+          "title": "Boy in the Bubble",
+          "length": 270000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "The Cache Valley Drifters",
+              "artist": {
+                "id": "df9faa47-f2dc-4227-b327-5b3b075b10f8",
+                "name": "Cache Valley Drifters",
+                "sort-name": "Cache Valley Drifters",
+                "disambiguation": "California-based bluegrass"
+              }
+            }
+          ],
+          "first-release-date": "1996",
+          "releases": [
+            {
+              "id": "31ae3865-2786-4590-8553-88369a11be43",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "White Room",
+              "status": "Official",
+              "release-group": {
+                "id": "46cb26ce-239b-4296-9ffe-6d22216cfa26",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "White Room",
+                "primary-type": "Album"
+              },
+              "date": "1996",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "1996",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "9c3b8cd4-df81-3ab6-b672-9153f4f2cc47",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "3f123efb-78a3-4631-8dbc-04ee3f59c7cd",
+                      "number": "5",
+                      "title": "Boy in the Bubble",
+                      "length": 271000
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 4
+                }
+              ]
+            },
+            {
+              "id": "79e26c48-c923-44d8-a8c9-6c20630773c6",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+              "count": 1,
+              "title": "Masterworks of American Bluegrass",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Various Artists",
+                  "artist": {
+                    "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                    "name": "Various Artists",
+                    "sort-name": "Various Artists",
+                    "disambiguation": "add compilations to this artist"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "77d36143-db56-4bdf-9a1e-38b5874066da",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Masterworks of American Bluegrass",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                ]
+              },
+              "date": "2002",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2002",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 20,
+              "media": [
+                {
+                  "id": "ee2ab167-2fe5-3f4c-8420-9b7da6173df9",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "f79ce7c2-7aa8-44ff-bfa2-f45b7ab32eef",
+                      "number": "6",
+                      "title": "Boy in the Bubble",
+                      "length": 270000
+                    }
+                  ],
+                  "track-count": 20,
+                  "track-offset": 5
+                }
+              ]
+            },
+            {
+              "id": "f046c214-60e5-411c-a153-be7dbb529828",
+              "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+              "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+              "count": 1,
+              "title": "Masterworks of American Bluegrass",
+              "status": "Promotion",
+              "artist-credit": [
+                {
+                  "name": "Various Artists",
+                  "artist": {
+                    "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                    "name": "Various Artists",
+                    "sort-name": "Various Artists",
+                    "disambiguation": "add compilations to this artist"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "77d36143-db56-4bdf-9a1e-38b5874066da",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Masterworks of American Bluegrass",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                ]
+              },
+              "date": "2002",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2002",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 20,
+              "media": [
+                {
+                  "id": "8d4ab0bb-ef2d-367c-b2b0-5f1f1fc04578",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "d5555382-31fa-4e04-83b5-9484677203c5",
+                      "number": "6",
+                      "title": "Boy in the Bubble",
+                      "length": 270000
+                    }
+                  ],
+                  "track-count": 20,
+                  "track-offset": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e831f40a-0785-492f-9c8b-b89052033d80",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 340000,
+          "disambiguation": "live, 1987‐12‐13: Madison Square Garden, New York City, NY, USA",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1993",
+          "releases": [
+            {
+              "id": "594e389e-4969-48fa-921f-f6c4e430f91e",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "1c91dff0-3dbf-3685-84b2-4b191c8087bc",
+              "count": 2,
+              "title": "Homeless Children’s: Medical Benefit Concert",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "joinphrase": " ‐ ",
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                },
+                {
+                  "joinphrase": " & Friends",
+                  "name": "Bruce Springsteen",
+                  "artist": {
+                    "id": "70248960-cb53-4ea4-943a-edb18f7d336f",
+                    "name": "Bruce Springsteen",
+                    "sort-name": "Springsteen, Bruce"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "36ada218-a50d-4cd2-a69d-a2ecc24d84d9",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Homeless Children’s: Medical Benefit Concert",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "1993",
+              "country": "LU",
+              "release-events": [
+                {
+                  "date": "1993",
+                  "area": {
+                    "id": "563d21b7-4a8e-35e2-83a7-7804baefbfa7",
+                    "name": "Luxembourg",
+                    "sort-name": "Luxembourg",
+                    "iso-3166-1-codes": [
+                      "LU"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 23,
+              "media": [
+                {
+                  "id": "59ee1ff3-ee4f-3b9a-af21-9d778d8c51e4",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "11396ac2-32dc-4427-aff5-bd185a29e5d0",
+                      "number": "1",
+                      "title": "Boy in the Bubble",
+                      "length": 340000
+                    }
+                  ],
+                  "track-count": 11,
+                  "track-offset": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e9e7542f-c777-4d32-a5a9-cb3e8c7b8c81",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 326000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1993",
+          "releases": [
+            {
+              "id": "9e2452e1-7b2e-4cab-9a6d-23f3622fc95b",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "Live USA",
+              "status": "Bootleg",
+              "disambiguation": "with new Catalogue Number imm 40.90149",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "167cba1e-c98e-4888-9d4b-99218ddb9702",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Live USA",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "1993",
+              "country": "DE",
+              "release-events": [
+                {
+                  "date": "1993",
+                  "area": {
+                    "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+                    "name": "Germany",
+                    "sort-name": "Germany",
+                    "iso-3166-1-codes": [
+                      "DE"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "922c0a18-c1c5-3577-b548-d0b2726a4e28",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "16407a0e-39f8-4771-984b-ba2c7b2bb516",
+                      "number": "10",
+                      "title": "Boy in the Bubble",
+                      "length": 326000
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "8e24306c-63fe-4837-bf46-71aa9cc6c7a8",
+          "score": 100,
+          "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+          "title": "Boy in the Bubble",
+          "length": 266000,
+          "disambiguation": "live, 1990‐10-31: Burgos, Spain",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Steve Wynn",
+              "artist": {
+                "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                "name": "Steve Wynn",
+                "sort-name": "Wynn, Steve",
+                "aliases": [
+                  {
+                    "sort-name": "Steve Wynn and Friends",
+                    "name": "Steve Wynn and Friends",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2000-10",
+          "releases": [
+            {
+              "id": "6f8b1597-1271-49e3-802a-18edc42aa51c",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+              "count": 1,
+              "title": "Syndicated Dreams, Volume 7: Live Covers, Part 1",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Steve Wynn",
+                  "artist": {
+                    "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                    "name": "Steve Wynn",
+                    "sort-name": "Wynn, Steve"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "c31e3f02-dd66-4cef-9a2a-e630c34dd60e",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Syndicated Dreams, Volume 7: Live Covers, Part 1",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "2000-10",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "2000-10",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 21,
+              "media": [
+                {
+                  "id": "6a787b81-bb10-3c76-ada4-9748d8c72c58",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "427fdd28-5e04-40f6-b63d-6ee7255c8781",
+                      "number": "11",
+                      "title": "Boy in the Bubble (Burgos, Spain, 1990.10.31)",
+                      "length": 266000
+                    }
+                  ],
+                  "track-count": 21,
+                  "track-offset": 10
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "75252c03-3226-446d-abf3-a65c69767891",
+          "score": 100,
+          "artist-credit-id": "cddd8cf4-d3af-396e-810e-0adec7993e63",
+          "title": "Bubble in the Boy",
+          "length": 148000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Montana",
+              "artist": {
+                "id": "142b8be8-07b2-4a2f-a323-df1f11a981db",
+                "name": "Montana",
+                "sort-name": "Montana",
+                "disambiguation": "Australian Indie Pop band"
+              }
+            }
+          ],
+          "first-release-date": "2005-01-01",
+          "releases": [
+            {
+              "id": "9261516b-a794-432e-863d-8f1b51d862d4",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "Bubblegum Love (With Extra Love)",
+              "status": "Official",
+              "release-group": {
+                "id": "1cc8d228-4eb9-4cc0-a70b-5566ece06115",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Bubblegum Love",
+                "primary-type": "Album"
+              },
+              "date": "2005-01-01",
+              "country": "GB",
+              "release-events": [
+                {
+                  "date": "2005-01-01",
+                  "area": {
+                    "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+                    "name": "United Kingdom",
+                    "sort-name": "United Kingdom",
+                    "iso-3166-1-codes": [
+                      "GB"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 21,
+              "media": [
+                {
+                  "id": "a0957c84-4fa2-3d8f-9ba9-c21e424f5c58",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "e3930d24-e846-316a-8857-d650bf8c1683",
+                      "number": "12",
+                      "title": "Bubble in the Boy",
+                      "length": 148000
+                    }
+                  ],
+                  "track-count": 21,
+                  "track-offset": 11
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "f70d03c7-14d8-40d9-9d1b-0fa31b35a764",
+          "score": 100,
+          "artist-credit-id": "144632ec-ad05-355c-9851-d1bbbfff7b53",
+          "title": "Boy in the Bubble",
+          "length": 253853,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Candy Golde",
+              "artist": {
+                "id": "10e50cb7-c21d-4bf4-9343-fea32ff5c76d",
+                "name": "Candy Golde",
+                "sort-name": "Candy Golde"
+              }
+            }
+          ],
+          "first-release-date": "2014-04-13",
+          "releases": [
+            {
+              "id": "59a82cbc-8422-4626-90d9-6de6b60b3c01",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+              "count": 1,
+              "title": "Happy Endings (Music from the Showtime Series Californication)",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Various Artists",
+                  "artist": {
+                    "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                    "name": "Various Artists",
+                    "sort-name": "Various Artists",
+                    "disambiguation": "add compilations to this artist"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "ea750b06-5700-4a3f-ae1e-a19a46eed21b",
+                "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Happy Endings (Music from the Showtime Series Californication)",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Compilation",
+                  "Soundtrack"
+                ],
+                "secondary-type-ids": [
+                  "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                  "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                ]
+              },
+              "track-count": 6,
+              "media": [
+                {
+                  "id": "5179fcfb-8333-3428-917b-294f8e90ec7f",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "20ef592e-126a-4f9f-856c-f83c5ab87174",
+                      "number": "3",
+                      "title": "Boy in the Bubble",
+                      "length": 253853
+                    }
+                  ],
+                  "track-count": 6,
+                  "track-offset": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2daddee4-d30f-4e9e-8c0a-227ec0f522ea",
+          "score": 100,
+          "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+          "title": "Boy in the Bubble",
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Steve Wynn",
+              "artist": {
+                "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                "name": "Steve Wynn",
+                "sort-name": "Wynn, Steve",
+                "aliases": [
+                  {
+                    "sort-name": "Steve Wynn and Friends",
+                    "name": "Steve Wynn and Friends",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1991",
+          "releases": [
+            {
+              "id": "e319b523-d31b-4211-b4d5-099d26e05201",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "f060f060-944f-360e-a12c-b9bf4c15ebff",
+              "count": 1,
+              "title": "Kerosene Man",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Steve Wynn",
+                  "artist": {
+                    "id": "5eb64fa9-5231-4a9b-8742-e72c2d185519",
+                    "name": "Steve Wynn",
+                    "sort-name": "Wynn, Steve"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "716793dc-6214-4b56-a5a5-68a6a7ac3a63",
+                "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                "title": "Kerosene Man",
+                "primary-type": "EP"
+              },
+              "date": "1991",
+              "country": "US",
+              "release-events": [
+                {
+                  "date": "1991",
+                  "area": {
+                    "id": "489ce91b-6658-3307-9877-795b68554c98",
+                    "name": "United States",
+                    "sort-name": "United States",
+                    "iso-3166-1-codes": [
+                      "US"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 5,
+              "media": [
+                {
+                  "id": "4ef9cf84-e998-343c-8c2b-20a1ddef51b5",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "6c66171c-962d-4846-a4b6-72a54d81bf0f",
+                      "number": "4",
+                      "title": "Boy in the Bubble"
+                    }
+                  ],
+                  "track-count": 5,
+                  "track-offset": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "72a6c25a-e628-4571-a238-ba5440fded40",
+          "score": 100,
+          "artist-credit-id": "454534de-4958-4f5b-8f2e-c5d4a2c709d4",
+          "title": "Boy in the Bubble",
+          "length": 221133,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "The Butterfly",
+              "artist": {
+                "id": "0cd98f0a-5c02-4c7b-ab43-49c21ae10c40",
+                "name": "The Butterfly",
+                "sort-name": "The Butterfly",
+                "disambiguation": "Theo, Bulletproof, Jell & James"
+              }
+            }
+          ],
+          "first-release-date": "2005",
+          "releases": [
+            {
+              "id": "d87533db-b79c-464f-8d10-3533b617164f",
+              "count": 1,
+              "title": "Care",
+              "release-group": {
+                "id": "e38286db-3740-47f0-98f4-07eecd405bc9",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Care",
+                "primary-type": "Album"
+              },
+              "track-count": 13,
+              "media": [
+                {
+                  "id": "c26037bd-eecf-3178-8700-ca683d17ca38",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "7edce119-2ade-46d0-9e24-1e6fe5d5f7f8",
+                      "number": "3",
+                      "title": "Boy in the Bubble",
+                      "length": 221133
+                    }
+                  ],
+                  "track-count": 13,
+                  "track-offset": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "084909d9-8871-4c00-b5e1-8969c9d484dc",
+          "score": 100,
+          "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+          "title": "Boy In The Bubble",
+          "length": 181000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Alec Benjamin",
+              "artist": {
+                "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                "name": "Alec Benjamin",
+                "sort-name": "Benjamin, Alec",
+                "aliases": [
+                  {
+                    "sort-name": "Benjamin, Alec Shane",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Alec Shane Benjamin",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2018-06-22",
+          "releases": [
+            {
+              "id": "68a3e29a-dd59-4e6b-986b-c504373f21e0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+              "count": 1,
+              "title": "Boy In The Bubble",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Alec Benjamin",
+                  "artist": {
+                    "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                    "name": "Alec Benjamin",
+                    "sort-name": "Benjamin, Alec"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "693138cd-6da4-47ef-aee2-bae4975eb88e",
+                "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+                "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+                "title": "Boy In The Bubble",
+                "primary-type": "Single"
+              },
+              "date": "2018-06-22",
+              "country": "XW",
+              "release-events": [
+                {
+                  "date": "2018-06-22",
+                  "area": {
+                    "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                    "name": "[Worldwide]",
+                    "sort-name": "[Worldwide]",
+                    "iso-3166-1-codes": [
+                      "XW"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 1,
+              "media": [
+                {
+                  "id": "d359131d-2edc-32ea-81bc-c5b8dad6ebd0",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "f678c2d7-d5a3-4575-a4e7-7fa7b040f682",
+                      "number": "1",
+                      "title": "Boy In The Bubble",
+                      "length": 181000
+                    }
+                  ],
+                  "track-count": 1,
+                  "track-offset": 0
+                }
+              ]
+            }
+          ],
+          "isrcs": [
+            "USAT21802908"
+          ]
+        },
+        {
+          "id": "0c65d718-430b-4249-ad0d-0b5264f37fc7",
+          "score": 100,
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "title": "Boy in the Bubble",
+          "length": 334000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "84132515-0c92-4601-b5d4-e5d3e27c9b12",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+              "count": 1,
+              "title": "Paul Simon, Live USA",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "name": "Paul Simon",
+                  "artist": {
+                    "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                    "name": "Paul Simon",
+                    "sort-name": "Simon, Paul",
+                    "disambiguation": "of Simon & Garfunkel"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "9af04375-1109-42bd-a4dd-9f5e8f1e2993",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Paul Simon, Live USA",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "date": "",
+              "country": "DE",
+              "release-events": [
+                {
+                  "date": "",
+                  "area": {
+                    "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+                    "name": "Germany",
+                    "sort-name": "Germany",
+                    "iso-3166-1-codes": [
+                      "DE"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "c2af96d9-67ed-3b75-9961-311f9d8ab3c9",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "530b4fb7-4edf-448f-ac8e-d13bef37c9a8",
+                      "number": "10",
+                      "title": "Boy in the Bubble",
+                      "length": 334000
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3663e252-5da9-4163-9f23-78c6485df816",
+          "score": 100,
+          "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+          "title": "Boy in the Bubble",
+          "length": 181000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Alec Benjamin",
+              "artist": {
+                "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                "name": "Alec Benjamin",
+                "sort-name": "Benjamin, Alec",
+                "aliases": [
+                  {
+                    "sort-name": "Benjamin, Alec Shane",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Alec Shane Benjamin",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "2018-11-15",
+          "releases": [
+            {
+              "id": "89abda4d-eb9f-499f-9da7-fa4188a44f2c",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+              "count": 1,
+              "title": "Narrated for You",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Alec Benjamin",
+                  "artist": {
+                    "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                    "name": "Alec Benjamin",
+                    "sort-name": "Benjamin, Alec"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "439fe53e-6ba4-426f-a97b-269d934cb6a6",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Narrated for You",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Mixtape/Street"
+                ],
+                "secondary-type-ids": [
+                  "15c1b1f5-d893-3375-a1db-e180c5ae15ed"
+                ]
+              },
+              "date": "2019-03-29",
+              "country": "XE",
+              "release-events": [
+                {
+                  "date": "2019-03-29",
+                  "area": {
+                    "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+                    "name": "Europe",
+                    "sort-name": "Europe",
+                    "iso-3166-1-codes": [
+                      "XE"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "7d8b34f0-a208-3523-bd08-f4f23c17fbf1",
+                  "position": 1,
+                  "format": "Vinyl",
+                  "track": [
+                    {
+                      "id": "eb14a39e-70ec-433d-aa6c-c09d9723295e",
+                      "number": "A6",
+                      "title": "Boy in the Bubble",
+                      "length": 181000
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 5
+                }
+              ]
+            },
+            {
+              "id": "534056a1-b641-46b5-b74e-2b41a6818d7e",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+              "count": 1,
+              "title": "Narrated for You",
+              "status": "Official",
+              "disambiguation": "Apple Digital Master",
+              "artist-credit": [
+                {
+                  "name": "Alec Benjamin",
+                  "artist": {
+                    "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                    "name": "Alec Benjamin",
+                    "sort-name": "Benjamin, Alec"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "439fe53e-6ba4-426f-a97b-269d934cb6a6",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Narrated for You",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Mixtape/Street"
+                ],
+                "secondary-type-ids": [
+                  "15c1b1f5-d893-3375-a1db-e180c5ae15ed"
+                ]
+              },
+              "date": "2018-11-15",
+              "country": "XW",
+              "release-events": [
+                {
+                  "date": "2018-11-15",
+                  "area": {
+                    "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                    "name": "[Worldwide]",
+                    "sort-name": "[Worldwide]",
+                    "iso-3166-1-codes": [
+                      "XW"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "db1c381b-ceba-3e45-9738-2979dca37409",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "74b2f506-4dc7-4a9d-9967-4209bcadfaf9",
+                      "number": "6",
+                      "title": "Boy in the Bubble",
+                      "length": 181705
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 5
+                }
+              ]
+            },
+            {
+              "id": "6b01786b-d004-41e7-94c6-623144aaf6fc",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "artist-credit-id": "d4531891-f7be-307d-adaf-384c47a3ebb5",
+              "count": 1,
+              "title": "Narrated for You",
+              "status": "Official",
+              "artist-credit": [
+                {
+                  "name": "Alec Benjamin",
+                  "artist": {
+                    "id": "21a14ee3-cede-420a-9d6d-a33517d2f952",
+                    "name": "Alec Benjamin",
+                    "sort-name": "Benjamin, Alec"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "439fe53e-6ba4-426f-a97b-269d934cb6a6",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "Narrated for You",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Mixtape/Street"
+                ],
+                "secondary-type-ids": [
+                  "15c1b1f5-d893-3375-a1db-e180c5ae15ed"
+                ]
+              },
+              "date": "2018-11-16",
+              "country": "XW",
+              "release-events": [
+                {
+                  "date": "2018-11-16",
+                  "area": {
+                    "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                    "name": "[Worldwide]",
+                    "sort-name": "[Worldwide]",
+                    "iso-3166-1-codes": [
+                      "XW"
+                    ]
+                  }
+                }
+              ],
+              "track-count": 12,
+              "media": [
+                {
+                  "id": "031c1927-5bf0-354e-b940-ba4b9ea76c2a",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "7ae1b9c2-6c1f-4445-8dba-51a66f3135a9",
+                      "number": "6",
+                      "title": "Boy in the Bubble",
+                      "length": 181000
+                    }
+                  ],
+                  "track-count": 12,
+                  "track-offset": 5
+                }
+              ]
+            }
+          ],
+          "isrcs": [
+            "USAT21811725",
+            "USAT21811718"
+          ]
+        },
+        {
+          "id": "4ace3d94-92ad-44ee-8549-3b0af06d89c8",
+          "score": 100,
+          "artist-credit-id": "e0a87774-2089-3467-8888-f0f527592dc8",
+          "title": "Boy in the Bubble",
+          "length": 260000,
+          "video": null,
+          "artist-credit": [
+            {
+              "name": "Colebrook Road",
+              "artist": {
+                "id": "05e718da-17b9-4994-98a4-df149491c65d",
+                "name": "Colebrook Road",
+                "sort-name": "Colebrook Road"
+              }
+            }
+          ],
+          "first-release-date": "2019-05-03",
+          "releases": [
+            {
+              "id": "b06ef4af-e2a0-46f6-bb43-de27eba0f68d",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "count": 1,
+              "title": "On Time",
+              "status": "Official",
+              "release-group": {
+                "id": "0c9084d5-9d5d-44f5-8215-43e5de71658b",
+                "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "On Time",
+                "primary-type": "Album"
+              },
+              "track-count": 10,
+              "media": [
+                {
+                  "id": "aac6dc9f-0e31-4a06-a86e-29c8979c42fd",
+                  "position": 1,
+                  "format": "Digital Media",
+                  "track": [
+                    {
+                      "id": "c31d0017-0f60-474a-adcd-cbb5d01d041e",
+                      "number": "4",
+                      "title": "Boy in the Bubble",
+                      "length": 260000
+                    }
+                  ],
+                  "track-count": 10,
+                  "track-offset": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ed8cc929-8a05-445e-9197-a6cbc259b962",
+          "score": 98,
+          "artist-credit-id": "672ba280-180b-36eb-98b4-be587d95391c",
+          "title": "The Boy in the Bubble",
+          "length": 333840,
+          "video": null,
+          "artist-credit": [
+            {
+              "joinphrase": " & ",
+              "name": "Bob Dylan",
+              "artist": {
+                "id": "72c536dc-7137-4477-a521-567eeb840fa8",
+                "name": "Bob Dylan",
+                "sort-name": "Dylan, Bob",
+                "aliases": [
+                  {
+                    "sort-name": "Boy Dylan",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Boy Dylan",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "DYLYN Bob",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "DYLYN Bob",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Dylan, Robert",
+                    "name": "Robert Dylan",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Zimmerman, Robert",
+                    "name": "Robert Zimmerman",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Zimmerman, Bobby",
+                    "name": "Bobby Zimmerman",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Дилан, Боб",
+                    "name": "Боб Дилан",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Landy, Bob",
+                    "name": "Bob Landy",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Wilbury, Boo",
+                    "name": "Boo Wilbury",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": "1990",
+                    "end-date": "1990"
+                  },
+                  {
+                    "sort-name": "Zimmerman, Robert Allen",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Robert Allen Zimmerman",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Bob D",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Bob D",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Dylan",
+                    "name": "Dylan",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Jack Frost",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Jack Frost",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Grunt, Blind Boy",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Blind Boy Grunt",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": "1962",
+                    "end-date": "1963"
+                  },
+                  {
+                    "sort-name": "Wilbury, Lucky",
+                    "name": "Lucky Wilbury",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": "1988",
+                    "end-date": "1988"
+                  },
+                  {
+                    "sort-name": "Dylan, Bob",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Bob Dylan",
+                    "locale": "en",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Grateful Dead",
+              "artist": {
+                "id": "6faa7ca7-0d99-4a5e-bfa6-1fd5037520c6",
+                "name": "Grateful Dead",
+                "sort-name": "Grateful Dead",
+                "aliases": [
+                  {
+                    "sort-name": "The Grateful Dead",
+                    "name": "The Grateful Dead",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Greatful Dead",
+                    "name": "Greatful Dead",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Greatfull Dead",
+                    "name": "Greatfull Dead",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "first-release-date": "1992",
+          "releases": [
+            {
+              "id": "1b287341-95e2-448f-b3d7-4db9343e91e3",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "artist-credit-id": "672ba280-180b-36eb-98b4-be587d95391c",
+              "count": 3,
+              "title": "The French Girl",
+              "status": "Bootleg",
+              "artist-credit": [
+                {
+                  "joinphrase": " & ",
+                  "name": "Bob Dylan",
+                  "artist": {
+                    "id": "72c536dc-7137-4477-a521-567eeb840fa8",
+                    "name": "Bob Dylan",
+                    "sort-name": "Dylan, Bob"
+                  }
+                },
+                {
+                  "name": "Grateful Dead",
+                  "artist": {
+                    "id": "6faa7ca7-0d99-4a5e-bfa6-1fd5037520c6",
+                    "name": "Grateful Dead",
+                    "sort-name": "Grateful Dead"
+                  }
+                }
+              ],
+              "release-group": {
+                "id": "fe3af5c5-f4c4-3515-83b3-f6551f466e38",
+                "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                "title": "The French Girl",
+                "primary-type": "Album",
+                "secondary-types": [
+                  "Live"
+                ],
+                "secondary-type-ids": [
+                  "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                ]
+              },
+              "track-count": 42,
+              "media": [
+                {
+                  "id": "ebfdf69e-57ea-3adc-9290-075602c4823a",
+                  "position": 1,
+                  "format": "CD",
+                  "track": [
+                    {
+                      "id": "4e598e41-103d-3c21-9a1d-cc2182313d37",
+                      "number": "11",
+                      "title": "The Boy in the Bubble",
+                      "length": 333840
+                    }
+                  ],
+                  "track-count": 15,
+                  "track-offset": 10
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/recording/dc116aff-899f-4c39-b9a9-043fc3319138",
+    "query": {
+      "inc": "artist-credits releases",
+      "fmt": "json"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "first-release-date": "2006-08-31",
+      "releases": [
+        {
+          "packaging": "Jewel Case",
+          "id": "1eaac429-02a7-48c7-b328-d1247f4d93a4",
+          "artist-credit": [
+            {
+              "artist": {
+                "country": "US",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "disambiguation": "",
+                "type": "Group",
+                "sort-name": "Detholz!, The",
+                "id": "7a6288ca-c654-442e-a745-2148159217ec",
+                "name": "The Detholz!"
+              },
+              "joinphrase": "",
+              "name": "The Detholz!"
+            }
+          ],
+          "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+          "barcode": null,
+          "text-representation": {
+            "script": "Latn",
+            "language": "eng"
+          },
+          "date": "2006-08-31",
+          "status": "Official",
+          "release-events": [
+            {
+              "date": "2006-08-31",
+              "area": {
+                "type-id": null,
+                "disambiguation": "",
+                "type": null,
+                "sort-name": "United States",
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "name": "United States",
+                "iso-3166-1-codes": [
+                  "US"
+                ]
+              }
+            }
+          ],
+          "quality": "normal",
+          "country": "US",
+          "title": "Cast Out Devils",
+          "disambiguation": "",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe"
+        }
+      ],
+      "id": "dc116aff-899f-4c39-b9a9-043fc3319138",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "name": "The Detholz!",
+            "id": "7a6288ca-c654-442e-a745-2148159217ec",
+            "sort-name": "Detholz!, The",
+            "disambiguation": "",
+            "type": "Group",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "US"
+          },
+          "name": "The Detholz!"
+        }
+      ],
+      "length": 260986,
+      "title": "Boy in the Bubble",
+      "disambiguation": "",
+      "video": false
+    }
+  }
+}

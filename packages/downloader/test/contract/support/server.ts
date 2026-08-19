@@ -25,18 +25,37 @@ export interface FixtureServer {
   readonly close: () => Promise<void>;
 }
 
+/** A query rendered order-independently, so two recordings of one path are told apart by it. */
+function queryKey(query: Record<string, string> | undefined): string {
+  return Object.entries(query ?? {})
+    .map(([name, value]) => `${name}=${value}`)
+    .toSorted((left, right) => left.localeCompare(right))
+    .join('&');
+}
+
 /**
- * Serve the given fixtures, routing by `METHOD pathname`. An unmatched request 404s — except a
- * `DELETE` under a transfers path, which returns slskd's documented `204 No Content` cancel
- * response so the download adapter's abandon path can run without a bespoke recorded fixture.
+ * Serve the given fixtures, routing by `METHOD pathname` and, where two recordings share a path,
+ * by the query that tells them apart. One endpoint can have several consumers — search-to-resolve
+ * and search-to-formulate both `GET /recording` — and routing on the path alone would let the load
+ * order silently decide which recording answers, leaving a test to assert alphabetical ordering
+ * rather than a contract. The path-only route remains as the fallback for consumers whose query is
+ * not pinned (slskd's polling and teardown vary theirs per round); where several recordings share
+ * a path, the first loaded holds that fallback.
+ *
+ * An unmatched request 404s — except a `DELETE` under a transfers path, which returns slskd's
+ * documented `204 No Content` cancel response so the download adapter's abandon path can run
+ * without a bespoke recorded fixture.
  */
 export async function startFixtureServer(
   fixtures: readonly { readonly fixture: ContractFixture }[],
 ): Promise<FixtureServer> {
   const requests: RecordedRequest[] = [];
   const routes = new Map<string, ContractFixture>();
+  const pathRoutes = new Map<string, ContractFixture>();
   for (const { fixture } of fixtures) {
-    routes.set(`${fixture.request.method} ${fixture.request.path}`, fixture);
+    const pathKey = `${fixture.request.method} ${fixture.request.path}`;
+    routes.set(`${pathKey}?${queryKey(fixture.request.query)}`, fixture);
+    if (!pathRoutes.has(pathKey)) pathRoutes.set(pathKey, fixture);
   }
 
   const server: Server = createServer((req, res) => {
@@ -58,7 +77,10 @@ export async function startFixtureServer(
         headers: req.headers as Record<string, string | undefined>,
         body,
       });
-      const fixture = routes.get(`${method} ${url.pathname}`);
+      const pathKey = `${method} ${url.pathname}`;
+      const fixture =
+        routes.get(`${pathKey}?${queryKey(Object.fromEntries(url.searchParams))}`) ??
+        pathRoutes.get(pathKey);
       if (fixture !== undefined) {
         const { body, status } = fixture.response;
         // A recorded body that is already a string is served verbatim as text. slskd answers a

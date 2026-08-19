@@ -1,0 +1,1584 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/artist",
+    "query": {
+      "query": "paul simon",
+      "fmt": "json",
+      "limit": "25"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "created": "2026-08-19T01:06:51.716Z",
+      "count": 22058,
+      "offset": 0,
+      "artists": [
+        {
+          "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 100,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Simon",
+          "sort-name": "Simon, Paul",
+          "gender": "male",
+          "country": "US",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United States",
+            "sort-name": "United States",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "85c7cd5f-6fe2-4195-a44d-69fa390bd6ec",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Newark",
+            "sort-name": "Newark",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "of Simon & Garfunkel",
+          "ipis": [
+            "00028781364"
+          ],
+          "isnis": [
+            "0000000114799181"
+          ],
+          "life-span": {
+            "begin": "1941-10-13",
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Simon, Paul",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "Paul Simon",
+              "locale": null,
+              "type": "Artist name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Kane, Paul",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "Paul Kane",
+              "locale": null,
+              "type": "Artist name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "ポール・サイモン",
+              "name": "ポール・サイモン",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Simon, Paul Frederic",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Frederic Simon",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 7,
+              "name": "pop"
+            },
+            {
+              "count": 7,
+              "name": "folk"
+            },
+            {
+              "count": 0,
+              "name": "american"
+            },
+            {
+              "count": 3,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 3,
+              "name": "folk rock"
+            },
+            {
+              "count": 0,
+              "name": "world"
+            },
+            {
+              "count": 0,
+              "name": "classic"
+            },
+            {
+              "count": 1,
+              "name": "pop rock"
+            },
+            {
+              "count": 1,
+              "name": "contemporary folk"
+            },
+            {
+              "count": 1,
+              "name": "folk pop"
+            },
+            {
+              "count": 0,
+              "name": "classic pop and rock"
+            },
+            {
+              "count": 0,
+              "name": "various artists"
+            },
+            {
+              "count": 0,
+              "name": "paul-simon"
+            },
+            {
+              "count": 1,
+              "name": "singer/songwriter"
+            },
+            {
+              "count": 0,
+              "name": "pop/rock"
+            }
+          ]
+        },
+        {
+          "id": "700a46de-499d-49d5-a561-4f972bbece2d",
+          "score": 83,
+          "name": "Paul Simon",
+          "sort-name": "Paul Simon",
+          "disambiguation": "Rapper",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "8d36e1ac-d721-4138-ac00-f851bbaab44c",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 82,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Simon",
+          "sort-name": "Simon, Paul",
+          "gender": "male",
+          "country": "GB",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "918efe5e-4f94-4554-8ce7-6aac7a5ac09f",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Halifax",
+            "sort-name": "Halifax",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "drummer, brother of Robin",
+          "life-span": {
+            "begin": "1950",
+            "ended": null
+          }
+        },
+        {
+          "id": "0d6edb67-eb11-44b7-94c3-a48fd70a651c",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 78,
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "country": "GB",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "UK trance DJ/producer",
+          "ipis": [
+            "00284567232"
+          ],
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "6251df9b-0085-4542-8722-5d71a9fd9d63",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 77,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "gender": "male",
+          "country": "CA",
+          "area": {
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "Canada",
+            "sort-name": "Canada",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "Canadian breakbeat DJ/producer",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "7fa89ff8-1d4c-472e-9ec9-7f09ef917323",
+          "score": 77,
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "disambiguation": "Simon Gledhill, Hard House",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "d3aa0259-fdc3-4c48-96f0-e093b023b8e6",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 77,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "gender": "male",
+          "disambiguation": "art director and designer",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "f4515af3-52a4-48dc-b0e0-0edb907c1258",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 77,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Paul",
+          "sort-name": "Paul, Simon",
+          "gender": "male",
+          "disambiguation": "songwriter",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "5d02f264-e225-41ff-83f7-d9b1f0b1874a",
+          "type": "Group",
+          "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+          "score": 77,
+          "name": "Simon & Garfunkel",
+          "sort-name": "Simon & Garfunkel",
+          "country": "US",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United States",
+            "sort-name": "United States",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "bf700b75-0498-4676-aed1-bc0a84a6a40b",
+            "type": "District",
+            "type-id": "84039871-5e47-38ca-a66a-45e512c8290f",
+            "name": "Kew Gardens Hills",
+            "sort-name": "Kew Gardens Hills",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "ipis": [
+            "00011396705",
+            "00028781364"
+          ],
+          "isnis": [
+            "0000000119545316"
+          ],
+          "life-span": {
+            "begin": "1963",
+            "end": "1970",
+            "ended": true
+          },
+          "aliases": [
+            {
+              "sort-name": "サイモン&ガーファンクル",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "サイモン&ガーファンクル",
+              "locale": "ja",
+              "type": "Artist name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Simon and Arthur Garfunkel",
+              "name": "Paul Simon and Arthur Garfunkel",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Simon & Garfunkle",
+              "name": "Simon & Garfunkle",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Simon & Garfunkal",
+              "name": "Simon & Garfunkal",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Simon and Garfunkle",
+              "name": "Simon and Garfunkle",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Simon and Art Garfunkle",
+              "name": "Paul Simon and Art Garfunkle",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Simon and Garfunkel",
+              "name": "Simon and Garfunkel",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Simon and Art Garfunkel",
+              "name": "Paul Simon and Art Garfunkel",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 4,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "pop"
+            },
+            {
+              "count": 6,
+              "name": "folk"
+            },
+            {
+              "count": 0,
+              "name": "american"
+            },
+            {
+              "count": 2,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 15,
+              "name": "folk rock"
+            },
+            {
+              "count": 0,
+              "name": "classic rock"
+            },
+            {
+              "count": 0,
+              "name": "pop rock"
+            },
+            {
+              "count": 1,
+              "name": "contemporary folk"
+            },
+            {
+              "count": 5,
+              "name": "folk pop"
+            },
+            {
+              "count": 0,
+              "name": "film soundtrack"
+            },
+            {
+              "count": 0,
+              "name": "classic pop and rock"
+            },
+            {
+              "count": 0,
+              "name": "seven"
+            },
+            {
+              "count": 0,
+              "name": "simon-garfunkel"
+            },
+            {
+              "count": 0,
+              "name": "singer/songwriter"
+            }
+          ]
+        },
+        {
+          "id": "fe3c7cec-3aad-4505-b5c2-ad72a3a98279",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 75,
+          "name": "Paul Gendler",
+          "sort-name": "Gendler, Paul",
+          "life-span": {
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Gendler, Paul Simon",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Simon Gendler",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "13da19c5-b82d-44dd-a0a9-edfcc64885a8",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 74,
+          "name": "Paul Elliott",
+          "sort-name": "Elliott, Paul",
+          "country": "GB",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "British musician",
+          "ipis": [
+            "00545532943"
+          ],
+          "life-span": {
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Elliott, Paul Simon",
+              "name": "Paul Simon Elliott",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "205ce171-6584-4ca7-a144-d9ca1591b30d",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 72,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Marc Paul Simon",
+          "sort-name": "Simon, Marc Paul",
+          "gender": "male",
+          "country": "US",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United States",
+            "sort-name": "United States",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "end-area": {
+            "id": "1f40c6e1-47ba-4e35-996f-fe6ee5840e62",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Los Angeles",
+            "sort-name": "Los Angeles",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "life-span": {
+            "ended": true
+          }
+        },
+        {
+          "id": "0564212f-379c-4708-a7b8-e275b090a635",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 72,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Simon Gabriel",
+          "sort-name": "Gabriel, Paul Simon",
+          "gender": "male",
+          "disambiguation": "arranger",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "84be72a5-f268-4629-aa37-8a1506f29c5c",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 72,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul-Simon Fürst",
+          "sort-name": "Fürst, Paul-Simon",
+          "gender": "male",
+          "country": "DE",
+          "area": {
+            "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "Germany",
+            "sort-name": "Germany",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "6d1c39d3-75c2-4985-8f16-ee774714f12a",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 67,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Gendler",
+          "sort-name": "Gendler",
+          "gender": "male",
+          "disambiguation": "Production music composer, first name unknown",
+          "ipis": [
+            "00047942849"
+          ],
+          "life-span": {
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Ghendler",
+              "name": "Ghendler",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Gendler, Paul Simon",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Simon Gendler",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "a8d5807f-6dd9-4967-b2dd-b2c10765b34f",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 59,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Jäger",
+          "sort-name": "Jäger, Simon",
+          "gender": "male",
+          "country": "DE",
+          "area": {
+            "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "Germany",
+            "sort-name": "Germany",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "c9ac1239-e832-41bc-9930-e252a1fd1105",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Berlin",
+            "sort-name": "Berlin",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "German voice actor",
+          "isnis": [
+            "000000001753013X"
+          ],
+          "life-span": {
+            "begin": "1972-03-16",
+            "ended": null
+          },
+          "tags": [
+            {
+              "count": 1,
+              "name": "german audiobook reader"
+            }
+          ]
+        },
+        {
+          "id": "1f61fecc-37b9-4d73-9cc3-6915d5f189ed",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 58,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul de Métairy",
+          "sort-name": "Métairy, Paul de",
+          "gender": "male",
+          "country": "FR",
+          "area": {
+            "id": "08310658-51eb-3801-80de-5a0739207115",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "France",
+            "sort-name": "France",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "f5120cc9-2364-47cd-afa3-d283c656a242",
+            "type": "Municipality",
+            "type-id": "17246454-5ac4-36a1-b81a-4753eb2dab20",
+            "name": "Ninove",
+            "sort-name": "Ninove",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "Franco-Belgian organist, film maker fka 'Paul Verhoeven'",
+          "life-span": {
+            "begin": "1942-04-25",
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Verhoeven, Paul",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Verhoeven",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": "1942-04-25",
+              "end-date": "2015-07-21"
+            },
+            {
+              "sort-name": "Métairy, Paul Simon Louis Alexis de",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Simon Louis Alexis de Métairy",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": "2015-07-21",
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "6df8e517-ab03-4997-9cd2-1f6fe0c1d164",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 57,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Simon Wadmore",
+          "sort-name": "Wadmore, Simon",
+          "gender": "male",
+          "country": "GB",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "ipis": [
+            "00440923080"
+          ],
+          "life-span": {
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Wadmore, Simon Paul",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Simon Paul Wadmore",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "ba550d0e-adac-4864-b88b-407cab5e76af",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 57,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul McCartney",
+          "sort-name": "McCartney, Paul",
+          "gender": "male",
+          "country": "GB",
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United Kingdom",
+            "sort-name": "United Kingdom",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "a83c126a-03af-4c34-9d73-4573b26581b2",
+            "type": "District",
+            "type-id": "84039871-5e47-38ca-a66a-45e512c8290f",
+            "name": "Walton",
+            "sort-name": "Walton",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "The Beatles",
+          "ipis": [
+            "00018873266",
+            "00080667953"
+          ],
+          "isnis": [
+            "0000000121452530"
+          ],
+          "life-span": {
+            "begin": "1942-06-18",
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Paul Mac Cartney",
+              "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+              "name": "Paul Mac Cartney",
+              "locale": null,
+              "type": "Search hint",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul MacCartney",
+              "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+              "name": "Paul MacCartney",
+              "locale": null,
+              "type": "Search hint",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Маккартни, Пол",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "Пол Маккартни",
+              "locale": "ru",
+              "type": "Artist name",
+              "primary": true,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Makartnijs, P.",
+              "name": "P.Makartnijs",
+              "locale": "lv",
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Webb, Bernard",
+              "name": "Bernard Webb",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Superweed",
+              "name": "Superweed",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Racy Tune Clamp",
+              "name": "Racy Tune Clamp",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Mitchell, Pete",
+              "name": "Pete Mitchell",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Pecan Army Cult",
+              "name": "Pecan Army Cult",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Ramon, Paul",
+              "name": "Paul Ramon",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "A. Smith",
+              "name": "A. Smith",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Apollo C. Vermouth",
+              "name": "Apollo C. Vermouth",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Mc Cartney",
+              "name": "Paul Mc Cartney",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Tuna Cycle Pram",
+              "name": "Tuna Cycle Pram",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "McCARTNEY, Paul",
+              "name": "McCARTNEY, Paul",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "ポール・マッカートニー",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "ポール・マッカートニー",
+              "locale": "ja_JP",
+              "type": "Artist name",
+              "primary": true,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Sir James Paul McCartney",
+              "name": "Sir James Paul McCartney",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "McCartney, Paul",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "Paul McCartney",
+              "locale": "en",
+              "type": "Artist name",
+              "primary": true,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "McCartney, James Paul",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "James Paul McCartney",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 3,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "classical"
+            },
+            {
+              "count": 1,
+              "name": "synthpop"
+            },
+            {
+              "count": 8,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "70s"
+            },
+            {
+              "count": 1,
+              "name": "80s"
+            },
+            {
+              "count": 1,
+              "name": "90s"
+            },
+            {
+              "count": 1,
+              "name": "folk"
+            },
+            {
+              "count": 3,
+              "name": "british"
+            },
+            {
+              "count": 2,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 1,
+              "name": "uk"
+            },
+            {
+              "count": 0,
+              "name": "60s"
+            },
+            {
+              "count": 1,
+              "name": "composer"
+            },
+            {
+              "count": 1,
+              "name": "soft rock"
+            },
+            {
+              "count": 5,
+              "name": "pop rock"
+            },
+            {
+              "count": 2,
+              "name": "rock and roll"
+            },
+            {
+              "count": 1,
+              "name": "english"
+            },
+            {
+              "count": 1,
+              "name": "united kingdom"
+            },
+            {
+              "count": 0,
+              "name": "00s"
+            },
+            {
+              "count": 1,
+              "name": "classic pop and rock"
+            },
+            {
+              "count": 1,
+              "name": "pop soul"
+            },
+            {
+              "count": 1,
+              "name": "male vocalists"
+            },
+            {
+              "count": 1,
+              "name": "the beatles"
+            },
+            {
+              "count": 1,
+              "name": "standards"
+            },
+            {
+              "count": 1,
+              "name": "grammy winner"
+            },
+            {
+              "count": 2,
+              "name": "singer/songwriter"
+            },
+            {
+              "count": 3,
+              "name": "rock & roll"
+            },
+            {
+              "count": 1,
+              "name": "pop/rock"
+            },
+            {
+              "count": 1,
+              "name": "western classical music"
+            }
+          ]
+        },
+        {
+          "id": "c4df30f5-5487-4806-9189-b69c9f27532c",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 56,
+          "gender-id": "93452b5a-a947-30c8-934f-6a4056b151c2",
+          "name": "Carly Simon",
+          "sort-name": "Simon, Carly",
+          "gender": "female",
+          "country": "US",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United States",
+            "sort-name": "United States",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "eb4a386e-1178-4e3a-a371-30418dd6fd2e",
+            "type": "District",
+            "type-id": "84039871-5e47-38ca-a66a-45e512c8290f",
+            "name": "The Bronx",
+            "sort-name": "The Bronx",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "ipis": [
+            "00035205711"
+          ],
+          "isnis": [
+            "0000000114706328"
+          ],
+          "life-span": {
+            "begin": "1943-06-25",
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Simon, Carly Elisabeth",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Carly Elisabeth Simon",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 2,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "electronic"
+            },
+            {
+              "count": 2,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "jazz"
+            },
+            {
+              "count": 1,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 1,
+              "name": "blues rock"
+            },
+            {
+              "count": 6,
+              "name": "soft rock"
+            },
+            {
+              "count": 2,
+              "name": "adult contemporary"
+            },
+            {
+              "count": 2,
+              "name": "pop rock"
+            },
+            {
+              "count": 0,
+              "name": "classic pop and rock"
+            },
+            {
+              "count": 1,
+              "name": "singer/songwriter"
+            }
+          ]
+        },
+        {
+          "id": "2d8ef80b-e23c-48d1-9894-be8bd7ac0cee",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 54,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Dinletir",
+          "sort-name": "Dinletir, Paul",
+          "gender": "male",
+          "country": "US",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "United States",
+            "sort-name": "United States",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "production music [audiomachine]",
+          "ipis": [
+            "00345433471",
+            "00345433569",
+            "01091889025"
+          ],
+          "life-span": {
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Dinletir, Birol",
+              "name": "Birol Dinletir",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Dinletir, Paul Birol",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Birol Dinletir",
+              "locale": "en",
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "P Dinletir",
+              "name": "P Dinletir",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Dinletir",
+              "name": "Paul Dinletir",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ]
+        },
+        {
+          "id": "82f75e30-e211-41a1-9b2b-f083b9dd3ba3",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 54,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Kane",
+          "sort-name": "Kane, Paul",
+          "gender": "male",
+          "disambiguation": "writer name used by Paul Simon",
+          "life-span": {
+            "ended": null
+          }
+        },
+        {
+          "id": "87496c04-c857-4bd5-b86b-345129a1be63",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 53,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Mauriat",
+          "sort-name": "Mauriat, Paul",
+          "gender": "male",
+          "country": "FR",
+          "area": {
+            "id": "08310658-51eb-3801-80de-5a0739207115",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "France",
+            "sort-name": "France",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "e815db74-f1aa-4fbc-a78c-f3e76f53409e",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Marseille",
+            "sort-name": "Marseille",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "end-area": {
+            "id": "421bfc2c-aba2-4019-87a8-0630f42e6f8d",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Perpignan",
+            "sort-name": "Perpignan",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "ipis": [
+            "00020182534"
+          ],
+          "isnis": [
+            "0000000117785367"
+          ],
+          "life-span": {
+            "begin": "1925-03-04",
+            "end": "2006-11-03",
+            "ended": true
+          },
+          "aliases": [
+            {
+              "sort-name": "Mauria, Paul",
+              "name": "Paul Mauria",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Maurial",
+              "name": "Paul Maurial",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Paul Mauriat Plus",
+              "name": "Paul Mauriat Plus",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Mauriat",
+              "name": "Mauriat",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Roma, Del",
+              "name": "Del Roma",
+              "locale": null,
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Мориа, Поль",
+              "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+              "name": "Поль Мориа",
+              "locale": "ru",
+              "type": "Artist name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "conductor"
+            },
+            {
+              "count": 1,
+              "name": "easy listening"
+            }
+          ]
+        },
+        {
+          "id": "420c6768-0885-415a-bb59-d6a275121125",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 52,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul Anka",
+          "sort-name": "Anka, Paul",
+          "gender": "male",
+          "country": "CA",
+          "area": {
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "type": "Country",
+            "type-id": "06dd0ae4-8c74-30bb-b43d-95dcedf961de",
+            "name": "Canada",
+            "sort-name": "Canada",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "bbc88d72-1f32-4936-8dc6-b62b3318e1c4",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Ottawa",
+            "sort-name": "Ottawa",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "Canadian singer, songwriter and actor",
+          "ipis": [
+            "00001049150",
+            "00019439180"
+          ],
+          "isnis": [
+            "0000000108673486"
+          ],
+          "life-span": {
+            "begin": "1941-07-30",
+            "ended": null
+          },
+          "aliases": [
+            {
+              "sort-name": "Anka",
+              "name": "Anka",
+              "locale": "en",
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Anka, Paul Albert",
+              "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+              "name": "Paul Albert Anka",
+              "locale": null,
+              "type": "Legal name",
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            },
+            {
+              "sort-name": "Anka, P.",
+              "name": "P. Anka",
+              "locale": "en",
+              "type": null,
+              "primary": null,
+              "begin-date": null,
+              "end-date": null
+            }
+          ],
+          "tags": [
+            {
+              "count": 2,
+              "name": "pop"
+            },
+            {
+              "count": 2,
+              "name": "jazz"
+            },
+            {
+              "count": 1,
+              "name": "canadian"
+            },
+            {
+              "count": 1,
+              "name": "vocal jazz"
+            },
+            {
+              "count": 0,
+              "name": "easy listening soundtracks and musicals"
+            },
+            {
+              "count": 1,
+              "name": "2008 universal fire victim"
+            }
+          ]
+        },
+        {
+          "id": "c2f923ca-e762-4082-86e5-318161861827",
+          "type": "Person",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "score": 52,
+          "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+          "name": "Paul McGann",
+          "sort-name": "McGann, Paul",
+          "gender": "male",
+          "area": {
+            "id": "c249c30e-88ab-4b2f-a745-96a25bd7afee",
+            "type": "City",
+            "type-id": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+            "name": "Liverpool",
+            "sort-name": "Liverpool",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "begin-area": {
+            "id": "a37eca4d-c1e2-48a3-bcba-61796db97ebf",
+            "type": "District",
+            "type-id": "84039871-5e47-38ca-a66a-45e512c8290f",
+            "name": "Kensington",
+            "sort-name": "Kensington",
+            "life-span": {
+              "ended": null
+            }
+          },
+          "disambiguation": "English actor",
+          "isnis": [
+            "0000000114729925"
+          ],
+          "life-span": {
+            "begin": "1959-11-14",
+            "ended": null
+          },
+          "tags": [
+            {
+              "count": 1,
+              "name": "voice actor"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

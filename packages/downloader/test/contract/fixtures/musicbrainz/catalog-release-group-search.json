@@ -1,0 +1,4273 @@
+{
+  "provenance": {
+    "source": "https://musicbrainz.org/ws/2 (live)",
+    "capturedAt": "2026-08-19",
+    "note": "public data; no sanitization"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release-group",
+    "query": {
+      "query": "paul simon graceland",
+      "fmt": "json",
+      "limit": "25"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "created": "2026-08-19T01:06:50.170Z",
+      "count": 22285,
+      "offset": 0,
+      "release-groups": [
+        {
+          "id": "cc779b67-8eda-41cb-a792-973bbd89d505",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 100,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "39a60fac-5cfe-34ff-8006-d26f48bbfc62",
+          "count": 1,
+          "title": "Paul Simon's Graceland: Solo Marimba",
+          "first-release-date": "2017-03-24",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Arthur Lipner",
+              "artist": {
+                "id": "ab65d513-ae49-4d53-b7eb-7af187f2cbd3",
+                "name": "Arthur Lipner",
+                "sort-name": "Lipner, Arthur"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "2a448692-e193-4371-8ecc-01b2cbe471fb",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon's Graceland: Solo Marimba",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "19847822-1430-3380-9cf1-bc45545b34ac",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 49,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 46,
+          "title": "Graceland",
+          "first-release-date": "1986-08-29",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "1a5460dc-dfab-34d6-8070-90fb9c4c7201",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "3e00e0dc-267e-43b4-bfd0-4a212e24dab0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "e2b703bc-9334-4b20-89e2-1ebd82cb1336",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "eb339f8b-e932-4086-af5b-5109c839b7a9",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "a27a99fb-8ef7-4b8f-b01f-7e508eb1a747",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "9df55475-3a6c-4bb1-98e7-9bc8b48003d3",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "fda05237-e7c3-41d0-b79b-7741b7c52b1c",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "7b064bd5-2e8d-4b64-85df-abbf00d2c7f6",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "f660c8f5-ba28-4b53-80e7-f196417a3802",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "85692f37-1468-4360-ab69-4819b66dc0e6",
+              "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+              "title": "Graceland",
+              "status": "Promotion"
+            },
+            {
+              "id": "0fe9089e-6b0a-4a73-9093-350d72e84be5",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "6237e800-ae51-45a6-bac7-cd69eb86b147",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "9b43bbdb-de72-4a13-9919-b19f1544a414",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "c2807d8a-8e30-4813-a51f-a894e789dc79",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "5ef7824d-3d9f-4094-bfce-fdee096b739d",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "fec286b3-1069-3cd6-9d63-8e05440dc375",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "8a4be3eb-b07e-49f9-94bf-77b341452ef3",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "319bac47-80c2-4d92-a63c-e80b21d24b2f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "f00a22e2-713b-3248-a375-7064ae669e35",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "492ddbd2-fa2b-497f-a6b5-fee4338b1731",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "6f417328-3a1d-4b2d-9d78-ed3eea2bfc31",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "edf34eb7-9da6-45da-acd1-9261e6ff3901",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "d26aa6ca-1075-471c-bf0f-f5a5ce438494",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "d6d8e571-5025-4d77-8dd3-50f7dcaed75f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "b1b2f602-f72b-4ccf-88a1-e8e22ee328ae",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "5d42c069-0d9f-4ad0-b20f-6281ebb0e447",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "f21264dd-ca61-4a39-95b9-fc27d690086b",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "19efc4dc-bd42-42d9-805d-fbc56fb7047c",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "69a1c637-5cd3-40cd-9af0-bb10fcc0d8c8",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "f53c5d26-1cd7-4bff-99f8-f42325c0156f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "e2b7d6b8-9d95-449b-9eb0-a57156ad12c4",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "73677f81-86e6-4087-9255-9ee81b8e3dd3",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "601cae16-adb2-4e49-b0a9-5a9b1583060f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "24bddd18-f124-4057-b665-a2c194d2cc2d",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "41afcabc-357e-4bb6-b2b7-e2f2d4d3be83",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "20072958-26ce-4aa9-ab7c-ae205ac7db12",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "74dd464c-d693-401f-9731-2a15223b4ad0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "d259b639-28ab-393b-a67f-223c73962b5c",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "4e11e3bd-fe6e-36cb-9df4-8b32f629b6ea",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "95718634-fc1e-3ccc-b0cf-a9df519230e9",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "a93a429c-cf65-451a-9cf4-555250d66746",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "bd442e81-f273-351a-a286-6df6e7ff1d53",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "69855ab7-2ad3-449c-8116-12aa676b8a20",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "38fbf057-cf33-44b0-8c1a-52e00490b28f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "bf5a4125-ea21-4a35-a430-e598386eed92",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "57665462-60e5-4167-8a47-3921a89229db",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 8,
+              "name": "rock"
+            },
+            {
+              "count": -1,
+              "name": "electronic"
+            },
+            {
+              "count": 13,
+              "name": "pop"
+            },
+            {
+              "count": 6,
+              "name": "folk"
+            },
+            {
+              "count": 4,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 1,
+              "name": "funk"
+            },
+            {
+              "count": 1,
+              "name": "uplifting"
+            },
+            {
+              "count": 2,
+              "name": "folk rock"
+            },
+            {
+              "count": 1,
+              "name": "world"
+            },
+            {
+              "count": -2,
+              "name": "fusion"
+            },
+            {
+              "count": 1,
+              "name": "melodic"
+            },
+            {
+              "count": -1,
+              "name": "classic"
+            },
+            {
+              "count": -1,
+              "name": "album rock"
+            },
+            {
+              "count": 6,
+              "name": "adult contemporary"
+            },
+            {
+              "count": 8,
+              "name": "pop rock"
+            },
+            {
+              "count": 1,
+              "name": "conscious"
+            },
+            {
+              "count": 1,
+              "name": "worldbeat"
+            },
+            {
+              "count": 2,
+              "name": "afrobeat"
+            },
+            {
+              "count": 1,
+              "name": "african"
+            },
+            {
+              "count": 1,
+              "name": "tropical"
+            },
+            {
+              "count": 2,
+              "name": "zydeco"
+            },
+            {
+              "count": 1,
+              "name": "eclectic"
+            },
+            {
+              "count": 1,
+              "name": "tribal"
+            },
+            {
+              "count": 1,
+              "name": "summer"
+            },
+            {
+              "count": 1,
+              "name": "happy"
+            },
+            {
+              "count": 1,
+              "name": "isicathamiya"
+            },
+            {
+              "count": 0,
+              "name": "soukous"
+            },
+            {
+              "count": 0,
+              "name": "mbube"
+            },
+            {
+              "count": 3,
+              "name": "male vocal"
+            },
+            {
+              "count": 1,
+              "name": "desert"
+            },
+            {
+              "count": 1,
+              "name": "male vocalist"
+            },
+            {
+              "count": 1,
+              "name": "poetic"
+            },
+            {
+              "count": 1,
+              "name": "playful"
+            },
+            {
+              "count": 1,
+              "name": "bittersweet"
+            },
+            {
+              "count": 1,
+              "name": "warm"
+            },
+            {
+              "count": 1,
+              "name": "introspective"
+            },
+            {
+              "count": 1,
+              "name": "optimistic"
+            },
+            {
+              "count": 0,
+              "name": "singer/songwriter"
+            },
+            {
+              "count": 0,
+              "name": "contemporary pop/rock"
+            },
+            {
+              "count": 1,
+              "name": "rhythm & blues"
+            },
+            {
+              "count": 1,
+              "name": "rhythmic"
+            },
+            {
+              "count": 1,
+              "name": "afropop"
+            },
+            {
+              "count": 1,
+              "name": "longing"
+            },
+            {
+              "count": 0,
+              "name": "mbaqanga"
+            }
+          ]
+        },
+        {
+          "id": "a1cc3fbd-609b-323c-95e2-435dfceb51e9",
+          "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+          "score": 42,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 1,
+          "title": "Paul Simon",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "59141d46-b3ff-4f27-9db9-7c72170f8b86",
+              "title": "Paul Simon"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "oldies"
+            },
+            {
+              "count": 2,
+              "name": "rock/pop"
+            }
+          ]
+        },
+        {
+          "id": "602d0c54-2901-3469-a683-a5a50f3e5260",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 42,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 15,
+          "title": "Paul Simon",
+          "first-release-date": "1972-03",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "4dea9a77-d661-4b78-b01b-bbe5067bcb06",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "8c4501a4-ae1c-4c87-9618-474c2ced854a",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "e56293c8-e323-4482-80cd-71915070635f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "d17c5252-8ea8-49dc-8b72-ba2c9abcff90",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "687c49ad-f891-49da-9b58-db11e592e842",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "6e255410-d694-4d47-b318-490d3a1125fa",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "c0768c2e-f9fa-49f8-86d0-bc8891f292cd",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "696aa6a2-c29e-4e47-ad95-0c90b7634e98",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "a46acd7a-2e14-4159-962d-ddc6daa62abd",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "135a4684-8a27-410c-83ec-b6aee745d817",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "98525987-1acb-4a44-898e-fb44fa17a2ba",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "9c520dc4-7f33-4b00-80fb-195d9d312185",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "ff61e541-f5b8-43bd-b019-904a9d02737b",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "c4d8f909-74d3-4389-b323-915e644100c0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            },
+            {
+              "id": "494ec519-3af5-33c8-8229-7cb7d9de3168",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 4,
+              "name": "rock"
+            },
+            {
+              "count": 3,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "folk"
+            },
+            {
+              "count": 1,
+              "name": "blues"
+            },
+            {
+              "count": 1,
+              "name": "singer-songwriter"
+            },
+            {
+              "count": 0,
+              "name": "reggae"
+            },
+            {
+              "count": 5,
+              "name": "folk rock"
+            },
+            {
+              "count": 2,
+              "name": "soft rock"
+            },
+            {
+              "count": 0,
+              "name": "adult contemporary"
+            },
+            {
+              "count": 2,
+              "name": "pop rock"
+            },
+            {
+              "count": 3,
+              "name": "folk pop"
+            },
+            {
+              "count": 2,
+              "name": "male vocal"
+            },
+            {
+              "count": 1,
+              "name": "singer/songwriter"
+            },
+            {
+              "count": 0,
+              "name": "folk/rock"
+            },
+            {
+              "count": 1,
+              "name": "pop reggae"
+            }
+          ]
+        },
+        {
+          "id": "7836c358-2a8d-4ced-a993-d2286a6b0ad5",
+          "type-id": "0c60f497-ff81-3818-befd-abfc84a4858b",
+          "score": 41,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 3,
+          "title": "Graceland: The Remixes",
+          "first-release-date": "2018-06-01",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Remix"
+          ],
+          "secondary-type-ids": [
+            "0c60f497-ff81-3818-befd-abfc84a4858b"
+          ],
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "1edd0d9e-67cd-45a3-9765-dee2905d8c7d",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland: The Remixes",
+              "status": "Official"
+            },
+            {
+              "id": "449d0a18-938a-49ff-8055-ac904b9f44ae",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland: The Remixes",
+              "status": "Official"
+            },
+            {
+              "id": "a11478ad-d1a0-41be-92ca-24fa58219752",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland: The Remixes",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "electronic"
+            },
+            {
+              "count": 1,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "house"
+            },
+            {
+              "count": 1,
+              "name": "techno"
+            },
+            {
+              "count": 1,
+              "name": "dance-pop"
+            }
+          ]
+        },
+        {
+          "id": "dc5a97d4-1d6c-42f4-a6c0-d8fe41cf9074",
+          "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+          "score": 38,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 1,
+          "title": "Graceland: The African Concert",
+          "first-release-date": "1999-06-01",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Live"
+          ],
+          "secondary-type-ids": [
+            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+          ],
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "18ac22f9-995c-45c4-88ef-ec50b0466f5e",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland: The African Concert",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "ballad"
+            },
+            {
+              "count": 1,
+              "name": "pop rock"
+            }
+          ]
+        },
+        {
+          "id": "3803c287-17d6-47d2-bc03-7ba884e345e2",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 37,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "057e0893-ce5e-3e82-a338-874b4c98a15a",
+          "count": 1,
+          "title": "Paul Simon Interpreted",
+          "first-release-date": "1968",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "The Sound Symposium",
+              "artist": {
+                "id": "aaaeffb1-b724-4e14-8988-408ea25eca02",
+                "name": "The Sound Symposium",
+                "sort-name": "The Sound Symposium"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "5734f14d-e639-49fb-8220-125ea7a36c69",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon Interpreted",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "pop"
+            }
+          ]
+        },
+        {
+          "id": "0711bad0-cf95-31a4-a3dd-ee854443a92b",
+          "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+          "score": 37,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "2b324850-cab9-37d7-9dcd-9fc30c8a5c77",
+          "count": 2,
+          "title": "Paul Simon Plus",
+          "first-release-date": "1990",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "artist-credit": [
+            {
+              "joinphrase": ", ",
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "joinphrase": ", ",
+              "name": "Neil Sedaka",
+              "artist": {
+                "id": "577d92bd-32ac-48b6-86df-4db6b0b52fbf",
+                "name": "Neil Sedaka",
+                "sort-name": "Sedaka, Neil",
+                "aliases": [
+                  {
+                    "sort-name": "ニール・セダカ",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ニール・セダカ",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Neal Sedaka",
+                    "name": "Neal Sedaka",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Neil Sedeka",
+                    "name": "Neil Sedeka",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Sedaka, Neil",
+                    "name": "Sedaka, Neil",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Седака, Н.",
+                    "name": "Н. Седака",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Sedaka",
+                    "name": "Sedaka",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Neil Sedoka",
+                    "name": "Neil Sedoka",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "joinphrase": ", ",
+              "name": "Tony Orlando",
+              "artist": {
+                "id": "422fc30a-5343-4aad-b094-50b6d16b1484",
+                "name": "Tony Orlando",
+                "sort-name": "Orlando, Tony"
+              }
+            },
+            {
+              "joinphrase": ", ",
+              "name": "Johnny Rivers",
+              "artist": {
+                "id": "83ae615f-b54a-4a80-8ab0-1de96820dd80",
+                "name": "Johnny Rivers",
+                "sort-name": "Rivers, Johnny",
+                "disambiguation": "Singer, songwriter, and guitarist",
+                "aliases": [
+                  {
+                    "sort-name": "Ramistella, John Henry",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "John Henry Ramistella",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Frankie Valli & The Four Seasons",
+              "artist": {
+                "id": "3f64d38c-1ad4-4fb0-941e-7f4b51d4c9e6",
+                "name": "The Four Seasons",
+                "sort-name": "Four Seasons, The",
+                "disambiguation": "aka Frankie Valli and the Four Seasons",
+                "aliases": [
+                  {
+                    "sort-name": "Frankie Vale & The Four Seasons",
+                    "name": "Frankie Vale & The Four Seasons",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Valli and the Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Valli and the Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Valli and The Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Valli and The Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Franke Valli & The Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Franke Valli & The Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "F. Valli & Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "F. Valli & Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Valli and The 4 Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Valli and The 4 Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "The 4 Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "The 4 Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Valli & The 4 Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Valli & The 4 Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Valli & The Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Valli & The Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Frankie Vali & The Four Season",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Frankie Vali & The Four Season",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Four Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Four Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "4 Seasons",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "4 Seasons",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "b3074a78-fefe-4e9d-a965-d1cc40d25a53",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon and Friends",
+              "status": "Official"
+            },
+            {
+              "id": "16bbc4b8-c8e9-438a-a887-e25c7ac87d3a",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon Plus",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "folk rock"
+            },
+            {
+              "count": 1,
+              "name": "ballad"
+            },
+            {
+              "count": 1,
+              "name": "rock and roll"
+            },
+            {
+              "count": 1,
+              "name": "male vocal"
+            },
+            {
+              "count": 1,
+              "name": "doo-wop"
+            },
+            {
+              "count": 1,
+              "name": "rock & roll"
+            }
+          ]
+        },
+        {
+          "id": "55d5f8ff-3e62-3969-adbe-7b99822e5e68",
+          "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+          "score": 37,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+          "count": 1,
+          "title": "Paul Simon Songbook",
+          "first-release-date": "1992-07-10",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "artist-credit": [
+            {
+              "name": "Various Artists",
+              "artist": {
+                "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                "name": "Various Artists",
+                "sort-name": "Various Artists",
+                "disambiguation": "add compilations to this artist",
+                "aliases": [
+                  {
+                    "sort-name": "Group, The",
+                    "name": "Berühmtesten Opernchören",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "versch. Künstler",
+                    "name": "versch. Künstler",
+                    "locale": "de",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Variuos",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Variuos",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi‐interprètes",
+                    "name": "Multi‐interprètes",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "различные исполнители",
+                    "name": "[различные исполнители]",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ヴァリアス・アーティスト",
+                    "name": "ヴァリアス・アーティスト",
+                    "locale": "ja",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi‐interprètes",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Multi‐interprètes",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "val",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "val",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Talented Artists",
+                    "name": "Various Talented Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Records, Circus",
+                    "name": "Circus Records",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Celtic Artists",
+                    "name": "Various Celtic Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse Kunstnere",
+                    "name": "Diverse Kunstnere",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi Interprètes",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Multi Interprètes",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various (original artists)",
+                    "name": "Various (original artists)",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Variées",
+                    "name": "Variées",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Compilaciones",
+                    "name": "Compilaciones",
+                    "locale": "es",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artistes variés",
+                    "name": "Artistes variés",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "(various)",
+                    "name": "(various)",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varius Artist",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varius Artist",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diversen",
+                    "name": "Diversen",
+                    "locale": "de",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "AA.VV.",
+                    "name": "AA.VV.",
+                    "locale": "it",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Hitradio Ö3",
+                    "name": "Hitradio Ö3",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Cheapbeats",
+                    "name": "Cheapbeats",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artist - GoGo Wonderful",
+                    "name": "Various Artist - GoGo Wonderful",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse danske artister",
+                    "name": "Diverse danske artister",
+                    "locale": "da",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varied",
+                    "name": "Varied",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Comp.",
+                    "name": "Comp.",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "VAR",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "VAR",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Ｖ．Ａ.",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Ｖ．Ａ.",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "אומנים שונים",
+                    "name": "אומנים שונים",
+                    "locale": "he",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "A.A.V.V.",
+                    "name": "A.A.V.V.",
+                    "locale": "it",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Collectif",
+                    "name": "Collectif",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "American Folk Blues Festival",
+                    "name": "American Folk Blues Festival",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varoius",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varoius",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varios",
+                    "name": "Varios",
+                    "locale": "es",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Speakers",
+                    "name": "Various Speakers",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "V. A.",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "V. A.",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Variois",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Variois",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "varias",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "varias",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Historia de la Fania, La",
+                    "name": "La Historia de la Fania",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "המשתתפים, כל",
+                    "name": "כל המשתתפים",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various",
+                    "name": "Various",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Verschiedene",
+                    "name": "Verschiedene",
+                    "locale": "de",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Military Bands",
+                    "name": "Various Military Bands",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Collégiale",
+                    "name": "Collégiale",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vari",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Vari",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artistas Varios",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Artistas Varios",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artists (Rock)",
+                    "name": "Various Artists (Rock)",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varios Intérpretes",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varios Intérpretes",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vários",
+                    "name": "Vários",
+                    "locale": "pt",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Rossmann",
+                    "name": "Rossmann",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Dominicanos Varios",
+                    "name": "Dominicanos Varios",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Verschiedene Interpret:innen",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Verschiedene Interpret:innen",
+                    "locale": "de",
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse",
+                    "name": "Diverse",
+                    "locale": "de",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "More artists",
+                    "name": "More artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Composers",
+                    "name": "Various Composers",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "V/a",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "V/a",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varius",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varius",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Ferkels grosee Abenteuer",
+                    "name": "Ferkels grosses Abenteuer",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Erinevad",
+                    "name": "Erinevad",
+                    "locale": "et",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nhiều nghệ sĩ",
+                    "name": "Nhiều nghệ sĩ",
+                    "locale": "vi",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "razlichnye ispolniteli",
+                    "name": "razlichnye ispolniteli",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artisti uniti per l'Emilia",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Artisti uniti per l'Emilia",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nhiều Nghệ Sĩ",
+                    "name": "Nhiều Nghệ Sĩ",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Encrypted Audio",
+                    "name": "Encrypted Audio",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artis JK",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Artis JK",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Danske Kunstnere",
+                    "name": "Danske Kunstnere",
+                    "locale": "da",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Przeboje, Światowe",
+                    "name": "Światowe Przeboje",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varoius Artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varoius Artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various DHM Artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various DHM Artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Hazbin Hotel",
+                    "name": "Hazbin Hotel",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "VariousArtist",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "VariousArtist",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Assorted Christian Artists",
+                    "name": "Assorted Christian Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Time Life Music: Various Artists",
+                    "name": "Time Life Music: Various Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "オムニバス",
+                    "name": "オムニバス",
+                    "locale": "ja",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Variés",
+                    "name": "Variés",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Battle of the Bits",
+                    "name": "Battle of the Bits",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Div. artister",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Div. artister",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vari Artisti",
+                    "name": "Vari Artisti",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varius Artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varius Artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Iedereen",
+                    "name": "Iedereen",
+                    "locale": "nl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Rizni vykonavci",
+                    "name": "Rizni vykonavci",
+                    "locale": "uk",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Bande originale",
+                    "name": "Bande originale",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Assorted Artists",
+                    "name": "Assorted Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi-artistes",
+                    "name": "Multi-artistes",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artist",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Artist",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ヴァリアス",
+                    "name": "ヴァリアス",
+                    "locale": "ja",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "80's, Various",
+                    "name": "Various 80's",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artsits",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Artsits",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Sampler",
+                    "name": "Sampler",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multiple Artists",
+                    "name": "Multiple Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "[Various Artists]",
+                    "name": "[Various Artists]",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Hợp ca",
+                    "name": "Hợp ca",
+                    "locale": "vi",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artists [DIY]",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Artists [DIY]",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Insomniac Music Group",
+                    "name": "Insomniac Music Group",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varios artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varios artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "V. Artist",
+                    "name": "V. Artist",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artitsts",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Artitsts",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vários intérpretes",
+                    "name": "Vários intérpretes",
+                    "locale": "pt",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Woman & Home / Classic FM",
+                    "name": "Woman & Home / Classic FM",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "various aritsts",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "various aritsts",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Pacific Northwest Tribute to Ray Charles",
+                    "name": "A Pacific Northwest Tribute to Ray Charles",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Различные исполнители",
+                    "name": "Различные исполнители",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse componisten",
+                    "name": "Diverse componisten",
+                    "locale": "nl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vrious Artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Vrious Artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "V.A.",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "V.A.",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Όλοι",
+                    "name": "Όλοι",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razni",
+                    "name": "Razni",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Tốp ca",
+                    "name": "Tốp ca",
+                    "locale": "vi",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Skratch 'N Sniff",
+                    "name": "Skratch 'N Sniff",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi-interprètes",
+                    "name": "Multi-interprètes",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varias Artistas",
+                    "name": "Varias Artistas",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "various artiste",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "various artiste",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Female Artists",
+                    "name": "Various Female Artists",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "หลากหลายศิลปิน",
+                    "name": "หลากหลายศิลปิน",
+                    "locale": "th",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Noevir",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Noevir",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artistes",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Artistes",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "EXIT TUNES/PONY CANYON",
+                    "name": "EXIT TUNES/PONY CANYON",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Coletânea",
+                    "name": "Coletânea",
+                    "locale": "pt",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Różni artyści",
+                    "name": "Różni artyści",
+                    "locale": "pl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Assorted Artisits",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Assorted Artisits",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "WitChoirRecords",
+                    "name": "WitChoirRecords",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Bassrush",
+                    "name": "Bassrush",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kunstnere, Blandede",
+                    "name": "Blandede Kunstnere",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "VV AA",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "VV AA",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various DJ's",
+                    "name": "Various DJ's",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "The Metal Observer",
+                    "name": "The Metal Observer",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Fitness Workout Music",
+                    "name": "Fitness Workout Music",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Amrywiol",
+                    "name": "Amrywiol",
+                    "locale": "cy",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various artists from CISM 89,3 FM",
+                    "name": "Various artists from CISM 89,3 FM",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "KZOK 102.5 FM",
+                    "name": "KZOK 102.5FM",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Arists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Arists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "30 Vermont Artists",
+                    "name": "30 Vermont Artists",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Tabu Recz",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Tabu Recz",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Compilation",
+                    "name": "Compilation",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Divers",
+                    "name": "Divers",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Miscellaneous",
+                    "name": "Miscellaneous",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "div.",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "div.",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Goths For Palestine",
+                    "name": "Goths For Palestine",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Compiled By",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Various Compiled By",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "MUSIC STUDY PROJECT",
+                    "name": "MUSIC STUDY PROJECT",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "KC101",
+                    "name": "KC101—Connecticut's #1 Hit Music Station",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Mixed Artists",
+                    "name": "Mixed Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "(V.A.)",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "(V.A.)",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "V.A.",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "V.A.",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Items",
+                    "name": "Various Items",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Icelandic Folk Music",
+                    "name": "Icelandic Folk Music",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Div. kunstnere",
+                    "name": "Div. kunstnere",
+                    "locale": "da",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "различных исполнителей",
+                    "name": "различных исполнителей",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "DESKPOP",
+                    "name": "DESKPOP",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Omnibus",
+                    "name": "Omnibus",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various (not original artists)",
+                    "name": "Various (not original artists)",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Helluva Boss",
+                    "name": "Helluva Boss",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Coala Records",
+                    "name": "Coala.Records",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Różni",
+                    "name": "Różni",
+                    "locale": "pl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Blandat",
+                    "name": "Blandat",
+                    "locale": "sv",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artisti vari",
+                    "name": "Artisti vari",
+                    "locale": "it",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Wszyscy artysci",
+                    "name": "Wszyscy artysci",
+                    "locale": "pl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Variuos Artists",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Variuos Artists",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "(Karaoke) Various Artists",
+                    "name": "(Karaoke) Various Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "משתתפי פסטיגל",
+                    "name": "משתתפי פסטיגל",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Siren Cues",
+                    "name": "Siren Cues",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Bypass Audio",
+                    "name": "Bypass Audio",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "AAVV",
+                    "name": "AAVV",
+                    "locale": "it",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razni izveduvači",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Разни изведувачи",
+                    "locale": "mk",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "різних виконавців",
+                    "name": "різних виконавців",
+                    "locale": "uk",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Rizni vykonavtsi",
+                    "name": "Rizni vykonavtsi",
+                    "locale": "uk",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Intérpretes Diversos",
+                    "name": "Intérpretes Diversos",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "WiddFam",
+                    "name": "WiddFam",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Verschiedene Interpreten",
+                    "name": "Verschiedene Interpreten",
+                    "locale": "de",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Различни изпълнители",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Различни изпълнители",
+                    "locale": "bg",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "War Child Records",
+                    "name": "War Child Records",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "VA",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "VA",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "さまざまなアーティスト",
+                    "name": "さまざまなアーティスト",
+                    "locale": "ja",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varios Artistas",
+                    "name": "Varios Artistas",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "MDB",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "MDB",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Suntory Oolong-cha CM Song Collection",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Suntory Oolong-cha CM Song Collection",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artistes divers",
+                    "name": "Artistes divers",
+                    "locale": "fr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vários Artistas",
+                    "name": "Vários Artistas",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varies",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Varies",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Big Bands",
+                    "name": "Various Big Bands",
+                    "locale": "en",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Christmas Karma",
+                    "name": "Christmas Karma",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "אמנים שונים",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "אמנים שונים",
+                    "locale": "he",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Tốp ca nam",
+                    "name": "Tốp ca nam",
+                    "locale": "vi",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Records, Reinelex",
+                    "name": "Reinelex Records",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Multi‐interprètes",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Multi‐interprètes",
+                    "locale": "fr",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Eri esittäjiä",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Eri esittäjiä",
+                    "locale": "fi",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "هنرمندان مختلف",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "هنرمندان مختلف",
+                    "locale": "fa",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Hainbat artista",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Hainbat artista",
+                    "locale": "eu",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Pluraj artistoj",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Pluraj artistoj",
+                    "locale": "eo",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Různí interpreti",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Různí interpreti",
+                    "locale": "cs",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "diversos artistes",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "diversos artistes",
+                    "locale": "ca",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "розныя выканаўцы",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "розныя выканаўцы",
+                    "locale": "be",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "群星",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "群星",
+                    "locale": "zh",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Разные артисты",
+                    "name": "Разные артисты",
+                    "locale": "ru",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diaforoi Kallitechnes",
+                    "name": "Διάφοροι Καλλιτέχνες",
+                    "locale": "el",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ヴァリアス・アーティスト",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "ヴァリアス・アーティスト",
+                    "locale": "ja",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "atlikėjai, Įvairūs",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Įvairūs atlikėjai",
+                    "locale": "lt",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vari",
+                    "name": "Vari",
+                    "locale": "it",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Ýmsir hljóðfæraleikarar",
+                    "name": "Ýmsir hljóðfæraleikarar",
+                    "locale": "is",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Verious",
+                    "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                    "name": "Verious",
+                    "locale": null,
+                    "type": "Search hint",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razni Izvođači",
+                    "name": "Razni Izvođači",
+                    "locale": "sr_Latn",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razni Izvođači",
+                    "name": "Razni Izvođači",
+                    "locale": "hr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razni Izvođači",
+                    "name": "Razni Izvođači",
+                    "locale": "bs",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "รวมศิลปิน",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "รวมศิลปิน",
+                    "locale": "th",
+                    "type": "Artist name",
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Blandade artister",
+                    "name": "Blandade artister",
+                    "locale": "sv",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Різні виконавці",
+                    "name": "Різні виконавці",
+                    "locale": "uk",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse Artistar",
+                    "name": "Diverse Artistar",
+                    "locale": "nn",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse Artister",
+                    "name": "Diverse Artister",
+                    "locale": "nb",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "مختلف الفنانين",
+                    "name": "مختلف الفنانين",
+                    "locale": "ar",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "여러 아티스트",
+                    "name": "여러 아티스트",
+                    "locale": "ko",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Various Artists",
+                    "name": "Various Artists",
+                    "locale": "en",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse Artiesten",
+                    "name": "Diverse Artiesten",
+                    "locale": "nl",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse Interpreten",
+                    "name": "Diverse Interpreten",
+                    "locale": "de",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Diverse kunstnere",
+                    "name": "Diverse kunstnere",
+                    "locale": "da",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Vários artistas",
+                    "name": "Vários artistas",
+                    "locale": "pt",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Varios artistas",
+                    "name": "Varios artistas",
+                    "locale": "es",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Erinevad esitajad",
+                    "name": "Erinevad esitajad",
+                    "locale": "et",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Çeşitli sanatçılar",
+                    "name": "Çeşitli sanatçılar",
+                    "locale": "tr",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Różni wykonawcy",
+                    "name": "Różni wykonawcy",
+                    "locale": "pl",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Nhiều ca sĩ",
+                    "name": "Nhiều ca sĩ",
+                    "locale": "vi",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Razlièni izvajalci",
+                    "name": "Razlièni izvajalci",
+                    "locale": "sl",
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Artistiaid Amrywiol",
+                    "name": "Artistiaid Amrywiol",
+                    "locale": "cy",
+                    "type": null,
+                    "primary": true,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "03a686c0-6ecf-45fa-a7e4-0119f538d12f",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Paul Simon Songbook",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "cabf7d3e-e3c4-42e7-92a5-ca3412648981",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 35,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "7af880d4-0ea1-3275-a127-abaaf5da28dd",
+          "count": 1,
+          "title": "Simon and Garfunkel Tribute meets Classic",
+          "first-release-date": "2017",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Graceland",
+              "artist": {
+                "id": "63a17f10-4f80-4e72-af63-4fa96dd258d9",
+                "name": "Graceland",
+                "sort-name": "Graceland",
+                "disambiguation": "Simon & Garfunkel tribute duo"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "df7b98f9-61d3-4a83-9394-8a2a70fe1618",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Simon and Garfunkel Tribute meets Classic",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "fce67351-9292-4ca7-a478-527b653a3009",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "7af880d4-0ea1-3275-a127-abaaf5da28dd",
+          "count": 2,
+          "title": "Simon & Garfunkel Tribute meets Quartet vol I",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Graceland",
+              "artist": {
+                "id": "63a17f10-4f80-4e72-af63-4fa96dd258d9",
+                "name": "Graceland",
+                "sort-name": "Graceland",
+                "disambiguation": "Simon & Garfunkel tribute duo"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "02c67888-1fc2-4a9d-8848-53178f888200",
+              "title": "Simon and Garfunkel Tribute meets Quartet"
+            },
+            {
+              "id": "cd2d16e6-2148-4dbd-841c-95df2e5ddba5",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Simon & Garfunkel Tribute meets Quartet vol I",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "52ee1ea0-0810-43d2-8a1e-64329b28eb35",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "9dc2093c-b284-4e0c-b3b4-931538aabace",
+          "count": 1,
+          "title": "Simon & Garfunkel Tribute meets Classic Vol. 2",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Simon & Garfunkel Tribute",
+              "artist": {
+                "id": "63a17f10-4f80-4e72-af63-4fa96dd258d9",
+                "name": "Graceland",
+                "sort-name": "Graceland",
+                "disambiguation": "Simon & Garfunkel tribute duo"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "9ab8c719-afda-4443-ad51-1f59b50233a8",
+              "title": "Simon & Garfunkel Tribute meets Classic Vol. 2"
+            }
+          ]
+        },
+        {
+          "id": "81ca879d-75a7-3c98-ae46-165aec8da4f5",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "2a8e01ee-9db3-3fc7-8ced-253894cac51e",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2006-07-09",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "200",
+              "artist": {
+                "id": "de916344-bf24-4fa3-bfff-659a2533d772",
+                "name": "200",
+                "sort-name": "200",
+                "disambiguation": "Tveyhundrað",
+                "aliases": [
+                  {
+                    "sort-name": "Tveyhundrað",
+                    "name": "Tveyhundrað",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "71c0c472-a972-41da-9ef8-5b8b39b95feb",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "48eb66c1-bc88-3319-af9f-8b7e45a3237d",
+          "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "score": 33,
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "artist-credit-id": "4e35f3a9-af68-3b59-8fb7-bdecc8751b9e",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2008-03-28",
+          "primary-type": "Single",
+          "artist-credit": [
+            {
+              "name": "Kettcar",
+              "artist": {
+                "id": "315fa94f-3bb5-43db-a28e-406a83e9805c",
+                "name": "Kettcar",
+                "sort-name": "Kettcar"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "1c2db390-0271-4a37-9d62-dc221a3bedb0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "indie rock"
+            }
+          ]
+        },
+        {
+          "id": "a7fc7529-0d28-3a9a-af5d-7700d4ce50d1",
+          "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "score": 33,
+          "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "artist-credit-id": "09feeb4d-4a86-3e6f-b2bd-ea8777e9f53e",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2006-10-31",
+          "primary-type": "EP",
+          "artist-credit": [
+            {
+              "name": "Casiotone for the Painfully Alone",
+              "artist": {
+                "id": "73d882c7-1146-4012-a61b-a3b2c11fce2f",
+                "name": "Casiotone for the Painfully Alone",
+                "sort-name": "Casiotone for the Painfully Alone",
+                "aliases": [
+                  {
+                    "sort-name": "CFTPA",
+                    "name": "CFTPA",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "f2418aef-a1fb-4786-a09c-5f80589ff047",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "121b2ef0-aead-4be0-bf48-1b0493afe53e",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "5c340dbf-4628-3057-bc7c-4ef8c845cccb",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2016-07-29",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Steve Adamyk BAND",
+              "artist": {
+                "id": "bb74e78c-4fb5-4f10-b855-e8cc538d61cc",
+                "name": "Steve Adamyk BAND",
+                "sort-name": "Steve Adamyk BAND",
+                "aliases": [
+                  {
+                    "sort-name": "Steve Adamyk Band, The",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "The Steve Adamyk Band",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "15668f53-2a13-4ff9-96cf-d49d03a88647",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "pop"
+            },
+            {
+              "count": 1,
+              "name": "punk"
+            },
+            {
+              "count": 1,
+              "name": "power pop"
+            },
+            {
+              "count": 1,
+              "name": "rock and roll"
+            }
+          ]
+        },
+        {
+          "id": "5fc5fed8-ac53-4063-a14a-99b4a00d7697",
+          "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "score": 33,
+          "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "artist-credit-id": "c653f3ae-c15a-3215-b8a5-ea5f9e1d13ac",
+          "count": 2,
+          "title": "Graceland",
+          "first-release-date": "2019-01-31",
+          "primary-type": "EP",
+          "artist-credit": [
+            {
+              "name": "Sam Kurt",
+              "artist": {
+                "id": "af322aed-f575-4f77-9ab5-b4f05b465247",
+                "name": "Sam Kurt",
+                "sort-name": "Kurt, Sam"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "2e1d7d2b-e94c-4eec-ac9b-f11a68929b34",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "81671973-f6fd-4d82-9274-722a4cbf0f65",
+              "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+              "title": "Graceland",
+              "status": "Promotion"
+            }
+          ]
+        },
+        {
+          "id": "4e398ab9-7112-43b4-8ea4-196edf9a5d3b",
+          "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "score": 33,
+          "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+          "artist-credit-id": "dcd8c850-d7f3-3212-9615-1fd46ff98a70",
+          "count": 1,
+          "title": "Graceland",
+          "primary-type": "EP",
+          "artist-credit": [
+            {
+              "name": "RockWeller",
+              "artist": {
+                "id": "76090571-9195-4b3d-9a1d-2aa31b365baf",
+                "name": "RockWeller",
+                "sort-name": "RockWeller"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "9a33ae23-87cc-4378-bbdc-1465c9c42ae9",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "14d018c4-67bd-4cea-88f4-eadf21a3ff46",
+          "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "score": 33,
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "artist-credit-id": "39e5c0f5-dd87-364a-94a1-3b0e3449dfbd",
+          "count": 2,
+          "title": "Graceland",
+          "first-release-date": "1999",
+          "primary-type": "Single",
+          "artist-credit": [
+            {
+              "name": "Kashmir",
+              "artist": {
+                "id": "cd08ab5e-a823-4985-975d-3a3438b9b5d5",
+                "name": "Kashmir",
+                "sort-name": "Kashmir",
+                "disambiguation": "Danish rock band"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "f3451dd3-0e21-4207-81d9-dcdb6f6927b0",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            },
+            {
+              "id": "3f2cae81-f892-4f10-b3e8-e8bd224c4359",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 1,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "alternative rock"
+            },
+            {
+              "count": 1,
+              "name": "pop rock"
+            }
+          ]
+        },
+        {
+          "id": "b489267d-8a91-4f0e-b6d7-a4e80764993d",
+          "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "score": 33,
+          "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+          "artist-credit-id": "5d8bf2dc-aacf-3558-8617-96081e200acc",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2010-04-13",
+          "primary-type": "Single",
+          "artist-credit": [
+            {
+              "name": "The Tallest Man on Earth",
+              "artist": {
+                "id": "7e35659f-f3bb-4c28-bcf5-47bd5cfa2bca",
+                "name": "The Tallest Man on Earth",
+                "sort-name": "Tallest Man on Earth, The",
+                "disambiguation": "Swedish singer‐songwriter"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "50e5a5b4-068b-4210-9e5b-d67b3b1f8ab2",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "2ef1dfb4-9548-47c3-9384-761d575483c5",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "214f549e-d8e2-479a-9370-047dd560ef3d",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2018-09-01",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Cigarette Smoking Man",
+              "artist": {
+                "id": "3681d844-86e8-4d41-856c-496ad405bb4d",
+                "name": "Cigarette Smoking Man",
+                "sort-name": "Cigarette Smoking Man"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "21910247-b23c-49bd-89d3-73ce99f0f4f4",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "186f6df6-6cf9-413a-b107-d65d6cfe6665",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "39c5153b-fb4b-3407-91e2-7115e17e778f",
+          "count": 1,
+          "title": "Graceland",
+          "first-release-date": "2001-07-19",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Civet",
+              "artist": {
+                "id": "c8912da4-5533-4623-b6bb-e6f20cb3406e",
+                "name": "Civet",
+                "sort-name": "Civet"
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "5769c451-c1cb-4402-ae9a-7dade8f4a360",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "Graceland",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "05b1e1af-1f2d-4713-b0ee-41e2968a9db4",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "abe88265-b4d0-3f7a-9f54-1ad489228214",
+          "count": 1,
+          "title": "GRACELAND",
+          "first-release-date": "2014-07-22",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Kierra Sheard",
+              "artist": {
+                "id": "83d102d1-c13b-483b-ba25-b23900e689d1",
+                "name": "Kierra Sheard",
+                "sort-name": "Sheard, Kierra",
+                "aliases": [
+                  {
+                    "sort-name": "Sheard, Kierra “Kiki”",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Kierra \"Kiki\" Sheard",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": "1997-11-04",
+                    "end-date": "2008-10-27"
+                  },
+                  {
+                    "sort-name": "Sheard, Kierra",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Kierra Sheard",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Sheard-Kelly, Kierra",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Kierra Sheard-Kelly",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": "2020-12-12",
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "edf4f01e-1c8c-4dbc-b97e-6f5b6e66dd9a",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "GRACELAND",
+              "status": "Official"
+            }
+          ]
+        },
+        {
+          "id": "0f5b014a-606d-3d29-9538-97fa01a82d76",
+          "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 2,
+          "title": "The Paul Simon Anthology",
+          "first-release-date": "1993",
+          "primary-type": "Album",
+          "secondary-types": [
+            "Compilation"
+          ],
+          "secondary-type-ids": [
+            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+          ],
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "c656ffd3-1962-3259-b0e1-d3648b598525",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "The Paul Simon Anthology",
+              "status": "Official"
+            },
+            {
+              "id": "61a102f9-4739-4a00-a6cb-95080adc26a5",
+              "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+              "title": "The Paul Simon Anthology",
+              "status": "Official"
+            }
+          ],
+          "tags": [
+            {
+              "count": 2,
+              "name": "rock"
+            },
+            {
+              "count": 1,
+              "name": "folk"
+            }
+          ]
+        },
+        {
+          "id": "cac5e408-d0a2-4899-b4a1-11e61eea71e1",
+          "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "score": 33,
+          "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+          "artist-credit-id": "e00dfc2d-61e1-3a41-aa71-39a55ebc52af",
+          "count": 1,
+          "title": "Paul Simon Live Unlicensed",
+          "primary-type": "Album",
+          "artist-credit": [
+            {
+              "name": "Paul Simon",
+              "artist": {
+                "id": "05517043-ff78-4988-9c22-88c68588ebb9",
+                "name": "Paul Simon",
+                "sort-name": "Simon, Paul",
+                "disambiguation": "of Simon & Garfunkel",
+                "aliases": [
+                  {
+                    "sort-name": "Simon, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Simon",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Kane, Paul",
+                    "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                    "name": "Paul Kane",
+                    "locale": null,
+                    "type": "Artist name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "ポール・サイモン",
+                    "name": "ポール・サイモン",
+                    "locale": null,
+                    "type": null,
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  },
+                  {
+                    "sort-name": "Simon, Paul Frederic",
+                    "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                    "name": "Paul Frederic Simon",
+                    "locale": null,
+                    "type": "Legal name",
+                    "primary": null,
+                    "begin-date": null,
+                    "end-date": null
+                  }
+                ]
+              }
+            }
+          ],
+          "releases": [
+            {
+              "id": "a4b242bc-f625-465c-9d1a-579b7738f48b",
+              "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+              "title": "Paul Simon Live Unlicensed",
+              "status": "Bootleg"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
