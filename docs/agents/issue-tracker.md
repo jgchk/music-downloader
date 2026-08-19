@@ -32,10 +32,12 @@ changes — `/triage` reads this flag.
 
 ## Labels beyond triage
 
-This tracker carries repo-specific labels that are _not_ triage states and should be left
-alone unless you're deliberately working that queue:
+`quality-gate` is a **category role** on this repo, not a stray label — see
+`docs/agents/triage-labels.md`.
 
-- `quality-gate` — a review finding nominated for promotion to a machine-enforced rule
+These repo-specific labels are neither category nor state, and should be left alone unless
+you're deliberately working that queue:
+
 - `mutation-drift` — surviving mutants found by the weekly full mutation run
 - `contract-drift` — a third-party API no longer matching its recorded contract
 - `dependencies`, `released` — Renovate and release automation
