@@ -201,7 +201,8 @@ describe('published correlation metadata', () => {
     // `JSON.stringify` drops an `undefined` property, so the two shapes are byte-identical on the
     // wire; `OutboundFeed` re-adds the key unconditionally one layer out; and no consumer reads a
     // published event with `in` or `Object.keys`. That assertion would exist for the mutation score
-    // rather than for a reader, so the mutant is recorded as an equivalent survivor instead.
+    // rather than for a reader, so the mutant carries a recorded-survivor marker at its site in
+    // `mapping.ts` — where the machine now reads it, instead of only this paragraph.
     expect(rendered.metadata).toBeUndefined();
     expect(rendered.data).toBeDefined(); // the payload is unaffected by the envelope's absence
   });

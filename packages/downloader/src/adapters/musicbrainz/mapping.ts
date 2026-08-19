@@ -369,13 +369,15 @@ function modalTrackCount(counts: readonly (number | undefined)[]): number | unde
   let modal: number | undefined;
   let modalFrequency = 0;
   for (const [count, freq] of frequency) {
-    // RECORDED SURVIVOR, waiver withheld: `count <= modal` is equivalent — `modal` is only ever a
-    // count already taken from this map, and map keys are distinct, so `count === modal` cannot
-    // hold here (the initial `modal = 0` pairs with `modalFrequency = 0`, which every real
-    // frequency (>= 1) beats on the first arm before this arm is consulted). A `disable next-line
-    // EqualityOperator` would silence that mutant AND the four killable siblings this line carries
-    // — `>=`/`<=` on the frequency test, `!==` on the tie test, and `count >= modal`, which
-    // inverts the documented lower-count tie-break. Silencing four real findings to hide one
+    // Stryker recorded-survivor EqualityOperator `count <= (modal ?? 0)`: equivalent — this arm is
+    // only ever reached when `freq === modalFrequency`, which requires `modalFrequency >= 1` and so
+    // requires `modal` to have already been set to a count taken from this very map (on the first
+    // iteration `modalFrequency` is 0, every real `freq` is >= 1, and the first arm short-circuits
+    // before this one is evaluated). Map keys are distinct, so `count === modal` cannot hold here
+    // and `<` and `<=` cannot disagree. Waived per mutant, not per line: a
+    // `disable next-line EqualityOperator` would silence the four killable siblings this line
+    // carries — `>=`/`<=` on the frequency test, `!==` on the tie test, and `count >= (modal ?? 0)`,
+    // which inverts the documented lower-count tie-break. Silencing four real findings to hide one
     // equivalent mutant is the trade the waiver doctrine rejects.
     if (!(freq > modalFrequency || (freq === modalFrequency && count < (modal ?? 0)))) {
       continue;
@@ -447,6 +449,9 @@ export function releaseGroupCandidateIds(
  * medium states one. Absent rather than 0 — see {@link ReleaseGroupEdition.trackCount}.
  */
 function totalTrackCount(release: MbBrowseRelease): number | undefined {
+  // Stryker disable next-line ArrayDeclaration: equivalent — the injected string has no
+  // `track-count`, so it maps to `undefined` and the `typeof count === 'number'` filter drops it,
+  // leaving the same empty `counts` an absent `media` leaves (the absent-collection note above).
   const counts = (release.media ?? [])
     .map((medium) => medium['track-count'])
     .filter((count): count is number => typeof count === 'number');

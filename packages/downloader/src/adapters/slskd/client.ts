@@ -130,14 +130,15 @@ export class SlskdClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      // RECORDED SURVIVOR, waiver withheld: the `body !== undefined` operand is a *type-level*
-      // guard. Forced true, the spread yields `body: JSON.stringify(undefined)` — the key present
-      // and undefined — which every `HttpClient` reads identically to an absent key (the fetch
-      // adapter destructures `body` and hands undefined to `fetch`, which sends no body). The
-      // conditional exists so the request satisfies `exactOptionalPropertyTypes`, and a compiler
-      // rule is not a behavior a test can observe. It is not waived, because the same mutator
-      // rewrites the whole `&&` to `true`/`false` on this line, and either of those spreads a
-      // boolean — dropping the request body outright, which is a real finding.
+      // Stryker recorded-survivor ConditionalExpression `true`: equivalent — this is the
+      // `body !== undefined` operand, a *type-level* guard. Forced true, the spread yields
+      // `body: JSON.stringify(undefined)` — the key present and undefined — which every
+      // `HttpClient` reads identically to an absent key (the fetch adapter destructures `body` and
+      // hands undefined to `fetch`, which sends no body). The conditional exists so the request
+      // satisfies `exactOptionalPropertyTypes`, and a compiler rule is not a behavior a test can
+      // observe. Waived per mutant, not per line: the same mutator rewrites the whole `&&` to
+      // `true`/`false` here, and either of those spreads a boolean — dropping the request body
+      // outright, which is a real finding.
       ...(body !== undefined && { body: JSON.stringify(body) }),
     });
   }

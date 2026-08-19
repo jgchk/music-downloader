@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { describeStale, readSourceFromDisk, refineReportText } from './recorded-survivors.ts';
 import { REPORT_PATH } from './report-model.ts';
 import { renderVerdict } from './verdict-summary.ts';
 import {
@@ -46,7 +47,23 @@ const read = (path: string | undefined): string | undefined => {
   }
 };
 
-const verdict = decideVerdict({ report: read(reportPath), diff: read(diffPath) });
+/**
+ * Recorded survivors are subtracted before the decider sees the report (change:
+ * mutation-recorded-survivors), so a mutant proven equivalent at its site does not block a branch
+ * that merely touched its line. Staleness is NOT asserted here: a PR run mutates only the changed
+ * files, so every marker in the rest of the repo would have no mutant to match. The weekly full run
+ * is where markers are rechecked, because it is the only run that looks at all of them.
+ */
+const { raw: refinedReport, stale } = refineReportText(read(reportPath), readSourceFromDisk);
+if (stale.length > 0) {
+  // Not a failure here, but not silent either: the weekly run will fail on these, and a PR that
+  // made a marker stale should learn it from its own log rather than from Sunday's job.
+  process.stderr.write(
+    `Recorded survivors that matched nothing in this scope:\n${describeStale(stale)}\n`,
+  );
+}
+
+const verdict = decideVerdict({ report: refinedReport, diff: read(diffPath) });
 const reading = readEnforcement(process.env[ENFORCE_SWITCH]);
 
 // A duration the job could not measure is absent rather than zero: "the step took no time" and "no

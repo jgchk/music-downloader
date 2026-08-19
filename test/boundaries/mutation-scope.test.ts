@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import mutationSuiteConfig from '../../vitest.mutation.config.ts';
 import { DIFF_FLAGS } from '../../scripts/mutation/changed-lines.ts';
+import { parseRecordedSurvivors } from '../../scripts/mutation/recorded-survivors.ts';
 import { REPORT_PATH } from '../../scripts/mutation/report-model.ts';
 import { ENFORCE_SWITCH } from '../../scripts/mutation/verdict.ts';
 import strykerConfig from '../../stryker.config.mjs';
@@ -534,5 +535,68 @@ describe('mutation waivers', () => {
     expect(isJustified('Stryker disable next-line all')).toBe(false);
     expect(isJustified('Stryker disable next-line all:')).toBe(false);
     expect(isJustified('Stryker disable next-line all: no behavior to assert here')).toBe(true);
+  });
+});
+
+/**
+ * The per-mutant waiver (change: mutation-recorded-survivors) is held to the same burden as the
+ * line-granular one above, plus one this form needs and that one does not.
+ *
+ * A malformed `disable next-line` is at worst inert — Stryker ignores it and the mutant keeps
+ * surviving, which is loud. A malformed recorded-survivor marker is inert in exactly the same way,
+ * and that is the danger: the author believes a mutant is waived, the weekly run keeps filing it,
+ * and the two facts never meet. So every comment that OPENS with the marker phrase must actually
+ * parse as one.
+ */
+const RECORDED_MARKER_OPENER = /(?:\/\/|\/\*)\s*(Stryker\s+recorded-survivor\b[^\n]*)/g;
+
+/** Every marker the parser actually accepts, across the mutated tree. */
+function parsedRecordedMarkers(): { readonly file: string; readonly reason: string }[] {
+  return MUTATED.flatMap((file) =>
+    parseRecordedSurvivors(readFileSync(path.join(REPO_ROOT, file), 'utf8')).map((entry) => ({
+      file,
+      reason: entry.reason,
+    })),
+  );
+}
+
+describe('recorded survivors', () => {
+  it('parses every comment that opens with the marker phrase — a malformed one waives nothing, silently', () => {
+    // The count is the assertion. A marker the parser rejects still READS as a waiver to a human,
+    // so the file looks argued while the mutant is re-filed every Sunday.
+    expect(parsedRecordedMarkers()).toHaveLength(scan(RECORDED_MARKER_OPENER).length);
+  });
+
+  it('carries a written justification on every marker, held to the same burden as an `any`', () => {
+    const unargued = parsedRecordedMarkers().filter(
+      (entry) => entry.reason.length < MIN_JUSTIFICATION_CHARS,
+    );
+
+    expect(unargued).toEqual([]);
+  });
+
+  it('reaches real markers, so the two scenarios above cannot pass over an empty set', () => {
+    // Both scenarios are satisfied by finding nothing at all — including if the parser broke, or if
+    // the scan's pattern stopped matching the form the tree actually uses.
+    expect(parsedRecordedMarkers().length).toBeGreaterThan(10);
+  });
+
+  it('holds the recorded-survivor count to a ceiling — a rising one is the same signal', () => {
+    // As with suppressions: a CEILING TO DRIVE DOWN, not a budget. Every entry here is a mutant no
+    // test can kill; a change that adds many at once is the rule failing admission, not the code.
+    const CEILING = 19;
+
+    expect(parsedRecordedMarkers().length).toBeLessThanOrEqual(CEILING);
+  });
+
+  it('is read by the machine, not only by a reader — the drift channel subtracts it', () => {
+    // "A suppression the machine never reads is the one that rots" (stryker.config.mjs). The
+    // fourteen prose comments this form replaced were exactly that, so the wiring is pinned here:
+    // both the weekly channel and the PR verdict must apply the transform.
+    const drift = readFileSync(path.join(REPO_ROOT, 'scripts/mutation/file-drift.ts'), 'utf8');
+    const verdict = readFileSync(path.join(REPO_ROOT, 'scripts/mutation/pr-verdict.ts'), 'utf8');
+
+    expect(drift).toContain('applyRecordedSurvivors');
+    expect(verdict).toContain('refineReportText');
   });
 });

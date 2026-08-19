@@ -255,6 +255,11 @@ export function evolve(state: DownloadState, event: DownloadEvent): DownloadStat
       const { started: _started, ...downloading } = state;
       return { ...downloading, phase: 'Validating', downloadedFiles: event.files };
     }
+    // Stryker disable next-line StringLiteral: equivalent — emptying the case label makes this
+    // event match no arm and fall to the switch's trailing `return state`, which is the same
+    // answer this arm gives. `StringLiteral` generates no other mutant on this line, so the waiver
+    // is exact; the arm's own `ConditionalExpression` and `BlockStatement` mutants stay observed
+    // and are killed (deleting the arm falls through to `CandidateRejected`, which does real work).
     case 'TryFailed': {
       return state; // the following CandidateRejected does the state work
     }
@@ -282,13 +287,20 @@ export function evolve(state: DownloadState, event: DownloadEvent): DownloadStat
       if (state.phase !== 'Validating') return state;
       return { ...state, phase: 'Importing' };
     }
-    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — deleting or
-    // emptying this arm falls straight through to `Imported`, the next arm, which also returns
-    // `state` unchanged. Two adjacent no-op arms cannot be told apart by any test; they stay
-    // separate because they are separate facts, each with its own reason for changing nothing.
+    // Stryker disable next-line ConditionalExpression,BlockStatement,StringLiteral: equivalent —
+    // deleting or emptying this arm falls straight through to `Imported`, the next arm, which also
+    // returns `state` unchanged, and emptying the case label falls to the switch's trailing
+    // `return state`. All three are the same answer. Two adjacent no-op arms cannot be told apart
+    // by any test; they stay separate because they are separate facts, each with its own reason
+    // for changing nothing.
     case 'ValidationFailed': {
       return state; // the following CandidateRejected does the state work
     }
+    // Stryker disable next-line StringLiteral: equivalent — emptying the case label makes this
+    // event match no arm and fall to the switch's trailing `return state`, the same answer this arm
+    // gives. `StringLiteral` generates no other mutant on this line, so the waiver is exact; the
+    // arm's `ConditionalExpression` and `BlockStatement` mutants stay observed and are killed
+    // (deleting the arm falls through to `DownloadFulfilled`, which does real work).
     case 'Imported': {
       // A state no-op: the co-emitted DownloadFulfilled carries the location; the import itself
       // is observed via `react` (staging cleanup), not folded into state.
@@ -322,15 +334,16 @@ export function evolve(state: DownloadState, event: DownloadEvent): DownloadStat
       // ladder as if its candidate had just failed validation; the co-emitted rejection/selection
       // events then fold through the existing cases. Nothing is staged any more (the files were
       // imported), so the transient Validating state carries no downloaded files.
-      // RECORDED SURVIVOR, waiver withheld: the `state.phase !== 'Fulfilled'` operand is equivalent
-      // when forced false — `resume` is declared on `FulfilledState` alone and no fold path carries
-      // it onto another phase (the revival below builds its `Validating` state field by field,
-      // dropping it), so on every other phase the second operand reads `undefined` and the guard
-      // returns `state` either way. The operand is the narrowing `state.resume` needs, not a
-      // decision. No waiver: this line also carries the whole guard forced true (no revival ever)
-      // and the `state.resume === undefined` operand forced false (a legacy fulfilment revived
-      // without retained context) — both killable, the second by
-      // `ignores FulfillmentRejected on a legacy fulfilment with no retained context`.
+      // Stryker recorded-survivor ConditionalExpression `false`: equivalent — this is the
+      // `state.phase !== 'Fulfilled'` operand, and `resume` is declared on `FulfilledState` alone
+      // with no fold path carrying it onto another phase (the revival below builds its `Validating`
+      // state field by field, dropping it). So on every other phase the second operand reads
+      // `undefined` and the guard returns `state` either way. The operand is the narrowing
+      // `state.resume` needs, not a decision. Waived per mutant, not per line: this line also
+      // carries the whole guard forced true (no revival ever) and the `state.resume === undefined`
+      // operand forced false (a legacy fulfilment revived without retained context) — both
+      // killable, the second by `ignores FulfillmentRejected on a legacy fulfilment with no
+      // retained context`.
       if (state.phase !== 'Fulfilled' || state.resume === undefined) return state;
       const resume = state.resume;
       return {

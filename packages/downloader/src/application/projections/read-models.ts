@@ -333,13 +333,13 @@ export async function seedStalledReadModel(
     return;
   }
   for (const letter of letters.value) {
-    // RECORDED SURVIVOR, waiver withheld: this guard is the type narrowing
-    // `mark(acquisitionId: string)` needs for an optional `streamId` (a subscription letter carries
-    // none), not a decision. Forcing it true adds `undefined` to a `Set<string>` that is only ever
-    // queried by `isStalled(id: string)`, so no query any caller can make changes its answer. The
-    // guard cannot be deleted: without it the call does not typecheck. Forcing it FALSE marks
-    // nothing stalled at boot, which is a real finding on the same line under the same mutator —
-    // so no waiver.
+    // Stryker recorded-survivor ConditionalExpression `true`: equivalent — this guard is the type
+    // narrowing `mark(acquisitionId: string)` needs for an optional `streamId` (a subscription
+    // letter carries none), not a decision. Forced true it adds `undefined` to a `Set<string>` that
+    // is only ever queried by `isStalled(id: string)`, and no string argument equals `undefined`,
+    // so no query any caller can make changes its answer. The guard cannot be deleted either:
+    // without it the call does not typecheck. Waived per mutant, not per line: forcing it FALSE
+    // marks nothing stalled at boot, a real finding under the same mutator on the same line.
     if (letter.streamId !== undefined) stalled.mark(letter.streamId);
   }
 }
