@@ -98,7 +98,7 @@ export function react(event: ImportEvent, state: ImportState): readonly Effect[]
       }
     }
 
-    case 'CandidatesProposed':
+    case 'MatchesProposed':
     case 'ReviewRequired':
     case 'ImportApplied':
     case 'RemediationRequired':

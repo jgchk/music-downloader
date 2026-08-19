@@ -1,13 +1,13 @@
 import fc from 'fast-check';
 import { asDistance } from '../../shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../shared/originating-download-id.js';
 import { assertNonEmpty } from '../../shared/non-empty-array.js';
 import type { NonEmptyReadonlyArray } from '../../shared/non-empty-array.js';
 import { toPositiveInt } from '../../shared/positive-int.js';
 import type { ImportCommand, ImportCommandType } from '../commands.js';
 import type {
   ApplyFailure,
-  CandidateReference,
+  MatchReference,
   DuplicateIncumbent,
   ImportEvent,
   ImportEventType,
@@ -15,7 +15,7 @@ import type {
   ImportPolicy,
   ImportSource,
   ManualTags,
-  ProposedCandidate,
+  MetadataMatch,
   Resolution,
   ResolutionKind,
   ReviewCause,
@@ -45,7 +45,7 @@ export const arbDirectory: fc.Arbitrary<string> = fc.constantFrom(
 );
 
 /** A tiny reference pool: identity collisions are what the known-candidate guard turns on. */
-export const arbCandidateReference: fc.Arbitrary<CandidateReference> = fc.record({
+export const arbCandidateReference: fc.Arbitrary<MatchReference> = fc.record({
   dataSource: fc.constantFrom('MusicBrainz', 'Discogs'),
   albumId: fc.constantFrom('album-1', 'album-2', 'album-3'),
 });
@@ -56,7 +56,7 @@ export const arbCandidateReference: fc.Arbitrary<CandidateReference> = fc.record
  */
 export const arbDistance = fc.constantFrom(0, 0.05, 0.1, 0.4, 1).map((value) => asDistance(value));
 
-export const arbCandidate: fc.Arbitrary<ProposedCandidate> = fc.record({
+export const arbCandidate: fc.Arbitrary<MetadataMatch> = fc.record({
   ref: arbCandidateReference,
   artist: fc.constantFrom('Fugazi', 'Slint'),
   album: fc.constantFrom('Repeater', 'Spiderland'),
@@ -75,7 +75,7 @@ export const arbCandidate: fc.Arbitrary<ProposedCandidate> = fc.record({
 });
 
 /** Proposals including the empty one — an empty candidate list is the `no-match` route. */
-export const arbCandidates: fc.Arbitrary<readonly ProposedCandidate[]> = fc.array(arbCandidate, {
+export const arbCandidates: fc.Arbitrary<readonly MetadataMatch[]> = fc.array(arbCandidate, {
   maxLength: 3,
 });
 
@@ -126,7 +126,7 @@ export const arbHints: fc.Arbitrary<ImportHints> = fc.record(
  */
 export const arbSource: fc.Arbitrary<ImportSource> = fc.record(
   {
-    acquisitionId: fc.constantFrom('acq-1', 'acq-2').map((id) => toAcquisitionId(id)),
+    acquisitionId: fc.constantFrom('acq-1', 'acq-2').map((id) => toOriginatingDownloadId(id)),
     candidate: fc.record(
       {
         username: fc.constantFrom('peer-a', 'peer-b'),
@@ -248,9 +248,9 @@ export const eventArbitraryByType: {
     },
     { requiredKeys: ['type', 'directory', 'policy'] },
   ),
-  CandidatesProposed: fc.record(
+  MatchesProposed: fc.record(
     {
-      type: fc.constant('CandidatesProposed' as const),
+      type: fc.constant('MatchesProposed' as const),
       candidates: arbCandidates,
       duplicates: arbIncumbents,
       pinnedId: fc.constantFrom('mb-release-1'),
@@ -285,7 +285,7 @@ export const eventArbitraryByType: {
   }),
   ReleaseVerdictRecorded: fc.record({
     type: fc.constant('ReleaseVerdictRecorded' as const),
-    acquisitionId: fc.constantFrom('acq-1').map((id) => toAcquisitionId(id)),
+    acquisitionId: fc.constantFrom('acq-1').map((id) => toOriginatingDownloadId(id)),
     candidate: fc.record({
       username: fc.constantFrom('peer-a'),
       path: fc.constantFrom('peer-a/Repeater [FLAC]'),
@@ -350,7 +350,7 @@ export const arbBlindCommandStep: fc.Arbitrary<CommandStep> = fc.oneof(
  * The lawful next move from whatever phase the import is in — what makes `applying`, `applied`,
  * and the remediation review reachable at all. The `awaiting-review` arm picks a resolution from
  * the *listed* candidates most of the time (so `apply-candidate` is usually known) and from the
- * open pool otherwise (so `UnknownCandidate` still gets exercised).
+ * open pool otherwise (so `UnknownMatch` still gets exercised).
  */
 export const arbAdvancingStep: fc.Arbitrary<CommandStep> = fc
   .record({

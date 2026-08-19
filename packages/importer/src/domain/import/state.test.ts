@@ -21,16 +21,16 @@ import {
   resolved,
 } from './__fixtures__/import-fixtures.js';
 import { asDistance } from '../shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../shared/originating-download-id.js';
 import type { ImportEvent } from './events.js';
-import { candidateReferenceKey } from './events.js';
+import { matchReferenceKey } from './events.js';
 import { evolve, foldEvents, initialState, isTerminal } from './state.js';
 
 const REJECTED: ImportEvent = { type: 'ImportRejected', reason: 'no good', filesDeleted: true };
 
-describe('candidateReferenceKey', () => {
+describe('matchReferenceKey', () => {
   it('keys a candidate by its (data_source, album_id) pair', () => {
-    expect(candidateReferenceKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe(
+    expect(matchReferenceKey({ dataSource: 'MusicBrainz', albumId: 'a1' })).toBe(
       'MusicBrainz:a1',
     );
   });
@@ -79,7 +79,7 @@ describe('evolve — the tolerant, total fold', () => {
     expect(state).toMatchObject({ phase: 'proposing', candidates: [reProposed] });
   });
 
-  it('ignores CandidatesProposed outside a proposing phase', () => {
+  it('ignores MatchesProposed outside a proposing phase', () => {
     const state = foldEvents(appliedHistory());
     expect(evolve(state, proposed([candidate()]))).toBe(state);
   });
@@ -317,7 +317,7 @@ describe('evolve — the tolerant, total fold', () => {
   it('ignores ReleaseVerdictRecorded — a record-only fact — in any phase', () => {
     const verdict: ImportEvent = {
       type: 'ReleaseVerdictRecorded',
-      acquisitionId: toAcquisitionId('acq-1'),
+      acquisitionId: toOriginatingDownloadId('acq-1'),
       candidate: DELIVERED_CANDIDATE,
       reasons: ['corrupt rip'],
     };

@@ -4,7 +4,7 @@ import type {
   ImportHints,
   ImportPolicy,
   ImportSource,
-  ProposedCandidate,
+  MetadataMatch,
   Resolution,
 } from './events.js';
 
@@ -22,7 +22,7 @@ export type ImportCommand =
     }
   | {
       readonly type: 'RecordProposal';
-      readonly candidates: readonly ProposedCandidate[];
+      readonly candidates: readonly MetadataMatch[];
       readonly duplicates: readonly DuplicateIncumbent[];
       readonly pinnedId?: string;
     }

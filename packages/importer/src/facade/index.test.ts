@@ -2,7 +2,7 @@ import { testContext } from '../application/__fixtures__/correlation.js';
 import { OTHER_STORY, STORY } from '../application/__fixtures__/correlation.js';
 import { describe, expect, it } from 'vitest';
 import { submitImport } from '../application/import/use-cases.js';
-import { toAcquisitionId } from '../domain/shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../domain/shared/originating-download-id.js';
 import { SOURCE } from '../domain/import/__fixtures__/import-fixtures.js';
 import { testWiring } from './__fixtures__/wiring.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
@@ -227,7 +227,7 @@ describe('createImporterFacade', () => {
         wiring.deps,
         {
           directory: INTAKE,
-          source: { acquisitionId: toAcquisitionId('acq-9') },
+          source: { acquisitionId: toOriginatingDownloadId('acq-9') },
         },
         testContext(),
       );

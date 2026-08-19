@@ -275,7 +275,7 @@ describe('mutation scope', () => {
     expect(
       mutated.filter((file) => file.startsWith('packages/importer/src/')).length,
     ).toBeGreaterThan(25);
-    expect(mutated.some((file) => file.includes('/domain/acquisition/'))).toBe(true);
+    expect(mutated.some((file) => file.includes('/domain/download/'))).toBe(true);
     expect(mutated.some((file) => file.includes('/domain/import/'))).toBe(true);
   });
 

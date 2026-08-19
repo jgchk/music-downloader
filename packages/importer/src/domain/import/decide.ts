@@ -1,8 +1,8 @@
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
 import type { ImportCommand } from './commands.js';
-import { candidateReferenceKey } from './events.js';
-import type { DuplicateIncumbent, ImportEvent, ProposedCandidate, Resolution } from './events.js';
+import { matchReferenceKey } from './events.js';
+import type { DuplicateIncumbent, ImportEvent, MetadataMatch, Resolution } from './events.js';
 import { isNonEmpty } from '../shared/non-empty-array.js';
 import type { NonEmptyReadonlyArray } from '../shared/non-empty-array.js';
 import { hasRemediation, isTerminal } from './state.js';
@@ -17,9 +17,9 @@ export type DomainError =
   | { readonly kind: 'UnknownImport' }
   | { readonly kind: 'NoOpenReview' }
   | { readonly kind: 'InvalidResolution'; readonly detail: string }
-  | { readonly kind: 'UnknownCandidate'; readonly candidate: string }
+  | { readonly kind: 'UnknownMatch'; readonly candidate: string }
   /** reject-unusable-delivery needs a retained delivered candidate; this import has none. */
-  | { readonly kind: 'NoRetainedCandidate' }
+  | { readonly kind: 'NoRetainedCopy' }
   /**
    * A NEW seam delivery (position past the stream watermark) arrived while a cycle is still in
    * flight. Converging would acknowledge — and permanently drop — the delivery, so the caller
@@ -33,7 +33,7 @@ type Decision = Result<readonly ImportEvent[], DomainError>;
 const NOTHING: Decision = ok([]);
 
 /** The lowest-distance candidate — beets' ordering, re-derived so `decide` never trusts input order. */
-function bestOf(candidates: NonEmptyReadonlyArray<ProposedCandidate>): ProposedCandidate {
+function bestOf(candidates: NonEmptyReadonlyArray<MetadataMatch>): MetadataMatch {
   let best = candidates[0];
   for (const next of candidates) {
     if (next.distance < best.distance) best = next;
@@ -68,12 +68,12 @@ function isNewDelivery(watermark: number | undefined, incoming: number | undefin
 
 function decideProposal(
   state: ImportState,
-  candidates: readonly ProposedCandidate[],
+  candidates: readonly MetadataMatch[],
   duplicates: readonly DuplicateIncumbent[],
   pinnedId: string | undefined,
 ): Decision {
   if (state.phase !== 'requested' && state.phase !== 'proposing') return NOTHING; // stale outcome
-  const proposed: ImportEvent = { type: 'CandidatesProposed', candidates, duplicates, pinnedId };
+  const proposed: ImportEvent = { type: 'MatchesProposed', candidates, duplicates, pinnedId };
   if (!isNonEmpty(candidates)) {
     return ok([proposed, { type: 'ReviewRequired', cause: { kind: 'no-match' } }]);
   }
@@ -86,7 +86,7 @@ function decideProposal(
   const isHinted = hintedReleaseId !== undefined;
   if (best.distance > state.policy.autoApplyThreshold) {
     // A weak — or hint-contradicted — match goes to a human with the evidence: the candidate list
-    // rides on `CandidatesProposed`, each candidate carrying its field-level diff (current-vs-proposed
+    // rides on `MatchesProposed`, each candidate carrying its field-level diff (current-vs-proposed
     // tags, extra/missing tracks, album fields), with the distance penalties kept as a summary.
     return ok([
       proposed,
@@ -116,16 +116,16 @@ function decideResolutionForReview(state: AwaitingReviewState, resolution: Resol
   }
   if (resolution.kind === 'apply-candidate') {
     const isKnown = state.candidates.some(
-      (candidate) => candidateReferenceKey(candidate.ref) === candidateReferenceKey(resolution.ref),
+      (candidate) => matchReferenceKey(candidate.ref) === matchReferenceKey(resolution.ref),
     );
     if (!isKnown)
-      return err({ kind: 'UnknownCandidate', candidate: candidateReferenceKey(resolution.ref) });
+      return err({ kind: 'UnknownMatch', candidate: matchReferenceKey(resolution.ref) });
   } else if (resolution.kind === 'reject-unusable-delivery') {
     // The verdict echoes back the exact copy the importer judged (opaque provenance for the
     // consumer); without a retained candidate the verb is refused precisely — plain reject stays
     // available.
     const source = state.source;
-    if (source?.candidate === undefined) return err({ kind: 'NoRetainedCandidate' });
+    if (source?.candidate === undefined) return err({ kind: 'NoRetainedCopy' });
     return ok([
       { type: 'ReviewResolved', resolution },
       {

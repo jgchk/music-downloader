@@ -1,17 +1,17 @@
 import type {
   ApplyFailure,
-  DeliveredCandidate,
+  DeliveredCopy,
   DuplicateIncumbent,
   ImportEvent,
   ImportHints,
   ImportPolicy,
   ImportSource,
   ManualTags,
-  ProposedCandidate,
+  MetadataMatch,
   Resolution,
 } from '../events.js';
 import { asDistance } from '../../shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../../shared/originating-download-id.js';
 import { toPositiveInt } from '../../shared/positive-int.js';
 
 /** Deterministic builders for domain tests. */
@@ -20,7 +20,7 @@ export const POLICY: ImportPolicy = { autoApplyThreshold: asDistance(0.1) };
 export const DIRECTORY = '/intake/Artist - Album';
 export const HINTS: ImportHints = { mbReleaseId: 'mb-release-1', artist: 'Artist', album: 'Album' };
 
-export const DELIVERED_CANDIDATE: DeliveredCandidate = {
+export const DELIVERED_CANDIDATE: DeliveredCopy = {
   username: 'peer1',
   path: 'peer1/Artist - Album [FLAC]',
   sizeBytes: 123_456,
@@ -28,11 +28,11 @@ export const DELIVERED_CANDIDATE: DeliveredCandidate = {
 
 /** Provenance of a downloader-delivered import, retained candidate included. */
 export const SOURCE: ImportSource = {
-  acquisitionId: toAcquisitionId('acq-1'),
+  acquisitionId: toOriginatingDownloadId('acq-1'),
   candidate: DELIVERED_CANDIDATE,
 };
 
-export function candidate(overrides: Partial<ProposedCandidate> = {}): ProposedCandidate {
+export function candidate(overrides: Partial<MetadataMatch> = {}): MetadataMatch {
   return {
     ref: { dataSource: 'MusicBrainz', albumId: 'album-1' },
     artist: 'Artist',
@@ -66,11 +66,11 @@ export function requested(
 }
 
 export function proposed(
-  candidates: readonly ProposedCandidate[],
+  candidates: readonly MetadataMatch[],
   duplicates: readonly DuplicateIncumbent[] = [],
   pinnedId?: string,
 ): ImportEvent {
-  return { type: 'CandidatesProposed', candidates, duplicates, pinnedId };
+  return { type: 'MatchesProposed', candidates, duplicates, pinnedId };
 }
 
 export function resolved(resolution: Resolution): ImportEvent {
@@ -113,7 +113,7 @@ export function awaitingReviewWithCandidate(): ImportEvent[] {
 /** A legacy intake review: an acquisition source recorded, but no retained delivery candidate. */
 export function legacyIntakeReview(): ImportEvent[] {
   return [
-    requested({ source: { acquisitionId: toAcquisitionId('acq-legacy') } }),
+    requested({ source: { acquisitionId: toOriginatingDownloadId('acq-legacy') } }),
     proposed([candidate({ distance: asDistance(0.5) })]),
     MATCH_REVIEW,
   ];

@@ -3,7 +3,7 @@ import type {
   ApplyFailure,
   ApplyMode,
   DuplicateIncumbent,
-  ProposedCandidate,
+  MetadataMatch,
 } from '../../domain/import/events.js';
 import type { OperationScope } from '../correlation/context.js';
 import type { InfraError } from './errors.js';
@@ -34,7 +34,7 @@ export interface ProposePins {
 export type ProposeOutcome =
   | {
       readonly kind: 'proposal';
-      readonly candidates: readonly ProposedCandidate[];
+      readonly candidates: readonly MetadataMatch[];
       readonly duplicates: readonly DuplicateIncumbent[];
     }
   | { readonly kind: 'doomed'; readonly reason: string };

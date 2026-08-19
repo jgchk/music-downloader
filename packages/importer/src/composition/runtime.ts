@@ -214,7 +214,7 @@ export async function createImporterRuntime(
   const status = new ImportStatusProjection();
   const backlog = await store.readAll(0);
   if (backlog.isErr()) {
-    // A projection rebuilt from a partial read boots half-blind: the durable acquisition-idempotency
+    // A projection rebuilt from a partial read boots half-blind: the durable originating-download-idempotency
     // index is incomplete (redelivered fulfillments re-import already-imported releases) and every
     // query returns nothing while readiness still says `up`. Fail the boot loudly, exactly as an
     // unusable beets config does — never boot on a projection we could not fully rebuild.

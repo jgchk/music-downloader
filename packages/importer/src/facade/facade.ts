@@ -42,8 +42,8 @@ export const importerFacadeErrorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('UnknownImport') }),
   z.object({ kind: z.literal('NoOpenReview') }),
   z.object({ kind: z.literal('InvalidResolution'), detail: z.string() }),
-  z.object({ kind: z.literal('UnknownCandidate'), candidate: z.string() }),
-  z.object({ kind: z.literal('NoRetainedCandidate') }),
+  z.object({ kind: z.literal('UnknownMatch'), candidate: z.string() }),
+  z.object({ kind: z.literal('NoRetainedCopy') }),
   z.object({ kind: z.literal('CycleInFlight') }),
   z.object({
     kind: z.literal('ConcurrencyConflict'),

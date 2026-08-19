@@ -403,7 +403,7 @@ export default tseslint.config(
       //
       // The coverage half of that argument is narrower than the whole set and only claims what it
       // covers: 12 of the 38 sit outside the coverage gate altogether — 5 in downloader
-      // `src/domain/acquisition/__fixtures__/`, 4 in the two packages' `scripts/` schema generators,
+      // `src/domain/download/__fixtures__/`, 4 in the two packages' `scripts/` schema generators,
       // 3 in `scripts/release/` — because vitest's coverage `include` is `packages/*/src/**` with
       // `__fixtures__` excluded (vitest.config.ts). A guard at those 12 buys no `v8 ignore`, so they
       // rest on the plainer ground: the assertion is honest and the guard would be unreachable noise.

@@ -1,7 +1,7 @@
 import type {
   ImportHints,
   ManualTags,
-  ProposedCandidate,
+  MetadataMatch,
   Resolution,
 } from '../domain/import/events.js';
 import type { OpenReview } from '../domain/import/import.js';
@@ -94,7 +94,7 @@ export function resolutionToDomain(dto: ResolveReviewRequestDto): Resolution {
   }
 }
 
-function candidateToDto(candidate: ProposedCandidate) {
+function candidateToDto(candidate: MetadataMatch) {
   return {
     ref: { dataSource: candidate.ref.dataSource, albumId: candidate.ref.albumId },
     artist: candidate.artist,

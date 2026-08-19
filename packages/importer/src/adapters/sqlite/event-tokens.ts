@@ -18,7 +18,7 @@ import type { ImportEventType } from '../../domain/import/events.js';
  */
 export const STORED_TOKEN_BY_TYPE: Record<ImportEventType, string> = {
   ImportRequested: 'ImportRequested',
-  CandidatesProposed: 'CandidatesProposed',
+  MatchesProposed: 'CandidatesProposed',
   AutoApplySelected: 'AutoApplySelected',
   ReviewRequired: 'ReviewRequired',
   ReviewResolved: 'ReviewResolved',

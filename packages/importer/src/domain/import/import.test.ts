@@ -22,10 +22,10 @@ import {
   resolved,
 } from './__fixtures__/import-fixtures.js';
 import { asDistance } from '../shared/__fixtures__/distance.js';
-import { toAcquisitionId } from '../shared/acquisition-id.js';
+import { toOriginatingDownloadId } from '../shared/originating-download-id.js';
 import type { ImportCommand } from './commands.js';
 import type { DomainError } from './decide.js';
-import type { CandidateReference, ImportEvent, Resolution, ResolutionKind } from './events.js';
+import type { MatchReference, ImportEvent, Resolution, ResolutionKind } from './events.js';
 import { Import } from './import.js';
 
 const SUBMIT: ImportCommand = { type: 'SubmitImport', directory: DIRECTORY, policy: POLICY };
@@ -60,7 +60,7 @@ describe('submission', () => {
 
   it('stamps the acquisition source onto an event-driven request', () => {
     const events = given([])
-      .execute({ ...SUBMIT, source: { acquisitionId: toAcquisitionId('acq-1') } })
+      .execute({ ...SUBMIT, source: { acquisitionId: toOriginatingDownloadId('acq-1') } })
       ._unsafeUnwrap();
     expect(events[0]).toMatchObject({
       type: 'ImportRequested',
@@ -209,7 +209,7 @@ describe('recording a proposal', () => {
       ._unsafeUnwrap();
     expect(events).toEqual([
       {
-        type: 'CandidatesProposed',
+        type: 'MatchesProposed',
         candidates: [weaker, strong],
         duplicates: [],
         pinnedId: undefined,
@@ -292,7 +292,7 @@ describe('recording a proposal', () => {
     const events = given([requested()])
       .execute(record([candidate({ distance: asDistance(0.6) })], [], 'mb-9'))
       ._unsafeUnwrap();
-    expect(events[0]).toMatchObject({ type: 'CandidatesProposed', pinnedId: 'mb-9' });
+    expect(events[0]).toMatchObject({ type: 'MatchesProposed', pinnedId: 'mb-9' });
     expect(events[1]).toMatchObject({ cause: { hinted: true, hintedReleaseId: 'mb-9' } });
   });
 
@@ -452,7 +452,7 @@ describe('resolving a review', () => {
         resolve({ kind: 'apply-candidate', ref: { dataSource: 'Discogs', albumId: 'nope' } }),
       )
       ._unsafeUnwrapErr();
-    expect(error).toEqual({ kind: 'UnknownCandidate', candidate: 'Discogs:nope' });
+    expect(error).toEqual({ kind: 'UnknownMatch', candidate: 'Discogs:nope' });
   });
 
   it('refuses to apply any candidate at all on a review that listed none', () => {
@@ -473,7 +473,7 @@ describe('resolving a review', () => {
       )
       ._unsafeUnwrapErr();
 
-    expect(error).toEqual({ kind: 'UnknownCandidate', candidate: 'MusicBrainz:album-1' });
+    expect(error).toEqual({ kind: 'UnknownMatch', candidate: 'MusicBrainz:album-1' });
   });
 
   it('applies the candidate a human picked out of several listed ones', () => {
@@ -543,12 +543,12 @@ describe('resolving a review', () => {
       given(awaitingMatchReview())
         .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
-    ).toEqual({ kind: 'NoRetainedCandidate' });
+    ).toEqual({ kind: 'NoRetainedCopy' });
     expect(
       given(legacyIntakeReview())
         .execute(resolve({ kind: 'reject-unusable-delivery' }))
         ._unsafeUnwrapErr(),
-    ).toEqual({ kind: 'NoRetainedCandidate' });
+    ).toEqual({ kind: 'NoRetainedCopy' });
   });
 
   it('resolves a plain reject on a legacy intake review normally', () => {
@@ -1011,7 +1011,7 @@ describe('the open review’s available actions', () => {
   });
 
   // A minimal valid resolution for a verb, so the cross-check exercises the real `decide` path.
-  const resolutionFor = (kind: ResolutionKind, reference: CandidateReference): Resolution => {
+  const resolutionFor = (kind: ResolutionKind, reference: MatchReference): Resolution => {
     switch (kind) {
       case 'apply-candidate': {
         return { kind, ref: reference };

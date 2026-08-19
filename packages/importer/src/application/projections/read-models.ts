@@ -3,7 +3,7 @@ import type { OpenReview } from '../../domain/import/import.js';
 import type { ImportPhase } from '../../domain/import/import.js';
 import type {
   ApplyFailure,
-  CandidateReference,
+  MatchReference,
   ImportEvent,
   ImportHints,
   ResolutionKind,
@@ -11,7 +11,7 @@ import type {
 } from '../../domain/import/events.js';
 import { toImportId } from '../../domain/shared/import-id.js';
 import type { ImportId } from '../../domain/shared/import-id.js';
-import type { AcquisitionId } from '../../domain/shared/acquisition-id.js';
+import type { OriginatingDownloadId } from '../../domain/shared/originating-download-id.js';
 import type { StoredEvent } from '../ports/event-store-port.js';
 import type { DeadLetterStore } from '../ports/dead-letter-port.js';
 import type { Logger } from '../logging/logger.js';
@@ -31,7 +31,7 @@ type HistoryPayload =
   | { readonly kind: 'proposed'; readonly candidateCount: number; readonly pinnedId?: string }
   | {
       readonly kind: 'auto-apply-selected';
-      readonly candidate: CandidateReference;
+      readonly candidate: MatchReference;
       readonly distance: number;
     }
   | { readonly kind: 'review-required'; readonly reviewKind: ReviewKind }
@@ -41,7 +41,7 @@ type HistoryPayload =
   | { readonly kind: 'rejected'; readonly reason: string; readonly filesDeleted: boolean }
   | {
       readonly kind: 'release-verdict-recorded';
-      readonly acquisitionId: AcquisitionId;
+      readonly acquisitionId: OriginatingDownloadId;
       readonly reasons: readonly string[];
     };
 
@@ -96,7 +96,7 @@ function historyEntry(event: ImportEvent): HistoryPayload {
     case 'ImportRequested': {
       return { kind: 'requested', hints: event.hints };
     }
-    case 'CandidatesProposed': {
+    case 'MatchesProposed': {
       return {
         kind: 'proposed',
         candidateCount: event.candidates.length,
@@ -163,7 +163,7 @@ export function projectStatus(
 
 export class ImportStatusProjection {
   private readonly streams = new Map<ImportId, StoredEvent[]>();
-  private readonly acquisitions = new Map<AcquisitionId, ImportId>();
+  private readonly acquisitions = new Map<OriginatingDownloadId, ImportId>();
 
   apply(stored: StoredEvent): void {
     // The event store speaks a generic streamId; the import read model reads it as the ImportId that
@@ -188,7 +188,7 @@ export class ImportStatusProjection {
    * The import an acquisition already submitted, if any — the durable idempotency check for the
    * intake seam consumer. Rebuilt from the log, so redelivery converges across restarts.
    */
-  importIdForAcquisition(acquisitionId: AcquisitionId): ImportId | undefined {
+  importIdForAcquisition(acquisitionId: OriginatingDownloadId): ImportId | undefined {
     return this.acquisitions.get(acquisitionId);
   }
 

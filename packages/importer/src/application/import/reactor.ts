@@ -47,8 +47,8 @@ export function isRetryable(error: CommandError): boolean {
     case 'UnknownImport':
     case 'NoOpenReview':
     case 'InvalidResolution':
-    case 'UnknownCandidate':
-    case 'NoRetainedCandidate': {
+    case 'UnknownMatch':
+    case 'NoRetainedCopy': {
       // A domain rejection — the stream has already settled this outcome. Retrying would only
       // re-fire the same rejection forever, so advance past it instead.
       return false;
