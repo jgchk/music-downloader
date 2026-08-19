@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [3.20.1](https://github.com/jgchk/music-downloader/compare/v3.20.0...v3.20.1) (2026-08-19)
+
+### Bug Fixes
+
+* **seam:** carry the cause the whole way, and pin what only ordering enforced ([8affe65](https://github.com/jgchk/music-downloader/commit/8affe657dbc118b79000ca849e1dcaddd2b53a1d))
+* **seam:** close what eleven reviewers found in the extraction ([8e7c1c9](https://github.com/jgchk/music-downloader/commit/8e7c1c945ab55c1db6951f587783c1bdc946dd15))
+* **seam:** give the last halting classification its account too ([7044dc8](https://github.com/jgchk/music-downloader/commit/7044dc8163983aeaaee49924e1c71e44e2d7c90b))
 ## [3.20.0](https://github.com/jgchk/music-downloader/compare/v3.19.0...v3.20.0) (2026-08-19)
 
 ### Features
