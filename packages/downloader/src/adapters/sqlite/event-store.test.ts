@@ -208,6 +208,19 @@ describe('SqliteEventStore', () => {
     });
   });
 
+  it('refuses an event type it has no stored token for, permanently', async () => {
+    const store = new SqliteEventStore(freshDatabase());
+    // Reachable only by round-tripping a token this build cannot name back into an append.
+    // Retrying can never invent a token, so the fault must skip the retry budget entirely.
+    const unnameable = { type: 'SomethingNobodyKnows' } as unknown as DownloadEvent;
+
+    const result = await store.append('acq-1', 0, [unnameable], META);
+
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({ kind: 'InfraError', permanent: true });
+    expect(JSON.stringify(error)).toContain('SomethingNobodyKnows');
+  });
+
   it('writes the frozen storage token to both the type column and the data blob', async () => {
     const database = freshDatabase();
     const store = new SqliteEventStore(database);

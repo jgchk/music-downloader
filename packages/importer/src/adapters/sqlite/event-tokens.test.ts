@@ -49,6 +49,13 @@ describe('stored-token <-> model-type map', () => {
     }
   });
 
+  it('does not resolve an inherited Object property as an event type', () => {
+    // The lookup is keyed by row data; on a normal object literal `toString` would resolve to a
+    // function where an event type is declared, and `??` would never fire.
+    expect(toModelType('toString')).toBe('toString');
+    expect(toModelType('constructor')).toBe('constructor');
+  });
+
   it('passes an unknown token through unchanged, so a future writer stays readable', () => {
     expect(toModelType('SomethingNobodyKnows')).toBe('SomethingNobodyKnows');
   });

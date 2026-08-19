@@ -32,9 +32,27 @@ export const STORED_TOKEN_BY_TYPE: Record<ImportEventType, string> = {
  * The read-side inverse, derived so the two directions cannot drift apart. A duplicate stored
  * token would silently collapse an entry here; the seam's tests assert the sizes still match.
  */
-export const MODEL_TYPE_BY_TOKEN: Record<string, ImportEventType> = Object.fromEntries(
-  Object.entries(STORED_TOKEN_BY_TYPE).map(([type, token]) => [token, type as ImportEventType]),
+// Null-prototype: a lookup keyed by row data must not reach Object.prototype, or a row whose
+// `type` column is `toString` resolves to a function where an event type is declared.
+export const MODEL_TYPE_BY_TOKEN: Record<string, ImportEventType> = Object.assign(
+  Object.create(null) as Record<string, ImportEventType>,
+  Object.fromEntries(
+    Object.entries(STORED_TOKEN_BY_TYPE).map(([type, token]) => [token, type as ImportEventType]),
+  ),
 );
+
+/**
+ * A model event type with no stored token. Named so the store can classify it as permanent: no
+ * amount of retrying invents a token, and spending the effect's whole budget on it only delays
+ * the dead-letter that was always coming. This module's InfraError carries no permanent flag, so
+ * the importer currently retries it to exhaustion before dead-lettering — noisier than the
+ * downloader, same destination.
+ */
+export class UnmappedEventType extends Error {
+  constructor(readonly eventType: string) {
+    super(`no stored token for event type ${eventType}`);
+  }
+}
 
 /**
  * Model type -> stored token, for the write path. Total over the union by construction; the
@@ -47,7 +65,7 @@ export function toStoredToken(type: ImportEventType): string {
   // can is a value that only claims to be a member — an event round-tripped out of the read path's
   // unknown-token tolerance. Naming it beats binding `undefined` into SQLite.
   if (!Object.hasOwn(STORED_TOKEN_BY_TYPE, type)) {
-    throw new Error(`no stored token for event type ${type}`);
+    throw new UnmappedEventType(type);
   }
   return STORED_TOKEN_BY_TYPE[type];
 }
@@ -58,7 +76,10 @@ export function toStoredToken(type: ImportEventType): string {
  * tag (they ignore it and return the state unchanged), which is what makes the tolerance safe
  * rather than a deferred crash. What it does NOT do is publish: an unknown event is skipped by the
  * outbound feed while the checkpoint advances past it, so a token this binary cannot name is
- * invisible downstream. That is acceptable only because there is exactly one writer per store.
+ * invisible downstream — and permanently, because the checkpoint has already advanced past it.
+ * The scenario that produces one is a rollback: an older binary reading a log a newer binary
+ * already wrote. Making that loss observable is tracked as follow-up work; today nothing on the
+ * path has a logger.
  */
 export function toModelType(token: string): ImportEventType {
   return MODEL_TYPE_BY_TOKEN[token] ?? (token as ImportEventType);
