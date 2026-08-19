@@ -1,0 +1,14 @@
+{
+  "provenance": {
+    "source": "https://coverartarchive.org (live)",
+    "capturedAt": "2026-08-19",
+    "note": "the archive holds no art for this identifier"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/release-group/00000000-0000-4000-8000-000000000000"
+  },
+  "response": {
+    "status": 404
+  }
+}

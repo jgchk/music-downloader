@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { mintCorrelationId } from '$lib/server/correlation.js';
-import { accessOf, bootRuntimes, facadesOf, loggerOf } from '$lib/server/runtime.js';
+import { accessOf, bootRuntimes, coverArtOf, facadesOf, loggerOf } from '$lib/server/runtime.js';
 import { SESSION_COOKIE, verifySession } from '$lib/server/session.js';
 
 /**
@@ -45,6 +45,7 @@ export const handle: Handle = ({ event, resolve }) => {
   event.locals.facades = facadesOf();
   event.locals.logger = loggerOf().child({ correlationId: event.locals.correlationId });
   event.locals.access = accessOf();
+  event.locals.coverArt = coverArtOf();
   event.locals.now = () => new Date().toISOString();
 
   const cookie = event.cookies.get(SESSION_COOKIE);

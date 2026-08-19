@@ -9,6 +9,9 @@ import type { ImporterReadiness } from '@music/importer/runtime';
 import type { DestinationStream, Logger } from 'pino';
 import { loadComposedConfig } from './config.js';
 import { createLogger } from './logger.js';
+import { CoverArtArchive } from './cover-art/adapter.js';
+import { cachingCoverArt } from './cover-art/cache.js';
+import type { CoverArtPort } from './cover-art/port.js';
 import { PlexTvAccess } from './plex/adapter.js';
 import type { PlexAccessPort } from './plex/port.js';
 import { version } from './version.js';
@@ -58,6 +61,8 @@ export interface Readiness {
 
 interface Booted {
   readonly facades: Facades;
+  /** The cached cover-art port the request page's artwork endpoint reads. */
+  readonly coverArt: CoverArtPort;
   readonly access: Access;
   /** The pino root shared with the module runtimes, exposed so routes can leave a trace too. */
   readonly logger: Logger;
@@ -193,6 +198,9 @@ async function boot(
 
   return {
     facades: { downloader: downloader.facade, importer: importer.facade },
+    // One cached archive client for the process: covers are re-fetchable, so the cache is a
+    // courtesy to the archive and a latency win for the grid, never a source of truth.
+    coverArt: cachingCoverArt(new CoverArtArchive()),
     access: {
       sessionSecret: config.value.access.sessionSecret,
       plex: new PlexTvAccess(config.value.access.plex),
@@ -227,6 +235,14 @@ export function facadesOf(): Facades {
     throw new Error('runtimes not booted — the init hook must run before requests are served');
   }
   return runtime.booted.facades;
+}
+
+/** The cover-art port for the artwork endpoint; boots with the daemon. */
+export function coverArtOf(): CoverArtPort {
+  if (runtime.booted === undefined) {
+    throw new Error('runtimes not booted — the init hook must run before requests are served');
+  }
+  return runtime.booted.coverArt;
 }
 
 /** The access-control composition for the gate and login routes; boots with the daemon. */

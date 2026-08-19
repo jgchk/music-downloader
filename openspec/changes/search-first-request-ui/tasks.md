@@ -14,8 +14,8 @@ All production code test-first (red before green), per `docs/development/testing
 
 ## 2. Cover art (downloader + web)
 
-- [ ] 2.1 Record CAA contract fixtures (front cover hit, confirmed 404) and add the Cover Art Archive adapter with a cover-art port; upstream failure modeled separately from confirmed absence
-- [ ] 2.2 Implement the web art endpoints (`/art/release-group/<mbid>`, `/art/release/<mbid>`) streaming through a size-capped cache; confirmed 404 cached as absence, transient failure never cached; tests for both cache states
+- [x] 2.1 Record CAA contract fixtures (manifest hit, confirmed 404) and add the Cover Art Archive port/adapter in the web package; upstream failure modeled separately from confirmed absence
+- [x] 2.2 Implement the web artwork endpoint (`/cover-art/<entity>/<mbid>`) serving through a byte-budgeted cache; art and confirmed absence are cacheable, an unreachable archive never is
 
 ## 3. Request page (web)
 

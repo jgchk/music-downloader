@@ -1,3 +1,4 @@
+import { okAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestEvent, ResolveOptions } from '@sveltejs/kit';
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from '$lib/server/session.js';
@@ -13,7 +14,11 @@ vi.mock('$lib/server/runtime.js', () => ({
   facadesOf: () => facadesOf(),
   loggerOf: () => logger,
   accessOf: () => access,
+  coverArtOf: () => coverArt,
 }));
+
+/** The gate only needs the port to be injected; what it answers is the artwork endpoint's business. */
+const coverArt = { front: () => okAsync({ kind: 'absent' as const }) };
 
 const { handle, handleError, init } = await import('./hooks.server.js');
 
