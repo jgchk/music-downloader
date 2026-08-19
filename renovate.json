@@ -8,6 +8,12 @@
       "matchManagers": ["nvm", "dockerfile"],
       "matchDepNames": ["node"],
       "groupName": "node runtime"
+    },
+    {
+      "description": "Hold TypeScript majors. The source is TS7-ready, but the toolchain is not: typescript-eslint pins `typescript <6.1.0` (it hard-throws above, taking lint and the boundaries test with it) and svelte-check declares `^5 || ^6` and crashes at module load. A version bump is therefore the wrong shape — the tested adoption path is tsgo side-by-side (keep typescript@^6, add @typescript/native-preview, point typecheck and svelte-check at tsgo). Lift this once both peers accept TS>=7.",
+      "matchDepNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
