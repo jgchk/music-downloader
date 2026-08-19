@@ -10,84 +10,98 @@
      with no DOM change. Keep component CSS reading ONLY the semantic tokens below.
    ============================================================================ */
 
-:root {
-  /* -- Primitives: spacing + type families ---------------------------------- */
-  --step-0: 0.25rem;
-  --step-1: 0.5rem;
-  --step-2: 0.75rem;
-  --step-3: 1rem;
-  --step-4: 1.5rem;
-  --step-5: 2rem;
-  --step-6: 3rem;
+/* The cascade's order, named once here because this is the first stylesheet the layout loads —
+   layer order is fixed by first appearance, so naming it anywhere later would put `reset` after
+   whatever had already opened a layer. `theme` sits LAST on purpose: a skin overriding the base
+   is the skin system's whole contract. What that deliberately does not buy — protection from a
+   skin re-chroming bare buttons — is held by the convention test beside these files instead. */
+@layer reset, base, theme;
 
-  --font-mono:
-    ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-}
+@layer base {
+  :root {
+    /* -- Primitives: spacing + type families ---------------------------------- */
+    --step-0: 0.25rem;
+    --step-1: 0.5rem;
+    --step-2: 0.75rem;
+    --step-3: 1rem;
+    --step-4: 1.5rem;
+    --step-5: 2rem;
+    --step-6: 3rem;
 
-:root {
-  /* -- Semantic defaults (unskinned fallback: a neutral light theme) -------- */
-  color-scheme: light;
+    --font-mono:
+      ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  }
 
-  --bg: #eef1f4;
-  --surface: #ffffff;
-  --surface-2: #f6f8fa;
-  --border: rgba(15, 40, 50, 0.12);
-  --text: #16242a;
-  --text-muted: #5a6b72;
-  --accent: #0e7c72;
-  --accent-contrast: #ffffff;
-  --focus: #0e7c72;
+  :root {
+    /* -- Semantic defaults (unskinned fallback: a neutral light theme) -------- */
+    color-scheme: light;
 
-  --ok: #2f9e6b;
-  --warn: #b8791f;
-  --danger: #c0463c;
-  --info: #2b7a9b;
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --surface-2: #f6f8fa;
+    --border: rgba(15, 40, 50, 0.12);
+    --text: #16242a;
+    --text-muted: #5a6b72;
+    --accent: #0e7c72;
+    --accent-contrast: #ffffff;
+    --focus: #0e7c72;
 
-  --font-body: var(--font-sans);
-  --font-head: var(--font-sans);
-  --fw-head: 700;
-  --fs-root: 15px;
-  --fs-h1: 1.6rem;
-  --fs-h2: 1.15rem;
-  --fs-small: 0.82rem;
-  --lh: 1.5;
-  --tracking-label: 0.02em;
-  --tt-label: none;
+    --ok: #2f9e6b;
+    --warn: #b8791f;
+    --danger: #c0463c;
+    --info: #2b7a9b;
 
-  --page-pad: var(--step-4);
-  --region-gap: var(--step-4);
-  --stack-gap: var(--step-3);
-  --inline-gap: var(--step-2);
-  --cell-pad-y: var(--step-2);
-  --cell-pad-x: var(--step-3);
+    --font-body: var(--font-sans);
+    --font-head: var(--font-sans);
+    --fw-head: 700;
+    --fs-root: 15px;
+    --fs-h1: 1.6rem;
+    --fs-h2: 1.15rem;
+    --fs-small: 0.82rem;
+    --lh: 1.5;
+    --tracking-label: 0.02em;
+    --tt-label: none;
 
-  --radius: 14px;
-  --radius-sm: 8px;
-  --border-width: 1px;
-  --shadow: 0 1px 2px rgba(15, 40, 50, 0.06), 0 8px 24px rgba(15, 40, 50, 0.08);
-  --surface-blur: 0px;
+    --page-pad: var(--step-4);
+    --region-gap: var(--step-4);
+    --stack-gap: var(--step-3);
+    --inline-gap: var(--step-2);
+    --cell-pad-y: var(--step-2);
+    --cell-pad-x: var(--step-3);
 
-  /* -- Timeline marker tokens (acquisition history anatomy): semantic states
-        the skins theme. State colors ride the skin's own palette remap; the
-        marker is reinforcement only — entry text carries the meaning. ------- */
-  --marker-size: 0.55rem;
-  --marker-routine: #9fadb4;
-  --marker-pending: var(--info);
-  --marker-attention: var(--warn);
-  --marker-failure: var(--danger);
-  --marker-success: var(--ok);
+    /* The detail view's readable width. rem-preferred so the panel keeps participating in each
+       skin's type scale, floored in px so no skin's root size can crush it below the band a side
+       panel is readable in, and ceilinged so it never becomes the page. */
+    --detail-size: clamp(340px, 26rem, 30rem);
 
-  /* -- Decision-surface tokens (review anatomy): the word-level diff mark.
-        Skins remap; color is reinforcement only — the direction cue and row
-        text carry the meaning on their own. --------------------------------- */
-  --diff-mark-bg: color-mix(in oklab, var(--warn) 22%, transparent);
-  --diff-mark-fg: var(--text);
+    --radius: 14px;
+    --radius-sm: 8px;
+    --border-width: 1px;
+    --shadow: 0 1px 2px rgba(15, 40, 50, 0.06), 0 8px 24px rgba(15, 40, 50, 0.08);
+    --surface-blur: 0px;
 
-  /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
-  --nav-dir: row; /* row = topbar, column = sidebar */
-  --shell-cols: 1fr;
-  --shell-rows: auto auto 1fr auto;
-  --shell-areas: 'masthead' 'nav' 'main' 'status';
+    /* -- Timeline marker tokens (acquisition history anatomy): semantic states
+          the skins theme. State colors ride the skin's own palette remap; the
+          marker is reinforcement only — entry text carries the meaning. ------- */
+    --marker-size: 0.55rem;
+    --marker-routine: #9fadb4;
+    --marker-pending: var(--info);
+    --marker-attention: var(--warn);
+    --marker-failure: var(--danger);
+    --marker-success: var(--ok);
+
+    /* -- Decision-surface tokens (review anatomy): the word-level diff mark.
+          Skins remap; color is reinforcement only — the direction cue and row
+          text carry the meaning on their own. --------------------------------- */
+    --diff-mark-bg: color-mix(in oklab, var(--warn) 22%, transparent);
+    --diff-mark-fg: var(--text);
+
+    /* -- Layout tokens: the app shell reads these, so a skin can re-lay-out --- */
+    --nav-dir: row; /* row = topbar, column = sidebar */
+    --shell-cols: 1fr;
+    --shell-rows: auto auto 1fr auto;
+    --shell-areas: 'masthead' 'nav' 'main' 'status';
+  }
 }

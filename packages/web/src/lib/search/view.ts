@@ -103,6 +103,19 @@ export function otherMatches(
 }
 
 /**
+ * What stands in for a cover the archive has not got — the subject's leading initials. Shared by
+ * every artwork slot (grid card, artist bubble, row thumbnail, detail panel), so a cover that is
+ * missing looks the same wherever it goes missing.
+ */
+export function initialsOf(title: string): string {
+  return title
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+}
+
+/**
  * The one line under a result's title. Built here rather than in the template because a template
  * that concatenates values has to answer what an absent one renders as, and the answer belongs
  * with the rule ("say nothing about what the catalog does not know"), not with the markup.

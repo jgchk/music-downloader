@@ -53,7 +53,9 @@
         {:else if confirm.reasons !== undefined}
           <input type="hidden" name="reasons" value={confirm.reasons} />
         {/if}
-        <button type="submit" class="danger" data-testid="confirm-delete">Delete the files</button>
+        <button type="submit" class="btn danger" data-testid="confirm-delete"
+          >Delete the files</button
+        >
       </form>
       <a class="btn" href={`/reviews/${pending.importId}`} data-testid="confirm-keep">
         Keep the files

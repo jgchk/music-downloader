@@ -179,6 +179,7 @@
     {#each FILTERS as option (option.value)}
       <button
         type="button"
+        class="btn"
         aria-pressed={filter === option.value}
         onclick={() => (filter = option.value)}
       >

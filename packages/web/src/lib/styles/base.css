@@ -8,1126 +8,1164 @@
    components to change; they remap tokens and reach these same hooks.
    ============================================================================ */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-html {
-  font-size: var(--fs-root);
-}
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
-  line-height: var(--lh);
-  -webkit-font-smoothing: antialiased;
-}
-
-/* -- App shell: layout lives here, swapped entirely by the --shell-* tokens - */
-.app {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-columns: var(--shell-cols);
-  grid-template-rows: var(--shell-rows);
-  grid-template-areas: var(--shell-areas);
-  gap: var(--region-gap);
-  padding: var(--page-pad);
-}
-.app > .masthead {
-  grid-area: masthead;
-}
-.app > nav.primary {
-  grid-area: nav;
-}
-.app > main {
-  grid-area: main;
-  min-width: 0;
-}
-.app > .statusbar {
-  grid-area: status;
-}
-
-/* -- Typography ----------------------------------------------------------- */
-h1,
-h2,
-h3 {
-  font-family: var(--font-head);
-  font-weight: var(--fw-head);
-  line-height: 1.15;
-  text-wrap: balance;
-  margin: 0;
-}
-h1 {
-  font-size: var(--fs-h1);
-}
-h2 {
-  font-size: var(--fs-h2);
-}
-h3 {
-  font-size: 0.95rem;
-}
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-}
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* -- Main content flow: layout owns spacing (gap, not margins) ------------- */
-main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-gap);
-  align-items: stretch;
-}
-main > * {
-  margin: 0;
-}
-main p {
-  margin: 0;
-}
-
-/* -- Masthead = app toolbar ------------------------------------------------ */
-.masthead {
-  display: flex;
-  align-items: center;
-  gap: var(--inline-gap);
-  flex-wrap: wrap;
-}
-.wordmark {
-  font-family: var(--font-head);
-  font-weight: var(--fw-head);
-  font-size: 1.15rem;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  text-decoration: none;
-  display: flex;
-  align-items: baseline;
-  gap: 0.5ch;
-}
-.wordmark:hover {
-  text-decoration: none;
-}
-.wordmark .mark {
-  color: var(--accent);
-}
-.masthead .spacer {
-  flex: 1;
-}
-/* The signed-in identity + sign-out control (web-access-control): one inline form. */
-.masthead .session {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--inline-gap);
-}
-.masthead .session .user {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-
-/* -- Buttons + button-styled links ---------------------------------------- */
-button,
-.btn {
-  --btn-bg: var(--surface-2);
-  --btn-fg: var(--text);
-  --btn-bd: var(--border);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5ch;
-  font: inherit;
-  font-size: var(--fs-small);
-  font-weight: var(--fw-head);
-  letter-spacing: var(--tracking-label);
-  padding: var(--step-1) var(--step-3);
-  color: var(--btn-fg);
-  background: var(--btn-bg);
-  border: var(--border-width) solid var(--btn-bd);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-}
-button:hover,
-.btn:hover {
-  border-color: var(--accent);
-  text-decoration: none;
-}
-.btn.primary {
-  --btn-bg: var(--accent);
-  --btn-fg: var(--accent-contrast);
-  --btn-bd: var(--accent);
-}
-.btn.danger,
-button.danger {
-  --btn-bg: transparent;
-  --btn-fg: var(--danger);
-  --btn-bd: color-mix(in oklab, var(--danger) 55%, var(--border));
-}
-.btn.danger:hover,
-button.danger:hover {
-  border-color: var(--danger);
-}
-button[disabled] {
-  opacity: 0.5;
-  cursor: default;
-}
-button[disabled]:hover {
-  border-color: var(--btn-bd);
-}
-
-/* -- Segmented control (skin switcher, filters) --------------------------- */
-.segmented {
-  display: inline-flex;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--surface-2);
-}
-.segmented button {
-  appearance: none;
-  border: 0;
-  border-right: var(--border-width) solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-  font-size: var(--fs-small);
-  text-transform: var(--tt-label);
-  padding: var(--step-0) var(--step-2);
-}
-.segmented button:last-child {
-  border-right: 0;
-}
-.segmented button:hover {
-  color: var(--text);
-  border-color: var(--border);
-}
-.segmented button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-
-/* -- Forms ---------------------------------------------------------------- */
-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-gap);
-  align-items: flex-start;
-}
-label {
-  display: grid;
-  gap: var(--step-0);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-input,
-select,
-textarea {
-  font: inherit;
-  font-size: var(--fs-small);
-  color: var(--text);
-  background: var(--surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--step-1) var(--step-2);
-  min-width: 16rem;
-  max-width: 100%;
-}
-textarea {
-  min-height: 4rem;
-  resize: vertical;
-}
-details {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--step-2);
-  background: var(--surface-2);
-  align-self: stretch;
-}
-summary {
-  cursor: pointer;
-  font-weight: var(--fw-head);
-  font-size: var(--fs-small);
-}
-details > form,
-details > label,
-details > fieldset {
-  margin-top: var(--stack-gap);
-}
-fieldset {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--step-3);
-  display: grid;
-  gap: var(--step-2);
-  align-self: stretch;
-}
-legend {
-  font-weight: var(--fw-head);
-  font-size: var(--fs-small);
-  padding: 0 var(--step-1);
-}
-
-/* -- Tables --------------------------------------------------------------- */
-.table-wrap {
-  overflow-x: auto;
-  align-self: stretch;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  align-self: stretch;
-}
-th {
-  text-align: left;
-}
-thead th {
-  font-size: var(--fs-small);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-  color: var(--text-muted);
-  font-weight: var(--fw-head);
-  padding: var(--cell-pad-y) var(--cell-pad-x);
-  border-bottom: var(--border-width) solid var(--border);
-}
-tbody td {
-  padding: var(--cell-pad-y) var(--cell-pad-x);
-  border-bottom: var(--border-width) solid var(--border);
-  vertical-align: middle;
-}
-tbody tr:hover td {
-  background: var(--surface-2);
-}
-tbody tr[aria-current='true'] td {
-  background: color-mix(in oklab, var(--accent) 16%, transparent);
-}
-
-/* -- Master-detail: a compact list pane beside the wider detail pane ------
-   (acquisitions). The master is a FIXED width holding a compact summary list —
-   not a table — so the detail is the wider pane (Apple HIG); below ~960px the
-   panes no longer fit side by side, so on a CHILD route (a detail or the
-   new-request form) the queue is hidden and that pane has the screen to itself
-   — the list-detail collapse every platform's small-screen guidance converges
-   on (docs/research/responsive-master-detail-ux.md). The index route is
-   deliberately untouched: there both panes still stack, queue first, with the
-   placeholder below it — a deliberate deferral: the queue is what that route
-   is for, so nothing is buried there.
-   The hidden pane is `display: none`, which takes it out of the tab order and
-   the accessibility tree too; the panes are never reordered, so document order
-   stays the reading order with CSS off and under every skin. */
-.master-detail {
-  display: grid;
-  gap: var(--region-gap);
-  grid-template-columns: 22rem minmax(0, 1fr);
-  align-items: start;
-}
-.master-detail .master {
-  min-width: 0;
-}
-.master-detail .detail {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-gap);
-}
-/* The way back to the queue: redundant while the queue is on screen beside the
-   detail, so it earns its place only at the widths where the queue is hidden. */
-.master-detail .back-to-queue {
-  display: none;
-}
-@media (max-width: 960px) {
-  .master-detail {
-    grid-template-columns: 1fr;
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
-  .master-detail.detail-active .master {
-    display: none;
-  }
-  .master-detail.detail-active .back-to-queue {
-    display: inline-block;
-    align-self: start;
+
+  /* Widget chrome is opt-in, via `.btn` — never carried by the element. A button that is a
+     surface (a whole result card, a track row, an edition) or an inline link has to be plain by
+     default: when the chrome rode the element instead, its alignment, nowrap and type size leaked
+     into every one of them and collapsed the layouts they were given. Deliberately NOT
+     `all: unset`, which would also throw away the focus indication a keyboard user navigates by. */
+  button {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
   }
 }
 
-/* -- Queue: the compact master list (target + phase signal per item) ------- */
-ul.queue {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 2px;
-}
-ul.queue > li {
-  min-width: 0;
-}
-ul.queue a {
-  display: grid;
-  gap: 2px;
-  padding: var(--cell-pad-y) var(--cell-pad-x);
-  border: var(--border-width) solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  text-decoration: none;
-}
-ul.queue a:hover {
-  background: var(--surface-2);
-  text-decoration: none;
-}
-ul.queue a[aria-current='true'] {
-  background: var(--surface-2);
-  border-color: var(--border);
-}
-ul.queue .row-main {
-  display: flex;
-  align-items: center;
-  gap: var(--inline-gap);
-  min-width: 0;
-}
-ul.queue .target {
-  flex: 1;
-  min-width: 0;
-  font-weight: var(--fw-head);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-ul.queue .badge {
-  flex: none;
-}
-ul.queue .row-sub {
-  display: flex;
-  gap: var(--inline-gap);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-
-/* -- Panels + title bars (region-head): the per-page chrome convention.
-   A `.panel` is a surface card; a `.region-head` is its heading row, which a
-   skin may render as a title bar (see forum). Hooks are meaning-based only —
-   no visual class names — so a skin restyles them without any markup change. */
-.panel {
-  background: var(--surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(var(--surface-blur));
-  padding: var(--stack-gap);
-}
-.region-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--inline-gap);
-  margin-bottom: var(--stack-gap);
-}
-.eyebrow {
-  font-size: var(--fs-small);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-  color: var(--text-muted);
-}
-.actions {
-  display: flex;
-  gap: var(--inline-gap);
-  flex-wrap: wrap;
-}
-
-/* -- Definition lists (dashboard stats + metadata pairs) ------------------ */
-dl.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--inline-gap);
-}
-dl.stats > div {
-  padding: var(--stack-gap);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-dl.stats dt {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-}
-dl.stats dd {
-  margin: var(--step-0) 0 0;
-  font-family: var(--font-head);
-  font-size: 1.7rem;
-  font-weight: var(--fw-head);
-  font-variant-numeric: tabular-nums;
-}
-dl:not(.stats) {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--step-1) var(--step-3);
-}
-dl:not(.stats) dt {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-}
-dl:not(.stats) dd {
-  margin: 0;
-}
-
-/* -- Status badges + tags (existing component hooks) ---------------------- */
-.badge {
-  --c: var(--info);
-  display: inline-block;
-  padding: 0.1em 0.6em;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-head);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-  color: var(--c);
-  border: var(--border-width) solid color-mix(in oklab, var(--c) 45%, transparent);
-  background: color-mix(in oklab, var(--c) 14%, transparent);
-  white-space: nowrap;
-}
-.badge[data-phase='imported'] {
-  --c: var(--ok);
-}
-.badge[data-phase='downloading'] {
-  --c: var(--info);
-}
-.badge[data-phase='searching'] {
-  --c: var(--info);
-}
-.badge[data-phase='pending'] {
-  --c: var(--info);
-}
-.badge[data-phase='awaiting'] {
-  --c: var(--warn);
-}
-.badge[data-phase='failed'] {
-  --c: var(--danger);
-}
-.chip {
-  display: inline-block;
-  padding: 0.05em 0.55em;
-  border-radius: 999px;
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-  border: var(--border-width) solid var(--border);
-  background: var(--surface-2);
-}
-
-/* -- Progress ------------------------------------------------------------- */
-progress {
-  width: 100%;
-  max-width: 22rem;
-  height: 0.7rem;
-  accent-color: var(--accent);
-}
-
-/* -- Lists (history, reviews) --------------------------------------------- */
-main ol,
-main ul {
-  padding-left: 1.2em;
-  display: grid;
-  gap: var(--step-1);
-}
-main ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-/* -- Error / alert -------------------------------------------------------- */
-.error,
-[role='alert'] {
-  color: var(--danger);
-  border: var(--border-width) solid color-mix(in oklab, var(--danger) 45%, transparent);
-  background: color-mix(in oklab, var(--danger) 10%, transparent);
-  padding: var(--step-1) var(--step-2);
-  border-radius: var(--radius-sm);
-}
-
-/* -- Status bar (footer) -------------------------------------------------- */
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: var(--stack-gap);
-  flex-wrap: wrap;
-  padding: var(--step-1) var(--stack-gap);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-.statusbar .spacer {
-  flex: 1;
-}
-.statusbar .note {
-  font-style: italic;
-}
-
-/* -- Primary nav: same <ul>, direction is a token ------------------------- */
-nav.primary ul {
-  list-style: none;
-  margin: 0;
-  padding: var(--stack-gap);
-  display: flex;
-  flex-direction: var(--nav-dir);
-  gap: var(--inline-gap);
-  background: var(--surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-nav.primary a {
-  display: flex;
-  align-items: center;
-  gap: 0.5ch;
-  padding: var(--step-1) var(--step-2);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: var(--fs-small);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-}
-nav.primary a:hover {
-  background: var(--surface-2);
-  text-decoration: none;
-}
-nav.primary a[aria-current='page'] {
-  color: var(--accent);
-  background: var(--surface-2);
-  font-weight: var(--fw-head);
-}
-
-/* -- Narrow: collapse every skin to one column ---------------------------- */
-@media (max-width: 900px) {
-  :root {
-    --shell-cols: 1fr !important;
-    --shell-rows: auto auto 1fr auto !important;
-    --shell-areas: 'masthead' 'nav' 'main' 'status' !important;
-    --nav-dir: row !important;
+@layer base {
+  html {
+    font-size: var(--fs-root);
   }
-  nav.primary ul {
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: var(--lh);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* -- App shell: layout lives here, swapped entirely by the --shell-* tokens - */
+  .app {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: var(--shell-cols);
+    grid-template-rows: var(--shell-rows);
+    grid-template-areas: var(--shell-areas);
+    gap: var(--region-gap);
+    padding: var(--page-pad);
+  }
+  .app > .masthead {
+    grid-area: masthead;
+  }
+  .app > nav.primary {
+    grid-area: nav;
+  }
+  .app > main {
+    grid-area: main;
+    min-width: 0;
+  }
+  .app > .statusbar {
+    grid-area: status;
+  }
+
+  /* -- Typography ----------------------------------------------------------- */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-head);
+    font-weight: var(--fw-head);
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h1 {
+    font-size: var(--fs-h1);
+  }
+  h2 {
+    font-size: var(--fs-h2);
+  }
+  h3 {
+    font-size: 0.95rem;
+  }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* -- Main content flow: layout owns spacing (gap, not margins) ------------- */
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+    align-items: stretch;
+  }
+  main > * {
+    margin: 0;
+  }
+  main p {
+    margin: 0;
+  }
+
+  /* -- Masthead = app toolbar ------------------------------------------------ */
+  .masthead {
+    display: flex;
+    align-items: center;
+    gap: var(--inline-gap);
     flex-wrap: wrap;
   }
-}
-
-/* -- Timeline: the acquisition history (legible-acquisition-history D11).
-   The anatomy is structural and defined once: a marker/body/time row grid, an
-   animated in-progress state, date dividers, and the per-entry disclosure.
-   Skins theme it via the --marker-* tokens plus focused rules of their own;
-   the marker is reinforcement only — the entry text carries the meaning. */
-ol.timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-ol.timeline > li.timeline-entry {
-  display: grid;
-  grid-template-columns: var(--step-3) minmax(0, 1fr) auto;
-  column-gap: var(--inline-gap);
-  padding: var(--step-1) 0;
-}
-.timeline-marker {
-  width: var(--marker-size);
-  height: var(--marker-size);
-  border-radius: 50%;
-  background: var(--marker-routine);
-  justify-self: center;
-  margin-top: calc((1rem * var(--lh) - var(--marker-size)) / 2);
-}
-ol.timeline > li[data-state='pending'] .timeline-marker {
-  background: var(--marker-pending);
-  animation: marker-pulse 1.6s ease-in-out infinite;
-}
-ol.timeline > li[data-state='attention'] .timeline-marker {
-  background: var(--marker-attention);
-}
-ol.timeline > li[data-state='failure'] .timeline-marker {
-  background: var(--marker-failure);
-}
-ol.timeline > li[data-state='success'] .timeline-marker {
-  background: var(--marker-success);
-}
-@keyframes marker-pulse {
-  50% {
-    opacity: 0.3;
+  .wordmark {
+    font-family: var(--font-head);
+    font-weight: var(--fw-head);
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    text-decoration: none;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5ch;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  ol.timeline > li[data-state='pending'] .timeline-marker {
-    animation: none;
+  .wordmark:hover {
+    text-decoration: none;
   }
-}
-.timeline-body {
-  min-width: 0;
-}
-.timeline-entry > time {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-  line-height: calc(1rem * var(--lh));
-}
-.timeline-duration {
-  color: var(--text-muted);
-}
-.timeline-link {
-  margin-left: var(--inline-gap);
-}
-li.timeline-date {
-  padding: var(--step-2) 0 var(--step-0) calc(var(--step-3) + var(--inline-gap));
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-  letter-spacing: var(--tracking-label);
-  text-transform: var(--tt-label);
-}
-.timeline-detail {
-  margin-top: var(--step-0);
-}
-.timeline-detail summary {
-  cursor: pointer;
-  width: max-content;
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-}
-.timeline-detail dl {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 2px var(--inline-gap);
-  margin: var(--step-0) 0 0;
-  font-size: var(--fs-small);
-}
-.timeline-detail dt {
-  color: var(--text-muted);
-}
-.timeline-detail dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-}
+  .wordmark .mark {
+    color: var(--accent);
+  }
+  .masthead .spacer {
+    flex: 1;
+  }
+  /* The signed-in identity + sign-out control (web-access-control): one inline form. */
+  .masthead .session {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--inline-gap);
+  }
+  .masthead .session .user {
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+  }
 
-/* -- Detail header: the status phrase + counters, and the labeled location. */
-.status-line {
-  display: flex;
-  align-items: center;
-  gap: var(--inline-gap);
-  flex-wrap: wrap;
-}
-.status-meta {
-  color: var(--text-muted);
-}
-.location-line {
-  color: var(--text-muted);
-}
-.location-path {
-  font-family: var(--font-mono);
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
+  /* -- Push buttons + button-styled links -----------------------------------
+     `.btn` is the whole of it: what wears this class is a widget, and what does
+     not is a surface or a link. Element selectors are the reset's business. */
+  .btn {
+    --btn-bg: var(--surface-2);
+    --btn-fg: var(--text);
+    --btn-bd: var(--border);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5ch;
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-head);
+    letter-spacing: var(--tracking-label);
+    padding: var(--step-1) var(--step-3);
+    color: var(--btn-fg);
+    background: var(--btn-bg);
+    border: var(--border-width) solid var(--btn-bd);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+  .btn.primary {
+    --btn-bg: var(--accent);
+    --btn-fg: var(--accent-contrast);
+    --btn-bd: var(--accent);
+  }
+  .btn.danger {
+    --btn-bg: transparent;
+    --btn-fg: var(--danger);
+    --btn-bd: color-mix(in oklab, var(--danger) 55%, var(--border));
+  }
+  .btn.danger:hover {
+    border-color: var(--danger);
+  }
+  .btn[disabled] {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .btn[disabled]:hover {
+    border-color: var(--btn-bd);
+  }
 
-/* -- Review decision surface (reviews-register-alignment D10).
-   Anatomy defined once: the staged-path support line, the coarse match-quality
-   headline, word-level diff marks over de-emphasized unchanged rows, the
-   per-candidate disclosure, and the destructive confirm block. Danger color is
-   never the only signal — the labels carry the consequence on their own. */
-.path-line {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-}
-.path-line .path {
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-}
-.match-quality {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.track-diff mark {
-  background: var(--diff-mark-bg);
-  color: var(--diff-mark-fg);
-  padding: 0 0.12em;
-  border-radius: 2px;
-}
-.track-diff tr.unchanged {
-  color: var(--text-muted);
-}
-.candidate-details summary,
-.review-detail-disclosure summary {
-  color: var(--text-muted);
-  font-weight: inherit;
-}
-.candidate-details dl,
-.review-detail-disclosure dl {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 2px var(--inline-gap);
-  margin: var(--step-1) 0 0;
-  font-size: var(--fs-small);
-}
-.candidate-details dl > div,
-.review-detail-disclosure dl > div {
-  display: contents;
-}
-.candidate-details dt,
-.review-detail-disclosure dt {
-  color: var(--text-muted);
-}
-.candidate-details dd,
-.review-detail-disclosure dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-}
-.confirm-destructive {
-  align-self: stretch;
-  display: grid;
-  gap: var(--stack-gap);
-  padding: var(--step-3);
-  border: var(--border-width) solid color-mix(in oklab, var(--danger) 45%, var(--border));
-  background: color-mix(in oklab, var(--danger) 8%, transparent);
-  border-radius: var(--radius-sm);
-}
-.confirm-destructive > p {
-  margin: 0;
-}
-.confirm-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--inline-gap);
-  align-items: center;
-}
-.confirm-choices form {
-  display: contents;
-}
+  /* An inline action that acts on this page rather than navigating to another one still reads as
+     a link — it is a link's job wearing a button's element, so it wears a link's clothes. */
+  .linkish {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .linkish:hover {
+    text-decoration: underline;
+  }
 
-/* -- Catalog-search anatomy: the request page's search surface ---------------
-   Structural once, themed per skin (web-ui-presentation). Meaning-based hooks
-   only: what a thing IS (a result, an edition, the artwork slot), never how it
-   should look. The artwork slot reserves its space before an image arrives, so
-   a grid does not reflow as covers load, and a cover that never arrives simply
-   leaves the placeholder it was drawn over. */
-.request-search {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-gap);
-}
-.search-field {
-  display: flex;
-  align-items: baseline;
-  gap: var(--inline-gap);
-  flex-wrap: wrap;
-}
-.search-label {
-  font-weight: var(--fw-head);
-}
-.search-field input[type='search'] {
-  flex: 1 1 18rem;
-  font-size: var(--fs-h2);
-}
-.searching {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-}
-.search-hint {
-  color: var(--text-muted);
-  margin: 0;
-  max-width: 60ch;
-}
+  /* -- Segmented control (skin switcher, filters) --------------------------- */
+  .segmented {
+    display: inline-flex;
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  /* Deliberately not `.btn`: the segmented control's children are one flat control's segments,
+     not a row of raised push buttons — so this rule says the whole of how they look. */
+  .segmented button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    border: 0;
+    border-right: var(--border-width) solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    box-shadow: none;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-head);
+    letter-spacing: var(--tracking-label);
+    white-space: nowrap;
+    text-transform: var(--tt-label);
+    padding: var(--step-0) var(--step-2);
+  }
+  .segmented button:last-child {
+    border-right: 0;
+  }
+  .segmented button:hover {
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .segmented button[aria-pressed='true'] {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
 
-/* The kind of result being looked at; `aria-pressed` carries the state, not a class. */
-.entity-filter {
-  display: flex;
-  gap: var(--step-0);
-  flex-wrap: wrap;
-}
-.entity-filter button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-}
+  /* -- Forms ---------------------------------------------------------------- */
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+    align-items: flex-start;
+  }
+  label {
+    display: grid;
+    gap: var(--step-0);
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+    font-size: var(--fs-small);
+    color: var(--text);
+    background: var(--surface);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--step-1) var(--step-2);
+    min-width: 16rem;
+    max-width: 100%;
+  }
+  textarea {
+    min-height: 4rem;
+    resize: vertical;
+  }
+  details {
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--step-2);
+    background: var(--surface-2);
+    align-self: stretch;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: var(--fw-head);
+    font-size: var(--fs-small);
+  }
+  details > form,
+  details > label,
+  details > fieldset {
+    margin-top: var(--stack-gap);
+  }
+  fieldset {
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--step-3);
+    display: grid;
+    gap: var(--step-2);
+    align-self: stretch;
+  }
+  legend {
+    font-weight: var(--fw-head);
+    font-size: var(--fs-small);
+    padding: 0 var(--step-1);
+  }
 
-.results h2 {
-  font-size: var(--fs-h2);
-  display: flex;
-  align-items: baseline;
-  gap: var(--inline-gap);
-}
-.results .count {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-  font-weight: 400;
-}
-.results ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* Albums read as artwork; artists as a row of names; tracks as compact lines.
-   Three shapes so the kinds are told apart by form, never by colour alone. */
-.art-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: var(--stack-gap);
-}
-.artist-row {
-  display: flex;
-  gap: var(--stack-gap);
-  overflow-x: auto;
-  padding-bottom: var(--step-0);
-}
-.artist-row > .result {
-  flex: 0 0 8rem;
-  text-align: center;
-}
-.track-rows {
-  display: flex;
-  flex-direction: column;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.track-rows > .result {
-  display: flex;
-  align-items: center;
-  gap: var(--inline-gap);
-  padding: var(--cell-pad-y) var(--cell-pad-x);
-  border-top: var(--border-width) solid var(--border);
-}
-.track-rows > .result:first-child {
-  border-top: 0;
-}
-.track-rows .result-open {
-  display: flex;
-  align-items: center;
-  gap: var(--inline-gap);
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.result {
-  background: var(--surface);
-}
-.art-grid > .result,
-.artist-row > .result {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--step-1);
-  display: flex;
-  flex-direction: column;
-  gap: var(--step-1);
-}
-.result-open {
-  display: flex;
-  flex-direction: column;
-  gap: var(--step-0);
-  background: none;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.result-title {
-  font-weight: var(--fw-head);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-detail {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-action {
-  color: var(--accent);
-  font-size: var(--fs-small);
-}
-
-/* The artwork slot: square, reserved, with the placeholder drawn underneath. */
-.art {
-  position: relative;
-  display: block;
-  aspect-ratio: 1;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.art img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  /* Above the placeholder it is drawn over: both are positioned, and the placeholder comes later
-     in the DOM, so without this the initials would paint on top of every cover that loaded. An
-     image that never loads paints nothing, leaving the placeholder visible — which is the point. */
-  z-index: 1;
-}
-.art-placeholder {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-weight: var(--fw-head);
-  font-size: var(--fs-h2);
-}
-.art-artist {
-  border-radius: 50%;
-  width: 5rem;
-  margin: 0 auto;
-}
-.art-thumb {
-  flex: 0 0 2.5rem;
-  width: 2.5rem;
-}
-
-.request-form {
-  margin: 0;
-}
-.request {
-  width: 100%;
-}
-.track-rows .request {
-  width: auto;
-}
-.empty-results {
-  color: var(--text-muted);
-}
-
-/* The catalog detail surface: a side panel where there is room, a bottom sheet where there is not.
-   Same DOM either way — only the CSS changes. Named `catalog-detail` rather than `detail`, which
-   the acquisitions master-detail layout already owns: a `position: fixed` rule under that name
-   would have collapsed that pane into a drawer on every route it lays out. */
-.catalog-detail {
-  position: fixed;
-  inset: 0 0 0 auto;
-  width: min(26rem, 100vw);
-  overflow-y: auto;
-  background: var(--surface);
-  border-left: var(--border-width) solid var(--border);
-  padding: var(--page-pad);
-  box-shadow: var(--shadow);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-gap);
-}
-@media (max-width: 40rem) {
-  .catalog-detail {
-    inset: auto 0 0 0;
+  /* -- Tables --------------------------------------------------------------- */
+  .table-wrap {
+    overflow-x: auto;
+    align-self: stretch;
+  }
+  table {
     width: 100%;
-    max-height: 82dvh;
-    border-left: 0;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    align-self: stretch;
+  }
+  th {
+    text-align: left;
+  }
+  thead th {
+    font-size: var(--fs-small);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+    color: var(--text-muted);
+    font-weight: var(--fw-head);
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    border-bottom: var(--border-width) solid var(--border);
+  }
+  tbody td {
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    border-bottom: var(--border-width) solid var(--border);
+    vertical-align: middle;
+  }
+  tbody tr:hover td {
+    background: var(--surface-2);
+  }
+  tbody tr[aria-current='true'] td {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+  }
+
+  /* -- Master-detail: a compact list pane beside the wider detail pane ------
+     (acquisitions). The master is a FIXED width holding a compact summary list —
+     not a table — so the detail is the wider pane (Apple HIG); below ~960px the
+     panes no longer fit side by side, so on a CHILD route (a detail or the
+     new-request form) the queue is hidden and that pane has the screen to itself
+     — the list-detail collapse every platform's small-screen guidance converges
+     on (docs/research/responsive-master-detail-ux.md). The index route is
+     deliberately untouched: there both panes still stack, queue first, with the
+     placeholder below it — a deliberate deferral: the queue is what that route
+     is for, so nothing is buried there.
+     The hidden pane is `display: none`, which takes it out of the tab order and
+     the accessibility tree too; the panes are never reordered, so document order
+     stays the reading order with CSS off and under every skin. */
+  .master-detail {
+    display: grid;
+    gap: var(--region-gap);
+    grid-template-columns: 22rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .master-detail .master {
+    min-width: 0;
+  }
+  .master-detail .detail {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+  }
+  /* The way back to the queue: redundant while the queue is on screen beside the
+     detail, so it earns its place only at the widths where the queue is hidden. */
+  .master-detail .back-to-queue {
+    display: none;
+  }
+  @media (max-width: 960px) {
+    .master-detail {
+      grid-template-columns: 1fr;
+    }
+    .master-detail.detail-active .master {
+      display: none;
+    }
+    .master-detail.detail-active .back-to-queue {
+      display: inline-block;
+      align-self: start;
+    }
+  }
+
+  /* -- Queue: the compact master list (target + phase signal per item) ------- */
+  ul.queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  ul.queue > li {
+    min-width: 0;
+  }
+  ul.queue a {
+    display: grid;
+    gap: 2px;
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    text-decoration: none;
+  }
+  ul.queue a:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  ul.queue a[aria-current='true'] {
+    background: var(--surface-2);
+    border-color: var(--border);
+  }
+  ul.queue .row-main {
+    display: flex;
+    align-items: center;
+    gap: var(--inline-gap);
+    min-width: 0;
+  }
+  ul.queue .target {
+    flex: 1;
+    min-width: 0;
+    font-weight: var(--fw-head);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  ul.queue .badge {
+    flex: none;
+  }
+  ul.queue .row-sub {
+    display: flex;
+    gap: var(--inline-gap);
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+  }
+
+  /* -- Panels + title bars (region-head): the per-page chrome convention.
+     A `.panel` is a surface card; a `.region-head` is its heading row, which a
+     skin may render as a title bar (see forum). Hooks are meaning-based only —
+     no visual class names — so a skin restyles them without any markup change. */
+  .panel {
+    background: var(--surface);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(var(--surface-blur));
+    padding: var(--stack-gap);
+  }
+  .region-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--inline-gap);
+    margin-bottom: var(--stack-gap);
+  }
+  .eyebrow {
+    font-size: var(--fs-small);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+    color: var(--text-muted);
+  }
+  .actions {
+    display: flex;
+    gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
+
+  /* -- Definition lists (dashboard stats + metadata pairs) ------------------ */
+  dl.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: var(--inline-gap);
+  }
+  dl.stats > div {
+    padding: var(--stack-gap);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+  dl.stats dt {
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+  }
+  dl.stats dd {
+    margin: var(--step-0) 0 0;
+    font-family: var(--font-head);
+    font-size: 1.7rem;
+    font-weight: var(--fw-head);
+    font-variant-numeric: tabular-nums;
+  }
+  dl:not(.stats) {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--step-1) var(--step-3);
+  }
+  dl:not(.stats) dt {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+  }
+  dl:not(.stats) dd {
+    margin: 0;
+  }
+
+  /* -- Status badges + tags (existing component hooks) ---------------------- */
+  .badge {
+    --c: var(--info);
+    display: inline-block;
+    padding: 0.1em 0.6em;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-head);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+    color: var(--c);
+    border: var(--border-width) solid color-mix(in oklab, var(--c) 45%, transparent);
+    background: color-mix(in oklab, var(--c) 14%, transparent);
+    white-space: nowrap;
+  }
+  .badge[data-phase='imported'] {
+    --c: var(--ok);
+  }
+  .badge[data-phase='downloading'] {
+    --c: var(--info);
+  }
+  .badge[data-phase='searching'] {
+    --c: var(--info);
+  }
+  .badge[data-phase='pending'] {
+    --c: var(--info);
+  }
+  .badge[data-phase='awaiting'] {
+    --c: var(--warn);
+  }
+  .badge[data-phase='failed'] {
+    --c: var(--danger);
+  }
+  .chip {
+    display: inline-block;
+    padding: 0.05em 0.55em;
+    border-radius: 999px;
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+    border: var(--border-width) solid var(--border);
+    background: var(--surface-2);
+  }
+
+  /* -- Progress ------------------------------------------------------------- */
+  progress {
+    width: 100%;
+    max-width: 22rem;
+    height: 0.7rem;
+    accent-color: var(--accent);
+  }
+
+  /* -- Lists (history, reviews) --------------------------------------------- */
+  main ol,
+  main ul {
+    padding-left: 1.2em;
+    display: grid;
+    gap: var(--step-1);
+  }
+  main ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  /* -- Error / alert -------------------------------------------------------- */
+  .error,
+  [role='alert'] {
+    color: var(--danger);
+    border: var(--border-width) solid color-mix(in oklab, var(--danger) 45%, transparent);
+    background: color-mix(in oklab, var(--danger) 10%, transparent);
+    padding: var(--step-1) var(--step-2);
+    border-radius: var(--radius-sm);
+  }
+
+  /* -- Status bar (footer) -------------------------------------------------- */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    gap: var(--stack-gap);
+    flex-wrap: wrap;
+    padding: var(--step-1) var(--stack-gap);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: var(--fs-small);
+    color: var(--text-muted);
+  }
+  .statusbar .spacer {
+    flex: 1;
+  }
+  .statusbar .note {
+    font-style: italic;
+  }
+
+  /* -- Primary nav: same <ul>, direction is a token ------------------------- */
+  nav.primary ul {
+    list-style: none;
+    margin: 0;
+    padding: var(--stack-gap);
+    display: flex;
+    flex-direction: var(--nav-dir);
+    gap: var(--inline-gap);
+    background: var(--surface);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  nav.primary a {
+    display: flex;
+    align-items: center;
+    gap: 0.5ch;
+    padding: var(--step-1) var(--step-2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: var(--fs-small);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+  }
+  nav.primary a:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  nav.primary a[aria-current='page'] {
+    color: var(--accent);
+    background: var(--surface-2);
+    font-weight: var(--fw-head);
+  }
+
+  /* -- Narrow: collapse every skin to one column ---------------------------- */
+  @media (max-width: 900px) {
+    :root {
+      --shell-cols: 1fr !important;
+      --shell-rows: auto auto 1fr auto !important;
+      --shell-areas: 'masthead' 'nav' 'main' 'status' !important;
+      --nav-dir: row !important;
+    }
+    nav.primary ul {
+      flex-wrap: wrap;
+    }
+  }
+
+  /* -- Timeline: the acquisition history (legible-acquisition-history D11).
+     The anatomy is structural and defined once: a marker/body/time row grid, an
+     animated in-progress state, date dividers, and the per-entry disclosure.
+     Skins theme it via the --marker-* tokens plus focused rules of their own;
+     the marker is reinforcement only — the entry text carries the meaning. */
+  ol.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  ol.timeline > li.timeline-entry {
+    display: grid;
+    grid-template-columns: var(--step-3) minmax(0, 1fr) auto;
+    column-gap: var(--inline-gap);
+    padding: var(--step-1) 0;
+  }
+  .timeline-marker {
+    width: var(--marker-size);
+    height: var(--marker-size);
+    border-radius: 50%;
+    background: var(--marker-routine);
+    justify-self: center;
+    margin-top: calc((1rem * var(--lh) - var(--marker-size)) / 2);
+  }
+  ol.timeline > li[data-state='pending'] .timeline-marker {
+    background: var(--marker-pending);
+    animation: marker-pulse 1.6s ease-in-out infinite;
+  }
+  ol.timeline > li[data-state='attention'] .timeline-marker {
+    background: var(--marker-attention);
+  }
+  ol.timeline > li[data-state='failure'] .timeline-marker {
+    background: var(--marker-failure);
+  }
+  ol.timeline > li[data-state='success'] .timeline-marker {
+    background: var(--marker-success);
+  }
+  @keyframes marker-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    ol.timeline > li[data-state='pending'] .timeline-marker {
+      animation: none;
+    }
+  }
+  .timeline-body {
+    min-width: 0;
+  }
+  .timeline-entry > time {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    white-space: nowrap;
+    line-height: calc(1rem * var(--lh));
+  }
+  .timeline-duration {
+    color: var(--text-muted);
+  }
+  .timeline-link {
+    margin-left: var(--inline-gap);
+  }
+  li.timeline-date {
+    padding: var(--step-2) 0 var(--step-0) calc(var(--step-3) + var(--inline-gap));
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    letter-spacing: var(--tracking-label);
+    text-transform: var(--tt-label);
+  }
+  .timeline-detail {
+    margin-top: var(--step-0);
+  }
+  .timeline-detail summary {
+    cursor: pointer;
+    width: max-content;
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+  }
+  .timeline-detail dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 2px var(--inline-gap);
+    margin: var(--step-0) 0 0;
+    font-size: var(--fs-small);
+  }
+  .timeline-detail dt {
+    color: var(--text-muted);
+  }
+  .timeline-detail dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  /* -- Detail header: the status phrase + counters, and the labeled location. */
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
+  .status-meta {
+    color: var(--text-muted);
+  }
+  .location-line {
+    color: var(--text-muted);
+  }
+  .location-path {
+    font-family: var(--font-mono);
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  /* -- Review decision surface (reviews-register-alignment D10).
+     Anatomy defined once: the staged-path support line, the coarse match-quality
+     headline, word-level diff marks over de-emphasized unchanged rows, the
+     per-candidate disclosure, and the destructive confirm block. Danger color is
+     never the only signal — the labels carry the consequence on their own. */
+  .path-line {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+  }
+  .path-line .path {
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+  .match-quality {
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .track-diff mark {
+    background: var(--diff-mark-bg);
+    color: var(--diff-mark-fg);
+    padding: 0 0.12em;
+    border-radius: 2px;
+  }
+  .track-diff tr.unchanged {
+    color: var(--text-muted);
+  }
+  .candidate-details summary,
+  .review-detail-disclosure summary {
+    color: var(--text-muted);
+    font-weight: inherit;
+  }
+  .candidate-details dl,
+  .review-detail-disclosure dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 2px var(--inline-gap);
+    margin: var(--step-1) 0 0;
+    font-size: var(--fs-small);
+  }
+  .candidate-details dl > div,
+  .review-detail-disclosure dl > div {
+    display: contents;
+  }
+  .candidate-details dt,
+  .review-detail-disclosure dt {
+    color: var(--text-muted);
+  }
+  .candidate-details dd,
+  .review-detail-disclosure dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+  .confirm-destructive {
+    align-self: stretch;
+    display: grid;
+    gap: var(--stack-gap);
+    padding: var(--step-3);
+    border: var(--border-width) solid color-mix(in oklab, var(--danger) 45%, var(--border));
+    background: color-mix(in oklab, var(--danger) 8%, transparent);
+    border-radius: var(--radius-sm);
+  }
+  .confirm-destructive > p {
+    margin: 0;
+  }
+  .confirm-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--inline-gap);
+    align-items: center;
+  }
+  .confirm-choices form {
+    display: contents;
+  }
+
+  /* -- Catalog-search anatomy: the request page's search surface ---------------
+     Structural once, themed per skin (web-ui-presentation). Meaning-based hooks
+     only: what a thing IS (a result, an edition, the artwork slot), never how it
+     should look. The artwork slot reserves its space before an image arrives, so
+     a grid does not reflow as covers load, and a cover that never arrives simply
+     leaves the placeholder it was drawn over. */
+  .request-search {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+  }
+  .search-field {
+    display: flex;
+    align-items: baseline;
+    gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
+  .search-label {
+    font-weight: var(--fw-head);
+  }
+  .search-field input[type='search'] {
+    flex: 1 1 18rem;
+    font-size: var(--fs-h2);
+  }
+  .searching {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+  }
+  .search-hint {
+    color: var(--text-muted);
+    margin: 0;
+    max-width: 60ch;
+  }
+
+  /* The kind of result being looked at; `aria-pressed` carries the state, not a class. */
+  .entity-filter {
+    display: flex;
+    gap: var(--step-0);
+    flex-wrap: wrap;
+  }
+  .entity-filter button[aria-pressed='true'] {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+  }
+
+  .results h2 {
+    font-size: var(--fs-h2);
+    display: flex;
+    align-items: baseline;
+    gap: var(--inline-gap);
+  }
+  .results .count {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    font-weight: 400;
+  }
+  .results ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Albums read as artwork; artists as a row of names; tracks as compact lines.
+     Three shapes so the kinds are told apart by form, never by colour alone. */
+  .art-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: var(--stack-gap);
+  }
+  .artist-row {
+    display: flex;
+    gap: var(--stack-gap);
+    overflow-x: auto;
+    padding-bottom: var(--step-0);
+  }
+  .artist-row > .result {
+    flex: 0 0 8rem;
+    text-align: center;
+  }
+  .track-rows {
+    display: flex;
+    flex-direction: column;
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .track-rows > .result {
+    display: flex;
+    align-items: center;
+    gap: var(--inline-gap);
+    padding: var(--cell-pad-y) var(--cell-pad-x);
     border-top: var(--border-width) solid var(--border);
   }
-}
-.detail-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--inline-gap);
-}
-.detail-art {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-}
-.detail-status {
-  color: var(--text-muted);
-}
-.detail-request {
-  display: flex;
-  flex-direction: column;
-  gap: var(--step-1);
-}
+  .track-rows > .result:first-child {
+    border-top: 0;
+  }
+  .track-rows .result-open {
+    display: flex;
+    /* The result card's own direction is a column; a track reads across, so it says so here. */
+    flex-direction: row;
+    align-items: center;
+    gap: var(--inline-gap);
+    flex: 1;
+    min-width: 0;
+  }
 
-.edition-groups,
-.editions,
-.discography {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--step-1);
-}
-.edition-group summary {
-  cursor: pointer;
-  font-weight: var(--fw-head);
-}
-.edition-note {
-  color: var(--text-muted);
-  font-weight: 400;
-  font-size: var(--fs-small);
-}
-.edition {
-  display: flex;
-  flex-direction: column;
-  gap: var(--step-0);
-  width: 100%;
-  text-align: left;
-  background: var(--surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--cell-pad-y) var(--cell-pad-x);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.edition[aria-pressed='true'] {
-  border-color: var(--accent);
-}
-.edition-summary {
-  color: var(--text-muted);
-  font-size: var(--fs-small);
-  font-family: var(--font-mono);
-}
-/* Both of these say what they mean in words; the colour is reinforcement. */
-.edition-default,
-.edition-pinned {
-  color: var(--accent);
-  font-size: var(--fs-small);
-}
-.tracklist {
-  margin: 0;
-  padding-left: var(--step-4);
-  color: var(--text-muted);
-}
-.tracklist li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--inline-gap);
-}
-.track-time {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-}
-.discography li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--inline-gap);
-  flex-wrap: wrap;
-}
-.discography .request-form {
-  margin-left: auto;
-}
-.native-request summary {
-  cursor: pointer;
-  color: var(--text-muted);
+  .result {
+    background: var(--surface);
+  }
+  .art-grid > .result,
+  .artist-row > .result {
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--step-1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-1);
+  }
+  /* A whole card is the control, so it needs no chrome stripped off it — the reset already left
+     it plain. Alignment is inherited rather than declared, so an artist card can centre its
+     contents and an album card can start them without either fighting this rule. */
+  .result-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-0);
+  }
+  /* min-width lets these clip: without it a flex item's floor is its content, so a long title
+     grows its card instead of ellipsing inside it. */
+  .result-title {
+    font-weight: var(--fw-head);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result-detail {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result-action {
+    color: var(--accent);
+    font-size: var(--fs-small);
+  }
+
+  /* The artwork slot: square, reserved, with the placeholder drawn underneath. */
+  .art {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    /* Above the placeholder it is drawn over: both are positioned, and the placeholder comes later
+       in the DOM, so without this the initials would paint on top of every cover that loaded. A
+       cover that fails stops being rendered at all (see CoverArt) rather than painting the
+       browser's broken-image mark over the placeholder that is meant to stand in for it. */
+    z-index: 1;
+  }
+  .art-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-weight: var(--fw-head);
+    font-size: var(--fs-h2);
+  }
+  .art-artist {
+    border-radius: 50%;
+    width: 5rem;
+    margin: 0 auto;
+  }
+  .art-thumb {
+    flex: 0 0 2.5rem;
+    width: 2.5rem;
+  }
+
+  .request-form {
+    margin: 0;
+  }
+  .request {
+    width: 100%;
+  }
+  .track-rows .request {
+    width: auto;
+  }
+  .empty-results {
+    color: var(--text-muted);
+  }
+
+  /* The catalog detail surface: a side panel where there is room, a bottom sheet where there is not.
+     Same DOM either way — only the CSS changes. Named `catalog-detail` rather than `detail`, which
+     the acquisitions master-detail layout already owns: a `position: fixed` rule under that name
+     would have collapsed that pane into a drawer on every route it lays out. */
+  .catalog-detail {
+    position: fixed;
+    inset: 0 0 0 auto;
+    /* The token carries the readable band; the viewport shares keep the panel from taking a small
+       window over, whatever a skin remaps the token to. */
+    width: min(var(--detail-size), 75vw, 100vw);
+    overflow-y: auto;
+    background: var(--surface);
+    border-left: var(--border-width) solid var(--border);
+    padding: var(--page-pad);
+    box-shadow: var(--shadow);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+  }
+  @media (max-width: 40rem) {
+    .catalog-detail {
+      inset: auto 0 0 0;
+      width: 100%;
+      max-height: 82dvh;
+      border-left: 0;
+      border-top: var(--border-width) solid var(--border);
+    }
+  }
+  .detail-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--inline-gap);
+  }
+  /* The same artwork slot the result grids use, at the panel's width — so a cover that never
+     arrives leaves the same placeholder here as it does there. */
+  .art-detail {
+    width: 100%;
+  }
+  .detail-status {
+    color: var(--text-muted);
+  }
+  .detail-request {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-1);
+  }
+
+  .edition-groups,
+  .editions,
+  .discography {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-1);
+  }
+  .edition-group summary {
+    cursor: pointer;
+    font-weight: var(--fw-head);
+  }
+  .edition-note {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: var(--fs-small);
+  }
+  .edition {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-0);
+    width: 100%;
+    text-align: left;
+    background: var(--surface);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .edition[aria-pressed='true'] {
+    border-color: var(--accent);
+  }
+  .edition-summary {
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    font-family: var(--font-mono);
+  }
+  /* Both of these say what they mean in words; the colour is reinforcement. */
+  .edition-default,
+  .edition-pinned {
+    color: var(--accent);
+    font-size: var(--fs-small);
+  }
+  .tracklist {
+    margin: 0;
+    padding-left: var(--step-4);
+    color: var(--text-muted);
+  }
+  .tracklist li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--inline-gap);
+  }
+  .track-time {
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+  }
+  .discography li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--inline-gap);
+    flex-wrap: wrap;
+  }
+  .discography .request-form {
+    margin-left: auto;
+  }
+  .native-request summary {
+    cursor: pointer;
+    color: var(--text-muted);
+  }
 }

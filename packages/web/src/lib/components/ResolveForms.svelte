@@ -39,7 +39,7 @@
         Release ID
         <input name="mbReleaseId" required placeholder="from any connected source" />
       </label>
-      <button type="submit">{actionButtonText('supply-id')}</button>
+      <button type="submit" class="btn">{actionButtonText('supply-id')}</button>
     </form>
   </details>
 {/if}
@@ -47,28 +47,28 @@
 {#if isOffered('refresh-candidates')}
   <form method="POST" action="?/resolve" data-testid="refresh">
     <input type="hidden" name="verb" value="refresh-candidates" />
-    <button type="submit">{actionButtonText('refresh-candidates')}</button>
+    <button type="submit" class="btn">{actionButtonText('refresh-candidates')}</button>
   </form>
 {/if}
 
 {#if isOffered('import-as-is')}
   <form method="POST" action="?/resolve" data-testid="import-as-is">
     <input type="hidden" name="verb" value="import-as-is" />
-    <button type="submit">{actionButtonText('import-as-is')}</button>
+    <button type="submit" class="btn">{actionButtonText('import-as-is')}</button>
   </form>
 {/if}
 
 {#if isOffered('accept')}
   <form method="POST" action="?/resolve" data-testid="accept">
     <input type="hidden" name="verb" value="accept" />
-    <button type="submit">{actionButtonText('accept')}</button>
+    <button type="submit" class="btn">{actionButtonText('accept')}</button>
   </form>
 {/if}
 
 {#if isOffered('retry-enrichment')}
   <form method="POST" action="?/resolve" data-testid="retry-enrichment">
     <input type="hidden" name="verb" value="retry-enrichment" />
-    <button type="submit">{actionButtonText('retry-enrichment')}</button>
+    <button type="submit" class="btn">{actionButtonText('retry-enrichment')}</button>
   </form>
 {/if}
 
@@ -76,7 +76,7 @@
   <form method="POST" action="?/resolve" data-testid="reject">
     <input type="hidden" name="verb" value="reject" />
     <label>Reason (optional) <input name="reason" /></label>
-    <button type="submit" class="danger">{actionButtonText('reject')}</button>
+    <button type="submit" class="btn danger">{actionButtonText('reject')}</button>
   </form>
 {/if}
 
@@ -87,6 +87,6 @@
       Reasons (one per line)
       <textarea name="reasons"></textarea>
     </label>
-    <button type="submit" class="danger">{actionButtonText('reject-unusable-delivery')}</button>
+    <button type="submit" class="btn danger">{actionButtonText('reject-unusable-delivery')}</button>
   </form>
 {/if}

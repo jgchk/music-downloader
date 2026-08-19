@@ -80,7 +80,7 @@ describe('ResolveForms (SSR)', () => {
     expect(upToReject).not.toContain('danger');
     const rejectSlice = fromReject.split('data-testid="reject-unusable"', 1)[0] ?? '';
     const unusableSlice = fromReject.slice(rejectSlice.length);
-    expect(rejectSlice).toContain('class="danger"');
-    expect(unusableSlice).toContain('class="danger"');
+    expect(rejectSlice).toContain('class="btn danger"');
+    expect(unusableSlice).toContain('class="btn danger"');
   });
 });

@@ -6,11 +6,13 @@
     artUrl,
     countOf,
     emptyLead,
+    initialsOf,
     unavailableNotice,
     orderedKinds,
     otherMatches,
     trackDetail,
   } from '$lib/search/view.js';
+  import CoverArt from './CoverArt.svelte';
   import type { EntityFilter, EntityKind } from '$lib/search/view.js';
   import type { CatalogSearchResultDto } from '@music/downloader';
 
@@ -52,13 +54,6 @@
     artist: 'Artists',
     recording: 'Tracks',
   };
-
-  const initialsOf = (title: string): string =>
-    title
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((word) => word.charAt(0).toUpperCase())
-      .join('');
 </script>
 
 {#if notice !== undefined}
@@ -93,16 +88,10 @@
               class="result-open"
               onclick={() => onOpen('release-group', group.mbid, group.title)}
             >
-              <span class="art">
-                <img
-                  src={artUrl('release-group', group.mbid, 250)}
-                  alt=""
-                  loading="lazy"
-                  width="250"
-                  height="250"
-                />
-                <span class="art-placeholder" aria-hidden="true">{initialsOf(group.title)}</span>
-              </span>
+              <CoverArt
+                src={artUrl('release-group', group.mbid, 250)}
+                initials={initialsOf(group.title)}
+              />
               <span class="result-title">{group.title}</span>
               <span class="result-detail">{albumDetail(group)}</span>
             </button>
@@ -130,9 +119,7 @@
               class="result-open"
               onclick={() => onOpen('artist', artist.mbid, artist.name)}
             >
-              <span class="art art-artist">
-                <span class="art-placeholder" aria-hidden="true">{initialsOf(artist.name)}</span>
-              </span>
+              <CoverArt initials={initialsOf(artist.name)} shape="art-artist" />
               <span class="result-title">{artist.name}</span>
               <span class="result-detail">{artist.disambiguation ?? 'Artist'}</span>
               <span class="result-action">Browse releases</span>
@@ -149,19 +136,13 @@
               class="result-open"
               onclick={() => onOpen('recording', recording.mbid, recording.title)}
             >
-              <span class="art art-thumb">
-                {#if recording.release !== undefined}
-                  <img
-                    src={artUrl('release', recording.release.mbid, 250)}
-                    alt=""
-                    loading="lazy"
-                    width="250"
-                    height="250"
-                  />
-                {/if}
-                <span class="art-placeholder" aria-hidden="true">{initialsOf(recording.title)}</span
-                >
-              </span>
+              <CoverArt
+                src={recording.release === undefined
+                  ? undefined
+                  : artUrl('release', recording.release.mbid, 250)}
+                initials={initialsOf(recording.title)}
+                shape="art-thumb"
+              />
               <span class="result-title">{recording.title}</span>
               <span class="result-detail">{trackDetail(recording)}</span>
             </button>
