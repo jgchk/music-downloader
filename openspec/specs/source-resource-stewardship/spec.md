@@ -7,7 +7,7 @@ Govern how the system stewards the remote resources it creates on a shared music
 ## Requirements
 
 ### Requirement: Remote resources are recorded in a durable ownership ledger
-The system SHALL durably record every remote resource it creates on a music source (searches, download transfers) in an ownership ledger, keyed to the owning acquisition, before or immediately upon creation. A transfer's ledger entry SHALL be written before the enqueue request (its natural key is known in advance); a search's entry SHALL be written as soon as the source returns its identifier. Recording SHALL be idempotent so a retried effect does not duplicate entries. Each entry SHALL track whether the system still owes the source a removal.
+The system SHALL durably record every remote resource it creates on a music source (searches, download transfers) in an ownership ledger, keyed to the owning download, before or immediately upon creation. A transfer's ledger entry SHALL be written before the enqueue request (its natural key is known in advance); a search's entry SHALL be written as soon as the source returns its identifier. Recording SHALL be idempotent so a retried effect does not duplicate entries. Each entry SHALL track whether the system still owes the source a removal.
 
 #### Scenario: A transfer is recorded write-ahead
 - **WHEN** the system enqueues a candidate's files on the source
@@ -60,7 +60,7 @@ The system SHALL remove its transfers' tracked records from the source after the
 
 #### Scenario: A later attempt sees only its own transfers
 - **GIVEN** a candidate that was attempted before, whose settled records were removed
-- **WHEN** the same candidate is enqueued again by a later acquisition
+- **WHEN** the same candidate is enqueued again by a later download
 - **THEN** the new attempt's outcome reflects only the new transfers
 
 #### Scenario: An abandoned candidate's in-flight transfers leave no lingering record
@@ -70,14 +70,14 @@ The system SHALL remove its transfers' tracked records from the source after the
 - **AND** a ledger entry whose record is not confirmed gone is left live so the startup sweep retires it, rather than being marked removed
 
 ### Requirement: A startup sweep converges the system's own unfinished removals
-The system SHALL, at startup and before reacting to events, find ledger entries still live whose owning acquisition is terminal, remove the corresponding resources from the source (cancelling first if still active), and mark the entries removed. Entries owned by non-terminal acquisitions SHALL be left untouched. A failure on one entry SHALL NOT stop the sweep; unconverged entries remain live for the next startup.
+The system SHALL, at startup and before reacting to events, find ledger entries still live whose owning download is terminal, remove the corresponding resources from the source (cancelling first if still active), and mark the entries removed. Entries owned by non-terminal downloads SHALL be left untouched. A failure on one entry SHALL NOT stop the sweep; unconverged entries remain live for the next startup.
 
 #### Scenario: A crash-leaked transfer is retired at startup
-- **GIVEN** a live ledger entry for a transfer whose acquisition is terminal
+- **GIVEN** a live ledger entry for a transfer whose download is terminal
 - **WHEN** the system starts
 - **THEN** the transfer is cancelled if active, its record removed from the source, and the entry marked removed
 
-#### Scenario: An in-progress acquisition's resources are left alone
-- **GIVEN** a live ledger entry owned by a non-terminal acquisition
+#### Scenario: An in-progress download's resources are left alone
+- **GIVEN** a live ledger entry owned by a non-terminal download
 - **WHEN** the startup sweep runs
 - **THEN** the entry and its resource are untouched

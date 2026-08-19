@@ -80,10 +80,7 @@ export class MusicBrainzMetadata implements MetadataPort {
     );
   }
 
-  private async doResolve(
-    request: DownloadRequest,
-    logger: Logger,
-  ): Promise<MetadataResolution> {
+  private async doResolve(request: DownloadRequest, logger: Logger): Promise<MetadataResolution> {
     logger.debug({ kind: request.kind, targetType: request.targetType }, 'resolving metadata');
     if (request.kind === 'musicbrainz') {
       return request.targetType === 'album'

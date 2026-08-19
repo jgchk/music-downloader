@@ -10,10 +10,7 @@ import {
   UpcasterRegistry,
   openEventDatabase,
 } from '../adapters/index.js';
-import type {
-  EffectPorts,
-  InterpreterDependencies,
-} from '../application/download/interpreter.js';
+import type { EffectPorts, InterpreterDependencies } from '../application/download/interpreter.js';
 import { Reactor } from '../application/download/reactor.js';
 import type { UseCaseDependencies } from '../application/download/use-cases.js';
 import { fixedClock, sequentialIds, silentLogger } from '../application/__fixtures__/fakes.js';

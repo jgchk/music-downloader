@@ -53,9 +53,9 @@ A consuming context SHALL adopt the producer's correlation id, carried in the pu
 
 Within a unit of work, structured log lines SHALL carry the correlation id and the work's subject identity (the stream id where one exists), bound once per unit of work via child loggers — request-scoped at the web layer, per-dispatch in reactors and the download supervisor — and inherited by adapters through the loggers they are already injected with. Adapter code SHALL NOT construct or manage correlation state itself. Ids SHALL NOT appear in user-visible interface text.
 
-#### Scenario: An adapter line joins its acquisition
+#### Scenario: An adapter line joins its download
 
-- **WHEN** a source adapter logs during an effect dispatched for an acquisition
+- **WHEN** a source adapter logs during an effect dispatched for a download
 - **THEN** the line carries the correlation id and stream identity bound by the dispatch, without the adapter having handled either
 
 #### Scenario: A request's lines share one id

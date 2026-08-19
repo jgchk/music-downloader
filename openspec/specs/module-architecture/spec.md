@@ -67,12 +67,12 @@ Interface packages MAY read from both modules' facades to compose a view and MAY
 
 #### Scenario: Fulfillment triggers import without interface involvement
 
-- **WHEN** an acquisition is fulfilled while no interface request is in flight
+- **WHEN** a download is fulfilled while no interface request is in flight
 - **THEN** the corresponding import still begins, driven solely by the event seam
 
 #### Scenario: Composed read view
 
-- **WHEN** an interface renders a page combining acquisition progress and import review state
+- **WHEN** an interface renders a page combining download progress and import review state
 - **THEN** it issues independent facade queries to each module and performs no writes as part of the read
 
 ### Requirement: Every first-party source tier is inside the lint and typecheck gates

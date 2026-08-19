@@ -102,7 +102,7 @@ Regardless of the active skin, DOM source order SHALL match the meaningful readi
 
 ### Requirement: Timeline anatomy is structural once and themed per skin
 
-The acquisition timeline's visual anatomy — a per-entry arrangement of marker slot, content, and
+The download timeline's visual anatomy — a per-entry arrangement of marker slot, content, and
 time; an animated in-progress entry state; attention and failure/success entry states; date
 dividers; and the per-entry disclosure element — SHALL be defined once at the semantic
 skeleton/token layer as meaning-based hooks and semantic marker tokens (routine, pending,
@@ -112,7 +112,7 @@ of an entry's state — the entry text SHALL carry the meaning on its own.
 
 #### Scenario: Anatomy is shared, themes differ
 
-- **WHEN** the active skin changes between shipped skins on the acquisition detail
+- **WHEN** the active skin changes between shipped skins on the download detail
 - **THEN** the timeline's DOM is identical and only CSS differs, while each skin presents a
   deliberately styled timeline (markers, in-progress animation, meta alignment, disclosure)
 

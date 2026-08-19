@@ -40,7 +40,7 @@ Two concrete pathologies follow structurally, not hypothetically:
    resolutions, retries, and verdict-driven follow-ons wait behind the held mutex. This violates
    the system's own spec: "an infrastructure fault retrying one acquisition's effect SHALL NOT
    delay the processing of any other acquisition's events"
-   (`openspec/specs/acquisition-lifecycle/spec.md:145-147`) — the requirement's *letter* covers
+   (`openspec/specs/download-lifecycle/spec.md:145-147`) — the requirement's *letter* covers
    failing effects, but a healthy hour-long effect delays others identically, which the
    requirement's rationale (isolation between acquisitions) plainly intends to forbid.
 2. **Same-stream cancellation is wedged.** Cancelling a downloading acquisition emits events whose
@@ -79,7 +79,7 @@ lives* and *how its outcomes re-enter the event-sourced core*.
 - **Effect results already re-enter as commands through `decide`**, which guards staleness
   (`docs/development/event-sourcing.md` §"Decisions in `decide`, effects in `react`";
   `interpreter.ts:85-93`; stale-outcome requirement at
-  `openspec/specs/acquisition-lifecycle/spec.md:184-197`).
+  `openspec/specs/download-lifecycle/spec.md:184-197`).
 - **A durable catch-up consumer already ingests another context's facts** tolerantly and
   translates them through an ACL into native commands
   (`packages/downloader/src/interfaces/events/verdict-consumer.ts:8-15`).
@@ -207,7 +207,7 @@ telemetry" (`docs/development/event-sourcing.md` §"Events are facts"); the doma
 mechanics (`architecture.md`); errors are values crossing the port as `Result`
 (`error-handling.md`); tests are deterministic, "no real clock/network in unit tests"
 (`testing.md` §"What to test") under a 100%-coverage hard gate; one acquisition must not delay
-others (`acquisition-lifecycle/spec.md:145-147`); progress is a read model, never events
+others (`download-lifecycle/spec.md:145-147`); progress is a read model, never events
 (`download-management/spec.md:22-29`).
 
 ### A. Status quo — synchronous blocking effect
@@ -235,7 +235,7 @@ half it leaves out (supervised, non-blocking workers [ER1]) is the half this pro
 - **Same-stream cancellation stays wedged** — the `AbortDownload` dispatch now waits on the
   *stream's* mutex, which the in-flight `Download` dispatch holds. The causal inversion of §1.1.2
   survives untouched. (The lifecycle spec explicitly demands settlement-after-cancellation
-  handling, `acquisition-lifecycle/spec.md:184-197` — a shape B makes unreachable until the
+  handling, `download-lifecycle/spec.md:184-197` — a shape B makes unreachable until the
   download self-settles.)
 - The single global checkpoint ("advance only once dispatched or parked") stops being coherent:
   with N streams mid-dispatch concurrently, the checkpoint can only advance to the *minimum*
@@ -325,7 +325,7 @@ against the domain-owned budgets it was handed (the division the adapter already
 failed-with-reason / stalled-past-budget — back into the core **as a command through `decide`**,
 the same re-entry every effect result and the importer's verdicts already use
 (`interpreter.ts:85-93`, `verdict-consumer.ts:8-15`), where staleness (late settlement after
-cancellation) is already specified and handled (`acquisition-lifecycle/spec.md:184-197`).
+cancellation) is already specified and handled (`download-lifecycle/spec.md:184-197`).
 Progress remains the ephemeral read model. No second event store: slskd's transfers API +
 persisted success log are the durable truth of transfer state; our ownership ledger is the durable
 correlation record; on restart the reactor's existing level-triggered re-drive re-dispatches the
@@ -491,7 +491,7 @@ stream; progress remains the ephemeral read model the spec requires.
 - `packages/downloader/src/application/acquisition/interpreter.ts:80-94, 127-137`
 - `packages/downloader/src/interfaces/events/verdict-consumer.ts:8-15`
 - `openspec/specs/download-management/spec.md:22-29` (progress is a read model, never events)
-- `openspec/specs/acquisition-lifecycle/spec.md:145-147` (no cross-acquisition delay), `:175-183` (readiness), `:184-197` (stale outcomes; settlement-after-cancellation)
+- `openspec/specs/download-lifecycle/spec.md:145-147` (no cross-acquisition delay), `:175-183` (readiness), `:184-197` (stale outcomes; settlement-after-cancellation)
 - `docs/development/event-sourcing.md`, `architecture.md`, `domain-driven-design.md`, `error-handling.md`, `testing.md`, `design-principles.md`
 
 **slskd** (source, master @ 2026-08-02):

@@ -107,7 +107,7 @@ The system SHALL accept a request that names a MusicBrainz release group by iden
 
 - **GIVEN** a request naming a release group for which the metadata source returns no editions
 - **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure
+- **THEN** the download terminates with a metadata-resolution failure
 
 ### Requirement: A release group with no official edition requests manual selection
 
@@ -128,25 +128,25 @@ The system SHALL, when a release-group request resolves to a group that contains
 
 ### Requirement: Unresolvable requests fail cleanly
 
-The system SHALL, when a request cannot be resolved to a confident match, terminate the acquisition with a metadata-resolution failure that is visible to the caller, rather than proceeding to search. For album requests without an identifier, ambiguity SHALL be judged at the identity (release group) level: multiple high-scoring editions of one release group are not ambiguity, and comparably-scored sibling groups are not ambiguity when exactly one group's title equals the request title after normalization; comparably-scored groups from different release groups SHALL be ambiguous when none — or more than one — of them bears the requested title.
+The system SHALL, when a request cannot be resolved to a confident match, terminate the download with a metadata-resolution failure that is visible to the caller, rather than proceeding to search. For album requests without an identifier, ambiguity SHALL be judged at the identity (release group) level: multiple high-scoring editions of one release group are not ambiguity, and comparably-scored sibling groups are not ambiguity when exactly one group's title equals the request title after normalization; comparably-scored groups from different release groups SHALL be ambiguous when none — or more than one — of them bears the requested title.
 
 #### Scenario: No match found
 
 - **GIVEN** a request for which the metadata source returns no candidates
 - **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure
+- **THEN** the download terminates with a metadata-resolution failure
 
 #### Scenario: Distinct albums genuinely sharing a title fail safe
 
 - **GIVEN** a request whose title equals, after normalization, the titles of two or more comparably high-scoring release groups
 - **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure rather than guessing between them
+- **THEN** the download terminates with a metadata-resolution failure rather than guessing between them
 
 #### Scenario: No titled match and close scores remain ambiguous
 
 - **GIVEN** a request whose title equals no high-confidence release group's title after normalization, and whose top two groups score within the ambiguity margin
 - **WHEN** the request is resolved
-- **THEN** the acquisition terminates with a metadata-resolution failure
+- **THEN** the download terminates with a metadata-resolution failure
 
 ### Requirement: The target model is source-agnostic
 The system SHALL express the resolved target in a normalized model that does not depend on metadata-source-specific fields, so that additional metadata sources can be added without changing downstream matching.

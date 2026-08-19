@@ -8,7 +8,7 @@ Proposes beets-powered metadata matches for each delivered directory of audio fi
 
 **Import**:
 The process that takes one submitted directory of audio files and drives it through beets to either land in the library or be rejected. The sole aggregate of this context.
-_Avoid_: import job, import run, import task. (The downloader's `Importing`/`Imported` phases and the `library-import` capability are that context's staging→library move — a different concept.)
+_Avoid_: import job, import run, import task. (The downloader's `Importing`/`Imported` phases and the `library-deposit` capability are that context's staging→library move — a different concept.)
 
 **Submitted directory**:
 The directory of audio files an import is keyed by; the unit of work.

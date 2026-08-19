@@ -5,30 +5,30 @@
 Define the SvelteKit BFF web interface — the product's sole interface at functional parity with the retired MCP tools — including its in-process facade access rule, the single-process daemon shape, and the testing/coverage regime that keeps the UI package inside the 100% merged coverage gate.
 
 ## Requirements
-### Requirement: Acquisition submission and cancellation
+### Requirement: Download submission and cancellation
 
-The web UI SHALL let a user submit an acquisition (target plus quality policy, matching the downloader facade's submit contract) and cancel a pending acquisition. Failures returned by the facade SHALL render as actionable messages, not crashes.
+The web UI SHALL let a user submit a download (target plus quality policy, matching the downloader facade's submit contract) and cancel a pending download. Failures returned by the facade SHALL render as actionable messages, not crashes.
 
 #### Scenario: Successful submission
 
-- **WHEN** a user submits a valid acquisition form
-- **THEN** the BFF dispatches the downloader facade's submit command in-process and the UI shows the new acquisition with its identifier and current phase
+- **WHEN** a user submits a valid download form
+- **THEN** the BFF dispatches the downloader facade's submit command in-process and the UI shows the new download with its identifier and current phase
 
 #### Scenario: Rejected submission renders the modeled error
 
 - **WHEN** the facade returns a modeled validation or conflict error for a submission
-- **THEN** the UI re-renders the form with the failure's message and no acquisition is created
+- **THEN** the UI re-renders the form with the failure's message and no download is created
 
 #### Scenario: Cancellation
 
-- **WHEN** a user cancels an acquisition that is still cancellable
+- **WHEN** a user cancels a download that is still cancellable
 - **THEN** the facade's cancel command is dispatched and the UI reflects the cancelled state
 
-### Requirement: Acquisition progress observation
+### Requirement: Download progress observation
 
-The web UI SHALL show the user each acquisition's current phase and outcome (including failure reasons) from the downloader facade's read models.
+The web UI SHALL show the user each download's current phase and outcome (including failure reasons) from the downloader facade's read models.
 
-The acquisitions view SHALL present the acquisitions as a compact master list — each acquisition rendering its target description and a phase signal (its in-progress phase, or its terminal done/failed state) — beside a detail pane that shows the selected acquisition in full. Each acquisition's outcome (its deposited location, or its failure reason) SHALL be surfaced in the detail view for the selected acquisition, NOT as an inline column of the master list, so the master stays scannable and one long value (a file path or a multi-clause reason) cannot distort it.
+The downloads view SHALL present the downloads as a compact master list — each download rendering its target description and a phase signal (its in-progress phase, or its terminal done/failed state) — beside a detail pane that shows the selected download in full. Each download's outcome (its deposited location, or its failure reason) SHALL be surfaced in the detail view for the selected download, NOT as an inline column of the master list, so the master stays scannable and one long value (a file path or a multi-clause reason) cannot distort it.
 
 Status SHALL be presented in human phrases, never as raw status enum identifiers (for example `MetadataFailed` or `Conflicted`); counts SHALL be pluralized correctly and zero-count segments omitted. The detail header SHALL label the library location when one exists and SHALL NOT repeat the failure account that the timeline's terminal entry already gives.
 
@@ -36,22 +36,22 @@ Failure reasons SHALL be surfaced through already-visible outcome text — the o
 
 #### Scenario: Progress listing
 
-- **WHEN** a user opens the acquisitions view while acquisitions exist in various phases
-- **THEN** each acquisition renders in the master list with its target description and a human-phrase phase signal, with correctly pluralized counts and no raw enum identifiers
+- **WHEN** a user opens the downloads view while downloads exist in various phases
+- **THEN** each download renders in the master list with its target description and a human-phrase phase signal, with correctly pluralized counts and no raw enum identifiers
 
 #### Scenario: Outcome is shown in the detail view on selection
 
-- **WHEN** a user selects an acquisition
-- **THEN** the detail view shows that acquisition's outcome — a labeled library location for a fulfilled acquisition, or the timeline's plain-words terminal account for a failed one — in human phrases
+- **WHEN** a user selects a download
+- **THEN** the detail view shows that download's outcome — a labeled library location for a fulfilled download, or the timeline's plain-words terminal account for a failed one — in human phrases
 
 #### Scenario: Human reasons visible once, diagnostics behind disclosure
 
-- **WHEN** a user views a failed acquisition whose history carries failure reasons
+- **WHEN** a user views a failed download whose history carries failure reasons
 - **THEN** the human-readable reasons appear in visible text exactly once, any raw diagnostic payload sits behind per-entry disclosure, and the phase badge presents no reveal control
 
 #### Scenario: No disclosure control when there is nothing to reveal
 
-- **WHEN** a user views a timeline entry or acquisition that carries no diagnostic payload
+- **WHEN** a user views a timeline entry or download that carries no diagnostic payload
 - **THEN** no disclosure affordance is presented, rather than a control that expands to an empty result
 
 
@@ -59,7 +59,7 @@ Failure reasons SHALL be surfaced through already-visible outcome text — the o
 
 The web UI SHALL let the user resolve a pending import review (matching the importer facade's resolve contract), at parity with the retired `resolve_review` MCP tool. Pending reviews SHALL be listed by the attention queue (see "The attention queue unifies work awaiting a human") rather than by an importer-only listing.
 
-**Titling.** The review detail page SHALL be titled by the download request — the request phrase of the acquisition the import arrived from, the same identity the acquisition detail page renders for the same story — composed by the web layer from existing facade reads without any new cross-module contract. When the import carries no acquisition correlation, or a composing read fails, the title SHALL degrade to the delivered directory's basename, then to a neutral awaiting-review phrase. The delivered path SHALL render as labeled supporting detail, never as the title.
+**Titling.** The review detail page SHALL be titled by the download request — the request phrase of the download the import arrived from, the same identity the download detail page renders for the same story — composed by the web layer from existing facade reads without any new cross-module contract. When the import carries no download correlation, or a composing read fails, the title SHALL degrade to the delivered directory's basename, then to a neutral awaiting-review phrase. The delivered path SHALL render as labeled supporting detail, never as the title.
 
 **Resolution affordances.** Resolution actions SHALL be labeled as imperative, verb-led, sentence-case fragments; an action's label SHALL name its object where the verb alone is ambiguous, and a destructive action SHALL name what it deletes. Consequence copy SHALL follow the label after an em-dash or sit in adjacent supporting text, and SHALL NOT be a parenthesized aside. Consequence copy SHALL state the composed system's actual contract: deterministic outcomes are stated plainly — rejecting a delivery as unusable resumes the search for a replacement; a plain rejection ends the story with nothing more tried — and hedged wording is reserved for genuine nondeterminism. An affordance that opens further input rather than committing SHALL carry a trailing ellipsis. The narration register's ban on internal vocabulary applies to affordance copy in full.
 
@@ -83,13 +83,13 @@ The web UI SHALL word the hint outcome truthfully: it SHALL state that the pinne
 
 #### Scenario: The review is titled by what the user asked for
 
-- **GIVEN** a pending review whose import arrived from an acquisition
+- **GIVEN** a pending review whose import arrived from a download
 - **WHEN** the user opens the review
-- **THEN** the page is titled by the acquisition's request phrase — the same identity the acquisition detail page shows — and the delivered path appears only as labeled supporting detail
+- **THEN** the page is titled by the download's request phrase — the same identity the download detail page shows — and the delivered path appears only as labeled supporting detail
 
-#### Scenario: The title degrades without an acquisition correlation
+#### Scenario: The title degrades without a download correlation
 
-- **GIVEN** a pending review whose import carries no acquisition correlation
+- **GIVEN** a pending review whose import carries no download correlation
 - **WHEN** the user opens the review
 - **THEN** the page is titled by the delivered directory's basename, and by a neutral awaiting-review phrase if no path is available
 
@@ -163,7 +163,7 @@ The production process SHALL start via a single entry point that boots both modu
 #### Scenario: One process serves pages and processes events
 
 - **WHEN** the production entry point starts
-- **THEN** the web UI responds on the configured port and a submitted acquisition progresses through download and import with no further HTTP requests arriving
+- **THEN** the web UI responds on the configured port and a submitted download progresses through download and import with no further HTTP requests arriving
 
 ### Requirement: UI package meets the coverage gate
 
@@ -214,39 +214,39 @@ The `/health` server route SHALL be covered by the web package's merged 100% lin
 
 ### Requirement: Manual edition selection for release-group requests
 
-The web UI SHALL surface acquisitions that are awaiting manual edition selection, presenting each candidate edition with its identifying metadata — title, release date, country, format, and track count — so a user can distinguish the editions. The UI SHALL let the user select one candidate edition, which resumes the acquisition with that edition as the resolved target. A selection that the system rejects (e.g. the acquisition is no longer awaiting selection) SHALL render as the modeled error, not a crash or a silent no-op. The UI SHALL accept the release-group identifier as a request kind when submitting an acquisition.
+The web UI SHALL surface downloads that are awaiting manual edition selection, presenting each candidate edition with its identifying metadata — title, release date, country, format, and track count — so a user can distinguish the editions. The UI SHALL let the user select one candidate edition, which resumes the download with that edition as the resolved target. A selection that the system rejects (e.g. the download is no longer awaiting selection) SHALL render as the modeled error, not a crash or a silent no-op. The UI SHALL accept the release-group identifier as a request kind when submitting a download.
 
-#### Scenario: Awaiting-selection acquisition lists its candidate editions
+#### Scenario: Awaiting-selection download lists its candidate editions
 
-- **GIVEN** an acquisition awaiting manual edition selection
+- **GIVEN** a download awaiting manual edition selection
 - **WHEN** the user views it
 - **THEN** the UI lists the candidate editions, each showing title, release date, country, format, and track count
 
-#### Scenario: Selecting an edition resumes the acquisition
+#### Scenario: Selecting an edition resumes the download
 
-- **GIVEN** an acquisition awaiting manual edition selection is shown with its candidate editions
+- **GIVEN** a download awaiting manual edition selection is shown with its candidate editions
 - **WHEN** the user selects one edition
-- **THEN** the UI submits that selection and the acquisition proceeds with the chosen edition as its target
+- **THEN** the UI submits that selection and the download proceeds with the chosen edition as its target
 
 #### Scenario: A stale selection renders the modeled error
 
-- **GIVEN** an acquisition that has left the awaiting-selection state
+- **GIVEN** a download that has left the awaiting-selection state
 - **WHEN** the user submits a selection for it
 - **THEN** the UI renders the modeled rejection error rather than crashing or silently ignoring it
 
 #### Scenario: Submitting a request by release-group identifier
 
-- **GIVEN** a user submitting a new acquisition
+- **GIVEN** a user submitting a new download
 - **WHEN** they provide a MusicBrainz release-group identifier as the request
 - **THEN** the UI submits a release-group request that the system resolves by selecting a representative edition
 
 ### Requirement: The attention queue unifies work awaiting a human
 
-The web UI SHALL present a single attention queue that lists every item across modules currently waiting on a human decision — at minimum the importer's pending match reviews and the downloader's acquisitions awaiting manual edition selection — as one list ordered longest-waiting first. Each item SHALL name **the ask** — the decision waiting on the user — in plain, action-oriented language, SHALL be titled by its download request where the correlation is available (degrading as the review titling requirement specifies), and SHALL link to the surface where the decision is made. Visible queue text SHALL NOT name the owning module or any architecture noun; a machine-readable module attribute MAY remain on the row for styling and tests. The queue SHALL be composed by the web layer from the module facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts. When one module's read fails, the queue SHALL render the other module's items alongside a modeled error for the failed section, not fail as a whole. Any capability that adds a new human-decision pause SHALL surface its pending items in this queue.
+The web UI SHALL present a single attention queue that lists every item across modules currently waiting on a human decision — at minimum the importer's pending match reviews and the downloader's downloads awaiting manual edition selection — as one list ordered longest-waiting first. Each item SHALL name **the ask** — the decision waiting on the user — in plain, action-oriented language, SHALL be titled by its download request where the correlation is available (degrading as the review titling requirement specifies), and SHALL link to the surface where the decision is made. Visible queue text SHALL NOT name the owning module or any architecture noun; a machine-readable module attribute MAY remain on the row for styling and tests. The queue SHALL be composed by the web layer from the module facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts. When one module's read fails, the queue SHALL render the other module's items alongside a modeled error for the failed section, not fail as a whole. Any capability that adds a new human-decision pause SHALL surface its pending items in this queue.
 
 #### Scenario: Items from both modules appear as one queue
 
-- **GIVEN** a pending import review and an acquisition awaiting manual edition selection
+- **GIVEN** a pending import review and a download awaiting manual edition selection
 - **WHEN** the user opens the attention queue
 - **THEN** both items appear in one list, longest-waiting first, each naming the decision asked of the user in action-oriented language and linking to its resolution surface
 
@@ -258,9 +258,9 @@ The web UI SHALL present a single attention queue that lists every item across m
 
 #### Scenario: Resolving an item removes it from the queue
 
-- **GIVEN** an attention queue showing an awaiting-selection acquisition
+- **GIVEN** an attention queue showing an awaiting-selection download
 - **WHEN** the user follows its link and selects an edition
-- **THEN** the acquisition proceeds and no longer appears in the attention queue
+- **THEN** the download proceeds and no longer appears in the attention queue
 
 #### Scenario: One module failing does not empty the queue
 
@@ -280,51 +280,51 @@ The web UI SHALL show, in the site navigation, the count of items currently in t
 
 #### Scenario: No badge when nothing waits
 
-- **GIVEN** no pending reviews and no awaiting-selection acquisitions
+- **GIVEN** no pending reviews and no awaiting-selection downloads
 - **WHEN** the user views any page
 - **THEN** the attention entry renders without a count badge
 
-### Requirement: Awaiting-selection acquisitions present as action-needed
+### Requirement: Awaiting-selection downloads present as action-needed
 
-The web UI SHALL present an acquisition awaiting manual edition selection as requiring the user's action — with a distinct badge tone and an explicit waiting-for-your-choice description — never as generic in-progress work or a bare "(resolving…)" placeholder. The determination that an acquisition is awaiting the user's action SHALL come from the downloader facade's decided awaiting-selection flag, and its membership in the attention queue's edition-selection arm SHALL follow that flag rather than a re-derivation from the status enum or the badge-tone table; the badge tone remains a presentational mapping the web layer owns.
+The web UI SHALL present a download awaiting manual edition selection as requiring the user's action — with a distinct badge tone and an explicit waiting-for-your-choice description — never as generic in-progress work or a bare "(resolving…)" placeholder. The determination that a download is awaiting the user's action SHALL come from the downloader facade's decided awaiting-selection flag, and its membership in the attention queue's edition-selection arm SHALL follow that flag rather than a re-derivation from the status enum or the badge-tone table; the badge tone remains a presentational mapping the web layer owns.
 
-#### Scenario: The list distinguishes an awaiting-selection acquisition
+#### Scenario: The list distinguishes an awaiting-selection download
 
-- **GIVEN** the acquisitions list contains an awaiting-selection acquisition and a searching acquisition
+- **GIVEN** the downloads list contains an awaiting-selection download and a searching download
 - **WHEN** the user views the list
 - **THEN** the awaiting-selection row carries a visually distinct action-needed tone and states that an edition choice is awaited, while the searching row remains generic in-progress
 
 #### Scenario: Attention-queue membership follows the decided flag
 
-- **GIVEN** an acquisition whose status DTO reports awaiting-selection as true
+- **GIVEN** a download whose status DTO reports awaiting-selection as true
 - **WHEN** the attention queue is composed
-- **THEN** the acquisition appears in the edition-selection arm because of that flag, not because of its badge tone or status name
+- **THEN** the download appears in the edition-selection arm because of that flag, not because of its badge tone or status name
 
-### Requirement: Acquisition detail presents the full download-through-import lifecycle
+### Requirement: Download detail presents the full download-through-import lifecycle
 
-The web UI's acquisition detail SHALL present the acquisition's complete history spanning both bounded contexts — the downloader's steps and, once the acquisition has been handed off, the importer's steps — as a single flat timeline ordered by occurrence time. The timeline SHALL speak in one narrator voice: no rendered text SHALL attribute an entry to its originating module or name the system's internal structure (module names, "importer", "staged", hand-off vocabulary); the originating module SHALL be retained only as a non-rendered DOM attribute for styling and tests. The timeline SHALL be composed by the web layer from the downloader and importer facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts (the same principle as the attention queue). When the importer read fails or no import exists yet for the acquisition, the detail SHALL render the downloader's timeline alongside a modeled, non-failing indication that the import has not started or is momentarily unavailable, never a page-level failure. The correlation between an acquisition and its import SHALL be the acquisition id.
+The web UI's download detail SHALL present the download's complete history spanning both bounded contexts — the downloader's steps and, once the download has been handed off, the importer's steps — as a single flat timeline ordered by occurrence time. The timeline SHALL speak in one narrator voice: no rendered text SHALL attribute an entry to its originating module or name the system's internal structure (module names, "importer", "staged", hand-off vocabulary); the originating module SHALL be retained only as a non-rendered DOM attribute for styling and tests. The timeline SHALL be composed by the web layer from the downloader and importer facades' own read models; the composition SHALL NOT introduce a cross-module contract between the bounded contexts (the same principle as the attention queue). When the importer read fails or no import exists yet for the download, the detail SHALL render the downloader's timeline alongside a modeled, non-failing indication that the import has not started or is momentarily unavailable, never a page-level failure. The correlation between a download and its import SHALL be the download id.
 
-The timeline SHALL render every entry's occurrence time: relative phrasing under 24 hours, absolute date and time beyond, with the full absolute timestamp always available via the entry's `time` element metadata. Date changes SHALL be marked between entries. The closing entry of a terminal acquisition SHALL carry a coarse total-duration gloss from request to ending.
+The timeline SHALL render every entry's occurrence time: relative phrasing under 24 hours, absolute date and time beyond, with the full absolute timestamp always available via the entry's `time` element metadata. Date changes SHALL be marked between entries. The closing entry of a terminal download SHALL carry a coarse total-duration gloss from request to ending.
 
-While the acquisition is not terminal, the timeline SHALL end with exactly one synthesized in-progress entry describing the current phase in present-progressive voice, derived from the status read models the page already loads (never from a new wire contract). During an active download, live progress SHALL be embedded in this in-progress entry rather than rendered as a separate widget; when progress is momentarily unavailable, the entry SHALL say so rather than render a blank indicator. Phases awaiting the user (edition choice, match review) SHALL present as attention-styled in-progress entries linking to the action. A terminal acquisition SHALL have no in-progress entry — its closing entry ends the story.
+While the download is not terminal, the timeline SHALL end with exactly one synthesized in-progress entry describing the current phase in present-progressive voice, derived from the status read models the page already loads (never from a new wire contract). During an active download, live progress SHALL be embedded in this in-progress entry rather than rendered as a separate widget; when progress is momentarily unavailable, the entry SHALL say so rather than render a blank indicator. Phases awaiting the user (edition choice, match review) SHALL present as attention-styled in-progress entries linking to the action. A terminal download SHALL have no in-progress entry — its closing entry ends the story.
 
 An entry carrying diagnostic payload (full remote paths, raw reason codes, staging paths, raw match distance) SHALL present that payload behind a per-entry native disclosure element, rendered only when payload exists; the always-visible entry text SHALL carry the human-readable account on its own.
 
-#### Scenario: A fulfilled, imported acquisition shows both contexts as one timeline
+#### Scenario: A fulfilled, imported download shows both contexts as one timeline
 
-- **GIVEN** an acquisition that was handed off to the importer and applied into the library
-- **WHEN** a user opens that acquisition's detail
+- **GIVEN** a download that was handed off to the importer and applied into the library
+- **WHEN** a user opens that download's detail
 - **THEN** the timeline shows the downloader steps followed by the importer steps (matching, any review and its resolution, applied) in occurrence order, with no rendered module attribution on any entry
 
 #### Scenario: An import rejection and its retry interleave correctly
 
-- **GIVEN** an acquisition whose import was rejected-and-retried, reviving it for another download and import round
-- **WHEN** a user opens that acquisition's detail
+- **GIVEN** a download whose import was rejected-and-retried, reviving it for another download and import round
+- **WHEN** a user opens that download's detail
 - **THEN** the timeline interleaves the importer rejection, the downloader's revived attempt, and the subsequent import strictly in occurrence order rather than as two disjoint blocks
 
 #### Scenario: The import section degrades independently
 
-- **WHEN** the importer read fails or no import exists yet for an acquisition
+- **WHEN** the importer read fails or no import exists yet for a download
 - **THEN** the downloader timeline still renders, accompanied by a modeled non-failing indication in the unified voice, and the page does not fail
 
 #### Scenario: Hand-off and library import are not conflated
@@ -334,22 +334,22 @@ An entry carrying diagnostic payload (full remote paths, raw reason codes, stagi
 
 #### Scenario: Every entry shows when it happened
 
-- **WHEN** a user opens an acquisition's detail
+- **WHEN** a user opens a download's detail
 - **THEN** every timeline entry renders its occurrence time — relative under 24 hours, absolute beyond — with the full absolute timestamp available on the entry's time metadata
 
-#### Scenario: An active acquisition always shows what is happening now
+#### Scenario: An active download always shows what is happening now
 
-- **WHEN** a user opens the detail of a non-terminal acquisition
+- **WHEN** a user opens the detail of a non-terminal download
 - **THEN** the timeline's final entry is a single synthesized in-progress entry describing the current phase in present-progressive voice
 
-#### Scenario: A just-submitted acquisition is never an empty history
+#### Scenario: A just-submitted download is never an empty history
 
-- **WHEN** a user opens the detail of an acquisition immediately after submitting it
+- **WHEN** a user opens the detail of a download immediately after submitting it
 - **THEN** the timeline shows the requested entry followed by the current-phase in-progress entry, never an empty state
 
 #### Scenario: Download progress lives in the in-progress entry
 
-- **WHEN** a user views the detail of an acquisition that is downloading
+- **WHEN** a user views the detail of a download that is downloading
 - **THEN** live progress renders embedded in the in-progress entry, and if progress is momentarily unavailable the entry says so instead of rendering a blank indicator
 
 #### Scenario: Diagnostic payload is one disclosure away, and only where it exists
@@ -358,19 +358,19 @@ An entry carrying diagnostic payload (full remote paths, raw reason codes, stagi
 - **THEN** the payload is available behind that entry's disclosure element while the visible text stands alone as a human-readable account
 - **AND** entries without payload render no disclosure control
 
-#### Scenario: A failed acquisition's story has an ending
+#### Scenario: A failed download's story has an ending
 
-- **WHEN** a user opens the detail of a failed acquisition
-- **THEN** the timeline ends with a terminal entry stating in plain words what ended the acquisition, plus one remediation hint where a real action exists, and no in-progress entry follows it
+- **WHEN** a user opens the detail of a failed download
+- **THEN** the timeline ends with a terminal entry stating in plain words what ended the download, plus one remediation hint where a real action exists, and no in-progress entry follows it
 
 
 ### Requirement: The BFF renders decided lifecycle and authorization facts, not re-derived ones
 
-The web BFF SHALL render lifecycle and authorization facts as decided by the owning module and surfaced on the module's facade DTOs — it SHALL NOT re-derive such a fact from a wire status enum or a presentation lookup table. Specifically: whether an acquisition may be cancelled SHALL be read from the acquisition status DTO's decided cancellable flag; whether an acquisition is awaiting a human's edition choice SHALL be read from the acquisition status DTO's decided awaiting-selection flag; and which resolution verbs a pending review offers SHALL be read from the pending-review DTO's permitted-action set. The BFF MAY retain purely presentational mappings that carry no business rule — for example the mapping from status to a badge colour, or how a permitted verb is laid out — because deleting the UI would not lose a decision. When a decided field is absent from a DTO (an older producer), the BFF SHALL degrade safely — omit the affordance — rather than fall back to re-deriving the fact.
+The web BFF SHALL render lifecycle and authorization facts as decided by the owning module and surfaced on the module's facade DTOs — it SHALL NOT re-derive such a fact from a wire status enum or a presentation lookup table. Specifically: whether a download may be cancelled SHALL be read from the download status DTO's decided cancellable flag; whether a download is awaiting a human's edition choice SHALL be read from the download status DTO's decided awaiting-selection flag; and which resolution verbs a pending review offers SHALL be read from the pending-review DTO's permitted-action set. The BFF MAY retain purely presentational mappings that carry no business rule — for example the mapping from status to a badge colour, or how a permitted verb is laid out — because deleting the UI would not lose a decision. When a decided field is absent from a DTO (an older producer), the BFF SHALL degrade safely — omit the affordance — rather than fall back to re-deriving the fact.
 
 #### Scenario: The cancel affordance follows the decided flag
 
-- **GIVEN** two acquisitions whose status DTOs report cancellable as true and false respectively
+- **GIVEN** two downloads whose status DTOs report cancellable as true and false respectively
 - **WHEN** the user views each
 - **THEN** the cancel affordance is offered for the cancellable one and withheld for the other, determined by the flag rather than by inspecting the status value
 
@@ -388,7 +388,7 @@ The web BFF SHALL render lifecycle and authorization facts as decided by the own
 
 ### Requirement: Timeline copy follows a single register
 
-All user-visible copy — the acquisition detail, the attention queue, the review surface, and any surface added later — SHALL follow one register. Completed timeline entries render as past-tense, verb-led fragments in sentence case without trailing periods; the in-progress entry in present progressive; no first-person voice; "you/your" only for user-initiated facts. Imperative affordances follow the affordance rules (verb-led sentence-case labels, object-naming destructive verbs, em-dash consequences, no parenthesized asides). Visible text SHALL contain no internal vocabulary — no enum identifiers, no architecture nouns, no internal tool names — while real-world names the user owns (source network, MusicBrainz, formats, album titles, peer usernames) are permitted. Every failure entry SHALL state what happened and what happens (or can be done) next in at most two sentences. Numbers SHALL be human-formatted: failure reason codes render through a plain-language gloss map with a safe generic fallback (raw code relegated to the entry's disclosure) for unmapped values, and match quality renders coarse and higher-is-better with the raw value only in disclosure. Unknown entry kinds SHALL render a neutral tolerant-reader line in the same register.
+All user-visible copy — the download detail, the attention queue, the review surface, and any surface added later — SHALL follow one register. Completed timeline entries render as past-tense, verb-led fragments in sentence case without trailing periods; the in-progress entry in present progressive; no first-person voice; "you/your" only for user-initiated facts. Imperative affordances follow the affordance rules (verb-led sentence-case labels, object-naming destructive verbs, em-dash consequences, no parenthesized asides). Visible text SHALL contain no internal vocabulary — no enum identifiers, no architecture nouns, no internal tool names — while real-world names the user owns (source network, MusicBrainz, formats, album titles, peer usernames) are permitted. Every failure entry SHALL state what happened and what happens (or can be done) next in at most two sentences. Numbers SHALL be human-formatted: failure reason codes render through a plain-language gloss map with a safe generic fallback (raw code relegated to the entry's disclosure) for unmapped values, and match quality renders coarse and higher-is-better with the raw value only in disclosure. Unknown entry kinds SHALL render a neutral tolerant-reader line in the same register.
 
 Consequence and narration copy SHALL state the composed system's actual contract — the web layer reads both modules' facades and narrates with the whole system's knowledge — hedging only genuine nondeterminism. In particular, the narration of a plain import rejection SHALL state that nothing more will be tried, and the narration of an unusable-delivery rejection SHALL state that the search resumes; neither SHALL suggest a retry that the system will not perform. The narration of a resolved review SHALL reuse the resolving action's verb, tense-shifted — choosing an affordance verb is choosing its timeline verb.
 
@@ -418,15 +418,15 @@ Consequence and narration copy SHALL state the composed system's actual contract
 - **WHEN** the timeline narrates that resolution
 - **THEN** the entry reuses the action's verb tense-shifted into the narration register
 
-### Requirement: The acquisition detail refreshes itself while the story is unsettled
+### Requirement: The download detail refreshes itself while the story is unsettled
 
-While the displayed acquisition's story is unsettled — the acquisition is not terminal, OR it was
+While the displayed download's story is unsettled — the download is not terminal, OR it was
 delivered (fulfilled) and its import has not yet reported its own decided settledness (including
 the asynchronous window where no import exists yet, and a failed importer read), OR its import
 rejected the delivery (which the downloader may still consume and revive) — the detail page
 SHALL periodically re-fetch its own data and re-render without user action, so the timeline and
 its in-progress entry track reality; refreshing SHALL stop once the whole story has settled and
-on leaving the page. A delivered acquisition whose import side is absent or unreadable SHALL NOT
+on leaving the page. A delivered download whose import side is absent or unreadable SHALL NOT
 be presented as in the library. A failed re-fetch SHALL be surfaced as a modeled indication
 beside the timeline, never a silently stale page. The refresh trigger SHALL sit behind a single
 swappable seam owned by the page layer, with the timeline presentation consuming page data only,
@@ -434,24 +434,24 @@ so a future push-based freshness source replaces the trigger without touching th
 The refresh SHALL reuse the page's existing load path and SHALL NOT introduce a new wire
 endpoint.
 
-#### Scenario: An active acquisition's page advances by itself
+#### Scenario: An active download's page advances by itself
 
-- **WHEN** a user keeps the detail of an active acquisition open while the acquisition progresses
+- **WHEN** a user keeps the detail of an active download open while the download progresses
 - **THEN** the timeline gains the new entries and the in-progress entry advances without a manual reload
 
-#### Scenario: A delivered acquisition keeps refreshing until its import settles
+#### Scenario: A delivered download keeps refreshing until its import settles
 
-- **WHEN** a user views a fulfilled acquisition whose import does not exist yet or has not settled
+- **WHEN** a user views a fulfilled download whose import does not exist yet or has not settled
 - **THEN** the page keeps refreshing, presents an in-progress entry, and does not claim the release is in the library
 
 #### Scenario: A settled story's page rests
 
-- **WHEN** the displayed acquisition's story has fully settled (a failed ending, or a delivery whose import reports itself settled and did not reject)
+- **WHEN** the displayed download's story has fully settled (a failed ending, or a delivery whose import reports itself settled and did not reject)
 - **THEN** periodic refreshing stops
 
 #### Scenario: A rejected import keeps the page watching for the revival
 
-- **WHEN** a user views a fulfilled acquisition whose import rejected the delivery
+- **WHEN** a user views a fulfilled download whose import rejected the delivery
 - **THEN** the page keeps refreshing, so the downloader's asynchronous revival (when the rejection warrants one) appears without a manual reload
 
 #### Scenario: A failed refresh is visible
@@ -459,37 +459,37 @@ endpoint.
 - **WHEN** a periodic re-fetch fails while the page stays open
 - **THEN** the page indicates its data may be momentarily stale instead of silently freezing
 
-### Requirement: Never-resolved acquisitions are titled by their request
+### Requirement: Never-resolved downloads are titled by their request
 
-An acquisition whose metadata never resolved SHALL be titled by what the user asked for — the
+A download whose metadata never resolved SHALL be titled by what the user asked for — the
 artist/title descriptor as given, or a neutral unknown-release label for an id-only request —
 in both the master list and the detail heading. A resolving placeholder title SHALL appear only
 while resolution is genuinely pending, never as the permanent title of a terminally failed
-acquisition.
+download.
 
-#### Scenario: A metadata-failed acquisition keeps a meaningful title
+#### Scenario: A metadata-failed download keeps a meaningful title
 
-- **WHEN** a user views the list or detail of an acquisition whose metadata resolution failed
+- **WHEN** a user views the list or detail of a download whose metadata resolution failed
 - **THEN** its title renders from the request as given (or a neutral unknown-release label for an
   id-only request), not a resolving placeholder
 
-### Requirement: The acquisitions queue reads newest first
+### Requirement: The downloads queue reads newest first
 
-The acquisitions master list SHALL present acquisitions ordered by when each was requested, newest first, so the entries a user most recently created — the ones they most likely came to check — are visible without scrolling. The ordering SHALL be keyed on the acquisition's stated requested-at fact, not on storage or replay order. This ordering applies to the acquisitions master list only; the attention queue keeps its own longest-waiting-first ordering.
+The downloads master list SHALL present downloads ordered by when each was requested, newest first, so the entries a user most recently created — the ones they most likely came to check — are visible without scrolling. The ordering SHALL be keyed on the download's stated requested-at fact, not on storage or replay order. This ordering applies to the downloads master list only; the attention queue keeps its own longest-waiting-first ordering.
 
 #### Scenario: Newest request appears at the top
 
-- **WHEN** a user views the acquisitions master list while acquisitions requested at different times exist
+- **WHEN** a user views the downloads master list while downloads requested at different times exist
 - **THEN** the list presents them newest-requested first, with the most recent request at the top
 
 #### Scenario: A newly submitted request leads the queue
 
-- **WHEN** a user submits a new download request and returns to the acquisitions view
-- **THEN** the new acquisition appears at the top of the master list
+- **WHEN** a user submits a new download request and returns to the downloads view
+- **THEN** the new download appears at the top of the master list
 
-### Requirement: Small screens present one acquisitions pane at a time
+### Requirement: Small screens present one downloads pane at a time
 
-At narrow viewport widths — below the acquisitions view's existing side-by-side breakpoint — the acquisition detail and new-request routes SHALL present only the detail pane: the master queue SHALL be hidden such that it is absent from the accessibility tree and keyboard-focus order, not merely invisible. A "Back to queue" link SHALL appear at the top of the detail pane's content at these widths, returning the user to the acquisitions list; it SHALL be present on deep-linked entry as well as in-app navigation. The list route keeps its current presentation at all widths, and wide viewports keep the two-pane presentation unchanged.
+At narrow viewport widths — below the downloads view's existing side-by-side breakpoint — the download detail and new-request routes SHALL present only the detail pane: the master queue SHALL be hidden such that it is absent from the accessibility tree and keyboard-focus order, not merely invisible. A "Back to queue" link SHALL appear at the top of the detail pane's content at these widths, returning the user to the downloads list; it SHALL be present on deep-linked entry as well as in-app navigation. The list route keeps its current presentation at all widths, and wide viewports keep the two-pane presentation unchanged.
 
 DOM source order SHALL remain list-then-detail at every width — the collapse hides, and never reorders, content (per the accessibility requirements of the presentation capability).
 
@@ -498,10 +498,10 @@ DOM source order SHALL remain list-then-detail at every width — the collapse h
 - **WHEN** a user on a narrow viewport opens the new-request route
 - **THEN** the request form is presented without the queue above it, and the form is reachable without scrolling past queue entries
 
-#### Scenario: An acquisition's detail stands alone on a small screen
+#### Scenario: A download's detail stands alone on a small screen
 
-- **WHEN** a user on a narrow viewport opens an acquisition's detail — by selecting it from the queue or by following a deep link
-- **THEN** only that acquisition's detail is presented, with a "Back to queue" link at the top of the pane
+- **WHEN** a user on a narrow viewport opens a download's detail — by selecting it from the queue or by following a deep link
+- **THEN** only that download's detail is presented, with a "Back to queue" link at the top of the pane
 
 #### Scenario: The hidden queue is out of the keyboard-focus order
 

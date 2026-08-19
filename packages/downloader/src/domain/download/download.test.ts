@@ -50,15 +50,9 @@ const conflictedHistory: DownloadEvent[] = [
   { type: 'ImportConflicted', location: '/library/x' },
 ];
 // Cancelled mid-download: the folded Cancelled state retains `a` as `in-flight` staging (abort-then-settle).
-const cancelledHistory: DownloadEvent[] = [
-  ...selectedHistory([a]),
-  { type: 'DownloadCancelled' },
-];
+const cancelledHistory: DownloadEvent[] = [...selectedHistory([a]), { type: 'DownloadCancelled' }];
 // Cancelled with no candidate in flight — a plainly terminal state with nothing left to settle.
-const cancelledNoPending: DownloadEvent[] = [
-  ...resolvedHistory(),
-  { type: 'DownloadCancelled' },
-];
+const cancelledNoPending: DownloadEvent[] = [...resolvedHistory(), { type: 'DownloadCancelled' }];
 const metadataFailedHistory: DownloadEvent[] = [
   ...requestedHistory(),
   { type: 'MetadataResolutionFailed' },
@@ -807,16 +801,16 @@ describe('Download.reactTo — the event → effect table', () => {
   it('aborts the transfer instead of cleaning up when cancelling an in-flight download', () => {
     // cancelledHistory cancels from Downloading: the transfer must first be aborted at the source;
     // staging cleanup is deferred until the resulting settlement rejects the candidate.
-    expect(
-      Download.fromHistory(cancelledHistory).reactTo({ type: 'DownloadCancelled' }),
-    ).toEqual([{ type: 'AbortDownload', candidate: a }]);
+    expect(Download.fromHistory(cancelledHistory).reactTo({ type: 'DownloadCancelled' })).toEqual([
+      { type: 'AbortDownload', candidate: a },
+    ]);
   });
 
   it('emits no effect when cancelling with no candidate in flight', () => {
     // Cancelled from Searching: staging is `none` — neither a settled nor a mid-download candidate is kept.
-    expect(
-      Download.fromHistory(cancelledNoPending).reactTo({ type: 'DownloadCancelled' }),
-    ).toEqual([]);
+    expect(Download.fromHistory(cancelledNoPending).reactTo({ type: 'DownloadCancelled' })).toEqual(
+      [],
+    );
   });
 
   it('re-reacting a cancellation after the pending candidate settled emits nothing', () => {
@@ -859,9 +853,7 @@ describe('Download.reactTo — the event → effect table', () => {
     const empty = Download.fromHistory([]);
     expect(empty.reactTo({ type: 'SearchRequested', round: 2 })).toEqual([]);
     expect(empty.reactTo({ type: 'CandidateSelected', candidate: a })).toEqual([]);
-    expect(empty.reactTo({ type: 'TryCompleted', candidate: a.identity, files: [] })).toEqual(
-      [],
-    );
+    expect(empty.reactTo({ type: 'TryCompleted', candidate: a.identity, files: [] })).toEqual([]);
     expect(
       empty.reactTo({
         type: 'ValidationPassed',
@@ -1260,12 +1252,8 @@ describe('Download.snapshot — the transfer-started decided flag', () => {
   const candidate = matchingCandidate('a');
 
   it('reports a live transfer once the start is recorded, and not before', () => {
-    expect(Download.fromHistory(selectedHistory([candidate])).snapshot.transferStarted).toBe(
-      false,
-    );
-    expect(Download.fromHistory(startedHistory([candidate])).snapshot.transferStarted).toBe(
-      true,
-    );
+    expect(Download.fromHistory(selectedHistory([candidate])).snapshot.transferStarted).toBe(false);
+    expect(Download.fromHistory(startedHistory([candidate])).snapshot.transferStarted).toBe(true);
   });
 
   it('resets on a re-attempt: a later selection is a new not-yet-started transfer', () => {

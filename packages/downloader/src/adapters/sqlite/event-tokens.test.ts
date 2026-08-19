@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildUpcasterRegistry, registeredUpcasterTypes } from './upcaster.js';
-import { MODEL_TYPE_BY_TOKEN, STORED_TOKEN_BY_TYPE, toModelType, toStoredToken } from './event-tokens.js';
-import type { DownloadEventType } from '../../domain/download/events.js';
+import {
+  MODEL_TYPE_BY_TOKEN,
+  STORED_TOKEN_BY_TYPE,
+  toModelType,
+  toStoredToken,
+} from './event-tokens.js';
 
 /**
  * The storage-token seam (adopt-download-language, design D1). Stored `type` strings are frozen
@@ -14,16 +18,10 @@ import type { DownloadEventType } from '../../domain/download/events.js';
 
 describe('stored-token <-> model-type map', () => {
   it('is total in both directions', () => {
-    const tokens = Object.keys(MODEL_TYPE_BY_TOKEN);
-    const types = Object.keys(STORED_TOKEN_BY_TYPE);
+    const entries = Object.entries(STORED_TOKEN_BY_TYPE);
 
-    expect(tokens).toHaveLength(types.length);
-    for (const token of tokens) {
-      const modelType = MODEL_TYPE_BY_TOKEN[token]!;
-      expect(STORED_TOKEN_BY_TYPE[modelType]).toBe(token);
-    }
-    for (const type of types) {
-      const token = STORED_TOKEN_BY_TYPE[type as DownloadEventType]!;
+    expect(Object.keys(MODEL_TYPE_BY_TOKEN)).toHaveLength(entries.length);
+    for (const [type, token] of entries) {
       expect(MODEL_TYPE_BY_TOKEN[token]).toBe(type);
     }
   });

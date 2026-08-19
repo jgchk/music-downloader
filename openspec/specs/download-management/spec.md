@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Govern how a selected candidate is downloaded as a single candidate-level unit, how live transfer progress is surfaced without polluting acquisition history, how stalled or endlessly-queued transfers fail by policy, and how source-specific failures are normalized into source-agnostic reasons.
+Govern how a selected candidate is downloaded as a single candidate-level unit, how live transfer progress is surfaced without polluting download history, how stalled or endlessly-queued transfers fail by policy, and how source-specific failures are normalized into source-agnostic reasons.
 
 ## Requirements
 
@@ -19,14 +19,14 @@ The system SHALL download a selected candidate at candidate granularity, aggrega
 - **WHEN** the source peer drops after 7 files
 - **THEN** the download produces a single failed outcome for the candidate
 
-### Requirement: Transfer progress is observable but not part of the acquisition history
-The system SHALL surface live transfer progress (bytes, percentage, queue position) through a read model, and SHALL NOT record progress updates as acquisition events.
+### Requirement: Transfer progress is observable but not part of the download history
+The system SHALL surface live transfer progress (bytes, percentage, queue position) through a read model, and SHALL NOT record progress updates as download events.
 
 #### Scenario: Progress is queryable during a transfer
 - **GIVEN** a candidate that is transferring
 - **WHEN** the caller queries progress
 - **THEN** the current percentage and queue position are returned
-- **AND** no progress update appears in the acquisition's recorded history
+- **AND** no progress update appears in the download's recorded history
 
 ### Requirement: Stalled or hopelessly-queued transfers fail by policy
 The system SHALL abandon a transfer that makes no progress within the download policy's stall timeout, or that remains queued beyond the download policy's maximum queue wait, and report it as a failed outcome.
@@ -115,24 +115,24 @@ When a candidate is abandoned or aborted mid-download (a stall, a queue timeout,
 
 The system SHALL observe an in-flight download — sampling the source, judging the caller-supplied
 stall and queue-wait budgets, and aggregating per-file transfers — without blocking the
-processing of any other acquisition's work. Starting a download SHALL complete promptly once the
+processing of any other download's work. Starting a download SHALL complete promptly once the
 source has accepted the enqueue; the candidate-level outcome (completed, or failed with its
 source-agnostic reason) SHALL be delivered asynchronously as a fact when the watch settles, and
-SHALL enter the acquisition's decision path exactly as if the download had been observed
+SHALL enter the download's decision path exactly as if the download had been observed
 synchronously — stale-outcome rejection unchanged.
 
 #### Scenario: A slow healthy download delays nobody
 
-- **GIVEN** one acquisition whose multi-file download is transferring slowly but making progress
-- **WHEN** another acquisition is submitted
-- **THEN** the second acquisition resolves, searches, and downloads to its own outcome while the
+- **GIVEN** one download whose multi-file download is transferring slowly but making progress
+- **WHEN** another download is submitted
+- **THEN** the second download resolves, searches, and downloads to its own outcome while the
   first is still transferring
 
 #### Scenario: The outcome still lands after the watch settles
 
-- **GIVEN** an acquisition whose download is being observed asynchronously
+- **GIVEN** a download whose download is being observed asynchronously
 - **WHEN** the last of its transfers settles
-- **THEN** the acquisition receives a single candidate-level outcome and proceeds through the
+- **THEN** the download receives a single candidate-level outcome and proceeds through the
   normal decision path
 
 ### Requirement: Aborting an in-flight download takes effect promptly

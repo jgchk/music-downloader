@@ -41,9 +41,7 @@ const KNOWN_PHASE_TABLE: Record<DownloadPhase, true> = {
   MetadataFailed: true,
   Conflicted: true,
 };
-const KNOWN_PHASES: readonly DownloadPhase[] = Object.keys(
-  KNOWN_PHASE_TABLE,
-) as DownloadPhase[];
+const KNOWN_PHASES: readonly DownloadPhase[] = Object.keys(KNOWN_PHASE_TABLE) as DownloadPhase[];
 
 /** Exhaustive over the effect union, for the same reason as {@link KNOWN_PHASE_TABLE}. */
 const KNOWN_EFFECT_TABLE: Record<Effect['type'], true> = {

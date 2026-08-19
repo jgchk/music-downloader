@@ -129,9 +129,7 @@ describe('projectStatus — lifecycle history coverage', () => {
   it('a fresh download already has a requested entry carrying the request as given', () => {
     const view = projectStatus(
       'acq-1',
-      stored([
-        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
-      ]),
+      stored([{ type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() }]),
     );
     expect(view.history).toEqual([{ kind: 'requested', request: sampleRequest, at: 't' }]);
   });
@@ -330,9 +328,7 @@ describe('projectStatus — target description', () => {
   it('is absent before any target is known for a musicbrainz request', () => {
     const view = projectStatus(
       'acq-1',
-      stored([
-        { type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() },
-      ]),
+      stored([{ type: 'DownloadRequested', request: sampleRequest, policies: defaultPolicies() }]),
     );
     expect(view.target).toBeUndefined();
   });

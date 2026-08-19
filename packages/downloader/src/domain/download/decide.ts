@@ -8,12 +8,7 @@ import type { RankedCandidate } from '../ranking/ranking.js';
 import type { DownloadCommand, DownloadCommandType } from './commands.js';
 import type { DownloadEvent, DownloadedFile } from './events.js';
 import { isTerminal } from './state.js';
-import type {
-  DownloadPhase,
-  DownloadState,
-  DownloadingState,
-  ValidatingState,
-} from './state.js';
+import type { DownloadPhase, DownloadState, DownloadingState, ValidatingState } from './state.js';
 
 /**
  * `decide` is the brain (D2): a pure function that, given a command and the current state,

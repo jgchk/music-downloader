@@ -188,12 +188,16 @@ describe('ImportStatusProjection', () => {
   it('indexes acquisition-sourced requests and forgets them on rebuild', () => {
     const projection = new ImportStatusProjection();
     projection.apply(
-      storedAll('imp-a', [requested({ source: { acquisitionId: toOriginatingDownloadId('acq-1') } })])[0]!,
+      storedAll('imp-a', [
+        requested({ source: { acquisitionId: toOriginatingDownloadId('acq-1') } }),
+      ])[0]!,
     );
     projection.apply(storedAll('imp-b', [requested()], 10)[0]!);
 
     expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-1'))).toBe('imp-a');
-    expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-unknown'))).toBeUndefined();
+    expect(
+      projection.importIdForAcquisition(toOriginatingDownloadId('acq-unknown')),
+    ).toBeUndefined();
 
     projection.rebuild(storedAll('imp-b', [requested()]));
     expect(projection.importIdForAcquisition(toOriginatingDownloadId('acq-1'))).toBeUndefined();

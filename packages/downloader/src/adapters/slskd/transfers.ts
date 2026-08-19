@@ -213,10 +213,7 @@ function escapeRegExp(value: string): string {
  * and `transfer-vocabulary.json` records that `Completed, Cancelled` is the one disposition slskd
  * 0.22.5 keeps distinct. So the structured signal is both safer and sufficient.
  */
-export function reasonFromTransfer(
-  transfer: SlskdTransfer,
-  username: string,
-): TryFailureReason {
+export function reasonFromTransfer(transfer: SlskdTransfer, username: string): TryFailureReason {
   const state = stateOf(transfer);
   if (state.toLowerCase().includes('cancel')) return 'Cancelled';
   // The exception is peer-adjacent too — slskd wraps other failures as "…from user <name>: …" — so
@@ -247,10 +244,7 @@ export function reasonFromTransfer(
  * "slskd says this peer is bad" — a separate change; see the contract tier's
  * `answers every enqueue failure with a 500` test, which pins the evidence.
  */
-export function recogniseRejection(
-  body: string,
-  username: string,
-): TryFailureReason | undefined {
+export function recogniseRejection(body: string, username: string): TryFailureReason | undefined {
   // For diagnostics only. `TransferError` is both a real classification and the catch-all, so a
   // caller that just wants to know "did slskd's body say anything we understand?" cannot learn it
   // from {@link enqueueRejectionReason} — an unrecognised body and a genuine generic error are the

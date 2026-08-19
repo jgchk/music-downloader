@@ -29,10 +29,7 @@ import { Reactor } from '../application/download/reactor.js';
 import { DEFAULT_RETRY_POLICY } from '../application/download/retry-policy.js';
 import type { RetryPolicy } from '../application/download/retry-policy.js';
 import { SourceResourceSweep } from '../application/download/sweep.js';
-import type {
-  EffectPorts,
-  InterpreterDependencies,
-} from '../application/download/interpreter.js';
+import type { EffectPorts, InterpreterDependencies } from '../application/download/interpreter.js';
 import { deliverDownloadOutcome } from '../application/download/download-outcome-consumer.js';
 import type { TransferObserverPort } from '../application/ports/outbound-ports.js';
 import type { UseCaseDependencies } from '../application/download/use-cases.js';

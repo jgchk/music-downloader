@@ -7,13 +7,13 @@ Define the importer module's producer-owned outbound event contract — release 
 ## Requirements
 ### Requirement: Release verdicts are published as events in the importer's own store
 
-Adopted from the music-importer repo's `outbound-events` capability, renamed `importer-outbound-events` on adoption (name collision with the downloader module's capability). The webhook transport is replaced by the cross-module seam: the importer module SHALL record each `release.verdict` as an event in its own event store, which the downloader module consumes via the durable catch-up subscription (see `cross-module-delivery`) — at-least-once, in recorded order, with the consumer's checkpoint holding delivery across crashes and restarts so a verdict is never lost. The payload SHALL carry the originating acquisition id, the delivered copy's identity (payload field `candidate`), the rejected verdict, and the reviewer's reasons. The published payload SHALL NOT carry the importer's internal resolution verb; renaming that verb SHALL NOT change the payload or its schema, so no consumer is affected. Redelivery of an already-consumed verdict SHALL converge as a no-op on the consumer side.
+Adopted from the music-importer repo's `outbound-events` capability, renamed `importer-outbound-events` on adoption (name collision with the downloader module's capability). The webhook transport is replaced by the cross-module seam: the importer module SHALL record each `release.verdict` as an event in its own event store, which the downloader module consumes via the durable catch-up subscription (see `cross-module-delivery`) — at-least-once, in recorded order, with the consumer's checkpoint holding delivery across crashes and restarts so a verdict is never lost. The payload SHALL carry the originating download id, the delivered copy's identity (payload field `candidate`), the rejected verdict, and the reviewer's reasons. The published payload SHALL NOT carry the importer's internal resolution verb; renaming that verb SHALL NOT change the payload or its schema, so no consumer is affected. Redelivery of an already-consumed verdict SHALL converge as a no-op on the consumer side.
 
 #### Scenario: A recorded verdict reaches the downloader module
 
 - **GIVEN** a review resolved with reject-unusable-delivery
 - **WHEN** the downloader module's subscription consumes the recorded verdict
-- **THEN** it receives the `release.verdict` payload carrying the acquisition id, the delivered copy's identity, and reasons
+- **THEN** it receives the `release.verdict` payload carrying the download id, the delivered copy's identity, and reasons
 
 #### Scenario: Verdicts survive downtime and resume in order
 

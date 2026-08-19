@@ -34,9 +34,7 @@ import type {
 
 type HistoryDto = AcquisitionStatusResponseDto['history'][number];
 
-export function requestToDomain(
-  dto: AcquisitionRequestDto,
-): Result<DownloadRequest, InvalidMbid> {
+export function requestToDomain(dto: AcquisitionRequestDto): Result<DownloadRequest, InvalidMbid> {
   // The wire request mirrors the domain request today, but its id crosses the anti-corruption
   // boundary here: parse it once into an Mbid so the domain only ever holds well-formed ids.
   if (dto.kind === 'descriptor') return ok(dto);
