@@ -1,5 +1,6 @@
 import { OTHER_STORY, STORY, appendMetadata } from '../application/__fixtures__/correlation.js';
-import { fixedClock } from '../application/__fixtures__/fakes.js';
+import { fixedClock, silentLogger } from '../application/__fixtures__/fakes.js';
+import { fakeCatalog } from '../application/__fixtures__/catalog.js';
 import { errAsync, okAsync } from 'neverthrow';
 import { describe, expect, it } from 'vitest';
 import type { EventStorePort } from '../application/ports/event-store-port.js';
@@ -11,6 +12,7 @@ import {
 } from '../domain/download/__fixtures__/download-fixtures.js';
 import { asMbid } from '../domain/shared/__fixtures__/mbid.js';
 import { testWiring } from './__fixtures__/wiring.js';
+import type { UseCaseDependencies } from '../application/acquisition/use-cases.js';
 import type { TestWiring } from './__fixtures__/wiring.js';
 import {
   acquisitionListResultSchema,
@@ -57,10 +59,17 @@ function roundTrip<T>(value: T): T {
   return tripped;
 }
 
+/**
+ * The facade under test, wired with a canned catalog: these specs are about the acquisition verbs,
+ * and a real catalog read would reach the network to prove nothing about them.
+ */
+const facadeUnderTest = (dependencies: UseCaseDependencies) =>
+  createDownloaderFacade(dependencies, { catalog: fakeCatalog(), logger: silentLogger() });
+
 describe('createDownloaderFacade', () => {
   describe('submitAcquisition', () => {
     it('accepts a valid submission and returns the download id', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(true);
@@ -70,7 +79,7 @@ describe('createDownloaderFacade', () => {
     });
 
     it('returns a modeled validation error for schema-invalid input, without throwing', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.submitAcquisition({ request: { kind: 'nonsense' } }, STORY);
 
       expect(result.ok).toBe(false);
@@ -84,7 +93,7 @@ describe('createDownloaderFacade', () => {
     });
 
     it('reports every rejected field in one validation message, not only the first', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.submitAcquisition(
         {
           ...VALID_SUBMIT,
@@ -101,7 +110,7 @@ describe('createDownloaderFacade', () => {
     });
 
     it('rejects a schema-valid but non-UUID MusicBrainz id as a validation error', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.submitAcquisition(
         {
           request: { kind: 'musicbrainz', mbid: 'not-a-uuid', targetType: 'album' },
@@ -122,7 +131,7 @@ describe('createDownloaderFacade', () => {
     });
 
     it('returns InvalidPolicy for a schema-valid but domain-inconsistent policy', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.submitAcquisition(
         {
           ...VALID_SUBMIT,
@@ -137,7 +146,7 @@ describe('createDownloaderFacade', () => {
     it('maps an infrastructure fault to a serializable InfraError value (cause stripped)', async () => {
       const wiring = testWiring();
       wiring.store.failReads = true;
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(false);
@@ -155,7 +164,7 @@ describe('createDownloaderFacade', () => {
         readStream: () => okAsync([]),
         readAll: () => okAsync([]),
       };
-      const facade = createDownloaderFacade({ ...testWiring().deps, store: conflictStore });
+      const facade = facadeUnderTest({ ...testWiring().deps, store: conflictStore });
       const result = await facade.submitAcquisition(VALID_SUBMIT, STORY);
 
       expect(result.ok).toBe(false);
@@ -169,7 +178,7 @@ describe('createDownloaderFacade', () => {
   describe('cancelAcquisition', () => {
     it('maps a cancel-time infrastructure fault to a modeled error value', async () => {
       const wiring = testWiring();
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
 
@@ -185,7 +194,7 @@ describe('createDownloaderFacade', () => {
 
     it('cancels a live download', async () => {
       const wiring = testWiring();
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
 
@@ -200,14 +209,14 @@ describe('createDownloaderFacade', () => {
     });
 
     it('converges as a tolerated no-op for an unknown id (the decider guards)', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.cancelAcquisition({ id: 'acq-unknown' }, STORY);
 
       expect(result).toEqual({ ok: true, value: { acquisitionId: 'acq-unknown' } });
     });
 
     it('rejects invalid input as a modeled validation error', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.cancelAcquisition({ id: '' }, STORY);
 
       expect(result.ok).toBe(false);
@@ -294,7 +303,7 @@ describe('createDownloaderFacade', () => {
     });
 
     it('rejects invalid input as a modeled validation error', async () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = await facade.selectEdition({ id: 'acq-1' }, STORY);
 
       expect(result.ok).toBe(false);
@@ -343,7 +352,7 @@ describe('createDownloaderFacade', () => {
 
     it('returns the status view for a known download', async () => {
       const wiring = testWiring();
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
       wiring.sync();
@@ -358,14 +367,14 @@ describe('createDownloaderFacade', () => {
     });
 
     it('returns NotFound for an unknown download', () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = facade.getAcquisition({ id: 'acq-unknown' });
 
       expect(result).toEqual({ ok: false, error: { kind: 'NotFound' } });
     });
 
     it('rejects invalid input as a modeled validation error', () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = facade.getAcquisition({ id: '' });
 
       expect(result.ok).toBe(false);
@@ -376,7 +385,7 @@ describe('createDownloaderFacade', () => {
   describe('listAcquisitions', () => {
     it('lists acquisitions as a wire-shaped collection', async () => {
       const wiring = testWiring();
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       const submitted = await facade.submitAcquisition(VALID_SUBMIT, STORY);
       if (!submitted.ok) throw new Error('submit failed');
       wiring.sync();
@@ -391,7 +400,7 @@ describe('createDownloaderFacade', () => {
   describe('getAcquisitionProgress', () => {
     it('returns progress when the read model has it', () => {
       const wiring = testWiring();
-      const facade = createDownloaderFacade(wiring.deps);
+      const facade = facadeUnderTest(wiring.deps);
       wiring.progress.update('acq-1', {
         percent: 50,
         bytesTransferred: 5,
@@ -408,14 +417,14 @@ describe('createDownloaderFacade', () => {
     });
 
     it('returns NotFound when no progress exists', () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = facade.getAcquisitionProgress({ id: 'acq-unknown' });
 
       expect(result).toEqual({ ok: false, error: { kind: 'NotFound' } });
     });
 
     it('rejects invalid input as a modeled validation error', () => {
-      const facade = createDownloaderFacade(testWiring().deps);
+      const facade = facadeUnderTest(testWiring().deps);
       const result = facade.getAcquisitionProgress({ id: '' });
 
       expect(result.ok).toBe(false);

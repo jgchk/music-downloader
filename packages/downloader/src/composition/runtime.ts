@@ -49,8 +49,10 @@ import type { SeamFeed } from '../application/events/catch-up-subscription.js';
 import { OutboundFeed } from '../application/events/outbound-feed.js';
 import { publishedEventMapping } from '../interfaces/contracts/events/mapping.js';
 import { verdictEventConsumer } from '../interfaces/events/verdict-consumer.js';
+import { MusicBrainzCatalogSearch } from '../adapters/musicbrainz/catalog-search.js';
 import { createDownloaderFacade } from '../facade/index.js';
 import type { DownloaderFacade } from '../facade/index.js';
+import type { CatalogSearchPort } from '../application/ports/catalog-search-port.js';
 
 // The module's log-redaction defaults, exposed on the runtime surface: the composed process
 // constructs the ONE pino root both runtimes share, so redaction must be composed there — a
@@ -90,6 +92,8 @@ export interface DownloaderRuntimeOverrides {
    */
   readonly ports?: (observer: TransferObserverPort) => EffectPorts;
   readonly clock?: Clock;
+  /** Test seam: swap the catalog the search reads ask, so no test reaches MusicBrainz. */
+  readonly catalog?: CatalogSearchPort;
   readonly ids?: IdGenerator;
   readonly correlation?: CorrelationSource;
   /** Test seam: swap the dead-letter store (e.g. to prove boot survives its faults). */
@@ -348,7 +352,16 @@ export async function createDownloaderRuntime(
     progress: progressModel,
     stalled: stalledModel,
   };
-  const facade = createDownloaderFacade(dependencies);
+  // The catalog is a READ dependency of the facade, not an effect the reactor dispatches, so it is
+  // constructed here and handed straight to the facade rather than joining the effect ports.
+  const catalog =
+    overrides.catalog ??
+    new MusicBrainzCatalogSearch(
+      fetchHttpClient,
+      { baseUrl: config.musicbrainz.baseUrl, userAgent: config.musicbrainz.userAgent },
+      clock,
+    );
+  const facade = createDownloaderFacade(dependencies, { catalog, logger });
   const feed = new OutboundFeed(store, publishedEventMapping);
   const wakeups: SeamWakeups = {
     subscribe: (listener) => bus.subscribe(() => listener()),
