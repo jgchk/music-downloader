@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@ninoseki/eslint-plugin-neverthrow':
-        specifier: 0.2.0
-        version: 0.2.0(eslint@10.8.1(supports-color@7.2.0))(typescript@6.0.3)
+        specifier: 0.3.1
+        version: 0.3.1(@typescript-eslint/parser@8.67.0(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       '@stryker-mutator/api':
         specifier: 10.0.0
         version: 10.0.0
@@ -792,10 +792,13 @@ packages:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
 
-  '@ninoseki/eslint-plugin-neverthrow@0.2.0':
-    resolution: {integrity: sha512-2QBatGYQO8DX1vc0CoHdm5xww55D3eq0vWEcr+qnQYmWzpMHxqVR7YNHdk4x8ye4rW6hOVSO+vJxJB0CstiSXg==}
+  '@ninoseki/eslint-plugin-neverthrow@0.3.1':
+    resolution: {integrity: sha512-ctHOhIL+yp03866iA6Is4jTVoa5bM8CgB1E78yVTxbk2X9fI+yg/HwZ5h4GL7HG3CRaYtfMYHaX535qQptS5NQ==}
+    engines: {node: '>=24'}
     peerDependencies:
+      '@typescript-eslint/parser': '>=8.0.0'
       eslint: '>=10.0.3'
+      typescript: '>=4.8.4'
 
   '@oxc-project/types@0.144.0':
     resolution: {integrity: sha512-nuhZIOLuI6TFQ32I/WnUx+SCPY7SdSKwgnFHydAuoS1+Z4BRcaP+RRJmGzl9lw+0OFF7UmaESf7KQRXaNLHypg==}
@@ -3125,17 +3128,8 @@ packages:
   tsconfig-paths@3.15.0:
     resolution: {integrity: sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg==}
 
-  tslib@1.14.1:
-    resolution: {integrity: sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==}
-
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
-
-  tsutils@3.21.0:
-    resolution: {integrity: sha512-mHKK3iUXL+3UF6xL5k0PEhKRUBKPBCv/+RkEOpjRWxxx27KKRBmmA60A9pgOUvMi8GKhRMPEmjBRPzs2W7O1OA==}
-    engines: {node: '>= 6'}
-    peerDependencies:
-      typescript: '>=2.8.0 || >= 3.2.0-dev || >= 3.3.0-dev || >= 3.4.0-dev || >= 3.5.0-dev || >= 3.6.0-dev || >= 3.6.0-beta || >= 3.7.0-dev || >= 3.7.0-beta'
 
   tsx@4.23.12:
     resolution: {integrity: sha512-FDf4L4sYzKtzWYhU/Xm0AQFdTjdIxNo9ElTf2mxXM6k8YMHXzYUe4yODVaXP4V9uMFbVg8c0qyBccK2OOxb45Q==}
@@ -3937,12 +3931,14 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@ninoseki/eslint-plugin-neverthrow@0.2.0(eslint@10.8.1(supports-color@7.2.0))(typescript@6.0.3)':
+  '@ninoseki/eslint-plugin-neverthrow@0.3.1(@typescript-eslint/parser@8.67.0(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
+      '@typescript-eslint/parser': 8.67.0(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.67.0(eslint@10.8.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       eslint: 10.8.1(supports-color@7.2.0)
-      tsutils: 3.21.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
-      - typescript
+      - supports-color
 
   '@oxc-project/types@0.144.0': {}
 
@@ -6370,14 +6366,7 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
-  tslib@1.14.1: {}
-
   tslib@2.8.1: {}
-
-  tsutils@3.21.0(typescript@6.0.3):
-    dependencies:
-      tslib: 1.14.1
-      typescript: 6.0.3
 
   tsx@4.23.12:
     dependencies:

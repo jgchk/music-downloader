@@ -31,7 +31,7 @@
     "dev": "pnpm --dir packages/web dev"
   },
   "devDependencies": {
-    "@ninoseki/eslint-plugin-neverthrow": "0.2.0",
+    "@ninoseki/eslint-plugin-neverthrow": "0.3.1",
     "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
