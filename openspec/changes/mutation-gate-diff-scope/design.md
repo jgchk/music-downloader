@@ -505,3 +505,183 @@ subprocess.
   the sample is uninformative rather than that the rate is zero — collect until the shadow verdict
   has fired at least a handful of times. This can be settled with the data in hand and does not
   change the specs, the approach, or the task breakdown.
+
+## The measurement (task 5.1): a replay backtest over eight merged PRs
+
+### What this is, and what it is not
+
+No live PR touched `packages/*/src` while the shadow gate was wired, so the verdict step has still
+never executed in CI (task 3.2's note stands). The measurement below is a **replay backtest**: for
+each PR, its head commit was checked out, the changed production files were resolved against its own
+merge-base by re-running the job's `scope` step verbatim, Stryker was run scoped to exactly those
+files, and **today's** `verdict.ts` was applied to that report plus that PR's
+`git diff -U0 --no-prefix --diff-filter=ACMR` output. The inputs are real diffs, real code, real
+tests and real Stryker reports.
+
+It is **not** live shadow observation, and three limits follow. The workflow wiring — `RUNNER_TEMP`,
+the step outputs, the env — is still unexercised, because the replay called the modules directly.
+Author behaviour is unobservable: this grades whether a finding *could* have been closed, not what a
+contributor actually did when shown it. And the sample is retrospective, so it cannot show the loop
+learning to appease a gate it knows is blocking — the failure mode the ten-percent bar exists to
+prevent is precisely the one a backtest cannot see.
+
+### Scope resolution, including the PRs that resolve to nothing
+
+Ten recently merged PRs were considered. Two resolve an **empty scope** by design and were skipped,
+not silently dropped: **#151** (`feat(web)`) touches only `packages/web`, which
+`stryker.config.mjs` excludes; **#157** (`test(properties)`) touches only test files, which the
+scope step's `.test.ts` filter removes. Both would skip the Stryker, summary and verdict steps
+exactly as #166 did.
+
+**Four replays required a graft, and it is declared.** StrykerJS entered the repo in **#161**, so
+#154, #156, #158 and #159 predate every part of the gate: at their head commits there is no
+`stryker.config.mjs`, no `vitest.mutation.config.ts` and no Stryker in the lockfile, and
+`pnpm install --frozen-lockfile` at those commits removes the runner outright. Each was replayed
+with the **commit's own production code and its own tests**, over main's dependency set and main's
+Stryker configuration — the only counterfactual available, since the thing being measured did not
+exist then. The lockfile drift is almost entirely additive (1096–1302 inserted lines against 4–39
+deleted, and the deletions are reflow rather than downgrades), and Stryker's own initial test run is
+the validity guard: it aborts and writes no report if the commit's tests do not pass against the
+grafted dependencies. All four produced reports, so all four had a green baseline. **No replay was
+excluded**; where a graft was used it is marked in the table.
+
+### Per-PR results
+
+`survivors` is what the file-wide reporting scope reported; `findings` is what the changed-line
+failure scope would have blocked on, after per-line folding.
+
+| PR | what it was | files | mutants | survivors | findings | actionable | non-actionable | Stryker |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| #154 † | `test(e2e)+fix(importer)` revival loop | 12 | 1294 | 113 | 6 | 2 | 4 | 42s |
+| #156 † | `fix(slskd)` failure vocabulary | 3 | 380 | 31 | 4 | 2 | 2 | 31s |
+| #158 † | `fix` close the enforcement gaps | 7 | 620 | 76 | 11 | 2 | 9 | 42s |
+| #159 † | `chore(quality)` strictest lint tier | 15 | 1554 | 134 | **0** | 0 | 0 | 111s |
+| #161 | `chore(mutation)` adopt StrykerJS | 2 | 394 | 13 | 1 | 0 | 1 | 39s |
+| #162 | `feat` end-to-end correlation | 51 | 2965 | 259 | 48 | 18 | 30 | 116s |
+| #163 | `test(mutation)` burn down 464 → 19 | 36 | 4264 | 27 | 1 | 0 | 1 | 208s |
+| #165 | `fix(musicbrainz)` uncomparable title | 4 | 497 | 1 | **0** | 0 | 0 | 25s |
+| **Total** | | | **11 968** | **654** | **71** | **24** | **47** | |
+
+† replayed with the dependency/config graft described above.
+
+**Effective false positives: 47 of 71 findings — 66.2%.** The bar in `quality-gates.md` is under
+ten percent. This is not near the bar; it is more than six times it.
+
+The result does not hinge on the arguable calls. #162 is the least representative PR in the set (its
+head predates #163's burn-down, so it landed on a codebase carrying ~464 survivors), and removing it
+entirely makes the rate **worse**: 17 of 23, or 73.9%. Flipping every finding either agent marked
+"arguable" to actionable still leaves the rate far above ten. There is no reading of this data that
+clears the gate.
+
+Two rows are worth reading for what the design got *right*. #159 and #165 name **zero** findings
+while their reports carry 134 and 1 survivors respectively — the changed-line scope is doing exactly
+the job D1 designed it for, refusing to fail a branch for debt it did not create. The problem is not
+that the failure scope is too wide. It is what remains inside it.
+
+### What the false positives actually are
+
+Four families account for all 47, and they differ sharply in whether anything can be done about them.
+
+- **Arid-adjacent control flow (the largest family).** The `arid-logging` ignorer retires mutants
+  *inside* a `logger.*()` call, but not the `if` that decides whether the call happens, not a block
+  whose entire body is one log statement, and not a call through an injected `warn` sink rather than
+  a literal `logger.*`. So `if (result.isErr()) logger.warn(…)` yields two surviving
+  `ConditionalExpression` mutants whose only observable difference is a log line, and a
+  `catch (error) { scope.logger.warn(…) }` yields a `BlockStatement` survivor with the same
+  property. The same shape produces the six `bestEffort(…, 'record search')` label strings in #158,
+  which reach nothing but a log template. The only available fixes are a fiction test asserting a
+  log call or a suppression comment — the appeasement the admission contract exists to prevent.
+  **Fixable, in the ignorer plugin**, and this is the single highest-value remedy available.
+- **Span-overlap attribution over pre-existing debt.** A `BlockStatement` mutant spans its whole
+  block, and `isOnChangedLine` is deliberately overlap rather than containment (D2, and rightly so —
+  containment silently drops the whole-block family). The consequence is that touching *one* line
+  inside a block makes the block's pre-existing gap this branch's finding. #162's
+  `this.logger` → `scope.logger` sweep did this across dozens of blocks: the reactor's
+  `if (stream.isErr()) { … }` at line 248 is flagged because line 249's logger receiver was renamed.
+  This is D1's "fails a branch for debt it did not create" arriving through the mechanism D1 chose.
+  **Partly fixable in the verdict**, but only by trading away the whole-block detection D2 bought;
+  requiring the mutant's *start* line to be a changed line is the cheap approximation.
+- **Known equivalents the repo has already triaged.** #161's and #163's single findings are both
+  from the seventeen "equivalent, waiver withheld" rows in `mutation-gate`'s design — indeed #163's
+  finding *is* the row `downloader/domain/shared/duration.ts:25`, `actualMs !== undefined`, whose
+  guarded comparison is NaN-safe either way. These lines are known-false and deliberately
+  un-waivable: `Stryker disable next-line` keys on (line, mutator), and each of these lines also
+  carries a killable mutant of the same mutator, so the waiver would silence a real finding. Any
+  branch touching one of those seventeen lines blocks on a finding with **no fix that is not worse
+  than the original code** — the quality-gates definition of an effective false positive, in as many
+  words. **Not fixable** without upstream per-node suppression.
+- **Composition roots the mutation suite cannot reach.** `vitest.mutation.config.ts` is the unit and
+  contract tiers only; the tier that exercises real wiring is the excluded E2E one. So
+  `ports = { … }` → `{}` in a composition root survives structurally, not for want of a test anyone
+  would write. The spec forbids excluding these directories, which is defensible, but the effect is
+  a standing supply of unkillable findings. **Fixable only by changing which tiers the mutation run
+  executes.**
+
+The genuine findings, for balance, cluster just as tightly and are worth acting on independently of
+the gate: a newly exported `isCycleStart` predicate with no direct test, a new `parseMetadata`
+exercised everywhere and asserted nowhere, the beets bridge's `argv` unpinned, and
+`state.ts`'s watermark fold where both `Math.max` → `Math.min` and the `incoming === undefined`
+guard survive.
+
+### The three predicted false-positive sources, priced
+
+The section above this one predicted three. Two are now measured and one was never reached.
+
+1. **A pure rename gates the whole moved file — CONFIRMED, and it is worse than "the diff is
+   restricted".** Measured twice. Against a real historical rename (`4ffc213b`,
+   `interfaces/contracts/schemas.ts` → `facade/schemas.ts`), cutting the diff with the pathspec the
+   job uses defeats git's rename pairing and emits the destination as `new file mode 100644` with a
+   single hunk `@@ -0,0 +1,188 @@`. Then constructed end to end at `main`: renaming
+   `domain/shared/duration.ts` → `track-duration.ts` and repointing its two importers — a branch
+   that changes no behaviour whatsoever — produces `@@ -0,0 +1,28 @@` over the moved file, 145
+   mutants, and **one blocking finding**, which is 100% false by construction. It compounds with the
+   family above: the survivor it named is one of the seventeen known equivalents, so renaming any
+   file containing one blocks the branch with a finding that cannot be waived. `--no-renames` in
+   `DIFF_FLAGS` is the candidate remedy and is now backed by evidence.
+2. **A scope of only `CompileError` mutants reads as audited — REACHABLE BUT UNOBSERVED.** The hole
+   is confirmed by reading: `CompileError` and `RuntimeError` sit in `DETECTED`, and `auditGap` keys
+   only on `mutants === 0` and `mutants === ignored`, so a scope in which every mutant failed to
+   compile returns `clean` rather than refusing. **No replay hit it**: `CompileError` was zero in
+   every run — the eight PR replays (11 968 mutants), the rename experiment (145), and both reruns.
+   Recorded as unpriced rather than as absent — this is a
+   silent-green hazard (a false *negative*), so it weakens the gate rather than annoying anyone, and
+   it does not enter the false-positive rate either way.
+3. **Rerun stability — MEASURED, and the decision is stable.** #163 and #162 were each replayed
+   twice from the same commit. Both reruns produced the **same verdict kind and the identical set of
+   (file, line) findings** — 1 and 48 respectively — and #163's rendered verdict was byte-identical.
+   Two caveats. #163's underlying counts moved (3841 Killed / 50 Timeout versus 3846 / 45): five
+   mutants flipped between `Killed` and `Timeout`, which is invisible here only because
+   `report-model.ts` counts `Timeout` as detected, and a `Killed` ↔ `Survived` flip on a changed line
+   would have flipped the verdict. And in #162 six rows named a *different representative mutant* on
+   the rerun, because `foldPerLine` keeps the first survivor it meets and Stryker's per-file mutant
+   order is not stable — so an author who fixes "the named mutant" may be shown a different one next
+   run. Cosmetic rather than blocking, but real, and worth fixing by folding on a deterministic key.
+
+### The decision (task 5.2)
+
+**At 66.2% effective false positives against a bar of under ten, the gate does not earn a blocking
+seat. `MUTATION_GATE_ENFORCE` stays absent and the verdict stays in shadow.** `mutation-gate` 4.1a
+and 4.1b are **not** handed off; neither the workflow switch nor the branch ruleset should be
+touched, and they must continue to move together whenever they do move.
+
+This is the outcome `quality-gates.md` names explicitly: *"A check can be worth running once without
+earning a seat."* The run was worth it. It produced 24 genuine, specific test gaps that no other
+instrument in this repo surfaces, and it did so on changed lines only — #159 and #165 show the
+scoping is sound. Keeping it as a published, non-blocking summary is the honest deployment for a
+check whose findings are two-thirds noise.
+
+What would have to change before this is worth re-measuring, in the order the evidence supports:
+
+1. **Extend the `arid-logging` ignorer** to cover a branch or block whose only effect is a log call,
+   and calls through injected `warn`/`error` sinks. This is the largest family and the cleanest fix,
+   and it lands in a plugin that already exists for exactly this purpose.
+2. **Add `--no-renames` to `DIFF_FLAGS`**, which removes an entire class of 100%-false blocking runs
+   for a one-word change, now that the cost is measured rather than assumed.
+3. **Decide the span-overlap trade** deliberately: require a mutant's start line to be a changed
+   line, accepting the loss of some whole-block detection, or keep overlap and accept the
+   attribution noise. This is a real trade-off and should not be made by default.
+4. **Close the `CompileError` audit gap** — a fourth refusal keyed on mutants actually *tested*.
+   Unobserved, but it is a silent green, which is the failure mode this design fears most.
+5. Only then re-run this measurement, on **live** PRs rather than a backtest, and preferably after
+   the seventeen known equivalents have a real answer — because until they do, every branch that
+   touches one of those lines blocks on a finding nobody can fix.
